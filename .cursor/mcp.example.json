@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "agentmemory-mcp": {
+      "command": "npx",
+      "args": ["-y", "@agentmemory/mcp"],
+      "env": {
+        "AGENTMEMORY_URL": "http://localhost:3111",
+        "AGENTMEMORY_VIEWER_URL": "http://localhost:3113"
+      }
+    },
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": ["serve", "--mcp", "--path", "/absolute/path/to/harness-eso"],
+      "env": {
+        "CODEGRAPH_ALLOW_UNSAFE_NODE": "1"
+      }
+    },
+    "docgraph": {
+      "command": "bun",
+      "args": ["run", "/absolute/path/to/harness-eso/.cursor/mcp/docgraph-mcp.mjs"],
+      "env": {
+        "DOCGRAPH_REPO": "/absolute/path/to/x79",
+        "DOCGRAPH_HARNESS": "cursor"
+      }
+    },
+    "deepseek-direct": {
+      "command": "bun",
+      "args": ["run", "/path/to/.gemini/antigravity/deepseek_direct.js"],
+      "env": {
+        "DEEPSEEK_ENV_FILE": "/path/to/.gemini/antigravity/deepseek.env"
+      }
+    }
+  }
+}
