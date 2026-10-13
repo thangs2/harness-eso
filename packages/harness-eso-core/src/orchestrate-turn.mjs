@@ -1,0 +1,76 @@
+import { decide } from '@mu/harness-decision';
+import { findRepoRoot, isoNow } from '@mu/harness-foundation/pure';
+import { runCollect } from './collect.mjs';
+import { buildTurnVerdict } from './gate.mjs';
+import { loadEsoPolicy, resolveEsoPolicy } from './eso-policy.mjs';
+import { loadHarnessProfile } from './profile-load.mjs';
+
+/**
+ * DPEF v2 — Collect → Gate (Act is host-side).
+ * @param {object} event
+ * @param {{ phase?: 'preflight' | 'full', cfg?: object, policy?: object, profileId?: string, decideFn?: typeof decide, waiver?: object, injectSnippets?: object[], reads?: object }} [options]
+ */
+export async function orchestrateTurn(event, options = {}) {
+    const phase = options.phase ?? 'preflight';
+    if (process.env.HARNESS_ESO === '0' && !options.policy) {
+        return { skipped: true, reason: 'eso_disabled' };
+    }
+
+    const profileLoad = options.policy
+        ? { policy: options.policy }
+        : loadHarnessProfile(options.profileId ?? 'generic-eso', options.cfg);
+    const policy = profileLoad.policy;
+    const eso = resolveEsoPolicy(policy);
+
+    if (!eso.enabled) {
+        return { skipped: true, reason: 'eso_disabled' };
+    }
+    if (phase === 'preflight' && eso.preflight?.enabled === false) {
+        return { skipped: true, reason: 'preflight_disabled' };
+    }
+
+    const requestId = event.turnId || event.requestId || event.sessionId || 'unknown';
+    const stem = String(event.userQueryStem || '').trim();
+    const root = options.cfg?.root || findRepoRoot() || process.cwd();
+    const decideFn = options.decideFn || decide;
+
+    const facade = await decideFn(
+        { ...event, event: event.event ?? 'turn_start' },
+        { ...options, policy, writeLedger: false },
+    );
+
+    const surface = { bucket: facade.route?.bucket ?? facade.l0?.winner?.bucket ?? 'general' };
+    const collected = await runCollect(event, {
+        policy,
+        eso,
+        surface,
+        stem,
+        root,
+        reads: options.reads,
+        injectSnippets: options.injectSnippets,
+    });
+
+    const verdict = buildTurnVerdict({
+        requestId,
+        phase,
+        measure: collected.measure,
+        gaps: collected.gaps,
+        eso,
+        stem,
+        waiver: options.waiver,
+    });
+
+    return {
+        skipped: false,
+        at: isoNow(),
+        phase,
+        facade,
+        pack: collected.pack,
+        retrieval: collected.retrieval,
+        gaps: collected.gaps,
+        measure: collected.measure,
+        verdict,
+    };
+}
+
+export { loadEsoPolicy };

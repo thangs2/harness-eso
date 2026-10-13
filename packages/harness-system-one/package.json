@@ -1,0 +1,16 @@
+{
+    "name": "@mu/harness-system-one",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "TypeSafe System One (Jev) HTTP client + resolver",
+    "exports": {
+        ".": "./src/index.mjs"
+    },
+    "files": [
+        "src"
+    ],
+    "dependencies": {
+        "@mu/harness-foundation": "0.1.0"
+    }
+}

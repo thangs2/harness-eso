@@ -1,0 +1,18 @@
+{
+    "name": "@mu/harness-foundation",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Repo anchor, .harness paths, decision-policy load",
+    "exports": {
+        ".": "./src/index.mjs",
+        "./pure": "./src/pure.mjs",
+        "./workspace": "./src/workspace-store.mjs",
+        "./project-registry": "./src/project-registry.mjs",
+        "./host-install": "./src/host-install.mjs",
+        "./init-profile": "./src/init-profile.mjs"
+    },
+    "files": [
+        "src"
+    ]
+}

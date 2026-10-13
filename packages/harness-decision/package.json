@@ -1,0 +1,17 @@
+{
+    "name": "@mu/harness-decision",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Agent decision facade — L0–L3 (Jev wired in W3)",
+    "exports": {
+        ".": "./src/index.mjs"
+    },
+    "files": [
+        "src"
+    ],
+    "dependencies": {
+        "@mu/harness-foundation": "0.1.0",
+        "@mu/harness-system-one": "0.1.0"
+    }
+}
