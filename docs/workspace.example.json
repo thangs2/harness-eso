@@ -1,0 +1,13 @@
+{
+    "version": 1,
+    "defaultProjectId": "x79",
+    "projects": [
+        {
+            "id": "x79",
+            "displayName": "x79",
+            "root": "/absolute/path/to/x79",
+            "port": 8792,
+            "profile": "generic-eso"
+        }
+    ]
+}
