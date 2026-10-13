@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
+cmd="${1:-}"
+if [[ -z "$cmd" ]]; then
+    echo "usage: ./harness console|init profile <path>|host-pack|up|down|restart|status|health|logs"
+    exit 2
+fi
+
+case "$cmd" in
+    console)
+        shift || true
+        exec ./docker/console.sh "${1:-up}" "${@:2}"
+        ;;
+    init)
+        shift
+        exec node packages/harness-cli/src/cli.mjs init "$@"
+        ;;
+    observatory)
+        shift
+        exec node packages/harness-cli/src/cli.mjs observatory "$@"
+        ;;
+    host-pack)
+        shift
+        exec node packages/harness-cli/src/cli.mjs host-pack "$@"
+        ;;
+    up)
+        node packages/harness-cli/src/cli.mjs observatory up
+        port="${HARNESS_OBSERVE_PORT:-8792}"
+        echo ""
+        echo "Monitor (Observatory): http://127.0.0.1:${port}/"
+        echo "Quản lý dự án (Console):   http://127.0.0.1:8791/"
+        ;;
+    down) node packages/harness-cli/src/cli.mjs observatory down ;;
+    restart) node packages/harness-cli/src/cli.mjs observatory restart ;;
+    status) node packages/harness-cli/src/cli.mjs observatory status ;;
+    health) node packages/harness-cli/src/cli.mjs observatory health ;;
+    logs) node packages/harness-cli/src/cli.mjs observatory logs ;;
+    -h|--help|help)
+        echo "usage:"
+        echo "  ./harness init profile <consumer-path>  # sole way to write harness files on consumer (e.g. x79)"
+        echo "  ./harness console   # Docker wizard — cổng 8791 (console.sh up)"
+        echo "  ./harness up        # Docker monitor — cổng 8792"
+        echo "  ./harness observatory up --project <id>  # same, scoped project"
+        echo "  ./harness host-pack status|refresh|add-ide|remove-ide [consumer]  # consumer hook pack"
+        ;;
+    *)
+        echo "unknown: $cmd" >&2
+        exit 2
+        ;;
+esac

@@ -1,0 +1,25 @@
+name: harness-eso-ci
+on:
+    push:
+        branches: [main, master]
+    pull_request:
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1.3.14"
+            - run: bun install
+            # The pack is a build output, so CI must produce it before `qc/host-pack.test.mjs`
+            # can assert on it (the test builds it too, but a CI failure should point at the
+            # build step when the bundle is broken).
+            - run: bun run build:host-pack
+            - run: bun test
+            # Both SPAs are typechecked here, not just built: `build` runs `tsc --noEmit` first, so
+            # a type error in either UI fails CI. Without the console step, a change to its pages or
+            # API types could be broken and CI would stay green.
+            - run: bun run build:console
+            - run: bun run build:observatory
+            - run: bun run test:observatory

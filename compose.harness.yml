@@ -1,0 +1,49 @@
+# Observe plane — một cổng :8792 (API + Observatory + cấu hình Projects).
+services:
+    observe-server:
+        build:
+            context: .
+            dockerfile: docker/observatory.Dockerfile
+        image: mu/harness-observe:local
+        ports:
+            - "${HARNESS_OBSERVE_PORT:-8792}:8792"
+        environment:
+            HARNESS_SERVER_HOST: "0.0.0.0"
+            # SQLite + writable observe state (not on consumer bind mount)
+            HARNESS_DATA_ROOT: /data/observe
+            HARNESS_PRODUCT_STATE_DIR: /data/product-state
+            HARNESS_PROFILES_DIR: /app/profiles
+            HARNESS_AGENT_ROOT_HOST: ${HARNESS_AGENT_ROOT:?Set HARNESS_AGENT_ROOT (e.g. $HOME/Workspaces)}
+            HARNESS_AGENT_MOUNT: /agent-repos
+            HARNESS_CURSOR_MOUNT: /host-cursor
+            HARNESS_REPO_ROOT_HOST: ${HARNESS_REPO_ROOT:?Set HARNESS_REPO_ROOT}
+        volumes:
+            # Consumer repo — read-only. This is the only path that identifies a project.
+            - ${HARNESS_REPO_ROOT:?Set HARNESS_REPO_ROOT}:/data/repo:ro
+            - observe-data:/data/observe
+            # Product state lives in the operator's home, NOT in the harness-eso checkout. Mounting
+            # the checkout here is what made the running stack depend on where the source tree is:
+            # `git clean` or moving it took the project registry with it, and a container started
+            # from a deleted directory could not boot at all.
+            - ${HARNESS_PRODUCT_STATE_HOST:-${HOME}/.harness}:/data/product-state
+            - ${HARNESS_AGENT_ROOT}:/agent-repos
+            # Cursor agent transcripts (REQUEST spine) — read-only; see docker/README.md
+            - ${HARNESS_CURSOR_HOME:-${HOME}/.cursor}:/host-cursor:ro
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "bun",
+                    "-e",
+                    "const r=await fetch('http://127.0.0.1:8792/health');if(!r.ok)process.exit(1)",
+                ]
+            interval: 15s
+            timeout: 5s
+            retries: 3
+            start_period: 20s
+        restart: unless-stopped
+
+volumes:
+    observe-data:

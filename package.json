@@ -1,0 +1,42 @@
+{
+    "name": "harness-eso",
+    "private": true,
+    "description": "Harness Evidence Sufficiency Orchestrator — @mu/harness-* monorepo",
+    "type": "module",
+    "workspaces": [
+        "packages/*"
+    ],
+    "scripts": {
+        "install:product": "./install.sh",
+        "harnessctl": "node packages/harness-cli/src/cli.mjs",
+        "test": "bun test packages/harness-foundation/src packages/harness-eso-core/src packages/harness-decision/src packages/harness-system-one/src qc",
+        "test:all": "bun run test && bun run test:observatory",
+        "build:host-pack": "node scripts/build-host-pack.mjs",
+        "bench:ingest": "node scripts/bench-ingest.mjs",
+        "build:console": "bun run --filter @mu/harness-console build",
+        "build:observatory": "bun run --filter @mu/harness-observatory build",
+        "console": "node packages/harness-console-server/src/server.mjs",
+        "test:observatory": "bun run --filter @mu/harness-observatory test",
+        "dev:observatory": "bun run --filter @mu/harness-observatory dev",
+        "observe:server": "node packages/harness-observe-server/src/server.mjs",
+        "dev:observe": "./scripts/dev-observe.sh",
+        "compose:up": "docker compose -f compose.harness.yml up --build",
+        "compose:down": "docker compose -f compose.harness.yml down"
+    },
+    "dependencies": {
+        "@mu/harness-decision": "workspace:*",
+        "@mu/harness-eso-core": "workspace:*",
+        "@mu/harness-foundation": "workspace:*",
+        "@mu/harness-observe-server": "workspace:*",
+        "@mu/harness-system-one": "workspace:*",
+        "@mu/harness-host-generic": "workspace:*"
+    },
+    "engines": {
+        "node": ">=20"
+    },
+    "packageManager": "bun@1.3.14",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/thangs2/harness-eso.git"
+    }
+}

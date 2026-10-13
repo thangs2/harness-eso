@@ -1,0 +1,3 @@
+# Default `bun test` (no paths) = qc only. Full suite: `bun run test`. Observatory: `bun run test:observatory`.
+[test]
+root = "./qc"

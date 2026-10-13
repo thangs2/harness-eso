@@ -1,0 +1,40 @@
+# Harness Console — wizard API + SPA (:8791). Observatory stays on compose.harness.yml (:8792).
+services:
+    console-server:
+        build:
+            context: .
+            dockerfile: docker/console.Dockerfile
+        image: mu/harness-console:local
+        ports:
+            - "${HARNESS_CONSOLE_PORT:-8791}:8791"
+        environment:
+            HARNESS_CONSOLE_HOST: "0.0.0.0"
+            HARNESS_CONSOLE_PORT: "8791"
+            # `/app` is the product INSIDE this image — not the host checkout. Nothing here needs to
+            # know where the source tree lives: the console provisions consumers from the bundled
+            # code it ships with.
+            HARNESS_ESO_ROOT: /app
+            HARNESS_PRODUCT_STATE_DIR: /data/product-state
+            HARNESS_PROFILES_DIR: /app/profiles
+            HARNESS_AGENT_ROOT_HOST: ${HARNESS_AGENT_ROOT:?Set HARNESS_AGENT_ROOT (e.g. $HOME/Workspaces)}
+            HARNESS_AGENT_MOUNT: /agent-repos
+            HARNESS_OBSERVE_HEALTH_BASE: ${HARNESS_OBSERVE_HEALTH_BASE:-http://host.docker.internal:8792}
+        volumes:
+            # Operator state, so the console sees the same projects as the host CLI.
+            - ${HARNESS_PRODUCT_STATE_HOST:-${HOME}/.harness}:/data/product-state
+            - ${HARNESS_AGENT_ROOT}:/agent-repos
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "bun",
+                    "-e",
+                    "const r=await fetch('http://127.0.0.1:8791/health');if(!r.ok)process.exit(1)",
+                ]
+            interval: 15s
+            timeout: 5s
+            retries: 3
+            start_period: 15s
+        restart: unless-stopped
