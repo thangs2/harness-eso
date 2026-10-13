@@ -1,0 +1,149 @@
+{
+    "version": 3,
+    "pipelineIntro": {
+        "diagramId": "v2-abcd",
+        "label": "Xem pipeline Phase A → D"
+    },
+    "groups": [
+        {
+            "id": "collect-adapters",
+            "label": "Nguồn evidence (COLLECT)",
+            "description": "Gắn với Phase B trong pipeline — chọn adapter law · code · memory.",
+            "diagramId": "v2-abcd",
+            "slots": [
+                {
+                    "id": "law",
+                    "label": "Law / tài liệu",
+                    "kind": "law",
+                    "options": [
+                        { "id": "noop-law", "label": "Không dùng" },
+                        {
+                            "id": "docgraph-cli",
+                            "label": "Docgraph CLI",
+                            "default": true,
+                            "hint": "Docgraph trong repo agent (x79).",
+                            "hintDiagram": "v2-abcd"
+                        },
+                        { "id": "custom-law", "label": "Adapter khác…", "custom": true }
+                    ]
+                },
+                {
+                    "id": "code",
+                    "label": "Code / luồng",
+                    "kind": "code",
+                    "options": [
+                        { "id": "noop-code", "label": "Không dùng" },
+                        {
+                            "id": "codegraph-cli",
+                            "label": "Codegraph (CLI / MCP)",
+                            "default": true,
+                            "hint": "MCP x79: project-0-x79-codegraph",
+                            "hintDiagram": "v2-abcd"
+                        },
+                        { "id": "custom-code", "label": "Adapter khác…", "custom": true }
+                    ]
+                },
+                {
+                    "id": "memory",
+                    "label": "Memory / session",
+                    "kind": "memory",
+                    "options": [
+                        { "id": "noop-memory", "label": "Không dùng", "default": true },
+                        {
+                            "id": "agentmemory-mcp",
+                            "label": "Agent memory MCP",
+                            "hint": "MCP x79: project-0-x79-agentmemory — cấu hình Cursor, không key trên Console.",
+                            "hintDiagram": "v2-abcd"
+                        },
+                        { "id": "custom-memory", "label": "Adapter khác…", "custom": true }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "facade-system1",
+            "label": "Quyết định System 1 (Facade)",
+            "description": "Phase A (surface) dùng L0–L3; Phase D có thể gọi L2 Jev evidence.",
+            "diagramId": "v3-layers",
+            "slots": [
+                {
+                    "id": "jev",
+                    "label": "L2 — Jev (TypeSafe)",
+                    "options": [
+                        {
+                            "id": "off",
+                            "label": "Tắt — jev.mode: off",
+                            "mode": "off",
+                            "policyPatch": { "jev": { "mode": "off" } }
+                        },
+                        {
+                            "id": "jev-typesafe-shadow",
+                            "label": "Shadow — audit, không enforce",
+                            "mode": "shadow",
+                            "policyPatch": { "jev": { "mode": "shadow" } },
+                            "hint": "Vị trí L2 trên Facade — xem diagram.",
+                            "hintDiagram": "v3-layers"
+                        },
+                        {
+                            "id": "jev-typesafe-active",
+                            "label": "Active — enforce route & guard",
+                            "mode": "active",
+                            "policyPatch": { "jev": { "mode": "active" } },
+                            "hint": "Cần TypeSafe API key trong typesafe.env.",
+                            "hintDiagram": "v1-coordinates"
+                        }
+                    ],
+                    "secrets": {
+                        "envFile": "installation/typesafe/typesafe.env",
+                        "envVar": "TYPESAFE_API_KEY",
+                        "doc": "https://console.typesafe.ai/keys",
+                        "note": "Secret chỉ trong file env trên repo agent."
+                    }
+                },
+                {
+                    "id": "l3_route",
+                    "label": "L3 — Flash route (tùy chọn)",
+                    "options": [
+                        {
+                            "id": "off",
+                            "label": "Tắt (khuyến nghị x79)",
+                            "default": true,
+                            "policyPatch": { "fallback": { "l3_flash": false } }
+                        },
+                        {
+                            "id": "deepseek-flash-route",
+                            "label": "DeepSeek flash JSON route",
+                            "policyPatch": { "fallback": { "l3_flash": true } },
+                            "hint": "Fallback routing Phase A — không phải Brain executor (L4).",
+                            "hintDiagram": "v3-layers"
+                        },
+                        { "id": "custom-l3", "label": "Adapter khác…", "custom": true }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "system2-brain",
+            "label": "Thực thi System 2 (Brain)",
+            "description": "Sau Phase D khi gate mở — L4 trong diagram.",
+            "diagramId": "v1-coordinates",
+            "slots": [
+                {
+                    "id": "brain",
+                    "label": "Brain provider",
+                    "options": [
+                        {
+                            "id": "deepseek-mcp",
+                            "label": "DeepSeek MCP",
+                            "default": true,
+                            "hint": "L4 — sau A→B→C→D. MCP: project-0-x79-deepseek-direct",
+                            "hintDiagram": "v1-coordinates"
+                        },
+                        { "id": "direct-ide", "label": "IDE default model (direct mode)" },
+                        { "id": "custom-brain", "label": "Provider khác…", "custom": true }
+                    ]
+                }
+            ]
+        }
+    ]
+}

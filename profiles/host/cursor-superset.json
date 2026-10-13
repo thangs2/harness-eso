@@ -1,0 +1,80 @@
+{
+    "id": "cursor-superset",
+    "label": "Cursor \u2014 Promax superset (standalone host pack)",
+    "description": "Guards, routing and preflight run from the bundled host pack \u2014 no checkout, no Docker",
+    "policyPatch": {
+        "eso": {
+            "preflight": {
+                "enabled": true
+            },
+            "mode": "hint",
+            "cognition": {
+                "enforceBrain": "fail_closed",
+                "gapAttestation": true
+            }
+        }
+    },
+    "cursor": {
+        "sessionDir": ".cursor/session",
+        "merge": {
+            "beforeSubmitPrompt": [
+                {
+                    "id": "harness-eso-preflight",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook preflight --tree cursor'",
+                    "failClosed": false
+                },
+                {
+                    "id": "harness-eso-route-trace-prompt",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook route --tree cursor'",
+                    "failClosed": false
+                }
+            ],
+            "beforeShellExecution": [
+                {
+                    "id": "harness-eso-guard-shell",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree cursor'",
+                    "failClosed": true
+                }
+            ],
+            "preToolUse": [
+                {
+                    "id": "harness-eso-guard-brain",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree cursor'",
+                    "matcher": "CallDynamicTool|ask_deepseek",
+                    "failClosed": false
+                }
+            ],
+            "preCompact": [
+                {
+                    "id": "harness-eso-pre-compact-cost",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree cursor'",
+                    "failClosed": false
+                }
+            ],
+            "postToolUse": [
+                {
+                    "id": "harness-eso-gap-tracker",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree cursor'",
+                    "failClosed": false
+                },
+                {
+                    "id": "harness-eso-post-tool-hint",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree cursor'",
+                    "failClosed": false
+                },
+                {
+                    "id": "harness-eso-route-trace",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook route --tree cursor'",
+                    "failClosed": false
+                }
+            ],
+            "stop": [
+                {
+                    "id": "harness-eso-route-trace-stop",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook route --tree cursor'",
+                    "failClosed": false
+                }
+            ]
+        }
+    }
+}

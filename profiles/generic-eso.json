@@ -1,0 +1,21 @@
+{
+    "version": 1,
+    "profile": "generic-eso",
+    "jev": { "mode": "off" },
+    "fallback": { "l3_flash": false },
+    "on_ambiguous": "hil_only",
+    "ledger": { "enabled": true },
+    "eso": {
+        "enabled": true,
+        "mode": "observe",
+        "enforceWrites": "off",
+        "thresholds": { "T_low": 0.45, "T_high": 0.72 },
+        "preflight": { "enabled": true, "maxMs": 8000 },
+        "cognition": { "insufficientPromptGate": "consent" },
+        "sources": {
+            "law": { "adapter": "docgraph-cli", "enabled": true },
+            "code": { "adapter": "codegraph-cli", "enabled": true },
+            "memory": { "adapter": "noop-memory", "enabled": false }
+        }
+    }
+}

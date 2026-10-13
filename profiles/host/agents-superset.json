@@ -1,0 +1,112 @@
+{
+    "id": "agents-superset",
+    "label": "Antigravity — Promax superset (standalone host pack)",
+    "description": "Guards, routing and preflight run from the bundled host pack — no checkout, no Docker",
+    "policyPatch": {
+        "eso": {
+            "preflight": { "enabled": true },
+            "mode": "hint",
+            "cognition": {
+                "enforceBrain": "fail_closed",
+                "gapAttestation": true
+            }
+        }
+    },
+    "agents": {
+        "sessionDir": ".agents/session",
+        "hooksJsonPath": ".agents/hooks.json",
+        "agyMerge": {
+            "harness-eso-preflight": {
+                "PreInvocation": [
+                    {
+                        "type": "command",
+                        "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook preflight --tree agents'"
+                    },
+                    {
+                        "type": "command",
+                        "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree agents'"
+                    }
+                ]
+            },
+            "harness-eso-guard-shell": {
+                "PreToolUse": [
+                    {
+                        "matcher": "run_command",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree agents'"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "harness-eso-guard-brain": {
+                "PreToolUse": [
+                    {
+                        "matcher": "*",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree agents'"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "harness-eso-observe": {
+                "PostToolUse": [
+                    {
+                        "matcher": "*",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree agents'"
+                            },
+                            {
+                                "type": "command",
+                                "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree agents'"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "harness-eso-route": {
+                "PreInvocation": [
+                    {
+                        "type": "command",
+                        "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreInvocation'"
+                    }
+                ],
+                "PreToolUse": [
+                    {
+                        "matcher": "*",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreToolUse'"
+                            }
+                        ]
+                    }
+                ],
+                "PostToolUse": [
+                    {
+                        "matcher": "*",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PostToolUse'"
+                            }
+                        ]
+                    }
+                ],
+                "Stop": [
+                    {
+                        "type": "command",
+                        "command": "bash -lc 'export HARNESS_TREE=agents; exec node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event Stop'"
+                    }
+                ]
+            }
+        }
+    }
+}
