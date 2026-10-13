@@ -1,0 +1,732 @@
+/**
+ * Transcript ingest — the REQUEST spine.
+ *
+ * A Cursor transcript is an append-only JSONL conversation file. It is the only
+ * source that knows where one LLM call ends and the next begins, so it owns two
+ * things and nothing else owns them:
+ *
+ *   request   = one real user prompt (a user line carrying <timestamp> +
+ *               <user_query>). This is the "1 request" the UI lists.
+ *   llm_call  = exactly one `assistant` line. This is the "many calls" under it.
+ *
+ * Everything is derived from line position, never from a running count, so the
+ * same file always yields the same rows. Ingest is incremental: it resumes from
+ * a byte offset, and only advances that offset in the same transaction as the
+ * rows it produced. A truncated or rotated file resets that one conversation.
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { isoNow } from './observe-config.mjs';
+
+const UQ_RE = /<user_query>([\s\S]*?)<\/user_query>/;
+const TS_RE = /<timestamp>([\s\S]*?)<\/timestamp>/;
+
+/** The transcript only has a human timestamp, so parse it best-effort to ISO. */
+/**
+ * Transcript prompt timestamps are wall-clock with an explicit zone annotation:
+ *   "Monday, Oct 12, 2026, 6:00 PM (UTC+7)"
+ *
+ * That annotation is the ONLY zone information in the line, and `Date.parse` ignores it
+ * in favour of the PROCESS timezone. Ingest runs inside the observe container, where TZ
+ * is UTC — so a UTC+7 operator's prompts were recorded 7h in the FUTURE and every
+ * window join built on `started_at` (prompt attachments, stop token windows) silently
+ * matched nothing.
+ *
+ * So: parse the wall clock deterministically as UTC, then apply the annotated offset.
+ * The result no longer depends on where ingest happens to run.
+ */
+/**
+ * Read `length` bytes at `offset` without loading the rest of the file.
+ *
+ * Loops because `readSync` may return short on a file being appended to (which is exactly the case
+ * here — the agent transcript is live). A short read is not an error, just an incomplete window.
+ */
+function readRange(filePath, offset, length) {
+    if (length <= 0) return Buffer.alloc(0);
+    const fd = fs.openSync(filePath, 'r');
+    try {
+        const buf = Buffer.allocUnsafe(length);
+        let read = 0;
+        while (read < length) {
+            const n = fs.readSync(fd, buf, read, length - read, offset + read);
+            if (n <= 0) break;
+            read += n;
+        }
+        return buf.subarray(0, read);
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
+export function parsePromptTs(raw) {
+    if (!raw) return null;
+    const zone = /\(UTC([+-])(\d{1,2})(?::?(\d{2}))?\)/i.exec(String(raw));
+    const cleaned = String(raw).replace(/\(UTC[^)]*\)/i, '').trim();
+    let ms = Date.parse(`${cleaned} UTC`);
+    if (!Number.isFinite(ms)) ms = Date.parse(cleaned);
+    if (!Number.isFinite(ms)) return null;
+    if (zone) {
+        const sign = zone[1] === '-' ? -1 : 1;
+        const offsetMinutes = (Number.parseInt(zone[2], 10) || 0) * 60 + (Number.parseInt(zone[3], 10) || 0);
+        ms -= sign * offsetMinutes * 60_000;
+    }
+    return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function userText(msg) {
+    const content = msg && msg.content;
+    if (!Array.isArray(content)) return '';
+    return content
+        .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
+        .map((b) => b.text)
+        .join('\n');
+}
+
+/**
+ * Shared with `parse-transcript-calls.mjs` so the backfill cannot drift from
+ * ingest — do not fork this formula.
+ *
+ * `emitChars` is EMITTED CHARACTERS, not a provider token count: no layer records
+ * per-call usage (assistant lines carry none, and hooks cover 0.8% of turns), so
+ * the measured size of what the assistant actually emitted is the honest signal.
+ * `textChars` stays a text-only field; the tool_use JSON is ~90% of the bytes.
+ */
+function pushToolUse(names, tools, emitChars, name, input) {
+    tools += 1;
+    if (name) names.push(String(name));
+    if (input !== undefined && input !== null) {
+        try {
+            emitChars += JSON.stringify(input).length;
+        } catch {
+            /* non-serialisable input */
+        }
+    }
+    return { tools, emitChars };
+}
+
+export function assistantStats(msg) {
+    const content = (msg && msg.content) || [];
+    if (!Array.isArray(content)) return { tools: 0, names: [], textChars: 0, emitChars: 0, preview: '' };
+    let tools = 0;
+    let textChars = 0;
+    let emitChars = 0;
+    let preview = '';
+    const names = [];
+    for (const b of content) {
+        if (!b || typeof b !== 'object') continue;
+        if (b.type === 'tool_use') {
+            const part = pushToolUse(names, tools, emitChars, b.name, b.input);
+            tools = part.tools;
+            emitChars = part.emitChars;
+        } else if (b.type === 'function_call' || b.type === 'tool-call' || b.type === 'tool_call') {
+            const part = pushToolUse(
+                names,
+                tools,
+                emitChars,
+                b.name || b.function?.name,
+                b.input ?? b.arguments ?? b.function?.arguments,
+            );
+            tools = part.tools;
+            emitChars = part.emitChars;
+        } else if (b.type === 'text' && typeof b.text === 'string') {
+            textChars += b.text.length;
+            emitChars += b.text.length;
+            if (!preview) preview = b.text.slice(0, 240);
+        } else if (b.type === 'thinking' && typeof b.thinking === 'string') {
+            // No thinking blocks on the current model; branch kept for other models.
+            emitChars += b.thinking.length;
+        }
+    }
+    const toolCalls = msg && msg.tool_calls;
+    if (Array.isArray(toolCalls)) {
+        for (const tc of toolCalls) {
+            if (!tc || typeof tc !== 'object') continue;
+            const part = pushToolUse(
+                names,
+                tools,
+                emitChars,
+                tc.name || tc.function?.name,
+                tc.input ?? tc.arguments ?? tc.function?.arguments,
+            );
+            tools = part.tools;
+            emitChars = part.emitChars;
+        }
+    }
+    return { tools, names, textChars, emitChars, preview };
+}
+
+/**
+ * Shared with `parse-transcript-calls.mjs` — the single definition of what starts
+ * a request. A real prompt is a user line carrying `<user_query>`; Cursor repeats
+ * that boundary 2-3x CONSECUTIVELY, so the previous key is what dedupes it.
+ */
+export function classifyUserLine(msg, lastBoundaryKey) {
+    const t = userText(msg);
+    const uq = UQ_RE.exec(t);
+    if (!uq) return { kind: 'injected' }; // injected context (<external_links>, <uploaded_documents>…)
+    const ts = TS_RE.exec(t);
+    const query = uq[1].trim();
+    const rawTs = ts ? ts[1].trim() : '';
+    const key = `${rawTs}\u0000${query}`;
+    if (key === lastBoundaryKey) return { kind: 'duplicate', key };
+    return { kind: 'boundary', key, query, rawTs, startedAt: parsePromptTs(rawTs) };
+}
+
+function getState(db, projectId, sourcePath) {
+    return (
+        db.get(
+            'SELECT * FROM ingest_state WHERE project_id = ? AND source_kind = ? AND source_path = ?',
+            [projectId, 'transcript', sourcePath],
+        ) || { last_size: 0, last_offset: 0, last_line_no: 0 }
+    );
+}
+
+function putState(db, projectId, sourcePath, size, offset, lineNo, error) {
+    db.run(
+        `INSERT INTO ingest_state (project_id, source_kind, source_path, last_size, last_offset, last_line_no, last_error, updated_at)
+         VALUES (?, 'transcript', ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(project_id, source_kind, source_path) DO UPDATE SET
+             last_size = excluded.last_size,
+             last_offset = excluded.last_offset,
+             last_line_no = excluded.last_line_no,
+             last_error = excluded.last_error,
+             updated_at = excluded.updated_at`,
+        [projectId, sourcePath, size, offset, lineNo, error || null, isoNow()],
+    );
+}
+
+/**
+ * Drop every row derived from this transcript and start it over. Used when the
+ * file got smaller than our cursor (rotation/truncation) — a rebuild in one
+ * transaction is the only safe answer, because keeping half-matched rows would
+ * silently mis-number the calls.
+ */
+function resetConversation(db, projectId, conversationId) {
+    const reqs = db.all('SELECT id FROM request WHERE conversation_id = ?', [conversationId]);
+    for (const r of reqs) {
+        db.run('DELETE FROM llm_call WHERE request_id = ?', [r.id]);
+        db.run('DELETE FROM request_rule WHERE request_id = ?', [r.id]);
+        db.run('DELETE FROM request_file WHERE request_id = ?', [r.id]);
+        db.run('DELETE FROM request_tool WHERE request_id = ?', [r.id]);
+        db.run('DELETE FROM check_result WHERE request_id = ?', [r.id]);
+        db.run('DELETE FROM request WHERE id = ?', [r.id]);
+    }
+    db.run('DELETE FROM event WHERE conversation_id = ? AND project_id = ?', [conversationId, projectId]);
+    db.run('DELETE FROM request_stop WHERE conversation_id = ? AND project_id = ?', [conversationId, projectId]);
+    db.run('UPDATE conversation SET request_count = 0 WHERE id = ?', [conversationId]);
+}
+
+/**
+ * Ingest one transcript file. Returns a small report so the caller can surface
+ * progress (and prove it did something — a no-op with ok:true is the failure
+ * mode this tool has already been burned by twice).
+ */
+export function ingestTranscript(db, cfg, transcriptPath) {
+    const projectId = cfg.project.id;
+    const agyMatch = transcriptPath.match(/\/brain\/([^/]+)\/\.system_generated\/logs\/transcript\.jsonl$/);
+    const conversationId = agyMatch ? agyMatch[1] : path.basename(transcriptPath).replace(/\.jsonl$/, '');
+    const isAntigravity = !!agyMatch || transcriptPath.includes('.gemini/antigravity');
+    const now = isoNow();
+
+    if (!fs.existsSync(transcriptPath)) {
+        return { path: transcriptPath, conversationId, ok: false, reason: 'missing file' };
+    }
+
+    db.run(
+        `INSERT INTO conversation (id, project_id, transcript_path, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET transcript_path = excluded.transcript_path, updated_at = excluded.updated_at`,
+        [conversationId, projectId, transcriptPath, now, now],
+    );
+
+    let state = getState(db, projectId, transcriptPath);
+    /*
+     * Read only the bytes appended since the last pass.
+     *
+     * This used to `readFileSync` the whole transcript and then `subarray(last_offset)`, i.e. it read
+     * every byte of every conversation on every poll to process a few hundred new ones. On a machine
+     * with many long conversations that is hundreds of MB of synchronous file I/O per cycle, on the
+     * server's own thread. The tail is what actually gets parsed, so the tail is what gets read.
+     */
+    let size;
+    try {
+        size = fs.statSync(transcriptPath).size;
+    } catch {
+        return { path: transcriptPath, conversationId, ok: false, reason: 'missing file' };
+    }
+
+    let rebuilt = false;
+    if (size < state.last_offset) {
+        resetConversation(db, projectId, conversationId);
+        state = { last_size: 0, last_offset: 0, last_line_no: 0 };
+        rebuilt = true;
+    }
+
+    const text = readRange(transcriptPath, state.last_offset, size - state.last_offset).toString('utf8');
+    const parts = text.split('\n');
+    const completeCount = text.endsWith('\n') ? parts.length - 1 : Math.max(0, parts.length - 1);
+
+    const report = { path: transcriptPath, conversationId, ok: true, rebuilt, newLines: 0, newRequests: 0, newCalls: 0 };
+    const touched = new Set();
+
+    if (completeCount === 0) {
+        db.run('UPDATE conversation SET byte_size = ?, updated_at = ? WHERE id = ?', [size, now, conversationId]);
+        report.touchedRequests = [];
+        return report;
+    }
+
+    db.tx(() => {
+        // Resume the open request: the one with the highest boundary index. Its
+        // calls may still be arriving, so we append to it rather than restarting.
+        let current = db.get(
+            'SELECT * FROM request WHERE conversation_id = ? ORDER BY boundary_index DESC LIMIT 1',
+            [conversationId],
+        );
+        let nextIndex = current ? current.boundary_index + 1 : 1;
+        let lastBoundaryKey = null;
+        let callIndex = current
+            ? db.get('SELECT COUNT(*) AS n FROM llm_call WHERE request_id = ?', [current.id]).n
+            : 0;
+
+        let offset = state.last_offset;
+        let lineNo = state.last_line_no;
+
+        for (let i = 0; i < completeCount; i += 1) {
+            const line = parts[i];
+            offset += Buffer.byteLength(line, 'utf8') + 1;
+            lineNo += 1;
+            if (!line.trim()) continue;
+            report.newLines += 1;
+
+            let rec;
+            try {
+                rec = JSON.parse(line);
+            } catch {
+                continue; // a half-flushed line is not fatal; the next pass retries it
+            }
+
+            if (isAntigravity) {
+                // ---- Antigravity: user prompt
+                if (rec.source === 'USER_EXPLICIT' && rec.type === 'USER_INPUT') {
+                    const contentText = typeof rec.content === 'string' ? rec.content : '';
+                    const ur = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i.exec(contentText);
+                    const uq = UQ_RE.exec(contentText);
+                    const query = ur ? ur[1].trim() : (uq ? uq[1].trim() : contentText.trim());
+                    if (!query) continue;
+                    const rawTs = rec.created_at || now;
+                    const key = `${rawTs}\u0000${query}`;
+                    if (key === lastBoundaryKey) continue;
+                    lastBoundaryKey = key;
+                    const startedAt = parsePromptTs(rawTs) || rawTs;
+
+                    if (current) {
+                        db.run(
+                            `UPDATE request SET status = CASE WHEN status = 'in_progress' THEN 'completed' ELSE status END,
+                                ended_at = COALESCE(ended_at, ?), updated_at = ? WHERE id = ?`,
+                            [startedAt, now, current.id],
+                        );
+                    }
+
+                    const reqId = `${conversationId}:${nextIndex}`;
+                    db.run(
+                        `INSERT INTO request (id, project_id, conversation_id, boundary_index, user_query, prompt_at,
+                            started_at, status, generation_id, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?, ?)
+                         ON CONFLICT(id) DO UPDATE SET user_query = excluded.user_query, started_at = excluded.started_at,
+                            generation_id = COALESCE(request.generation_id, excluded.generation_id), updated_at = excluded.updated_at`,
+                        [reqId, projectId, conversationId, nextIndex, query, rawTs, startedAt, reqId, now, now],
+                    );
+                    current = {
+                        id: reqId,
+                        boundary_index: nextIndex,
+                        status: 'in_progress',
+                        call_count: 0,
+                    };
+                    nextIndex += 1;
+                    callIndex = 0;
+                    report.newRequests += 1;
+                    touched.add(reqId);
+                    continue;
+                }
+
+                // ---- Antigravity: LLM call (assistant response)
+                if (rec.source === 'MODEL' && rec.type === 'PLANNER_RESPONSE') {
+                    if (!current) continue;
+                    const toolCalls = Array.isArray(rec.tool_calls) ? rec.tool_calls : [];
+                    const tools = toolCalls.length;
+                    const names = toolCalls.map((tc) => tc.name).filter(Boolean);
+                    const contentText = typeof rec.content === 'string' ? rec.content : '';
+                    let textChars = contentText.length;
+                    let emitChars = contentText.length;
+                    for (const tc of toolCalls) {
+                        if (tc.args !== undefined && tc.args !== null) {
+                            try {
+                                emitChars += JSON.stringify(tc.args).length;
+                            } catch {}
+                        }
+                    }
+                    const preview = contentText.slice(0, 240);
+                    callIndex += 1;
+                    const callId = `${current.id}:${callIndex}`;
+                    db.run(
+                        `INSERT INTO llm_call (id, project_id, request_id, call_index, file_line_no, tool_count, text_chars, emit_chars, tool_names, preview, created_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ON CONFLICT(id) DO UPDATE SET
+                             tool_count = excluded.tool_count, text_chars = excluded.text_chars,
+                             emit_chars = excluded.emit_chars, tool_names = excluded.tool_names, preview = excluded.preview`,
+                        [
+                            callId,
+                            projectId,
+                            current.id,
+                            callIndex,
+                            lineNo,
+                            tools,
+                            textChars,
+                            emitChars,
+                            names.join(','),
+                            preview,
+                            now,
+                        ],
+                    );
+                    report.newCalls += 1;
+                    touched.add(current.id);
+                    continue;
+                }
+
+                if (rec.status === 'ERROR' && current) {
+                    db.run(`UPDATE request SET has_failures = 1 WHERE id = ?`, [current.id]);
+                }
+                continue;
+            }
+
+            // ---- turn_ended: the agent stopped; this finalises the open request
+            if (rec.type === 'turn_ended') {
+                if (current) {
+                    const status = rec.status === 'error' ? 'error' : 'completed';
+                    db.run(
+                        `UPDATE request SET status = ?, has_failures = ?, ended_at = COALESCE(ended_at, ?), updated_at = ?
+                         WHERE id = ?`,
+                        [status, rec.status === 'error' ? 1 : 0, now, now, current.id],
+                    );
+                    current.status = status;
+                }
+                continue;
+            }
+
+            // ---- a real user prompt: close the previous request, open a new one
+            if (rec.role === 'user') {
+                const boundary = classifyUserLine(rec.message, lastBoundaryKey);
+                if (boundary.kind !== 'boundary') continue; // injected context, or a repeated boundary
+                lastBoundaryKey = boundary.key;
+
+                // finalise the request we are leaving; its end is this prompt's start
+                if (current) {
+                    db.run(
+                        `UPDATE request SET status = CASE WHEN status = 'in_progress' THEN 'completed' ELSE status END,
+                            ended_at = COALESCE(ended_at, ?), updated_at = ? WHERE id = ?`,
+                        [boundary.startedAt, now, current.id],
+                    );
+                }
+
+                const reqId = `${conversationId}:${nextIndex}`;
+                db.run(
+                    `INSERT INTO request (id, project_id, conversation_id, boundary_index, user_query, prompt_at,
+                        started_at, status, created_at, updated_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?)
+                     ON CONFLICT(id) DO UPDATE SET user_query = excluded.user_query, updated_at = excluded.updated_at`,
+                    [reqId, projectId, conversationId, nextIndex, boundary.query, boundary.rawTs, boundary.startedAt, now, now],
+                );
+                current = {
+                    id: reqId,
+                    boundary_index: nextIndex,
+                    status: 'in_progress',
+                    call_count: 0,
+                };
+                nextIndex += 1;
+                callIndex = 0;
+                report.newRequests += 1;
+                touched.add(reqId);
+                continue;
+            }
+
+            // ---- one assistant message == one LLM call
+            if (rec.role === 'assistant') {
+                if (!current) continue; // pre-prompt context; nothing to attribute it to
+                const st = assistantStats(rec.message);
+                callIndex += 1;
+                const callId = `${current.id}:${callIndex}`;
+                db.run(
+                    `INSERT INTO llm_call (id, project_id, request_id, call_index, file_line_no, tool_count, text_chars, emit_chars, tool_names, preview, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(id) DO UPDATE SET
+                         tool_count = excluded.tool_count, text_chars = excluded.text_chars,
+                         emit_chars = excluded.emit_chars, tool_names = excluded.tool_names, preview = excluded.preview`,
+                    [
+                        callId,
+                        projectId,
+                        current.id,
+                        callIndex,
+                        lineNo,
+                        st.tools,
+                        st.textChars,
+                        st.emitChars,
+                        st.names.join(','),
+                        st.preview,
+                        now,
+                    ],
+                );
+                report.newCalls += 1;
+                touched.add(current.id);
+            }
+        }
+
+        // Recompute the request aggregates from the calls we just wrote, so a
+        // resumed pass and a from-scratch pass produce identical numbers.
+        db.run(
+            `UPDATE request SET
+                call_count = (SELECT COUNT(*) FROM llm_call WHERE request_id = request.id),
+                tool_count = (SELECT COALESCE(SUM(tool_count), 0) FROM llm_call WHERE request_id = request.id),
+                text_chars = (SELECT COALESCE(SUM(text_chars), 0) FROM llm_call WHERE request_id = request.id),
+                updated_at = ?
+             WHERE conversation_id = ?`,
+            [now, conversationId],
+        );
+        if (current) {
+            db.run(
+                `UPDATE request SET status = CASE WHEN status = '' THEN 'in_progress' ELSE status END WHERE id = ?`,
+                [current.id],
+            );
+        }
+
+        const agg = db.get(
+            `SELECT COUNT(*) AS n, MIN(started_at) AS started, MAX(COALESCE(ended_at, started_at)) AS ended
+             FROM request WHERE conversation_id = ?`,
+            [conversationId],
+        );
+        db.run(
+            `UPDATE conversation SET byte_size = ?, line_count = ?, request_count = ?, started_at = ?, ended_at = ?, updated_at = ?
+             WHERE id = ?`,
+            [size, lineNo, agg ? agg.n : 0, agg ? agg.started : null, agg ? agg.ended : null, now, conversationId],
+        );
+        putState(db, projectId, transcriptPath, size, offset, lineNo, null);
+    });
+
+    report.touchedRequests = [...touched];
+    return report;
+}
+
+function relPath(cfg, p) {
+    const root = (cfg.root || '').replace(/\\/g, '/');
+    const s = String(p || '').replace(/\\/g, '/');
+    if (!s) return '';
+    if (root && s.startsWith(root + '/')) return s.slice(root.length + 1);
+    if (!path.isAbsolute(s)) return s.replace(/^\.\//, '');
+    try {
+        const rel = path.relative(cfg.root, s);
+        if (!rel || rel.startsWith('..')) return s;
+        return rel.split(path.sep).join('/');
+    } catch {
+        return s;
+    }
+}
+
+/**
+ * Build a `turn_start` event for `decide()` from ingested request evidence (WP4).
+ *
+ * @param {import('./db.mjs').Db} db
+ * @param {object} cfg
+ * @param {string} requestId
+ * @returns {import('./decision-types.mjs').DecisionEvent|null}
+ */
+export function buildRequestDecisionContext(db, cfg, requestId) {
+    const req = db.get(
+        'SELECT id, conversation_id, generation_id, user_query FROM request WHERE id = ? AND project_id = ?',
+        [requestId, cfg.project.id],
+    );
+    if (!req) return null;
+
+    const files = db.all('SELECT path FROM request_file WHERE request_id = ?', [requestId]);
+    const touchedPaths = [...new Set(files.map((f) => relPath(cfg, f.path)).filter(Boolean))];
+
+    const rules = db.all('SELECT rule_id FROM request_rule WHERE request_id = ?', [requestId]);
+    const stem = String(req.user_query || '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 240);
+
+    return {
+        event: 'turn_start',
+        sessionId: req.conversation_id || req.generation_id || undefined,
+        turnId: req.id,
+        userQueryStem: stem,
+        touchedPaths,
+        hookMeta: {
+            attachedRules: rules.map((r) => r.rule_id),
+            generationId: req.generation_id,
+        },
+    };
+}
+
+/** Every transcript file belonging to THIS project (never another project's). */
+/**
+ * Antigravity writes `Active Document: <path> (LANGUAGE_X)` and a bullet list of other open
+ * documents, each with the same suffix. The suffix is not part of the path.
+ */
+const AG_DOC_SUFFIX_RE = /\s*\((?:LANGUAGE_[A-Z_]+|UNSPECIFIED)\)\s*$/;
+
+/** @param {string} line */
+function docPath(line) {
+    return String(line).replace(AG_DOC_SUFFIX_RE, '').trim();
+}
+
+/** Nearest ancestor of `filePath` that holds a `harness.config.json`, or null. */
+function projectRootOf(filePath) {
+    let cur = path.dirname(filePath);
+    for (let i = 0; i < 24; i += 1) {
+        if (fs.existsSync(path.join(cur, 'harness.config.json'))) return cur;
+        const up = path.dirname(cur);
+        if (up === cur) break;
+        cur = up;
+    }
+    return null;
+}
+
+/**
+ * The harness project root that owns an Antigravity conversation, or `null` when the transcript
+ * records no usable signal.
+ *
+ * Antigravity's brain directory is **global** (`~/.gemini/antigravity-ide/brain`), so every configured
+ * project scans every conversation, and the only filter used to be "does this file mention my root
+ * anywhere". That is not ownership: an agent routinely `cd`s into sibling repositories to inspect
+ * them, so a single baplatform conversation contained the x79 path 74 times — and both projects
+ * ingested it into their own databases. One transcript, two owners, and the observatory showed the
+ * same requests under both.
+ *
+ * What the transcript does record is the window's open documents, in `ADDITIONAL_METADATA`. Mapping
+ * those to the nearest `harness.config.json` and taking the most frequent answer is deterministic, and
+ * it matches how the rest of the system decides which project a path belongs to. The focused document
+ * votes first, so a single stray file opened from another repo cannot outvote the actual workspace.
+ *
+ * The records must be **parsed**, not pattern-matched on the raw bytes: inside the JSON each newline
+ * in the metadata is the two-character escape `\n`, so a `[^\n]+` match runs past the document line
+ * and swallows the rest of the block, yielding a path that resolves to nothing. That mistake made this
+ * function return `null` for every real transcript while passing hand-built fixtures.
+ *
+ * @param {string} transcriptPath
+ * @returns {string | null} absolute project root
+ */
+export function resolveTranscriptOwner(transcriptPath) {
+    let text;
+    try {
+        const fd = fs.openSync(transcriptPath, 'r');
+        const buf = Buffer.alloc(131072);
+        const read = fs.readSync(fd, buf, 0, 131072, 0);
+        fs.closeSync(fd);
+        text = buf.subarray(0, read).toString('utf8');
+    } catch {
+        return null;
+    }
+
+    // Records are newline-delimited JSON; the metadata arrives with the first user turn.
+    let metadata = '';
+    for (const line of text.split('\n')) {
+        if (!line.trim()) continue;
+        let record;
+        try {
+            record = JSON.parse(line);
+        } catch {
+            continue; // a half-written trailing line
+        }
+        if (typeof record?.content !== 'string') continue;
+        if (record.content.includes('Active Document:')) {
+            metadata = record.content;
+            break;
+        }
+    }
+    if (!metadata) return null;
+
+    const votes = new Map();
+    const vote = (docLine) => {
+        const root = projectRootOf(docPath(docLine));
+        if (root) votes.set(root, (votes.get(root) ?? 0) + 1);
+    };
+
+    const active = /Active Document: ([^\n]+)/.exec(metadata);
+    if (active) vote(active[1]);
+
+    const listStart = metadata.indexOf('Other open documents:');
+    if (listStart !== -1) {
+        for (const line of metadata.slice(listStart).split('\n').slice(1)) {
+            const m = /^\s*-\s+(.+?)\s*$/.exec(line);
+            if (!m) break; // the list is contiguous; anything else ends it
+            vote(m[1]);
+        }
+    }
+
+    if (!votes.size) return null;
+    // The focused document wins ties: insertion order puts it first.
+    let winner = null;
+    let best = 0;
+    for (const [root, count] of votes) {
+        if (count > best) {
+            best = count;
+            winner = root;
+        }
+    }
+    return winner;
+}
+
+export function discoverTranscripts(cfg) {
+    const dir = cfg.ingest.transcriptDir;
+    const out = [];
+    if (dir && fs.existsSync(dir)) {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+                out.push(path.join(dir, entry.name));
+            } else if (entry.isDirectory()) {
+                const inner = path.join(dir, entry.name, `${entry.name}.jsonl`);
+                if (fs.existsSync(inner)) out.push(inner);
+            }
+        }
+    }
+
+    const brainDirs = cfg.ingest.brainDirs || [];
+    const root = path.resolve(cfg.root);
+    for (const bDir of brainDirs) {
+        if (!fs.existsSync(bDir)) continue;
+        for (const entry of fs.readdirSync(bDir, { withFileTypes: true })) {
+            if (!entry.isDirectory()) continue;
+            const logFile = path.join(bDir, entry.name, '.system_generated', 'logs', 'transcript.jsonl');
+            if (!fs.existsSync(logFile)) continue;
+
+            const owner = resolveTranscriptOwner(logFile);
+            if (owner) {
+                /*
+                 * The transcript names its workspace: that is authoritative. A project that is merely
+                 * mentioned in the conversation does not get to claim it.
+                 */
+                if (path.resolve(owner) === root) out.push(logFile);
+                continue;
+            }
+
+            /*
+             * No usable signal (conversations from before the metadata existed). Fall back to the
+             * historical substring check, which stays safe for these: measured across every stored
+             * conversation, none of the signal-less ones mention more than one project root.
+             */
+            try {
+                const fd = fs.openSync(logFile, 'r');
+                const buf = Buffer.alloc(131072);
+                const read = fs.readSync(fd, buf, 0, 131072, 0);
+                fs.closeSync(fd);
+                if (buf.subarray(0, read).toString('utf8').includes(cfg.root)) out.push(logFile);
+            } catch {
+                /* skip unreadable file */
+            }
+        }
+    }
+
+    return out.sort();
+}

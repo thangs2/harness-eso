@@ -1,0 +1,25 @@
+-- 003_llm_call_emit_chars.sql
+--
+-- Add llm_call.emit_chars: the EMITTED CHARACTER count of one assistant message,
+-- not a provider token count. It sums the length of what the assistant emitted,
+-- counted from three block sources:
+--     1. text blocks      -> b.text.length
+--     2. tool_use blocks  -> JSON.stringify(b.input).length
+--     3. thinking blocks  -> b.thinking.length  (kept for other models; the
+--                            current model emits none)
+--
+-- Why characters and not tokens: a real per-call token count cannot be
+-- reconstructed at any layer (assistant transcript lines carry no usage; the hook
+-- side only has `stop` + `preCompact`, and request.input_tokens is populated on
+-- 0.8% of turns). A text_chars-only estimate under-reports by roughly an order of
+-- magnitude because tool_use.input is ~90% of the emitted bytes. emit_chars is
+-- the only honest per-call size signal measurable from byte 0.
+--
+-- Any token figure shown in the UI must be labelled "~tok (est.)" and derived as
+-- emit_chars / 4.
+--
+-- Backfill is non-destructive: re-read each transcript from byte 0 and
+-- UPDATE llm_call SET emit_chars = ? WHERE id = ?. Cursors are NOT zeroed and
+-- resetConversation is NOT called.
+
+ALTER TABLE llm_call ADD COLUMN emit_chars INTEGER NOT NULL DEFAULT 0;

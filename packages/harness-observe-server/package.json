@@ -1,0 +1,24 @@
+{
+    "name": "@mu/harness-observe-server",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Harness observe plane — REST + SSE ingest server",
+    "exports": {
+        ".": "./src/index.mjs",
+        "./server": "./src/server.mjs",
+        "./storage-gc": "./src/storage-gc.mjs"
+    },
+    "bin": {
+        "harness-observe-server": "./src/server.mjs"
+    },
+    "files": [
+        "src",
+        "db"
+    ],
+    "dependencies": {
+        "@mu/harness-decision": "0.1.0",
+        "@mu/harness-eso-core": "0.1.0",
+        "@mu/harness-foundation": "0.1.0"
+    }
+}
