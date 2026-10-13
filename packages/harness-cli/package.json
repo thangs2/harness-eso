@@ -1,0 +1,14 @@
+{
+    "name": "@mu/harness-cli",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "harnessctl — project init, observe Docker, storage GC",
+    "bin": {
+        "harnessctl": "./src/cli.mjs"
+    },
+    "dependencies": {
+        "@mu/harness-foundation": "0.1.0",
+        "@mu/harness-observe-server": "0.1.0"
+    }
+}

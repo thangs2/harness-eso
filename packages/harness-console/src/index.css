@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        color-scheme: dark;
+    }
+    body {
+        @apply m-0 bg-surface text-slate-100 font-sans antialiased;
+    }
+    a {
+        @apply text-accent-link;
+    }
+}
+
+@layer components {
+    .shell {
+        @apply max-w-console mx-auto px-4 pt-5 pb-12;
+    }
+    header h1 {
+        @apply text-xl m-0 mb-1 font-semibold;
+    }
+    .sub {
+        @apply opacity-80 text-sm;
+    }
+    .steps {
+        @apply flex flex-wrap gap-2 my-4 text-xs;
+    }
+    .steps a {
+        @apply px-2 py-1 rounded bg-surface-card no-underline text-inherit;
+    }
+    .steps a.on {
+        @apply bg-accent;
+    }
+    form {
+        @apply grid gap-3;
+    }
+    label {
+        @apply grid gap-1 text-sm;
+    }
+    input,
+    select {
+        @apply px-2 py-2 rounded border border-surface-border bg-surface-raised text-inherit;
+    }
+    button {
+        @apply px-4 py-2 rounded border border-accent-soft bg-accent text-inherit cursor-pointer;
+    }
+    button:disabled {
+        @apply opacity-50 cursor-not-allowed;
+    }
+    button.secondary {
+        @apply bg-surface-card border-surface-border;
+    }
+    .card {
+        @apply border border-surface-border rounded-lg p-4 my-4;
+    }
+    .plugin-group {
+        @apply border border-surface-border rounded-xl my-5 overflow-hidden;
+    }
+    .plugin-group__head {
+        @apply flex gap-3 items-start p-4 bg-surface-card border-b border-surface-border;
+    }
+    .plugin-group__head h3 {
+        @apply m-0 mb-1 text-base;
+    }
+    .plugin-group__body {
+        @apply p-3 flex flex-col gap-3;
+    }
+    .plugin-row-card {
+        @apply border border-surface-border rounded-lg p-3 bg-surface-raised;
+    }
+    .plugin-row-card__meta {
+        @apply flex items-center gap-2 mb-2;
+    }
+    .kind-tag {
+        @apply text-[0.65rem] px-1.5 py-0.5 rounded uppercase bg-surface-card text-slate-400;
+    }
+    .plugin-select {
+        @apply w-full max-w-full;
+    }
+    .hint {
+        @apply mt-2 text-xs opacity-85;
+    }
+    .hint-link {
+        @apply mt-2 p-0 border-0 bg-transparent text-accent-link text-xs text-left cursor-pointer underline;
+    }
+    .callout {
+        @apply mt-2 p-3 rounded text-sm bg-surface-raised;
+    }
+    .callout--warn {
+        @apply border-l-[3px] border-warn;
+    }
+    .callout--info {
+        @apply border-l-[3px] border-accent-soft;
+    }
+    .jev-modes {
+        @apply flex flex-col gap-1.5;
+    }
+    .jev-pill {
+        @apply flex items-start gap-2 p-2 rounded-md border border-surface-border cursor-pointer text-sm;
+    }
+    .jev-pill.on {
+        @apply border-accent-soft bg-accent/40;
+    }
+    .error {
+        @apply text-red-300 my-2;
+    }
+    .list {
+        @apply list-none p-0;
+    }
+    .list li {
+        @apply p-3 border border-surface-border rounded-md mb-2 flex justify-between items-center;
+    }
+    pre {
+        @apply text-xs overflow-auto max-h-52 bg-surface-raised p-3 rounded;
+    }
+    code {
+        @apply text-[0.85em];
+    }
+    button.linkish {
+        @apply p-0 border-0 bg-transparent text-accent-link text-sm cursor-pointer underline;
+    }
+    .btn-link {
+        @apply inline-block px-3 py-2 rounded bg-accent no-underline text-inherit;
+    }
+    /* Host pack health. `ok` stays quiet — it is the normal state and should not compete with the
+       project name. The other states are the ones an operator needs to see, so they carry colour:
+       `broken`/`missing` mean the consumer's guards are not deciding anything. */
+    .badge {
+        @apply inline-block ml-1 px-2 py-0.5 rounded-full text-[0.7rem] align-middle border;
+    }
+    .badge--ok {
+        @apply border-accent-soft text-accent-link;
+    }
+    .badge--outdated,
+    .badge--unwired {
+        @apply border-amber-400/60 text-amber-300;
+    }
+    .badge--broken,
+    .badge--missing,
+    .badge--error {
+        @apply border-red-400/60 text-red-300;
+    }
+}

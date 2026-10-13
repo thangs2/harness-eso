@@ -1,0 +1,340 @@
+/** Frozen shapes from 15.observe-api-contract.md + 16.harness-observatory-spec.md §3 */
+
+export type SufficiencyLevel = 'sufficient' | 'partial' | 'insufficient';
+
+export interface EvidenceGap {
+    id?: string;
+    kind?: string;
+    message?: string;
+}
+
+export interface RecoveryPlaybookStep {
+    id?: string;
+    label?: string;
+    hint?: string;
+}
+
+export interface EsoSlice {
+    sufficiency?: SufficiencyLevel | string;
+    score?: number | null;
+    gaps?: EvidenceGap[];
+    recoveryPlaybook?: RecoveryPlaybookStep[];
+}
+
+export interface ConsentOutcome {
+    outcome?: 'stop' | 'continue' | 'pending';
+    at?: string;
+    waiverId?: string;
+}
+
+export interface PreflightSlice {
+    injectBrainBlock?: boolean;
+    artifactPath?: string;
+}
+
+export interface PolicySnapshot {
+    eso?: {
+        mode?: string;
+        enforceWrites?: string;
+        /** ESO sufficiency bands — `score < T_low` is insufficient, `>= T_high` is sufficient. */
+        thresholds?: { T_low?: number | null; T_high?: number | null };
+        cognition?: {
+            insufficientPromptGate?: 'warn_only' | 'consent' | 'deny';
+        };
+        preflight?: { jevOnPartial?: boolean };
+    };
+}
+
+export interface RequestConsentVm {
+    eso?: EsoSlice;
+    consent?: ConsentOutcome;
+    preflight?: PreflightSlice;
+    policySnapshot?: PolicySnapshot;
+}
+
+export interface RequestListItem {
+    id: string;
+    generationId?: string | null;
+    conversationId: string;
+    boundaryIndex: number;
+    userQuery: string;
+    startedAt?: string | null;
+    endedAt?: string | null;
+    status: string;
+    stopStatus?: string | null;
+    decisionVerdict?: string | null;
+    callCount?: number;
+    toolCount?: number;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    cacheReadTokens?: number | null;
+    cacheWriteTokens?: number | null;
+    modelId?: string | null;
+    hasFailures?: boolean | number;
+    checksPass?: number;
+    checksFail?: number;
+    /** Output from emit_chars÷4 when hook tokens missing */
+    tokensEstimated?: boolean;
+    emitChars?: number | null;
+}
+
+export interface FlowGraphVm {
+    nodes?: Array<{
+        id: string;
+        combo?: string;
+        style?: { x?: number; y?: number };
+        data?: Record<string, unknown>;
+    }>;
+    edges?: Array<{ id?: string; source: string; target: string; data?: Record<string, unknown> }>;
+    combos?: Array<{ id: string; data?: { label?: string } }>;
+    highlights?: string[];
+    width?: number;
+    height?: number;
+    legend?: string;
+    title?: string;
+    activeNodeCount?: number;
+    activeEdgeCount?: number;
+}
+
+export interface DecisionLedgerRowVm {
+    id: string;
+    eventType?: string;
+    jevMode?: string;
+    resolverWinner?: string | null;
+    enforcedVerdict?: string | null;
+    jevSummary?: string | null;
+    createdAt?: string;
+}
+
+export interface DecisionFlowVm {
+    request?: {
+        id?: string;
+        conversationId?: string;
+        boundaryIndex?: number;
+        userQuery?: string;
+        startedAt?: string;
+    };
+    decisions?: DecisionLedgerRowVm[];
+    decisionsDisplay?: DecisionLedgerRowVm[];
+    evidenceSufficiency?: {
+        enforcedVerdict?: string;
+        summary?: string;
+    } | null;
+    ingestNote?: string | null;
+    graph?: FlowGraphVm | null;
+    designGraph?: FlowGraphVm | null;
+    sequenceGraph?: FlowGraphVm | null;
+    mcpStats?: {
+        flashBrain?: number;
+        flashExecutor?: number;
+        pro?: number;
+        jev?: number;
+    } | null;
+    designRef?: string;
+}
+
+export type RouteGraphDocument = Record<string, unknown> & {
+    nodes?: unknown[];
+    edges?: unknown[];
+    surfaces?: unknown[];
+    rules?: unknown[];
+    skills?: unknown[];
+    dirs?: unknown[];
+    directories?: unknown[];
+    buckets?: Record<string, unknown>;
+};
+
+export interface RequestListResponse {
+    items: RequestListItem[];
+    page: { limit: number; offset: number; total: number };
+}
+
+export interface McpCallStatsRow {
+    flashBrain?: number;
+    flashExecutor?: number;
+    proCount?: number;
+    jevCount?: number;
+    updatedAt?: string;
+}
+
+export interface RequestHeaderMetrics {
+    callCount?: number;
+    toolCount?: number;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    cacheReadTokens?: number | null;
+    cacheWriteTokens?: number | null;
+    modelId?: string | null;
+    hasFailures?: boolean;
+    mcpCallStats?: McpCallStatsRow | null;
+}
+
+export interface TokenSummary {
+    input?: number | null;
+    output?: number | null;
+    cacheRead?: number | null;
+    source?: string;
+    estimated?: boolean;
+    /**
+     * Set when the transcript carried no token usage at all, so the input side is unknowable
+     * rather than zero. The server uses `no_token_usage_in_transcript`.
+     */
+    inputUnavailable?: string | null;
+}
+
+export interface RequestDetailResponse extends RequestConsentVm {
+    /** Consumer repo root — for promax-style relative paths in flow steps. */
+    tenantRootPath?: string;
+    request?: Record<string, unknown>;
+    requestMetrics?: RequestHeaderMetrics;
+    mcpCallStats?: McpCallStatsRow | null;
+    tokenSummary?: TokenSummary;
+    stops?: Array<Record<string, unknown>>;
+    evidence?: Record<string, unknown>;
+    decisionFlow?: DecisionFlowVm | null;
+    checks?: Array<{ checkId: string; status: string; heuristic?: boolean; detail?: string }>;
+    tools?: Array<{ tool: string; count: number }>;
+    files?: Array<{ path: string; reads: number; edits: number }>;
+    llmCalls?: unknown[];
+    evidenceNote?: string | null;
+    /** Route-trace / hook rollup (observe-server VM extension). */
+    events?: Array<{ eventType?: string; tool?: string; path?: string; hookAt?: string; command?: string }>;
+    meta?: Record<string, unknown>;
+    rules?: Array<{ ruleId?: string; attachedAt?: string }>;
+    attached?: Array<{ type?: string; filePath?: string }>;
+    conversation?: Record<string, unknown> | null;
+    /** Rules/skills + tool trace (promax flow graph). */
+    flowGraph?: FlowGraphVm | null;
+}
+
+export interface AggregateBucket {
+    t: string;
+    requests: number;
+    llmCalls: number;
+    tools: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    failures: number;
+}
+
+export interface AggregatesResponse {
+    buckets: AggregateBucket[];
+}
+
+export interface WorkspaceProject {
+    id: string;
+    displayName: string;
+    root: string;
+    rootHost?: string;
+    port: number;
+    profile?: string;
+}
+
+export interface WorkspaceInfo {
+    ok: boolean;
+    defaultProjectId: string | null;
+    projects: WorkspaceProject[];
+    workspaceFile?: string;
+}
+
+export interface ConfigureAddResult {
+    ok: boolean;
+    projectId: string;
+    consumerPath: string;
+    serverUrl?: string;
+    created?: { config: boolean; policy: boolean };
+    error?: string;
+}
+
+export interface TenantInfo {
+    id: string;
+    displayName: string;
+    rootPath: string;
+    enabled: boolean;
+    server?: { host: string; port: number; url: string };
+    counts?: { requests: number; calls: number; events: number; conversations: number };
+}
+
+export interface IngestSpineStatus {
+    spineOk?: boolean;
+    transcriptDir?: string | null;
+    transcriptDirExists?: boolean;
+    transcriptFiles?: number;
+    cursorMount?: string | null;
+    requestCount?: number;
+    warnings?: string[];
+}
+
+export interface HealthResponse {
+    ok: boolean;
+    degraded?: boolean;
+    enabled?: boolean;
+    revision?: number;
+    turns?: number;
+    events?: number;
+    uptimeSec?: number;
+    clients?: number;
+    ingestSpine?: IngestSpineStatus;
+}
+
+export interface IngestStatus {
+    db?: string;
+    dbExists?: boolean;
+    enabled?: boolean;
+    counts?: { requests: number; calls: number; events: number; conversations?: number };
+    transcriptDir?: string | null;
+    transcriptDirExists?: boolean;
+    transcriptFiles?: number;
+    cursorMount?: string | null;
+    spineOk?: boolean;
+    warnings?: string[];
+}
+
+export interface CallListItem {
+    id: string;
+    requestId?: string;
+    userQuery?: string;
+    requestStartedAt?: string;
+    kind?: string;
+    toolCount?: number;
+    preview?: string;
+}
+
+export interface CallListResponse {
+    items: CallListItem[];
+    page: { limit: number; offset: number; total: number };
+}
+
+export interface DecisionListItem {
+    id: string;
+    requestId?: string;
+    userQuery?: string;
+    eventType: string;
+    enforcedVerdict?: string | null;
+    resolverWinner?: string | null;
+    createdAt?: string;
+}
+
+export interface DecisionListResponse {
+    items: DecisionListItem[];
+    page: { limit: number; offset: number; total: number };
+}
+
+export interface IngestRunReport {
+    ok: boolean;
+    reason?: string;
+    counts?: { requests: number; calls: number; events: number };
+}
+
+export interface ToggleState {
+    enabled: boolean;
+}
+
+export interface ApiVersion {
+    apiVersion: string;
+    package: string;
+    serverVersion: string;
+    openapi: string;
+    startedAt: string;
+}

@@ -1,0 +1,13 @@
+{
+    "name": "@mu/harness-console-server",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Harness Console — project management API (port 8791)",
+    "bin": {
+        "harness-console-server": "./src/server.mjs"
+    },
+    "dependencies": {
+        "@mu/harness-foundation": "0.1.0"
+    }
+}

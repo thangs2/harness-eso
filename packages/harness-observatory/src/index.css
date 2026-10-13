@@ -1,0 +1,1080 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        color-scheme: dark;
+    }
+    body {
+        @apply m-0 bg-surface text-slate-100 font-sans antialiased;
+    }
+    a {
+        @apply text-accent-link;
+    }
+}
+
+@layer components {
+    .obs-shell {
+        @apply min-h-screen flex flex-col;
+    }
+    .obs-header {
+        @apply border-b border-surface-border bg-surface-raised/80 backdrop-blur sticky top-0 z-20;
+    }
+    .obs-header-inner {
+        @apply max-w-observe mx-auto px-[18px] py-3;
+    }
+    .obs-main {
+        @apply flex-1 max-w-observe mx-auto w-full px-[18px] py-6 pb-16;
+    }
+    .obs-nav {
+        @apply flex flex-wrap gap-1.5 mt-3;
+    }
+    .obs-nav a {
+        @apply no-underline text-sm px-2.5 py-1 rounded-md border border-transparent text-slate-300 hover:text-white hover:bg-surface-card;
+    }
+    .obs-nav a[aria-current='page'] {
+        @apply bg-accent/50 border-accent-soft text-white font-medium;
+    }
+    .obs-health {
+        @apply inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border border-surface-border bg-surface-card;
+    }
+    .obs-health-dot {
+        @apply w-2 h-2 rounded-full bg-slate-500;
+    }
+    .obs-health-dot--ok {
+        @apply bg-ok;
+    }
+    .obs-health-dot--bad {
+        @apply bg-danger;
+    }
+    .obs-page-title {
+        @apply text-xl font-semibold m-0;
+    }
+    .obs-sub {
+        @apply text-sm text-[#8b97ab];
+    }
+    /* ---- Card primitive ----------------------------------------------------
+       One chrome for every panel on the page: a 3px accent rail whose colour is set
+       per-card via `--card-accent`, a head (title + lede + badges), a body, and an
+       optional foot separated by a hairline. Cards previously each invented their own
+       border, radius, padding and heading level, so a row of them read as unrelated
+       boxes. `--card-accent` keeps the categorisation visible without a second system. */
+    .obs-card {
+        @apply relative flex flex-col rounded-lg bg-surface-card p-4 my-4;
+        border: 1px solid #253047;
+        border-left-width: 3px;
+        border-left-color: var(--card-accent, #5aa9ff);
+    }
+    .obs-card-head {
+        @apply flex flex-wrap items-start justify-between gap-3;
+        flex: 0 0 auto;
+    }
+    /* The text block yields width so the badges keep their right-hand slot.
+       Measured before this: consent's lede (424px) + 3 badges (354px) = 778px against a 758px
+       head, so the cluster wrapped to a second line and stopped being a top-right status — and
+       it only stayed on one line for cards whose lede happened to be short. `flex-basis: 12rem`
+       keeps the block readable while making it shrinkable: it gives up width (lede wraps to two
+       lines) before the badges ever move. The basis, rather than `0`, is what still lets the
+       whole head wrap on a genuinely narrow viewport instead of crushing the text to nothing. */
+    .obs-card-head > :first-child {
+        flex: 1 1 12rem;
+        min-width: 0;
+    }
+    .obs-card-badges {
+        @apply flex flex-wrap gap-1.5;
+        flex: 0 0 auto;
+        justify-content: flex-end;
+    }
+    .obs-card-title {
+        @apply text-base font-semibold m-0;
+    }
+    .obs-card-lede {
+        @apply text-xs m-0 mt-1;
+        color: #8b97ab;
+    }
+    .obs-card-body {
+        @apply mt-3;
+        flex: 0 0 auto;
+    }
+    .obs-card-body:first-child {
+        @apply mt-0;
+    }
+    /* Only when a foot follows, so the gap between body and footer never collapses to zero
+       when the card has no free space to give. */
+    .obs-card-body:not(:last-child) {
+        margin-bottom: 0.75rem;
+    }
+    /* `margin-top: auto` pins the foot to the bottom of a stretched card, so sibling cards of
+       different content length still show their hairlines on the same line. It contributes 0
+       padding of its own — the body's bottom margin above holds the minimum gap. */
+    .obs-card-foot {
+        @apply flex flex-wrap items-center gap-x-4 gap-y-1 pt-3 text-[11px];
+        margin-top: auto;
+        border-top: 1px solid #253047;
+        color: #8b97ab;
+    }
+    .obs-card-flag {
+        @apply inline-flex items-center gap-1.5;
+    }
+    .obs-card-flag b {
+        @apply font-semibold;
+        color: #cbd5e1;
+    }
+    /* "on" state for a boolean preflight flag — the value reads amber so a true is visible
+       at a glance without a badge per flag. */
+    .obs-card-flag b.consent-flag--on {
+        color: #e0b341;
+    }
+    /* Legacy alias — existing panels and `@apply obs-panel` callers keep working while
+       inheriting the shared chrome. */
+    .obs-panel {
+        @apply obs-card;
+    }
+    .obs-panel--decision {
+        --card-accent: #c084fc;
+    }
+    .obs-panel h3 {
+        @apply text-base font-semibold m-0 mb-3;
+    }
+    .obs-table-wrap {
+        @apply overflow-x-auto rounded-lg border border-surface-border;
+    }
+    .obs-table {
+        @apply w-full text-sm border-collapse;
+    }
+    .obs-table th {
+        @apply text-left text-xs uppercase tracking-wide text-slate-400 font-medium bg-surface-raised px-3 py-2 border-b border-surface-border;
+    }
+    .obs-table td {
+        @apply px-3 py-2.5 border-b border-surface-border align-top;
+    }
+    .obs-table tbody tr:hover {
+        @apply bg-surface-raised/60;
+    }
+    .obs-table--requests th,
+    .obs-table--requests td {
+        @apply whitespace-nowrap;
+    }
+    /* Column widths: compact columns hug their content, Query absorbs the slack.
+       Auto table layout spread width evenly instead, so the 3-link Open cell alone claimed
+       ~243px at a 1728px viewport while Query — the only genuinely wide content — was left
+       with 398px. `width: 1%` is the shrink-to-fit trigger under auto layout. */
+    .obs-table--requests .obs-col-num,
+    .obs-table--requests .obs-col-when,
+    .obs-table--requests .obs-col-tok,
+    .obs-table--requests .obs-col-status,
+    .obs-table--requests .obs-col-verdict,
+    .obs-table--requests .obs-col-checks,
+    .obs-table--requests .obs-col-open {
+        width: 1%;
+    }
+    .obs-table--requests .obs-col-query {
+        width: 100%;
+        white-space: normal;
+        min-width: 14rem;
+        max-width: none;
+    }
+    .obs-table--requests .obs-col-model {
+        width: 1%;
+        max-width: 7rem;
+    }
+    /* Keep the row's action links on one line — wrapping inflated row height. */
+    .obs-table--requests .obs-col-open .obs-cmd-group {
+        @apply flex-nowrap;
+    }
+    /* Numeric columns read as columns when right-aligned on a shared digit grid. */
+    .obs-table--requests .obs-col-num,
+    .obs-table--requests .obs-col-tok {
+        @apply text-right;
+    }
+    .obs-table--compact th,
+    .obs-table--compact td {
+        @apply py-1.5 text-xs;
+    }
+    /* A sticky box is measured against its nearest SCROLLPORT, and `.obs-table-wrap` is
+       one: `overflow-x: auto` makes the wrapper the sticky ancestor for BOTH axes, so an
+       inset measured from the viewport is applied from the WRAPPER's top instead and paints
+       the header down over the first rows. The offset only means what it says once the
+       wrapper is not a scrollport — i.e. at widths where the table actually fits. */
+    .obs-table-wrap--sticky thead th {
+        @apply sticky z-10 shadow-sm;
+    }
+    @media (min-width: 1200px) {
+        .obs-table-wrap--sticky {
+            overflow: visible;
+        }
+        .obs-table-wrap--sticky thead th {
+            top: var(--obs-header-h, 3.25rem);
+        }
+    }
+    @media (max-width: 1199.98px) {
+        /* Narrower than the table: it must scroll sideways, so the wrapper owns the
+           scrollport and the head can only stick to its own top. */
+        .obs-table-wrap--sticky thead th {
+            top: 0;
+        }
+    }
+    .obs-row--fail {
+        @apply bg-danger/5;
+    }
+    .obs-cmd-group {
+        @apply inline-flex flex-wrap gap-1;
+    }
+    .obs-cmd {
+        @apply no-underline text-xs px-2 py-0.5 rounded border border-surface-border bg-surface-raised text-slate-200 hover:border-accent-soft hover:text-white;
+    }
+    .obs-cmd--primary {
+        @apply border-accent-soft bg-accent/30 font-semibold;
+    }
+    .obs-query-link {
+        @apply font-medium text-slate-100 no-underline hover:text-accent-link;
+    }
+    .obs-checks--ok {
+        @apply text-emerald-300 font-medium tabular-nums;
+    }
+    .obs-checks--fail {
+        @apply text-red-300 font-medium tabular-nums;
+    }
+    .requests-toolbar {
+        @apply mb-4 flex flex-wrap gap-4 items-end p-3 rounded-lg border border-surface-border bg-surface-card/60;
+    }
+    .requests-toolbar-search {
+        @apply grid gap-1 text-sm flex-1 min-w-[14rem];
+    }
+    .requests-toolbar-check {
+        @apply flex items-center gap-2 text-sm pb-1;
+    }
+    .request-detail-hero {
+        @apply mb-6 pb-5 border-b border-surface-border;
+    }
+    .request-detail-nav {
+        @apply flex flex-wrap items-center gap-2 text-sm;
+    }
+    .obs-crumb {
+        @apply text-slate-400 no-underline hover:text-accent-link;
+    }
+    .obs-crumb-sep {
+        @apply text-slate-600;
+    }
+    .obs-crumb-current {
+        @apply text-slate-500;
+    }
+    .request-detail-actions {
+        @apply ml-auto flex flex-wrap gap-1.5;
+    }
+    .obs-pill {
+        @apply no-underline text-xs px-2.5 py-1 rounded-full border border-surface-border bg-surface-raised text-slate-200 hover:border-accent-soft hover:text-white;
+    }
+    .request-detail-title-row {
+        @apply flex flex-wrap items-center gap-3 gap-y-2;
+    }
+    .request-detail-title {
+        @apply text-2xl font-semibold m-0;
+    }
+    .request-detail-badges {
+        @apply flex flex-wrap gap-1.5;
+    }
+    /* Identity + timing for one turn. Deliberately NOT tiles: cost and volume have their own
+       card, and giving timing the same visual weight made the page read as two competing
+       metric strips. */
+    .request-facts {
+        @apply flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs;
+        color: #8b97ab;
+    }
+    .request-fact {
+        @apply inline-flex items-baseline gap-1.5;
+    }
+    .request-fact + .request-fact {
+        @apply relative pl-4;
+    }
+    .request-fact + .request-fact::before {
+        content: '';
+        @apply absolute left-0 top-1/2 w-px h-3 -translate-y-1/2;
+        background: #253047;
+    }
+    .request-fact-label {
+        @apply text-[10px] uppercase tracking-wide;
+        color: #64748b;
+    }
+    .request-fact-value {
+        @apply font-medium;
+        color: #cbd5e1;
+    }
+    .obs-col-preview {
+        white-space: normal;
+        max-width: 20rem;
+    }
+    .obs-badge {
+        @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md
+               uppercase tracking-wide leading-none;
+    }
+    /* A border gives each pill an edge on the dark surface; without it a low-opacity
+       background reads as plain text. */
+    .obs-badge--neutral {
+        @apply bg-surface-raised text-slate-300 border border-surface-border;
+    }
+    .obs-badge--ok {
+        @apply bg-ok/15 text-emerald-200 border border-ok/30;
+    }
+    .obs-badge--warn {
+        @apply bg-warn/15 text-amber-100 border border-warn/30;
+    }
+    .obs-badge--danger {
+        @apply bg-danger/20 text-red-200 border border-danger/40;
+    }
+    .obs-badge--info {
+        @apply bg-sky-900/40 text-sky-100 border border-sky-700/40;
+    }
+    .obs-badge--dot {
+        @apply normal-case tracking-normal;
+    }
+    .obs-badge--dot::before {
+        content: '';
+        @apply w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0;
+    }
+    .obs-badge--ok.obs-badge--dot::before {
+        @apply bg-emerald-400;
+    }
+    .obs-badge--warn.obs-badge--dot::before {
+        @apply bg-amber-300;
+    }
+    .obs-badge--danger.obs-badge--dot::before {
+        @apply bg-red-400;
+    }
+    .obs-badge--info.obs-badge--dot::before {
+        @apply bg-sky-300;
+    }
+    .obs-error {
+        @apply text-red-200 text-sm p-3 rounded-lg border border-danger/40 bg-danger/10;
+    }
+    .obs-empty {
+        @apply obs-panel text-center py-10 obs-sub;
+    }
+    .obs-btn {
+        @apply px-3 py-1.5 rounded-md text-sm border border-accent-soft bg-accent text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+    }
+    .obs-btn--ghost {
+        @apply bg-transparent border-surface-border text-slate-200;
+    }
+    .obs-kv {
+        @apply grid gap-y-2 gap-x-4 text-sm max-w-2xl;
+        grid-template-columns: 8rem 1fr;
+    }
+    .obs-kv dt {
+        @apply text-slate-400;
+    }
+    .obs-kv dd {
+        @apply m-0;
+    }
+    .obs-mono {
+        @apply font-mono text-xs break-all;
+    }
+    /* ---- Evidence & consent gate (read-only mirror of the IDE gate) ---- */
+    .consent-card {
+        --card-accent: #e0b341;
+    }
+    /* Level tints the rail so severity is readable before any text is. */
+    .consent-card[data-level='sufficient'] {
+        --card-accent: #4ec97a;
+    }
+    .consent-card[data-level='insufficient'] {
+        --card-accent: #ff6b6b;
+    }
+    .consent-card[data-level='unknown'] {
+        --card-accent: #64748b;
+    }
+    .consent-meter-row {
+        @apply flex flex-wrap items-center gap-2;
+    }
+    .consent-meter-label {
+        @apply text-[11px] uppercase tracking-wide;
+        color: #8b97ab;
+    }
+    .consent-score {
+        @apply text-xs tabular-nums;
+        color: #8b97ab;
+    }
+    .consent-score strong {
+        @apply text-slate-100 text-sm;
+    }
+    /* The tick labels are absolutely positioned so they can overhang a clipped track. They
+       must therefore live INSIDE this element's own box — reserving the space with a margin
+       leaves the layout at the mercy of font metrics, and the labels collided with the
+       section below at 6px clearance. */
+    .consent-meter {
+        @apply relative mt-2 mb-4;
+        padding-bottom: 18px;
+    }
+    .consent-meter-track {
+        @apply relative h-2 rounded-full overflow-hidden;
+        background: #0d1118;
+        box-shadow: inset 0 0 0 1px #253047;
+    }
+    .consent-meter-fill {
+        @apply h-full rounded-full transition-[width] duration-500;
+        background: linear-gradient(90deg, #7f1d1d, #ff6b6b);
+    }
+    .consent-card[data-level='partial'] .consent-meter-fill {
+        background: linear-gradient(90deg, #6b4f12, #e0b341);
+    }
+    .consent-card[data-level='sufficient'] .consent-meter-fill {
+        background: linear-gradient(90deg, #1f5c38, #4ec97a);
+    }
+    .consent-card[data-level='unknown'] .consent-meter-fill {
+        background: #3d4654;
+    }
+    /* Threshold ticks are absolutely positioned outside the clipped track so they can
+       overhang it — the score is only meaningful next to the band it must clear. */
+    .consent-tick {
+        @apply absolute w-px;
+        top: -3px;
+        height: 14px;
+        background: #64748b;
+    }
+    .consent-tick-label {
+        @apply absolute text-[9px] whitespace-nowrap;
+        top: 16px;
+        transform: translateX(-50%);
+        color: #64748b;
+    }
+    .consent-section {
+        @apply mt-4;
+    }
+    .consent-section-title {
+        @apply text-sm font-semibold m-0 mb-2 flex items-center gap-2;
+    }
+    .consent-count {
+        @apply text-[10px] px-1.5 py-0.5 rounded-full font-medium tabular-nums;
+        background: #1a2030;
+        color: #8b97ab;
+        border: 1px solid #253047;
+    }
+    .consent-gaps {
+        @apply list-none m-0 p-0 space-y-1.5;
+    }
+    .consent-gap {
+        @apply flex items-start gap-2 text-sm rounded-md px-2.5 py-2;
+        background: #0d1118;
+        border: 1px solid #253047;
+    }
+    .consent-gap-text {
+        @apply leading-snug;
+    }
+    .consent-playbook {
+        @apply list-none m-0 p-0 space-y-1.5;
+        counter-reset: step;
+    }
+    .consent-step {
+        @apply flex items-start gap-2.5 text-sm rounded-md px-2.5 py-2;
+        background: #0d1118;
+        border: 1px solid #253047;
+    }
+    .consent-step-n {
+        @apply shrink-0 grid place-items-center text-[10px] font-semibold rounded-full tabular-nums;
+        width: 18px;
+        height: 18px;
+        background: #1f5c38;
+        color: #a7f3d0;
+    }
+    .consent-step-text {
+        @apply leading-snug;
+    }
+    .consent-step-hint {
+        @apply block text-xs mt-0.5;
+        color: #8b97ab;
+    }
+    .consent-choice {
+        @apply mt-5 rounded-lg px-3 py-3;
+        background: #0d1118;
+        border: 1px solid #253047;
+    }
+    .consent-choice-head {
+        @apply flex flex-wrap items-center gap-2;
+    }
+    .consent-readonly {
+        @apply ml-auto text-[10px] uppercase tracking-wide;
+        color: #64748b;
+    }
+    .consent-choices {
+        @apply flex flex-wrap gap-1.5 mt-2;
+    }
+    .consent-choice-opt {
+        @apply inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md;
+        border: 1px solid #253047;
+        background: #131722;
+        color: #8b97ab;
+    }
+    .consent-choice-opt--on {
+        border-color: #4ec97a;
+        background: rgb(78 201 122 / 0.14);
+        color: #d1fae5;
+        font-weight: 500;
+    }
+    .consent-choice-dot {
+        @apply w-2 h-2 rounded-full shrink-0;
+        background: #3d4654;
+    }
+    .consent-choice-opt--on .consent-choice-dot {
+        background: #4ec97a;
+        box-shadow: 0 0 0 3px rgb(78 201 122 / 0.2);
+    }
+    .consent-waiver {
+        @apply text-xs m-0 mt-2.5;
+        color: #8b97ab;
+    }
+    /* ---- Top row: gate (left) + cost read (right) ---- */
+    .detail-top-grid {
+        @apply grid gap-4 mb-4;
+        /* Even halves — the two cards carry equal weight, and 1.15/0.85 made the pair read as
+           a primary column with a sidebar. `minmax(0, 1fr)` keeps long unbroken values (file
+           paths, model ids) from forcing a column wider than its share. */
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        /* Stretch, not start: the row's height is the taller card, and both cards fill it so
+           their bottom edges line up. */
+        align-items: stretch;
+    }
+    .detail-top-grid--single {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    @media (max-width: 1000px) {
+        .detail-top-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+    /* The gate is the taller of the two; let the pair breathe as one block instead of
+       inheriting the stacked .obs-panel margins. */
+    .detail-top-grid > .consent-card,
+    .detail-top-grid > .tokens-card {
+        @apply my-0;
+    }
+
+    /* ---- Tokens & cost card ---- */
+    .tokens-card {
+        --card-accent: #5aa9ff;
+    }
+    .tokens-tiles {
+        @apply grid gap-2 mt-4;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .tokens-tile {
+        @apply rounded-lg px-3 py-2.5 flex flex-col gap-0.5;
+        background: #0d1118;
+        border: 1px solid #253047;
+    }
+    .tokens-tile-label {
+        @apply text-[10px] uppercase tracking-wide;
+        color: #8b97ab;
+    }
+    .tokens-tile-value {
+        @apply text-xl font-semibold tabular-nums leading-tight;
+    }
+    /* An unmeasured value must not read as a real zero. */
+    .tokens-tile[data-tone='unknown'] .tokens-tile-value {
+        color: #64748b;
+        font-weight: 500;
+    }
+    .tokens-tile[data-tone='est'] .tokens-tile-value {
+        color: #e0b341;
+    }
+    .tokens-tile-hint {
+        @apply text-[10px];
+        color: #64748b;
+    }
+    .tokens-ratio {
+        @apply mt-4;
+    }
+    .tokens-ratio-bar {
+        @apply h-2 rounded-full overflow-hidden;
+        background: #1a2030;
+        box-shadow: inset 0 0 0 1px #253047;
+    }
+    .tokens-ratio-in {
+        @apply block h-full;
+        background: linear-gradient(90deg, #2f4a7a, #5aa9ff);
+    }
+    .tokens-ratio-legend {
+        @apply flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-[11px];
+        color: #8b97ab;
+    }
+    .tokens-swatch {
+        @apply inline-block w-2 h-2 rounded-sm mr-1.5 align-middle;
+    }
+    .tokens-swatch--in {
+        background: #5aa9ff;
+    }
+    .tokens-swatch--out {
+        background: #1a2030;
+        box-shadow: inset 0 0 0 1px #253047;
+    }
+    .tokens-mcp {
+        @apply flex flex-wrap items-center gap-2 mt-4;
+    }
+    .tokens-mcp-tile {
+        @apply inline-flex items-baseline gap-1.5 rounded-md px-2.5 py-1;
+        background: #131722;
+        border: 1px solid #253047;
+    }
+    /* A zero MCP count is information, not a highlight — keep it quiet. */
+    .tokens-mcp-tile[data-zero='true'] {
+        opacity: 0.55;
+    }
+    .tokens-mcp-value {
+        @apply text-sm font-semibold tabular-nums;
+    }
+    .tokens-mcp-label {
+        @apply text-[10px] uppercase tracking-wide;
+        color: #8b97ab;
+    }
+    .tokens-mcp-note {
+        @apply text-[10px] uppercase tracking-wide ml-auto;
+        color: #64748b;
+    }
+    /* Per-harness breakdown sits inside the card, not in a separate panel: it is the same
+       measurement split by producer. */
+    .tokens-breakdown {
+        @apply mt-4;
+    }
+    .tokens-breakdown-title {
+        @apply text-[11px] uppercase tracking-wide m-0 mb-2;
+        color: #8b97ab;
+    }
+    .tokens-breakdown table {
+        @apply w-full text-xs border-collapse;
+    }
+    .tokens-breakdown th {
+        @apply text-left font-medium pb-1.5;
+        color: #64748b;
+        border-bottom: 1px solid #253047;
+    }
+    .tokens-breakdown td {
+        @apply py-1.5 tabular-nums;
+        border-bottom: 1px solid rgb(37 48 71 / 0.5);
+    }
+    .tokens-breakdown tr:last-child td {
+        border-bottom: 0;
+    }
+    .tokens-note {
+        @apply text-[11px] mt-3 mb-0 leading-snug;
+        color: #8b97ab;
+    }
+    .tokens-note strong {
+        color: #e0b341;
+    }
+
+    /* ---- Compact list rows inside cards ---- */
+    .conformance-row + .conformance-row {
+        @apply mt-2.5 pt-2.5;
+        border-top: 1px solid rgb(37 48 71 / 0.6);
+    }
+    .conformance-head {
+        @apply flex flex-wrap items-center gap-2;
+    }
+    .files-row {
+        @apply flex items-baseline gap-2 text-xs py-1;
+    }
+    .files-row + .files-row {
+        border-top: 1px solid rgb(37 48 71 / 0.6);
+    }
+    .files-action {
+        @apply shrink-0 text-[10px] uppercase tracking-wide;
+        color: #64748b;
+    }
+    .files-path {
+        @apply break-all;
+        color: #cbd5e1;
+    }
+
+    .drill-blocks .obs-panel + .obs-panel {
+        @apply mt-0;
+    }
+    .projects-form label {
+        @apply grid gap-1 text-sm;
+    }
+    .projects-form input {
+        @apply px-2 py-2 rounded border border-surface-border bg-surface-raised text-inherit;
+    }
+    .projects-form {
+        @apply grid gap-3 max-w-xl mb-6;
+    }
+    .obs-search {
+        @apply px-2 py-2 rounded border border-surface-border bg-surface-raised text-inherit w-full;
+    }
+    .request-group {
+        @apply border border-surface-border rounded-lg mb-3 bg-surface-card;
+    }
+    .request-group summary {
+        @apply cursor-pointer px-3 py-2.5 flex flex-wrap items-center gap-2 list-none;
+    }
+    .request-group summary::-webkit-details-marker {
+        display: none;
+    }
+    .request-group[open] summary {
+        @apply border-b border-surface-border;
+    }
+    .request-group .obs-table-wrap {
+        @apply border-0 rounded-none;
+    }
+    .tree-branch {
+        @apply obs-panel;
+    }
+    .tree-branch summary {
+        @apply cursor-pointer font-medium list-none;
+    }
+    .tree-branch summary::-webkit-details-marker {
+        display: none;
+    }
+    .tree-branch-body {
+        @apply mt-2 pl-2 border-l border-surface-border;
+    }
+    .tree-list {
+        @apply text-sm m-0 pl-4 space-y-1;
+    }
+    .tree-tag {
+        @apply obs-badge obs-badge--neutral mr-2 normal-case;
+    }
+    .tree-picker-row--active {
+        @apply bg-accent/20;
+    }
+    .g6-graph-host {
+        @apply w-full rounded-md border border-[#253047] bg-[#0b0e14] overflow-hidden;
+    }
+    .g6-graph-host--flow {
+        /* Pre-render fallback. Kept equal to FLOW_MIN_PX in promaxG6Mount.ts and to
+           `.promax-d-graph` below — the mount function sets the height inline once the node
+           count is known, and CSS wins until then. */
+        min-height: 380px;
+    }
+    .chip {
+        @apply inline-block border border-[#253047] rounded px-1.5 text-[11px] bg-[#1a2030] text-[#8b97ab];
+    }
+    .g6-graph-panel {
+        @apply w-full;
+    }
+    .flow-graph-wrap {
+        @apply overflow-x-auto rounded-md border border-[#253047] bg-[#0b0e14] p-2;
+    }
+    .flow-graph-svg {
+        @apply block;
+    }
+    .flow-node {
+        fill: #252b36;
+        stroke: #3d4654;
+        stroke-width: 1;
+    }
+    .flow-node--hi {
+        stroke: #4ec97a;
+        stroke-width: 2;
+        fill: #1a3d2e;
+    }
+    .flow-node--dim {
+        opacity: 0.45;
+    }
+    .flow-node--blueprint {
+        fill: #252b36;
+        stroke: #3d4654;
+    }
+    .flow-combo-band {
+        fill: #0f121a;
+        stroke: #253047;
+        stroke-width: 1;
+    }
+    .flow-combo-label {
+        fill: #8b97ab;
+        font-size: 11px;
+        font-weight: 500;
+    }
+    .flow-graph-legend {
+        @apply text-xs text-[#8b97ab];
+    }
+    .flow-edge-label {
+        fill: #d7dee9;
+        font-size: 9px;
+    }
+    .flow-node--verdict {
+        fill: rgb(6, 78, 59);
+    }
+    .flow-node--eso {
+        fill: rgb(88, 28, 135);
+    }
+    .flow-node--facade {
+        fill: rgb(30, 58, 138);
+    }
+    .flow-node-layer {
+        @apply fill-slate-500;
+        font-size: 9px;
+    }
+    .flow-node-label {
+        @apply fill-slate-100;
+        font-size: 11px;
+    }
+    .flow-tabs {
+        @apply flex flex-wrap gap-2;
+    }
+    .flow-tab--on {
+        @apply border-accent-soft bg-accent/40;
+    }
+    .promax-flow-card-head {
+        @apply flex flex-wrap items-center gap-2 mb-2;
+    }
+    .promax-flow-meta {
+        @apply ml-auto text-right;
+    }
+    .promax-flow-card .promax-flow-legend {
+        @apply mt-2;
+    }
+    #d-legend .lg {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid #253047;
+        border-radius: 4px;
+        padding: 0 6px;
+        font-size: 11px;
+        background: #1a2030;
+        color: #8b97ab;
+    }
+    #d-legend .lg i {
+        width: 9px;
+        height: 9px;
+        border-radius: 3px;
+        display: inline-block;
+        flex: none;
+    }
+    .promax-d-graph {
+        position: relative;
+        height: min(52vh, 520px);
+        /* Must equal FLOW_MIN_PX in promaxG6Mount.ts: this rule outranks the inline height, so
+           it is the effective floor whether or not the script has run. */
+        min-height: 380px;
+        border: 1px solid #253047;
+        border-radius: 8px;
+        background: #1a2030;
+        overflow: hidden;
+    }
+    .g6-fallback-host .g6-fallback {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+        text-align: center;
+        line-height: 1.7;
+    }
+    .promax-steps-wrap {
+        margin-top: 10px;
+    }
+    .promax-steps-wrap > summary {
+        cursor: pointer;
+        padding: 4px 0;
+    }
+    .promax-steps-wrap > summary:hover {
+        color: #e8edf5;
+    }
+    .promax-flow-timeline {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-top: 6px;
+    }
+    .fstep {
+        display: grid;
+        grid-template-columns: 34px 92px 1fr;
+        gap: 10px;
+        padding: 4px 6px;
+        border-radius: 4px;
+        border-left: 2px solid var(--stc, #253047);
+        align-items: baseline;
+    }
+    .fstep:hover {
+        background: #1a2030;
+    }
+    .fstep .fi {
+        color: #8b97ab;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+    .fstep .ftag {
+        font-size: 11px;
+        color: var(--stc, #8b97ab);
+    }
+    .fstep .fb {
+        word-break: break-word;
+    }
+    .fpath {
+        color: #e8edf5;
+    }
+    .fmdc {
+        color: #5aa9ff;
+    }
+    .fcmd {
+        color: #8b97ab;
+        font-size: 11.5px;
+    }
+    .fempty {
+        padding: 16px 6px;
+    }
+    .st-attach { --stc: #c084fc; }
+    .st-brain { --stc: #5aa9ff; }
+    .st-memory { --stc: #4ec97a; }
+    .st-codegraph { --stc: #22d3ee; }
+    .st-docgraph { --stc: #38bdf8; }
+    .st-inspect { --stc: #8b97ab; }
+    .st-edit { --stc: #e0b341; }
+    .st-verify { --stc: #4ec97a; }
+    .st-shell { --stc: #94a3b8; }
+    .st-browser { --stc: #f472b6; }
+    .st-design { --stc: #fb7185; }
+    .st-agent { --stc: #a78bfa; }
+    .st-store { --stc: #4ec97a; }
+    .st-other { --stc: #8b97ab; }
+    .st-end { --stc: #8b97ab; }
+    .rule-bucket {
+        margin-top: 8px;
+    }
+    .rule-bucket:first-child {
+        margin-top: 0;
+    }
+    .rule-bucket-title {
+        margin-bottom: 4px;
+        font-weight: 600;
+        color: #e8edf5;
+        font-size: 12px;
+    }
+    .chip-rule-skill { border-color: #2b5c3d; color: #4ec97a; }
+    .chip-rule-core { border-color: #5c3d7a; color: #c084fc; }
+    .chip-rule-delivery { border-color: #5c2b4a; color: #f472b6; }
+    .chip-rule-playbook { border-color: #4a5568; color: #e5e7eb; }
+    .chip-rule-workflow { border-color: #5c3d4a; color: #fb7185; }
+    .chip-rule-stack { border-color: #2b4a6b; color: #38bdf8; }
+    .chip-rule-sdlc { border-color: #2b5c5c; color: #22d3ee; }
+    .chip-rule-brain { border-color: #2b4a6b; color: #5aa9ff; }
+    .chip-rule-ux { border-color: #5c4f2b; color: #fab387; }
+    .chip-rule-agents-rules { border-color: #4a3d6b; color: #a78bfa; }
+    .chip-rule-rules-other { border-color: #3d4654; color: #94a3b8; }
+    .promax-flow-rule-buckets {
+        margin-top: 10px;
+    }
+    .promax-flow-rule-buckets:empty {
+        display: none;
+    }
+    .promax-drill-grid {
+        display: grid;
+        /* Golden standard (baplatform monitor `.grid.drilldown`): 1.35fr/.65fr. The previous
+           `1fr minmax(240px, 340px)` starved the side rail to 340px, so conformance detail and
+           file paths wrapped every few words while the timeline column sat half empty. */
+        grid-template-columns: 1.35fr 0.65fr;
+        gap: 16px;
+        align-items: start;
+    }
+    @media (max-width: 900px) {
+        .promax-drill-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .promax-drill-side .obs-panel {
+        margin-top: 0;
+        margin-bottom: 16px;
+    }
+    .promax-call-timeline {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        max-height: 460px;
+        overflow: auto;
+    }
+    .tl {
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        gap: 10px;
+        padding: 4px 6px;
+        border-radius: 4px;
+    }
+    .tl:hover {
+        background: #1a2030;
+    }
+    .tl-i {
+        color: #8b97ab;
+        text-align: right;
+    }
+    .tl-single {
+        background: rgba(224, 179, 65, 0.1);
+    }
+    .bar-tokens {
+        display: inline-block;
+        height: 7px;
+        border-radius: 2px;
+        background: #5aa9ff;
+        vertical-align: middle;
+    }
+    .ktag {
+        font-size: 11px;
+        border-radius: 4px;
+        padding: 0 5px;
+        border: 1px solid #253047;
+        white-space: nowrap;
+        margin-left: 6px;
+    }
+    .k-single {
+        color: #e0b341;
+        border-color: #5c4f2b;
+        background: #2a2416;
+    }
+    .k-batched {
+        color: #4ec97a;
+        border-color: #2b5c3d;
+    }
+    .k-answer {
+        color: #8b97ab;
+    }
+    .promax-chip-active {
+        border-color: #2b5c3d;
+        color: #4ec97a;
+    }
+    .promax-s1-grid {
+        /* Rows follow each panel's own height (set inline from the combo's rank count): a fixed
+           cell forced `fitView()` to zoom the taller combos out, which is what made the top-down
+           order unreadable. `--s1-cell-h` remains only as the pre-mount fallback. */
+        --s1-cell-h: 320px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: auto;
+        gap: 14px 16px;
+        margin-top: 10px;
+    }
+    /* Two columns of a blueprint need real width. Below this the cells were ~370px, at which
+       point a 5-node rank is scaled to ~0.37 and the labels are sub-pixel — one column is more
+       readable even though it is taller. */
+    @media (max-width: 1180px) {
+        .promax-s1-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+    .promax-s1-panel {
+        min-width: 0;
+        min-height: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .promax-s1-panel-title {
+        flex: 0 0 auto;
+        @apply mb-1 text-sm font-semibold text-[#d7dee9];
+    }
+    .promax-s1-graph-host {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        @apply rounded-md border border-[#253047] bg-[#0b0e14] overflow-hidden;
+    }
+    .obs-table--decision th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .g6-tip {
+        @apply text-xs text-slate-200 whitespace-pre-wrap max-w-xs p-1;
+    }
+}
