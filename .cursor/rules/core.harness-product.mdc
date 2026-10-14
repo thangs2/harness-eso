@@ -32,7 +32,7 @@ bun run build:observatory
 bun run test:observatory
 ```
 
-Docker (operator): **`docker/observatory.ps1`** (Windows) or **`docker/observatory.sh`** (macOS/Linux) — no `observe.sh` symlink.
+Docker (operator): **`docker/observatory.ps1`** (Windows) or **`docker/observatory.sh`** (macOS/Linux).
 
 ## Agent
 

@@ -126,6 +126,48 @@ function writeSidecarEnv(root, profileIds, port) {
     return { relative: '.harness/sidecar.env', action: 'write' };
 }
 
+const PROFILES_DIR_DEFAULT = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../../../profiles',
+);
+
+/**
+ * Ensure consumer guard templates exist in the target IDE tree.
+ * Creates .<treeKey>/hooks/guard-write.py and guard-shell.py (and pre-tool-use.py for agents)
+ * only if missing on disk, preserving existing operator customizations.
+ */
+export function ensureConsumerGuards(root, treeKey) {
+    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
+    const templatesDir = path.join(baseProfiles, 'templates', 'hooks');
+    if (!fs.existsSync(templatesDir)) return [];
+
+    const actions = [];
+    const targetHooksDir = path.join(root, `.${treeKey}`, 'hooks');
+    fs.mkdirSync(targetHooksDir, { recursive: true });
+
+    const filesToEnsure = ['guard-write.py', 'guard-shell.py'];
+    if (treeKey === 'agents') {
+        filesToEnsure.push('pre-tool-use.py');
+    }
+
+    for (const name of filesToEnsure) {
+        const dest = path.join(targetHooksDir, name);
+        if (!fs.existsSync(dest)) {
+            const src = path.join(templatesDir, name);
+            if (fs.existsSync(src)) {
+                fs.copyFileSync(src, dest);
+                try {
+                    fs.chmodSync(dest, 0o755);
+                } catch {
+                    /* chmod best effort */
+                }
+                actions.push({ relative: `.${treeKey}/hooks/${name}`, action: 'created' });
+            }
+        }
+    }
+    return actions;
+}
+
 /**
  * Merge one IDE tree's hook config, three-way.
  *
@@ -143,10 +185,48 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
     const actions = [];
     if (!treeSpec) return { actions, report: {} };
 
+    actions.push(...ensureConsumerGuards(root, treeKey));
+
     const hooksPath = path.join(root, treeSpec.hooksJsonPath || `.${treeKey}/hooks.json`);
     let hooksDoc = { version: 1, hooks: {} };
     if (fs.existsSync(hooksPath)) {
         hooksDoc = JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
+    }
+
+    // Seed consumer guard hooks if not present
+    if (treeKey === 'cursor') {
+        if (!hooksDoc.hooks) hooksDoc.hooks = {};
+        if (!hooksDoc.hooks.preToolUse) hooksDoc.hooks.preToolUse = [];
+        if (!hooksDoc.hooks.preToolUse.some((e) => entryCommand(e).includes('guard-write.py'))) {
+            hooksDoc.hooks.preToolUse.unshift({
+                command: '.cursor/hooks/guard-write.py',
+                matcher: 'Write|StrReplace|Delete',
+                failClosed: true,
+            });
+        }
+        if (!hooksDoc.hooks.beforeShellExecution) hooksDoc.hooks.beforeShellExecution = [];
+        if (!hooksDoc.hooks.beforeShellExecution.some((e) => entryCommand(e).includes('guard-shell.py'))) {
+            hooksDoc.hooks.beforeShellExecution.unshift({
+                command: '.cursor/hooks/guard-shell.py',
+                failClosed: true,
+            });
+        }
+    } else if (treeKey === 'agents') {
+        if (!hooksDoc['harness-tracer'] && !hooksDoc['consumer-guards']) {
+            hooksDoc['harness-tracer'] = {
+                PreToolUse: [
+                    {
+                        matcher: '*',
+                        hooks: [
+                            {
+                                type: 'command',
+                                command: 'python3 .agents/hooks/pre-tool-use.py',
+                            },
+                        ],
+                    },
+                ],
+            };
+        }
     }
 
     const state = readHostState(root);

@@ -9,6 +9,7 @@ import {
     type HostProfileSummary,
 } from '@/api';
 import { WizardSteps } from '@/WizardSteps';
+import { ConsentManagementPanel } from '@/components/ConsentManagementPanel';
 
 export function ConfigPage() {
     const { id } = useParams();
@@ -181,6 +182,8 @@ export function ConfigPage() {
             </form>
             {reloadMsg && <p className="sub">{reloadMsg}</p>}
             {error && <p className="error">{error}</p>}
+
+            {id && <ConsentManagementPanel projectId={id} />}
         </div>
     );
 }

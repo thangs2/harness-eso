@@ -21,9 +21,7 @@
         "test:observatory": "bun run --filter @mu/harness-observatory test",
         "dev:observatory": "bun run --filter @mu/harness-observatory dev",
         "observe:server": "node packages/harness-observe-server/src/server.mjs",
-        "dev:observe": "./scripts/dev-observe.sh",
-        "compose:up": "docker compose -f compose.harness.yml up --build",
-        "compose:down": "docker compose -f compose.harness.yml down"
+        "dev:observe": "./scripts/dev-observe.sh"
     },
     "dependencies": {
         "@mu/harness-decision": "workspace:*",

@@ -22,11 +22,18 @@ CONSOLE_PORT="${HARNESS_CONSOLE_PORT:-8791}"
 
 die() { echo "console.sh: $*" >&2; exit 1; }
 
+require_docker() {
+    command -v docker >/dev/null 2>&1 || die "cần Docker Desktop / Engine"
+    docker compose version >/dev/null 2>&1 || die "cần docker compose v2"
+    docker info >/dev/null 2>&1 || die "Docker daemon not running — start Docker Desktop / Engine"
+}
+
 require_cli() {
     [[ -f "$CLI" ]] || die "missing $CLI — run from harness-eso clone"
     if [[ ! -d "$ESO_ROOT/node_modules" ]]; then
         die "missing node_modules — run: cd \"$ESO_ROOT\" && bun install"
     fi
+    require_docker
 }
 
 run_console() {

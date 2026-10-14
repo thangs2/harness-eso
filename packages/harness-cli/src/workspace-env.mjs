@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defaultProductStateDir, productStateDir, writeJsonAtomic } from '@mu/harness-foundation/workspace';
+import { defaultProductStateDir, ensureProductState, productStateDir, writeJsonAtomic } from '@mu/harness-foundation/workspace';
 
 const CLI_SRC = path.dirname(fileURLToPath(import.meta.url));
 
@@ -85,6 +85,7 @@ export function applyWorkspaceEnv() {
         process.env.HARNESS_PROFILES_DIR = path.join(ESO_ROOT, 'profiles');
     }
     migrateLegacyProductState();
+    ensureProductState();
 }
 
 export { defaultProductStateDir };

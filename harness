@@ -31,7 +31,7 @@ case "$cmd" in
         port="${HARNESS_OBSERVE_PORT:-8792}"
         echo ""
         echo "Monitor (Observatory): http://127.0.0.1:${port}/"
-        echo "Quản lý dự án (Console):   http://127.0.0.1:8791/"
+        echo "Quản lý dự án (Console):   http://127.0.0.1:8791/ (bật riêng: ./harness console)"
         ;;
     down) node packages/harness-cli/src/cli.mjs observatory down ;;
     restart) node packages/harness-cli/src/cli.mjs observatory restart ;;

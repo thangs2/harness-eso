@@ -1,11 +1,5 @@
 # Docker / operator scripts
 
-> **Known debt:** this folder's operator surface is duplicated across `harness`, these scripts,
-> `docker/process/` and the npm `compose:*` aliases — and two documented commands are already broken on
-> Windows. Register with evidence and a cleanup sequence:
-> [`../documents/05.development/04.docker-tech-debt.md`](../documents/05.development/04.docker-tech-debt.md).
-> Read it before adding a script here, and before trusting the Console table below.
-
 ## Harness Console (monorepo product)
 
 **`console.sh`** / **`console.ps1`** — wizard API + SPA on **Docker** (`compose.console.yml`, cổng **8791**).
@@ -29,20 +23,16 @@ export HARNESS_AGENT_ROOT=~/Workspaces
 
 One container: **Observatory API + UI** on port **8792**. Host needs **Docker** (+ Compose v2) only.
 
-Workspace config: `harness-eso/.harness/workspace.json` — see [docs/00.getting-started.md](../docs/00.getting-started.md).
+Workspace config: `~/.harness/workspace.json` (hoặc `$HARNESS_PRODUCT_STATE_DIR`) — xem [docs/00.getting-started.md](../docs/00.getting-started.md).
 
-## Luồng operator (thứ tự bắt buộc)
+## Luồng operator
 
-Scripts numbered: **`docker/process/`** — xem [`docker/process/00.README.md`](process/00.README.md).
+Chỉ cần duy nhất bộ lệnh `./harness` (hoặc `docker/observatory.sh` / `console.sh`):
 
-| Bước | Script | Việc |
-|------|--------|------|
-| **00** | `00.docker-check` | Docker + bun |
-| **01** | `01.observatory-up` | build + `harness up` + `/health` |
-| **02** | `02.console-up` | Console wizard (terminal riêng) |
-| **03** | `03.verify-observatory` | tenant + hướng dẫn Requests |
-
-Không dùng `dev-observe.sh` khi test Docker. Chạy **01 trước 02**.
+1. **Cài đặt & Build:** `./install.sh`
+2. **Khởi động Observatory:** `./harness up` (port 8792)
+3. **Khởi động Console (nếu cần wizard):** `./harness console` (port 8791, chạy ở terminal riêng)
+4. **Kiểm tra sức khoẻ & Sanity:** `./docker/observatory.sh smoke` hoặc `curl http://127.0.0.1:8792/api/tenant`
 
 ## Quick start
 
@@ -50,7 +40,7 @@ Không dùng `dev-observe.sh` khi test Docker. Chạy **01 trước 02**.
 cd harness-eso
 ./install.sh
 ./harness up                    # bước 1
-./harness console               # bước 2
+./harness console               # bước 2 (terminal riêng)
 ./harness health
 ```
 

@@ -205,3 +205,43 @@ export function smokeTestJev(body: { apiKey?: string }) {
         persisted: false;
     }>('/api/jev/smoke-test', 'POST', body);
 }
+
+export interface ConsentRecord {
+    id: string;
+    path: string;
+    approvedBy: string;
+    reason?: string;
+    requestId?: string | null;
+    at: string;
+    expiresAt: string;
+}
+
+export interface ConsentResponse {
+    ok: boolean;
+    dir: string;
+    live: ConsentRecord[];
+    all: ConsentRecord[];
+}
+
+export function fetchConsent(projectId: string) {
+    return getJson<ConsentResponse>(`/api/projects/${encodeURIComponent(projectId)}/consent`);
+}
+
+export function grantConsent(
+    projectId: string,
+    body: { path: string; reason?: string; ttlSeconds?: number; requestId?: string },
+) {
+    return sendJson<{ ok: boolean; record: ConsentRecord }>(
+        `/api/projects/${encodeURIComponent(projectId)}/consent`,
+        'POST',
+        body,
+    );
+}
+
+export function revokeConsent(projectId: string, target: { id?: string; path?: string }) {
+    return sendJson<{ ok: boolean; revoked: number; active: number }>(
+        `/api/projects/${encodeURIComponent(projectId)}/consent`,
+        'DELETE',
+        target,
+    );
+}

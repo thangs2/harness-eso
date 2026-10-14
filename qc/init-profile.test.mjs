@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -32,6 +33,39 @@ test('init profile apply writes tenant + host on consumer', () => {
     assert.ok(fs.existsSync(path.join(root, '.harness', 'decision-policy.json')));
     assert.ok(fs.existsSync(path.join(root, '.harness', 'host-pack', 'harness-hook.mjs')));
     assert.ok(fs.existsSync(path.join(root, '.harness', 'host-pack', 'host-pack.json')));
+
+    // Consumer write gates must be provisioned
+    assert.ok(fs.existsSync(path.join(root, '.cursor/hooks/guard-write.py')));
+    assert.ok(fs.existsSync(path.join(root, '.cursor/hooks/guard-shell.py')));
+    assert.ok(fs.existsSync(path.join(root, '.agents/hooks/guard-write.py')));
+    assert.ok(fs.existsSync(path.join(root, '.agents/hooks/guard-shell.py')));
+    assert.ok(fs.existsSync(path.join(root, '.agents/hooks/pre-tool-use.py')));
+
+    const cursorHooks = JSON.parse(fs.readFileSync(path.join(root, '.cursor/hooks.json'), 'utf8'));
+    assert.ok(
+        (cursorHooks.hooks.preToolUse || []).some(
+            (e) => e.command === '.cursor/hooks/guard-write.py' && e.failClosed === true,
+        ),
+    );
+    assert.ok(
+        (cursorHooks.hooks.beforeShellExecution || []).some(
+            (e) => e.command === '.cursor/hooks/guard-shell.py' && e.failClosed === true,
+        ),
+    );
+});
+
+test('init profile preserves operator edits to consumer guard scripts', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-init-preserve-'));
+    const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-init-preserve' });
+    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+
+    const guardFile = path.join(root, '.cursor/hooks/guard-write.py');
+    const customContent = '# operator custom write policy\nimport sys\n';
+    fs.writeFileSync(guardFile, customContent, 'utf8');
+
+    // Re-provisioning must not clobber operator edits
+    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    assert.equal(fs.readFileSync(guardFile, 'utf8'), customContent, 'operator customizations must survive provision');
 });
 
 test('reloadHostConfig rewrites host-bootstrap.json with a fresh appliedAt', async () => {
@@ -182,3 +216,62 @@ test('init profile merges decision-policy when file already exists', () => {
     );
     assert.equal(policy.eso?.preflight?.enabled, true);
 });
+
+test('provisioned guard-write.py respects allowSessionStampFallback setting', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-guard-fallback-'));
+    const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-fallback' });
+    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+
+    const guardWritePath = path.join(root, '.cursor/hooks/guard-write.py');
+    assert.ok(fs.existsSync(guardWritePath));
+
+    const checkScript = `
+import sys
+import importlib.util
+spec = importlib.util.spec_from_file_location('gw', '${guardWritePath}')
+gw = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gw)
+assert gw.allow_session_stamp_fallback() is True
+print("DEFAULT_TRUE")
+`;
+    const res1 = spawnSync('python3', ['-c', checkScript], { cwd: root, encoding: 'utf8' });
+    assert.equal(res1.status, 0);
+    assert.match(res1.stdout, /DEFAULT_TRUE/);
+
+    // Disable via decision-policy.json
+    fs.writeFileSync(
+        path.join(root, '.harness', 'decision-policy.json'),
+        JSON.stringify({ version: 1, allowSessionStampFallback: false }),
+    );
+    const checkScriptFalse = `
+import sys
+import importlib.util
+spec = importlib.util.spec_from_file_location('gw', '${guardWritePath}')
+gw = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gw)
+assert gw.allow_session_stamp_fallback() is False
+print("CONFIG_FALSE")
+`;
+    const res2 = spawnSync('python3', ['-c', checkScriptFalse], { cwd: root, encoding: 'utf8' });
+    assert.equal(res2.status, 0);
+    assert.match(res2.stdout, /CONFIG_FALSE/);
+
+    // Disable via environment variable
+    const checkScriptEnv = `
+import sys
+import importlib.util
+spec = importlib.util.spec_from_file_location('gw', '${guardWritePath}')
+gw = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gw)
+assert gw.allow_session_stamp_fallback() is False
+print("ENV_FALSE")
+`;
+    const res3 = spawnSync('python3', ['-c', checkScriptEnv], {
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...process.env, HARNESS_ALLOW_SESSION_STAMP_FALLBACK: 'false' },
+    });
+    assert.equal(res3.status, 0);
+    assert.match(res3.stdout, /ENV_FALSE/);
+});
+

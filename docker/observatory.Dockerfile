@@ -1,4 +1,4 @@
-# Harness Observatory image — API + bundled SPA (see document/harness/02.harness-eso/12.deploy-observe-plane.md).
+# Harness Observatory image — API + bundled SPA (see documents/04.operations/02.docker-deploy.md).
 FROM oven/bun:1.3.14 AS build
 WORKDIR /app
 COPY package.json bun.lock ./
