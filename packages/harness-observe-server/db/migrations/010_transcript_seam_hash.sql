@@ -1,0 +1,14 @@
+-- The transcript cursor is a byte offset, and it was trusted as long as the file was not SHORTER than
+-- it. That misses the case that actually happened: a transcript rewritten **in place** to a size at
+-- least as large as the cursor.
+--
+-- In that case the pass reads from the stale offset, so the prompt line — which is before the cursor —
+-- is never seen. Nothing is created, and the cursor then advances to the new size, losing that prompt
+-- permanently. Observed on a real conversation: cursor at EOF, zero requests, zero llm_calls, and
+-- `<user_query>` present in the file.
+--
+-- `seam_hash` is the sha256 of the 64 bytes ending at `last_offset` — proof that the bytes before the
+-- cursor are still the ones already consumed. A mismatch means the file was rewritten, and the
+-- conversation is rebuilt. Rows written before this column existed have NULL and fall back to the
+-- newline check described in ingest-transcript.mjs.
+ALTER TABLE ingest_state ADD COLUMN seam_hash TEXT;

@@ -1,6 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { loadDecisionPolicy, sessionDir } from '@mu/harness-foundation';
+import { loadDecisionPolicy } from '@mu/harness-foundation';
+import { liveConsents } from '@mu/harness-foundation/consent';
 
 function gapToPlaybookSteps(gaps) {
     return (gaps || []).slice(0, 12).map((g, i) => {
@@ -23,17 +22,27 @@ function normalizeGaps(bundle, summary) {
     }));
 }
 
-function readWaiver(cfg) {
-    for (const tree of ['cursor', 'agents']) {
-        const p = path.join(sessionDir(cfg.root, tree), '.eso-consent-waiver.json');
-        if (!fs.existsSync(p)) continue;
-        try {
-            return JSON.parse(fs.readFileSync(p, 'utf8'));
-        } catch {
-            /* ignore */
-        }
+/**
+ * The **live** consent records for this project, from product state.
+ *
+ * This used to read `.eso-consent-waiver.json` out of the session directory — a path the agent must be
+ * able to write, because its own Brain stamp lives beside it. So the card reported "continued" on the
+ * strength of a file only the agent could have written, and nothing enforced it: the record was read
+ * here and by no guard at all. On top of that it read **either** tree, so a waiver in `.cursor/` spoke
+ * for Antigravity too.
+ *
+ * Consent now comes from `<product state>/consent/<projectId>.json`, written by the console's
+ * `POST /api/projects/:id/consent` and by nothing else. See `consent.mjs`.
+ */
+function readConsents(cfg) {
+    const projectId = cfg?.project?.id;
+    if (!projectId) return [];
+    try {
+        return liveConsents(projectId);
+    } catch {
+        // Unreadable is "no consent", never "consent".
+        return [];
     }
-    return null;
 }
 
 /**
@@ -48,14 +57,15 @@ export function buildConsentVm(cfg, evidence) {
     const level = summary.level || bundle?.sufficiency?.level || 'unknown';
     const score = summary.score ?? bundle?.sufficiency?.score ?? null;
     const gaps = normalizeGaps(bundle, summary);
-    const waiver = readWaiver(cfg);
+    const consents = readConsents(cfg);
+    const newest = consents[0] || null;
 
     const esoMode = policy?.eso?.mode ?? 'observe';
     const enforceWrites = policy?.eso?.enforceWrites ?? 'off';
 
     let outcome = 'pending';
     if (level === 'sufficient' && gaps.length === 0) outcome = 'not_required';
-    else if (waiver?.waiverId || waiver?.id) outcome = 'continue';
+    else if (newest) outcome = 'continue';
     else if (gate === 'consent' && level === 'insufficient' && enforceWrites === 'fail_closed') {
         outcome = 'blocked';
     }
@@ -69,8 +79,15 @@ export function buildConsentVm(cfg, evidence) {
         },
         consent: {
             outcome: outcome === 'not_required' ? 'continue' : outcome,
-            at: waiver?.at || null,
-            waiverId: waiver?.waiverId || waiver?.id || null,
+            at: newest?.at || null,
+            waiverId: newest?.id || null,
+            // What was actually approved, and by whom. The old shape carried a bare id, so the card could
+            // say "continued" without being able to show on whose authority or for which path — which is
+            // how an agent-issued claim read as a human decision.
+            path: newest?.path || null,
+            approvedBy: newest?.approvedBy || null,
+            expiresAt: newest?.expiresAt || null,
+            liveCount: consents.length,
         },
         preflight: {
             injectBrainBlock: level !== 'sufficient' || gaps.length > 0,

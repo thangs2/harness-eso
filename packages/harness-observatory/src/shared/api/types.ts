@@ -153,7 +153,23 @@ export interface McpCallStatsRow {
     flashBrain?: number;
     flashExecutor?: number;
     proCount?: number;
+    /**
+     * The `ask_deepseek` smart router, whose tier the server derives from complexity keywords at call
+     * time. Kept out of `proCount`/`flashExecutor` rather than guessed into one.
+     */
+    smartRouteCount?: number;
+    /**
+     * Jev decisions, not MCP calls: Jev is invoked over HTTP by the decision facade. Shown in the
+     * same card because it is a per-turn model-call count, but labelled as decisions.
+     */
     jevCount?: number;
+    /** Brain tokens reported by the MCP server. Null (not 0) when nothing reported — see `brainUsageCalls`. */
+    brainPromptTokens?: number | null;
+    brainCompletionTokens?: number | null;
+    brainCacheHitTokens?: number | null;
+    brainReasoningTokens?: number | null;
+    /** How many MCP calls actually reported usage, so a partial report is visible. */
+    brainUsageCalls?: number;
     updatedAt?: string;
 }
 
@@ -166,6 +182,13 @@ export interface RequestHeaderMetrics {
     cacheWriteTokens?: number | null;
     modelId?: string | null;
     hasFailures?: boolean;
+    /**
+     * MCP **tool** calls (Jira, search, browser…) — a different quantity from the model calls in
+     * `mcpCallStats`. Both travel over MCP and share nothing else: different counts, different costs.
+     * Kept separate because labelling the model figure "MCP calls" read as the tool count.
+     */
+    mcpToolCalls?: number;
+    mcpToolKinds?: number;
     mcpCallStats?: McpCallStatsRow | null;
 }
 

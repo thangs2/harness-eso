@@ -1,0 +1,13 @@
+-- `mcp_call_stats.jev_count` counted Jev calls by testing `jev_response_json IS NOT NULL`, but that
+-- column is shared: `insertEvidenceLedger` parks the whole ESO bundle in it so the ESO view can read
+-- it back. Every `evidence_sufficiency` row therefore counted as a Jev call.
+--
+-- Measured on x79: 3,238 of 3,238 requests reported `jev_count=1` while the policy had
+-- `jev.mode: "off"` and no ledger row anywhere had `latency_ms_jev > 0`. Jev had never run once, and
+-- the monitor said otherwise on every request. `refreshMcpCallStats` now identifies a Jev call by
+-- `latency_ms_jev > 0`.
+--
+-- The counter is derived, so the stored values are cleared here and rebuilt on the next ingest pass.
+-- That pass is a full one by construction: `changed` is true whenever migrations ran, so the scope is
+-- wide and every request is recomputed.
+DELETE FROM mcp_call_stats;

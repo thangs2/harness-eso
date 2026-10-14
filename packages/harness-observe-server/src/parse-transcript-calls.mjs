@@ -16,15 +16,31 @@
 import { assistantStats, classifyUserLine } from './ingest-transcript.mjs';
 
 /**
- * Classify a tool_use name from transcript / llm_call.tool_names (WP8).
- * @returns {'pro'|'flash_brain'|'flash_executor'|'jev'|null}
+ * Classify a tool label from transcript / llm_call.tool_names (WP8).
+ *
+ * Order matters. `ask_deepseek_flash_brain` and `ask_deepseek_flash_brain_fallback` are Brain tiers
+ * but both contain `ask_deepseek_flash`, so they are checked before it.
+ *
+ * The label vocabulary comes from `mcpToolLabel` (which reads Cursor's `CallDynamicTool` input) and
+ * matches the consumer's own `BRAIN_VIA` set. A bare `ask_deepseek_flash` is the **executor** — the
+ * Brain tiers of that tool carry a prompt prefix which `mcpToolLabel` resolves — and this used to be
+ * classified as Brain, so every executor call was counted as a paid reasoning call.
+ *
+ * `ask_deepseek_auto` is the smart router whose tier the server derives from complexity keywords at
+ * call time. It is reported as its own bucket rather than guessed into Pro or Flash: re-implementing
+ * that heuristic here would make a second source of truth for routing.
+ *
+ * @returns {'pro'|'flash_brain'|'flash_executor'|'smart'|'jev'|null}
  */
 export function classifyMcpToolName(name) {
     const n = String(name || '').toLowerCase();
     if (!n) return null;
+    if (n.includes('ask_deepseek_flash_brain')) return 'flash_brain';
     if (n.includes('ask_deepseek_pro')) return 'pro';
+    if (n.includes('ask_deepseek_auto')) return 'smart';
     if (n.includes('jev') || n.includes('typesafe') || n.includes('system_one')) return 'jev';
-    if (n.includes('ask_deepseek_flash')) return 'flash_brain';
+    // A bare `ask_deepseek_flash` is the executor; the Brain tiers were matched above.
+    if (n.includes('ask_deepseek_flash')) return 'flash_executor';
     if (n.includes('ask_deepseek')) return 'flash_executor';
     return null;
 }
@@ -35,6 +51,7 @@ export function mcpCountsFromToolNames(toolNamesCsv) {
         flash_brain_count: 0,
         flash_executor_count: 0,
         pro_count: 0,
+        smart_route_count: 0,
         jev_count: 0,
     };
     for (const raw of String(toolNamesCsv || '').split(',')) {
@@ -44,6 +61,7 @@ export function mcpCountsFromToolNames(toolNamesCsv) {
         if (kind === 'pro') out.pro_count += 1;
         else if (kind === 'flash_brain') out.flash_brain_count += 1;
         else if (kind === 'flash_executor') out.flash_executor_count += 1;
+        else if (kind === 'smart') out.smart_route_count += 1;
         else if (kind === 'jev') out.jev_count += 1;
     }
     return out;
@@ -109,6 +127,8 @@ export function parseTranscriptCalls(content) {
                 toolNames: st.names.join(','),
                 preview: st.preview,
                 mcp,
+                /** Model prompts sent through MCP, for attributing provider-reported usage. */
+                mcpPrompts: st.mcpPrompts,
             });
         }
     }

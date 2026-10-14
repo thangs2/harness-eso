@@ -28,7 +28,23 @@ const ROUTE_PY = path.join(ROOT, 'packages/harness-observe-server/src/route-hook
 const OUT_DIR = path.join(HOST_GENERIC, 'dist/host-pack');
 
 /** Files that make up the pack, in install order. */
-export const PACK_FILES = ['harness-hook.mjs', 'route-hook.py'];
+export const PACK_FILES = ['harness-hook.mjs', 'route-hook.py', 'path-policy.default.json'];
+
+/**
+ * The product's default path policy, emitted as JSON for the **Python** guards.
+ *
+ * Those guards cannot import `@mu/harness-foundation`, so without this they would need their own copy
+ * of the list — and two hand-maintained copies of a path list is exactly how the observer's copy came to
+ * be blind to 9 of 19 protected paths. Generated from the single definition in `path-policy.mjs` at build
+ * time, so there is still one thing to edit.
+ */
+async function writeDefaultPathPolicy() {
+    const mod = await import(path.join(ROOT, 'packages/harness-foundation/src/path-policy.mjs'));
+    fs.writeFileSync(
+        path.join(OUT_DIR, 'path-policy.default.json'),
+        `${JSON.stringify(mod.DEFAULT_PATH_POLICY, null, 2)}\n`,
+    );
+}
 
 /** Import specifiers the bundle is still allowed to reference once built. */
 const ALLOWED_EXTERNAL = /^node:/;
@@ -121,6 +137,8 @@ export async function buildHostPack() {
     } catch {
         /* best-effort */
     }
+
+    await writeDefaultPathPolicy();
 
     const manifest = writeManifest();
     const bytes = PACK_FILES.reduce((n, f) => n + fs.statSync(path.join(OUT_DIR, f)).size, 0);

@@ -11,8 +11,18 @@
  */
 
 import { isoNow } from './observe-config.mjs';
+import {
+    loadDecisionPolicy,
+    pathMode,
+    resolvePathPolicy,
+    shellHasWriteIntent,
+    shellWriteTargets,
+} from '@mu/harness-foundation/pure';
 
-const PROTECTED_RE = /(^|\/)(AGENTS\.md|\.cursorrules)$|\.cursor\/rules\/|\.agents\/rules\/|\.cursor\/instructions\.md|\.agents\/instructions\.md|^frontend\/|^backend\/mu-|^document\/mu\/|^sdlc\//;
+/**
+ * A tool that runs a command. Bash and Terminal are accepted for non-Cursor harnesses.
+ */
+const SHELL_TOOL_RE = /^(Shell|Bash|Terminal)$/;
 /**
  * Kept in lockstep with route-watch.mjs's `VERIFY_RE`. A verify is a real
  * COMMAND, so it may only ever be read out of a Shell payload: matching
@@ -71,6 +81,14 @@ function isVerifyCommand(cmd) {
 export function computeChecks(db, cfg, scope) {
     const projectId = cfg.project.id;
     const now = isoNow();
+    /*
+     * Which paths count as protected is **consumer policy**, resolved once per pass. It used to be a
+     * regex in this file, which meant the product hardcoded one consumer's directories — and that the
+     * second copy had already drifted: it was blind to `scripts/ci/`, the `hooks/` scripts and the
+     * skills/agents directories, so a write to the verifiers reported as "no protected path was edited".
+     * One list, in the consumer's policy, read by the guard and the observer alike.
+     */
+    const pathPolicy = resolvePathPolicy(loadDecisionPolicy(cfg).policy);
     // Same scoping rule as overlayEvidence: recomputing every request each poll
     // is what made a pass take seconds.
     let requests;
@@ -218,7 +236,16 @@ export function computeChecks(db, cfg, scope) {
             (e, i) => i > lastEditIdx && e.tool === 'Shell' && isVerifyCommand(shellCommand(e.raw_json)),
         );
         if (lastEditIdx < 0) {
-            results['verify-after-edit'] = verdict('skip', 1, 'no edits in this request');
+            /*
+             * Distinguish "nothing was edited" from "we cannot see edits". The pack does not wire the
+             * `afterFileEdit` event, so this branch is the normal one — and "no edits in this request"
+             * asserts something we have not established. Edits recorded in `request_file` prove the
+             * latter.
+             */
+            const editsRecorded = editedPaths.length > 0;
+            results['verify-after-edit'] = editsRecorded
+                ? verdict('skip', 1, 'edits recorded but no edit event captured — cannot judge')
+                : verdict('skip', 1, 'no edits in this request');
         } else if (verifyHit > lastEditIdx) {
             results['verify-after-edit'] = verdict('pass', 1, 'a verify command ran after the final edit');
         } else {
@@ -226,20 +253,48 @@ export function computeChecks(db, cfg, scope) {
         }
 
         // --- brain-before-protected-write
-        const protectedEdits = events.filter(
-            (e) => e.event_type === 'afterFileEdit' && PROTECTED_RE.test((e.path || '').replace(cfg.root + '/', '')),
-        );
-        if (protectedEdits.length === 0) {
-            results['brain-before-protected-write'] = verdict('skip', 0, 'no protected path was edited');
+        /*
+         * Two channels can write a protected file, and the check used to watch only one of them.
+         *
+         * `afterFileEdit` is the pack's own write signal — and the pack does not wire that event, so
+         * this check could not see *any* write. Worse, it reported "no protected path was edited",
+         * which reads as a finding rather than as an absence of one.
+         *
+         * Shell is the other channel, and it is the one that actually mattered: a turn wrote 7
+         * protected files with `cat >` while this check said nothing was touched, because
+         * `guard-write.py` only runs on Write/StrReplace and `actionOf` files Shell under `'shell'`.
+         * Both channels are read now.
+         */
+        const relOf = (p) => String(p || '').replace(cfg.root + '/', '');
+        const editSignals = [];
+        events.forEach((e, i) => {
+            if (e.event_type === 'afterFileEdit' && e.path) {
+                editSignals.push({ idx: i, path: e.path, rel: relOf(e.path) });
+                return;
+            }
+            if (!SHELL_TOOL_RE.test(e.tool || '')) return;
+            const cmd = shellCommand(e.raw_json);
+            if (!shellHasWriteIntent(cmd)) return;
+            const parsed = shellWriteTargets(cmd).map(relOf);
+            // A Python heredoc writes a path held in a variable: no target parses, and the event's own
+            // path is the only signal available.
+            const list = parsed.length ? parsed : e.path ? [relOf(e.path)] : [];
+            for (const t of list) editSignals.push({ idx: i, path: t, rel: t, via: 'shell' });
+        });
+        const protectedSignals = editSignals.filter((s) => pathMode(s.rel, pathPolicy) !== null);
+        if (protectedSignals.length === 0) {
+            results['brain-before-protected-write'] =
+                editSignals.length === 0
+                    ? verdict('skip', 1, 'cannot determine — no file-edit events were captured')
+                    : verdict('skip', 0, 'no protected path was edited');
         } else {
-            const firstProtected = events.findIndex(
-                (e) => e.event_type === 'afterFileEdit' && PROTECTED_RE.test((e.path || '').replace(cfg.root + '/', '')),
-            );
+            const firstProtected = protectedSignals[0].idx;
             const brainHit = events.findIndex((e, i) => i < firstProtected && BRAIN_RE.test(e.raw_json || ''));
+            const how = protectedSignals[0].via === 'shell' ? ' (via Shell)' : '';
             results['brain-before-protected-write'] =
                 brainHit >= 0
-                    ? verdict('pass', 0, 'a brain call preceded the first protected write')
-                    : verdict('fail', 0, `protected write with no preceding brain call: ${protectedEdits[0].path}`);
+                    ? verdict('pass', 0, `a brain call preceded the first protected write${how}`)
+                    : verdict('fail', 0, `protected write with no preceding brain call${how}: ${protectedSignals[0].rel}`);
         }
 
         let pass = 0;

@@ -25,6 +25,12 @@ services:
             # the checkout here is what made the running stack depend on where the source tree is:
             # `git clean` or moving it took the project registry with it, and a container started
             # from a deleted directory could not boot at all.
+            #
+            # This mount also carries the MCP usage ledger (`<dir>/deepseek-usage.jsonl`), which is
+            # how the host-side DeepSeek MCP server and this container agree on one file: both
+            # resolve it through product state, so neither needs to know the other's layout. Do not
+            # move the ledger under HARNESS_DATA_ROOT — that root is a *named volume* here, a
+            # container-only filesystem the host server cannot see.
             - ${HARNESS_PRODUCT_STATE_HOST:-${HOME}/.harness}:/data/product-state
             - ${HARNESS_AGENT_ROOT}:/agent-repos
             # Cursor agent transcripts (REQUEST spine) — read-only; see docker/README.md

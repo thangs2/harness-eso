@@ -36,6 +36,13 @@
                     "failClosed": true
                 }
             ],
+            "afterFileEdit": [
+                {
+                    "id": "harness-eso-route-trace-edit",
+                    "command": "bash -lc 'export HARNESS_TREE=cursor; exec node .harness/host-pack/harness-hook.mjs --hook route --tree cursor'",
+                    "failClosed": false
+                }
+            ],
             "preToolUse": [
                 {
                     "id": "harness-eso-guard-brain",

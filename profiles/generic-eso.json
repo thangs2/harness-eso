@@ -1,21 +1,73 @@
 {
     "version": 1,
     "profile": "generic-eso",
-    "jev": { "mode": "off" },
-    "fallback": { "l3_flash": false },
+    "jev": {
+        "mode": "off"
+    },
+    "fallback": {
+        "l3_flash": false
+    },
     "on_ambiguous": "hil_only",
-    "ledger": { "enabled": true },
+    "ledger": {
+        "enabled": true
+    },
     "eso": {
         "enabled": true,
         "mode": "observe",
         "enforceWrites": "off",
-        "thresholds": { "T_low": 0.45, "T_high": 0.72 },
-        "preflight": { "enabled": true, "maxMs": 8000 },
-        "cognition": { "insufficientPromptGate": "consent" },
+        "thresholds": {
+            "T_low": 0.45,
+            "T_high": 0.72
+        },
+        "preflight": {
+            "enabled": true,
+            "maxMs": 8000
+        },
+        "cognition": {
+            "insufficientPromptGate": "consent"
+        },
         "sources": {
-            "law": { "adapter": "docgraph-cli", "enabled": true },
-            "code": { "adapter": "codegraph-cli", "enabled": true },
-            "memory": { "adapter": "noop-memory", "enabled": false }
+            "law": {
+                "adapter": "docgraph-cli",
+                "enabled": true
+            },
+            "code": {
+                "adapter": "codegraph-cli",
+                "enabled": true
+            },
+            "memory": {
+                "adapter": "noop-memory",
+                "enabled": false
+            }
         }
+    },
+    "paths": {
+        "locked": [],
+        "gated": [
+            "AGENTS.md",
+            ".cursorrules",
+            ".cursor/instructions.md",
+            ".agents/instructions.md",
+            ".cursor/rules/",
+            ".agents/rules/",
+            ".cursor/skills/",
+            ".agents/skills/",
+            ".cursor/agents/",
+            ".agents/agents/",
+            ".cursor/mcp.json",
+            ".vscode/mcp.json",
+            ".agents/mcp_config.json",
+            ".cursor/hooks/guard-write.py",
+            ".cursor/hooks/guard-shell.py",
+            ".cursor/hooks/locked-paths.txt",
+            ".agents/hooks/guard-write.py",
+            ".agents/hooks/guard-shell.py",
+            ".agents/hooks/locked-paths.txt",
+            "scripts/ci/",
+            "installation/docgraph/",
+            "docgraph.scope"
+        ],
+        "ask": [],
+        "sot": []
     }
 }

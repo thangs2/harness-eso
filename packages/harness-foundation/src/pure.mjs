@@ -19,3 +19,43 @@ export {
     sessionDir,
 } from './paths.mjs';
 export { DEFAULT_POLICY, loadDecisionPolicy, loadDecisionPolicyForCwd } from './policy-load.mjs';
+/*
+ * Shell write detection. Lives here, not in the observe server, because the **host pack** needs it
+ * too: the pack's `shell-targets` hook is what the consumer's shell guard calls to find out which
+ * files a command writes. Putting it in the observe server would have forced a second copy, and two
+ * copies of a heuristic is exactly what let the Shell write channel go unnoticed.
+ *
+ * Pure string work — no filesystem, no child process — so it is safe on the pack's hot path.
+ */
+export { shellCommandOf, shellHasWriteIntent, shellWriteTargets } from './shell-writes.mjs';
+export {
+    DEFAULT_PATH_POLICY,
+    isSotPath,
+    pathMode,
+    resolvePathPolicy,
+    toRepoRelative,
+} from './path-policy.mjs';
+
+/*
+ * Consent records. The **read** side is exported here because the pack and the observer may need to
+ * answer "is this path approved?"; the write side is deliberately not, so nothing on the hot path can
+ * acquire the ability to grant consent by importing it.
+ */
+export { CONSENT_DIR_NAME, consentCovers, consentDir, consentFile, liveConsents, readConsentStore } from './consent.mjs';
+
+/*
+ * Attestations. Exported from `pure` because the pack's preflight hook is a writer: it records the
+ * evidence verdict where the guard can read it and the agent's own Write/Shell path cannot.
+ */
+export {
+    ATTEST_MAX_AGE_SECONDS,
+    BRAIN_ROLES,
+    attestDir,
+    brainAttested,
+    esoAttestationFile,
+    projectIdFrom,
+    readEsoAttestation,
+    usageLedgerFile,
+    writeEsoAttestation,
+} from './attest.mjs';
+

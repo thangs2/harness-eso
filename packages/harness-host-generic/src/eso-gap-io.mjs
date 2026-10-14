@@ -1,4 +1,4 @@
-import { isoNow } from '@mu/harness-foundation/pure';
+import { isoNow, projectIdFrom, writeEsoAttestation } from '@mu/harness-foundation/pure';
 import { harnessTree, readJsonFile, sessionDir, writeJsonFile } from './hook-io.mjs';
 
 const READ_TOOL_RE = /^(Read|Grep|Glob|CallDynamicTool)$/i;
@@ -164,5 +164,36 @@ export function writeBundleStampFromPreflight(preflight, policy, root = process.
         preflightAt: preflight.at || null,
     };
     writeJsonFile(bundleStampPath(root, tree), payload);
+
+    /*
+     * The same verdict, written where the agent's own Write/Shell path cannot reach.
+     *
+     * The session stamp above has to stay — every existing guard and the pack's own gap tracker read it,
+     * and it is the pack's legitimate output. But it is one directory away from files the agent must be
+     * able to write (the Brain stamp lives beside it), so the agent can overwrite it, and one did: an
+     * incident had the agent replace `allowWrite: false` with `true`, and invent a score and a
+     * `hilWaiver`. Product state is guarded by both `guard-write.py` and `guard-shell.py`, so the agent's
+     * ordinary channels are shut for this copy. The guard prefers it; see `attest.mjs`.
+     */
+    try {
+        const projectId = projectIdFrom(root);
+        if (projectId) {
+            writeEsoAttestation(projectId, {
+                at: payload.at,
+                generationId: preflight.generationId ?? null,
+                level: payload.level,
+                score: payload.score,
+                allowWrite: payload.allowWrite,
+                enforceWrites: payload.enforceWrites,
+                mode: payload.mode,
+            });
+        }
+    } catch {
+        /*
+         * Preflight must never fail because the attestation could not be written: `root` may be a repo
+         * with no `harness.config.json`, and product state may be read-only in a container. The guard
+         * falls back to the session stamp, which is the behaviour that existed before this.
+         */
+    }
     return payload;
 }

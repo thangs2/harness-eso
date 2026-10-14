@@ -19,6 +19,7 @@ import { run as postToolHint } from './post-tool-hint.mjs';
 import { run as preCompact } from './pre-compact-cost-hook.mjs';
 import { run as preflight } from './preflight-hook.mjs';
 import { run as route } from './route-hook.mjs';
+import { run as shellTargets } from './shell-targets-hook.mjs';
 
 /** @typedef {'deny' | 'allow'} ErrorPosture */
 
@@ -47,6 +48,15 @@ export const HOOKS = {
     'gap-tracker': { run: gapTracker, onError: 'allow', kind: 'telemetry' },
     'post-tool-hint': { run: postToolHint, onError: 'allow', kind: 'telemetry' },
     'pre-compact': { run: preCompact, onError: 'allow', kind: 'telemetry' },
+    /*
+     * Not a guard and not wired to any IDE event — a **query** the consumer's shell hook runs to find
+     * out which files a command writes. It prints JSON instead of a permission payload, so wiring it
+     * into a profile would replace a real guard's decision with that JSON.
+     *
+     * `onError: 'deny'` because its caller treats a failure as "cannot tell", and the caller decides
+     * what to do from there; leaving it as `allow` would make an unparseable command look safe.
+     */
+    'shell-targets': { run: shellTargets, onError: 'deny', kind: 'guard' },
 };
 
 export const HOOK_NAMES = Object.keys(HOOKS);

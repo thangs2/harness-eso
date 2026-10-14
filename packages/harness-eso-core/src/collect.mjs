@@ -56,7 +56,17 @@ export function scoreSufficiency(pack, retrieval, gaps, stem, thresholds) {
     const lawRatio = required ? lawHit / required : 1;
 
     const reads = retrieval.reads?.readCount ?? 0;
-    const minReads = Math.max(pack.minReadPaths ?? 0, 1);
+    /*
+     * `minReadPaths: 0` means the pack requires **no** file read, so reading nothing must not cost
+     * score. `Math.max(pack.minReadPaths ?? 0, 1)` forced the minimum to 1, which made two things
+     * true at once: the `minReads === 0` branch below was unreachable, and the `docs` / `general` /
+     * `root` packs — which all declare 0 — were scored as though they demanded a read. A docs turn
+     * that read nothing lost 45% of its score for a requirement its own pack says does not exist.
+     *
+     * It also disagreed with `detectGaps`, which reads the same field as `?? 0`. Gaps and score have
+     * to agree about what the pack requires, or the score is not explainable from the reported gaps.
+     */
+    const minReads = pack.minReadPaths ?? 0;
     const readRatio = minReads === 0 ? 1 : Math.min(1, reads / minReads);
 
     let score = lawRatio * 0.55 + readRatio * 0.45;

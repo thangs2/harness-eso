@@ -1,0 +1,15 @@
+-- `mcp_call.id` did not include the project, but the usage ledger is machine-wide and *every*
+-- project reads the whole file.
+--
+-- Both projects therefore computed the same id for the same record, and `ON CONFLICT(id) DO NOTHING`
+-- let whichever project ingested first keep the row. The project that actually owned the prompt then
+-- had nothing to insert and reported the record as `skipped` — so its spend was lost, while the
+-- first project displayed it as unattributed.
+--
+-- Scoping the hash by `project_id` changes every id. Rows derived under the old scheme are cleared
+-- here so the next ingest pass re-derives them correctly; leaving them would duplicate every
+-- attributed call and double-count its tokens in `mcp_call_stats`.
+--
+-- Clearing is safe because `mcp_call` is wholly derived: the ledger is the source of truth, and
+-- attribution is re-read from `mcp_prompt` (untouched here, and derived from transcripts).
+DELETE FROM mcp_call;

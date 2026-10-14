@@ -16,7 +16,16 @@ type McpStats = {
     flashBrain?: number;
     flashExecutor?: number;
     proCount?: number;
+    /** Smart-routed calls whose tier the server decides at call time — not guessed into brain/pro. */
+    smartRouteCount?: number;
+    /** Jev decisions — HTTP to the decision facade, not MCP calls. */
     jevCount?: number;
+    brainPromptTokens?: number | null;
+    brainCompletionTokens?: number | null;
+    brainCacheHitTokens?: number | null;
+    brainReasoningTokens?: number | null;
+    /** How many MCP calls reported usage; fewer than the call count means a partial report. */
+    brainUsageCalls?: number;
 };
 
 type RequestMetrics = {
@@ -28,6 +37,13 @@ type RequestMetrics = {
     cacheWriteTokens?: number | null;
     modelId?: string | null;
     mcpCallStats?: McpStats | null;
+    /**
+     * MCP **tool** calls (Jira, search, browser…) — a different quantity from the model calls in
+     * `mcpCallStats`. Both travel over MCP and nothing else is shared: different counts, different
+     * costs. Kept separate because labelling the model figure "MCP calls" read as the tool count.
+     */
+    mcpToolCalls?: number;
+    mcpToolKinds?: number;
 };
 
 type StopRow = {
@@ -83,16 +99,51 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
     const estimated = tokenSummary?.estimated === true;
     const inputUnknown = input == null;
     const hasAny = input != null || output != null || cacheRead != null;
-    const hasMcp = Boolean(
-        mcp && (mcp.flashBrain || mcp.flashExecutor || mcp.proCount || mcp.jevCount),
-    );
+
+    /*
+     * Brain is the model side of the turn: the Pro and flash-brain tiers the Dispatcher delegates
+     * to. The executor tier is deliberately excluded — it is thinking-off tooling, not reasoning.
+     *
+     * `brainUsageCalls` is the honesty hinge. The Dispatcher's totals come from the `stop` hook and
+     * are always its own usage; the Brain's come from the MCP server's ledger, which may be missing
+     * (server not yet updated, or the ledger not shared with this deployment). When Brain calls
+     * happened but none reported usage, the card must say so — otherwise a reader adds up the tiles
+     * and concludes the turn was cheap when most of its cost is simply unmeasured.
+     */
+    const brainCalls = (mcp?.flashBrain ?? 0) + (mcp?.proCount ?? 0);
+    const brainUsageCalls = mcp?.brainUsageCalls ?? 0;
+    const brainIn = mcp?.brainPromptTokens ?? null;
+    const brainOut = mcp?.brainCompletionTokens ?? null;
+    const brainCache = mcp?.brainCacheHitTokens ?? null;
+    const brainTokensUnknown = brainCalls > 0 && brainUsageCalls === 0;
+    const brainTokensPartial = brainUsageCalls > 0 && brainUsageCalls < brainCalls;
+
+    /*
+     * Two different quantities share the MCP transport and must not share a label:
+     *
+     *   - `modelCalls` — calls the agent made *to a model* through an MCP server (DeepSeek Brain,
+     *     executor, Pro). This is what carries token cost, and it is what `mcpCallStats` counts.
+     *   - `mcpToolCalls` — calls to an MCP *tool* (Jira, search, browser). No tokens of their own.
+     *
+     * The card previously showed only the first under the label "MCP calls", so a turn with five
+     * Jira/search calls displayed no MCP activity at all.
+     */
+    const modelCalls =
+        (mcp?.flashBrain ?? 0) +
+        (mcp?.flashExecutor ?? 0) +
+        (mcp?.proCount ?? 0) +
+        (mcp?.smartRouteCount ?? 0);
+    const mcpToolCalls = metrics?.mcpToolCalls ?? 0;
+    const mcpToolKinds = metrics?.mcpToolKinds ?? 0;
+
+    const hasModelCalls = modelCalls > 0;
 
     const mcpTiles: Array<{ label: string; value: number }> = mcp
         ? [
-              { label: 'flash', value: mcp.flashBrain ?? 0 },
+              { label: 'flash brain', value: mcp.flashBrain ?? 0 },
               { label: 'executor', value: mcp.flashExecutor ?? 0 },
               { label: 'pro', value: mcp.proCount ?? 0 },
-              { label: 'jev', value: mcp.jevCount ?? 0 },
+              { label: 'smart', value: mcp.smartRouteCount ?? 0 },
           ]
         : [];
 
@@ -112,7 +163,7 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
         (s) => s.inputTokens != null || s.outputTokens != null || s.cacheRead != null,
     );
 
-    const empty = !hasAny && !hasMcp && !metrics?.callCount;
+    const empty = !hasAny && !hasModelCalls && !metrics?.callCount && mcpToolCalls === 0;
 
     return (
         <Panel
@@ -125,7 +176,14 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
                 <>
                     {tokenSummary?.source ? <Badge tone="neutral">{tokenSummary.source}</Badge> : null}
                     {estimated ? <Badge tone="warn">estimated</Badge> : null}
-                    {!estimated && hasAny ? <Badge tone="ok">reported</Badge> : null}
+                    {!estimated && hasAny ? <Badge tone="ok">dispatcher reported</Badge> : null}
+                    {brainTokensUnknown ? (
+                        <Badge tone="warn">brain tokens not reported</Badge>
+                    ) : null}
+                    {brainTokensPartial ? <Badge tone="warn">brain tokens partial</Badge> : null}
+                    {brainUsageCalls > 0 && !brainTokensPartial ? (
+                        <Badge tone="ok">brain tokens reported</Badge>
+                    ) : null}
                 </>
             }
             footer={
@@ -154,6 +212,9 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
                 </p>
             ) : (
                 <>
+                    {/* The tiles above are one measurement, not the whole turn: `stop` reports the
+                        Dispatcher. The Brain's own spend is a separate measurement below. */}
+                    <h4 className="tokens-breakdown-title">dispatcher · hook stop</h4>
                     <div className="tokens-tiles">
                         <StatTile
                             label="Input"
@@ -223,15 +284,101 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
                         </div>
                     ) : null}
 
-                    {hasMcp ? (
-                        <div className="tokens-mcp">
+                    {/*
+                     * MCP *tool* calls — a count of calls, not of tokens. Rendered before the model
+                     * block so the two read as distinct facts rather than one ambiguous "MCP" figure.
+                     */}
+                    {mcpToolCalls > 0 ? (
+                        <div className="tokens-mcp" data-testid="mcp-tool-calls">
+                            <div className="tokens-mcp-tile">
+                                <span className="tokens-mcp-value">{mcpToolCalls}</span>
+                                <span className="tokens-mcp-label">tools</span>
+                            </div>
+                            <span className="tokens-mcp-note">
+                                MCP tool calls{mcpToolKinds > 1 ? ` · ${mcpToolKinds} kinds` : ''}
+                            </span>
+                        </div>
+                    ) : null}
+
+                    {hasModelCalls ? (
+                        <div className="tokens-mcp" data-testid="mcp-model-calls">
                             {mcpTiles.map((t) => (
                                 <div key={t.label} className="tokens-mcp-tile" data-zero={t.value === 0}>
                                     <span className="tokens-mcp-value">{t.value}</span>
                                     <span className="tokens-mcp-label">{t.label}</span>
                                 </div>
                             ))}
-                            <span className="tokens-mcp-note">MCP calls</span>
+                            <span className="tokens-mcp-note">
+                                model calls over MCP · {modelCalls} total
+                            </span>
+                        </div>
+                    ) : null}
+
+                    {/*
+                     * Jev sits in the same card because it is a per-turn model-call count, but it is
+                     * not an MCP call — Jev is invoked over HTTP by the decision facade. Shown as its
+                     * own line rather than as a fifth tile so neither the "model calls over MCP" nor
+                     * the "MCP tool calls" figure is diluted with something that is neither.
+                     */}
+                    {(mcp?.jevCount ?? 0) > 0 ? (
+                        <p className="tokens-note">
+                            <strong>Jev decisions {mcp?.jevCount}.</strong> HTTP to the decision
+                            facade, not an MCP call.
+                        </p>
+                    ) : null}
+
+                    {brainCalls > 0 ? (
+                        <div className="tokens-breakdown" data-testid="brain-tokens">
+                            <h4 className="tokens-breakdown-title">brain · MCP server</h4>
+                            <div className="tokens-tiles">
+                                <StatTile
+                                    label="Brain input"
+                                    value={fmt(brainIn)}
+                                    hint={brainIn == null ? 'not reported' : undefined}
+                                />
+                                <StatTile
+                                    label="Brain output"
+                                    value={fmt(brainOut)}
+                                    hint={brainOut == null ? 'not reported' : undefined}
+                                />
+                                <StatTile
+                                    label="Brain cache read"
+                                    value={fmt(brainCache)}
+                                    hint={brainCache == null ? 'not reported' : undefined}
+                                />
+                            </div>
+                            <p className="tokens-note">
+                                {brainTokensUnknown ? (
+                                    <>
+                                        <strong>Brain tokens not reported.</strong> This turn requested{' '}
+                                        {brainCalls} Brain call{brainCalls === 1 ? '' : 's'}, but the
+                                        MCP server reported no usage for{' '}
+                                        {brainCalls === 1 ? 'it' : 'any of them'} — so the Dispatcher
+                                        figures above are not the cost of the turn.
+                                        {/*
+                                         * "requested", not "made": the transcript records the agent's
+                                         * tool call, and Cursor writes no tool result, so a call that
+                                         * was dispatched and then cancelled or timed out out is
+                                         * indistinguishable here from one that ran. Seen on x79: a
+                                         * `[BRAIN FLASH]` call was dispatched, never reached the
+                                         * server (no log, no ledger, no hook event), and this counter
+                                         * still read 1.
+                                         */}
+                                    </>
+                                ) : brainTokensPartial ? (
+                                    <>
+                                        <strong>Partial.</strong> {brainUsageCalls} of {brainCalls}{' '}
+                                        Brain calls reported usage; the rest did not, so these sums
+                                        understate the turn.
+                                    </>
+                                ) : (
+                                    <>
+                                        Reported by the MCP server for {brainUsageCalls} Brain call
+                                        {brainUsageCalls === 1 ? '' : 's'} ({fmt(brainIn) ?? '—'} in,{' '}
+                                        {fmt(brainOut) ?? '—'} out).
+                                    </>
+                                )}
+                            </p>
                         </div>
                     ) : null}
                 </>
@@ -239,10 +386,10 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
 
             {inputUnknown && !empty ? (
                 <p className="tokens-note">
-                    <strong>Input tokens unknown.</strong> Only a hook <code>stop</code> payload
-                    reports them; a transcript does not carry usage, and the model&apos;s input is
-                    the whole context (system prompt + attached rules + files + history), so it
-                    cannot be reconstructed from the prompt text.
+                    <strong>Dispatcher input tokens unknown.</strong> Only a hook{' '}
+                    <code>stop</code> payload reports them; a transcript does not carry usage, and the
+                    model&apos;s input is the whole context (system prompt + attached rules + files +
+                    history), so it cannot be reconstructed from the prompt text.
                     {estimated ? ' Output is estimated from the assistant text (chars ÷ 4).' : ''}
                 </p>
             ) : null}

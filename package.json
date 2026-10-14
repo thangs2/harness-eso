@@ -1,7 +1,7 @@
 {
     "name": "harness-eso",
     "private": true,
-    "description": "Harness Evidence Sufficiency Orchestrator — @mu/harness-* monorepo",
+    "description": "Harness Evidence Sufficiency Orchestrator \u2014 @mu/harness-* monorepo",
     "type": "module",
     "workspaces": [
         "packages/*"
@@ -9,10 +9,12 @@
     "scripts": {
         "install:product": "./install.sh",
         "harnessctl": "node packages/harness-cli/src/cli.mjs",
-        "test": "bun test packages/harness-foundation/src packages/harness-eso-core/src packages/harness-decision/src packages/harness-system-one/src qc",
+        "test": "node scripts/run-tests.mjs",
+        "test:qc": "bun test",
         "test:all": "bun run test && bun run test:observatory",
         "build:host-pack": "node scripts/build-host-pack.mjs",
         "bench:ingest": "node scripts/bench-ingest.mjs",
+        "sync:diagrams": "node scripts/sync-diagrams.mjs",
         "build:console": "bun run --filter @mu/harness-console build",
         "build:observatory": "bun run --filter @mu/harness-observatory build",
         "console": "node packages/harness-console-server/src/server.mjs",

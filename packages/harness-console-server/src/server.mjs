@@ -22,6 +22,15 @@ import {
     syncTenantsFromWorkspace,
     tenantsFile,
 } from '@mu/harness-foundation/workspace';
+// Consent records — the `ask` tier's human half. Imported by subpath rather than from the package root
+// so the console server does not pull the SQLite port into its cold start for one JSON file.
+import {
+    consentDir,
+    grantConsent,
+    liveConsents,
+    readConsentStore,
+    revokeConsent,
+} from '@mu/harness-foundation/consent';
 import {
     consumerTypesafeEnvConfigured,
     resolveApiKey,
@@ -253,7 +262,9 @@ async function route(req, res) {
         return;
     }
 
-    const match = p.match(/^\/api\/projects\/([^/]+)(\/preview|\/provision|\/reload|\/observe-health)?$/);
+    const match = p.match(
+        /^\/api\/projects\/([^/]+)(\/preview|\/provision|\/reload|\/observe-health|\/consent)?$/,
+    );
     if (match) {
         const id = decodeURIComponent(match[1]);
         const action = match[2];
@@ -261,6 +272,58 @@ async function route(req, res) {
         if (!project) {
             json(res, 404, { ok: false, error: 'not found' });
             return;
+        }
+
+        /*
+         * Human consent for the `ask` path tier.
+         *
+         * This is the **only** writer of a consent record, and that is its purpose: the record lives in
+         * product state (outside the repo) so the agent's write gates cannot reach it, and the console is
+         * a surface a human operates. A route an agent could call would put the record back inside the
+         * agent's reach and the tier would mean nothing.
+         */
+        if (action === '/consent') {
+            if (req.method === 'GET') {
+                json(res, 200, {
+                    ok: true,
+                    dir: consentDir(),
+                    live: liveConsents(id),
+                    all: readConsentStore(id).records,
+                });
+                return;
+            }
+            if (req.method === 'POST') {
+                const body = await readBody(req);
+                if (!body?.path) {
+                    json(res, 400, { ok: false, error: 'consent needs a path' });
+                    return;
+                }
+                try {
+                    const record = grantConsent(id, {
+                        path: body.path,
+                        reason: body.reason,
+                        ttlSeconds: Number(body.ttlSeconds) || undefined,
+                        requestId: body.requestId,
+                        // Named, not implied. If a future channel grants consent it records its own
+                        // identity here, and an out-of-band approval stays distinguishable.
+                        approvedBy: 'human:console',
+                    });
+                    json(res, 201, { ok: true, record });
+                } catch (err) {
+                    json(res, 400, { ok: false, error: String(err?.message || err) });
+                }
+                return;
+            }
+            if (req.method === 'DELETE') {
+                const body = await readBody(req);
+                const query = url.searchParams;
+                const out = revokeConsent(id, {
+                    path: body?.path || query.get('path') || undefined,
+                    id: body?.id || query.get('id') || undefined,
+                });
+                json(res, 200, { ok: true, ...out });
+                return;
+            }
         }
 
         if (!action && req.method === 'GET') {

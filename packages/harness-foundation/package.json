@@ -10,7 +10,8 @@
         "./workspace": "./src/workspace-store.mjs",
         "./project-registry": "./src/project-registry.mjs",
         "./host-install": "./src/host-install.mjs",
-        "./init-profile": "./src/init-profile.mjs"
+        "./init-profile": "./src/init-profile.mjs",
+        "./consent": "./src/consent.mjs"
     },
     "files": [
         "src"

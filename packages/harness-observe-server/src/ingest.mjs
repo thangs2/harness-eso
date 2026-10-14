@@ -15,7 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isTrackingDisabled, isoNow, loadConfig } from './observe-config.mjs';
 import { openDb, migrate, upsertProject, healthCheck } from './observe-db.mjs';
-import { ingestTranscript, discoverTranscripts } from './ingest-transcript.mjs';
+import { ingestTranscript, discoverTranscripts, rebuildTranscript } from './ingest-transcript.mjs';
 import { ingestHookFile, linkRequests, overlayEvidence } from './ingest-hooks.mjs';
 import { computeChecks } from './checks.mjs';
 import { refreshRequestListCache } from './request-list-cache.mjs';
@@ -126,13 +126,22 @@ export async function runIngestOnce(cfg, opts = {}) {
         cycleCount += 1;
         const runBackfill = changed || cycleCount % BACKFILL_EVERY() === 0;
 
-        // Re-roll ONLY the requests this cycle touched. A rebuild, a fresh
-        // migration, or a self-healed mis-link invalidates everything, so those
-        // pass null = "all". An idle pass therefore costs almost nothing, which
-        // is what lets a 2s poll and 2600 historical requests coexist.
+        /*
+         * Re-roll ONLY the requests this cycle touched. A rebuild, a fresh migration, or a self-healed
+         * mis-link invalidates everything, so those pass null = "all". An idle pass therefore costs
+         * almost nothing, which is what lets a 2s poll and 2600 historical requests coexist.
+         *
+         * A newly LINKED prompt belongs in the same category as a rebuild: linking is what populates
+         * `request_rule` from the captured prompt, so it changes the rules list, the evidence overlay
+         * and every attachment check for that turn. Scoping those away left the checks reporting
+         * "prompt attachment was not captured" while `request_rule` was already filled in — the fix
+         * looked like it had not worked. Linking is rare (it can only happen once per prompt), so the
+         * full recompute is bounded by the number of prompts, not by the poll rate.
+         */
         const forceFull =
             migrations.length > 0 ||
             link.repaired > 0 ||
+            link.linked > 0 ||
             transcripts.some((t) => t.rebuilt) ||
             hooks.some((h) => h.rebuilt);
         let scope = null;
@@ -176,16 +185,43 @@ export async function runIngestOnce(cfg, opts = {}) {
         }
 
         /*
-         * MCP stats are derived purely from `llm_call` / `decision_ledger`, so rebuilding them when
-         * neither changed is pure waste — and on a large DB the rebuild is the most expensive single
-         * stage: it selects every request id, joins the whole `llm_call` table, and upserts once per
-         * request. Skipping it on idle passes is most of the cycle-time win.
+         * MCP attribution: converge the history walk, then read the provider's ledger.
+         *
+         * The walk is not gated on `runBackfill` (the transcript-change cadence). It is bounded
+         * internally — a cheap "who still needs walking" count plus a limited number of transcripts
+         * per pass — and it stops selecting rows once converged. Gating it on a cadence tied to
+         * transcript changes meant history was never walked at all on a CLI pass where nothing had
+         * changed, which is exactly the case for data that predates this feature.
+         */
+        let mcpUsage = { read: 0, inserted: 0, attributed: 0, unattributed: 0, skipped: 0 };
+        let mcpBackfill = { scanned: 0, labels: 0, prompts: 0, remaining: 0 };
+        try {
+            const { backfillMcpCalls, ingestMcpUsage } = await import('./ingest-mcp-usage.mjs');
+            mcpBackfill = backfillMcpCalls(db, cfg, {
+                limit: Number(process.env.HARNESS_MCP_PROMPT_BACKFILL_LIMIT || 20),
+            });
+            mcpUsage = ingestMcpUsage(db, cfg);
+        } catch (err) {
+            mcpUsage = { error: String(err?.message || err) };
+        }
+
+        /*
+         * MCP stats are derived purely from `llm_call` / `decision_ledger` / `mcp_call`, so rebuilding
+         * them when none changed is pure waste — and on a large DB the rebuild is the most expensive
+         * single stage: it selects every request id, joins the whole `llm_call` table, and upserts once
+         * per request. Skipping it on idle passes is most of the cycle-time win.
          */
         let mcpStats = { updated: 0, skipped: true };
-        if (changed) {
+        /*
+         * Attribution can add usage to requests this cycle's transcript work never touched — a
+         * backfilled conversation, or a ledger line for an older turn. A scope-limited refresh would
+         * silently skip exactly those, so the presence of new usage forces a full rebuild.
+         */
+        const usageChanged = mcpUsage.inserted > 0 || mcpBackfill.labels > 0 || mcpBackfill.prompts > 0;
+        if (changed || usageChanged) {
             const { refreshMcpCallStats } = await import('./mcp-call-stats.mjs');
             const mcpScope =
-                scope && scope.requestIds && scope.requestIds.size
+                !usageChanged && scope && scope.requestIds && scope.requestIds.size
                     ? scope.requestIds
                     : null;
             mcpStats = refreshMcpCallStats(db, cfg.project.id, mcpScope);
@@ -217,10 +253,13 @@ export async function runIngestOnce(cfg, opts = {}) {
             hooks,
             linked,
             repaired: link.repaired,
+            corrected: link.corrected,
             checked,
             facade,
             eso,
             mcpStats,
+            mcpUsage,
+            mcpBackfill,
             overlaid,
             scope: scope === null ? 'all' : `${scope.requestIds.size} requests / ${scope.generations.size} gens`,
             counts,
@@ -378,6 +417,37 @@ if (import.meta.main) {
         console.error(`harness ingest: ${cfg.reason}`);
         process.exit(2);
     }
+
+    /*
+     * `--rebuild=<conversation id or path fragment>` — re-read matching transcripts from byte 0.
+     *
+     * Needed because the seam check can only detect a rewrite from bytes recorded at the cursor. A
+     * cursor written before `seam_hash` existed has nothing to compare, so a stale offset that happens
+     * to land on a newline is invisible to it. This is the repair for those rows; it is not part of a
+     * normal pass, because it discards and re-derives the conversation's requests.
+     */
+    const rebuildArg = process.argv.find((a) => a.startsWith('--rebuild='));
+    if (rebuildArg) {
+        const target = rebuildArg.slice('--rebuild='.length).trim();
+        if (!target) {
+            console.error('harness ingest: --rebuild needs a conversation id or path fragment');
+            process.exit(2);
+        }
+        const db = pooledDb(cfg);
+        migrateOnce(db);
+        const matches = discoverTranscripts(cfg).filter((p) => p.includes(target));
+        if (!matches.length) {
+            console.error(`harness ingest: no transcript matches "${target}"`);
+            process.exit(2);
+        }
+        for (const p of matches) {
+            const r = rebuildTranscript(db, cfg, p);
+            console.log(`  rebuilt ${r.conversationId}: +${r.newRequests} requests, +${r.newCalls} calls`);
+        }
+        closeIngestDb();
+        process.exit(0);
+    }
+
     const report = await runIngestOnce(cfg, {
         force,
         esoBackfillOnly,

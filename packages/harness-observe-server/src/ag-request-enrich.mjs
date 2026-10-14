@@ -3,7 +3,41 @@
  * Project tool/file/event evidence and UI fallbacks from llm_call rows.
  */
 
-/** @param {import('./db.mjs').Db} db */
+/**
+ * A request holds a **real** generation link only when the value is not the placeholder this module
+ * writes (which is the request's own id).
+ *
+ * The distinction matters because two different things live in the same column. `linkRequests` uses
+ * `generation_id` to mean "this turn was matched to a captured prompt", and skips a turn that already
+ * has one. The placeholder means the opposite — "nothing matched, fall back to the request id so the
+ * spine still has something to join on" — but it is indistinguishable from a real link by a plain
+ * `IS NOT NULL` test.
+ *
+ * Leaving them indistinguishable is not a cosmetic problem: once the placeholder was stamped for
+ * every request, the skip-guard fired for every prompt and **no turn could ever be linked**, so
+ * `request_rule` stayed empty for the whole project and every attachment check reported "was not
+ * captured" while the rules were sitting in the hook events. Use this helper instead of
+ * `generation_id IS NOT NULL` anywhere the question is "is there a real link".
+ *
+ * A real generation id is a bare UUID and a request id is `<uuid>:<n>`, so they cannot collide.
+ *
+ * @param {{ id?: string, generation_id?: string | null } | null | undefined} row
+ */
+export function hasRealGenerationLink(row) {
+    return Boolean(row?.generation_id) && row.generation_id !== row.id;
+}
+
+/** SQL predicate form of `hasRealGenerationLink`, for queries that cannot post-filter. */
+export const REAL_GENERATION_LINK_SQL = 'generation_id IS NOT NULL AND generation_id != id';
+
+/**
+ * Stamp a placeholder generation id on turns that have no hook trace yet, so the spine still has a
+ * join key.
+ *
+ * MUST run **after** `linkRequests` has attempted real matches. It used to run first, and because the
+ * placeholder is written to the same column the skip-guard reads, it made every subsequent match
+ * impossible. The `id GLOB '*:*'` guard restricts this to spine request ids.
+ */
 export function backfillAntigravityGenerationIds(db, projectId) {
     db.run(
         `UPDATE request SET generation_id = id

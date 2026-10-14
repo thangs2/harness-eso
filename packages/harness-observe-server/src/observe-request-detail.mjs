@@ -114,7 +114,7 @@ export function requestDetail(db, cfg, id) {
     return {
         request,
         tenantRootPath: cfg.root,
-        requestMetrics: requestHeaderMetrics(request, mcpCallStats),
+        requestMetrics: requestHeaderMetrics(request, mcpCallStats, tools),
         mcpCallStats,
         decisionFlow,
         evidence: {
@@ -201,7 +201,13 @@ export function listCalls(db, cfg, url) {
 function mcpCallStatsForRequest(db, requestId) {
     const row = db.get(
         `SELECT flash_brain_count AS flashBrain, flash_executor_count AS flashExecutor,
-                pro_count AS proCount, jev_count AS jevCount, updated_at AS updatedAt
+                pro_count AS proCount, smart_route_count AS smartRouteCount, jev_count AS jevCount,
+                brain_prompt_tokens AS brainPromptTokens,
+                brain_completion_tokens AS brainCompletionTokens,
+                brain_cache_hit_tokens AS brainCacheHitTokens,
+                brain_reasoning_tokens AS brainReasoningTokens,
+                brain_usage_calls AS brainUsageCalls,
+                updated_at AS updatedAt
          FROM mcp_call_stats WHERE request_id = ?`,
         [requestId],
     );
@@ -210,7 +216,35 @@ function mcpCallStatsForRequest(db, requestId) {
 }
 
 /** Header metrics for Observatory (F-TEL-01). */
-export function requestHeaderMetrics(request, mcpCallStats) {
+/**
+ * Tool labels that came through MCP.
+ *
+ * The stored value is `MCP:<name>` once ingest has resolved Cursor's `CallDynamicTool` wrapper to the
+ * real tool — and `mcp:<name>` when the tool list is derived from transcript `llm_call` rows instead,
+ * so the match has to be case-insensitive.
+ *
+ * This exists because two different things were both being called "MCP calls": the *tool* calls a turn
+ * made (Jira, search, browser) and the *model* calls it made through an MCP server (DeepSeek brain,
+ * executor, Pro). They share the transport and nothing else — different counts, different costs — so
+ * they need different labels. The token card used to show only the model figure under the label "MCP
+ * calls", which read as the tool count: a turn with 5 Jira/search/browser calls displayed no MCP
+ * activity at all.
+ */
+const MCP_TOOL_RE = /^mcp:/i;
+
+/**
+ * @param {Array<{tool: string, count: number}>} tools
+ * @returns {{ mcpToolCalls: number, mcpToolKinds: number }}
+ */
+export function mcpToolBreakdown(tools) {
+    const rows = (tools || []).filter((t) => MCP_TOOL_RE.test(String(t?.tool || '')));
+    return {
+        mcpToolCalls: rows.reduce((a, t) => a + (Number(t?.count) || 0), 0),
+        mcpToolKinds: rows.length,
+    };
+}
+
+export function requestHeaderMetrics(request, mcpCallStats, tools) {
     return {
         callCount: request.call_count ?? 0,
         toolCount: request.tool_count ?? 0,
@@ -221,6 +255,7 @@ export function requestHeaderMetrics(request, mcpCallStats) {
         modelId: request.model_id,
         hasFailures: !!request.has_failures,
         mcpCallStats,
+        ...mcpToolBreakdown(tools),
     };
 }
 

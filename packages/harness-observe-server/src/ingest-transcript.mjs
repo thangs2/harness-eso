@@ -15,9 +15,11 @@
  * rows it produced. A truncated or rotated file resets that one conversation.
  */
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isoNow } from './observe-config.mjs';
+import { insertPromptRow } from './mcp-prompt-store.mjs';
 
 const UQ_RE = /<user_query>([\s\S]*?)<\/user_query>/;
 const TS_RE = /<timestamp>([\s\S]*?)<\/timestamp>/;
@@ -74,6 +76,21 @@ export function parsePromptTs(raw) {
     return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
+/**
+ * Bytes of the file immediately before the cursor, used to prove the cursor still points where we
+ * left it.
+ */
+const SEAM_BYTES = 64;
+
+/** sha256 of the bytes ending at `offset`, or null when there is nothing before it. */
+function seamHashOf(filePath, offset) {
+    if (offset <= 0) return null;
+    const start = Math.max(0, offset - SEAM_BYTES);
+    const seam = readRange(filePath, start, offset - start);
+    if (!seam.length) return null;
+    return crypto.createHash('sha256').update(seam).digest('hex');
+}
+
 function userText(msg) {
     const content = msg && msg.content;
     if (!Array.isArray(content)) return '';
@@ -92,9 +109,89 @@ function userText(msg) {
  * the measured size of what the assistant actually emitted is the honest signal.
  * `textChars` stays a text-only field; the tool_use JSON is ~90% of the bytes.
  */
+const BRAIN_FLASH_PREFIX = /^\[brain flash\]/i;
+const BRAIN_FALLBACK_PREFIX = /^\[brain fallback\]/i;
+const ROUTE_OVERRIDE_PREFIX = /^\[(pro|flash)\]/i;
+
+/**
+ * Canonical MCP label for one tool_use block.
+ *
+ * Cursor routes every MCP call through a single generic tool named `CallDynamicTool`, with the real
+ * server and tool in the input (`{namespace, toolName, arguments}`). Storing the wrapper name meant
+ * `mcp_call_stats` reported **zero** brain and Pro calls for every Cursor turn — 339 brain calls in one
+ * conversation, all counted as `CallDynamicTool`. Reading the input is the whole fix.
+ *
+ * `ask_deepseek_flash` is one tool serving two very different roles, chosen by a prompt prefix the
+ * server itself reads (`flashRole()`): `[BRAIN FLASH]` / `[BRAIN FALLBACK]` means thinking ON (Brain),
+ * anything else is the executor. The prefix has to be resolved here, because the tool name alone
+ * cannot tell them apart — and the tier is what determines cost. Measured across this machine's
+ * transcripts, 248 of 588 `ask_deepseek_flash` calls are Brain, so guessing from the name would be
+ * wrong most of the time in the other direction.
+ *
+ * The names produced here match the vocabulary the consumer already uses
+ * (`BRAIN_VIA` in `guard-write.py`): `ask_deepseek_pro`, `ask_deepseek_flash_brain`,
+ * `ask_deepseek_flash_brain_fallback`.
+ *
+ * `ask_deepseek` (the smart router) resolves its tier from complexity keywords at call time, which
+ * this module must not re-implement — a second copy of that heuristic would be a second source of
+ * truth. Unless the prompt carries an explicit `[pro]`/`[flash]` override, it is labelled without a
+ * tier and counted separately rather than guessed into one.
+ *
+ * @param {string} name tool_use name from the transcript
+ * @param {object} [input] tool_use input
+ * @returns {string} label stored in `llm_call.tool_names`
+ */
+export function mcpToolLabel(name, input) {
+    const raw = String(name || '');
+    if (raw !== 'CallDynamicTool') return raw;
+
+    const toolName = typeof input?.toolName === 'string' ? input.toolName.trim() : '';
+    if (!toolName) return raw;
+
+    const prompt = String(input?.arguments?.prompt ?? '').trim();
+
+    if (toolName === 'ask_deepseek_flash') {
+        if (BRAIN_FLASH_PREFIX.test(prompt)) return 'mcp:ask_deepseek_flash_brain';
+        if (BRAIN_FALLBACK_PREFIX.test(prompt)) return 'mcp:ask_deepseek_flash_brain_fallback';
+        return 'mcp:ask_deepseek_flash';
+    }
+
+    if (toolName === 'ask_deepseek') {
+        const override = ROUTE_OVERRIDE_PREFIX.exec(prompt);
+        if (override) {
+            return override[1].toLowerCase() === 'pro'
+                ? 'mcp:ask_deepseek_pro'
+                : 'mcp:ask_deepseek_flash';
+        }
+        return 'mcp:ask_deepseek_auto';
+    }
+
+    return `mcp:${toolName}`;
+}
+
+/**
+ * The prompt a model MCP call was made with, when this `tool_use` is one.
+ *
+ * Returns null for MCP calls that are not model calls (Jira, chrome-devtools, …): they have no
+ * prompt to hash and no tokens worth attributing.
+ *
+ * @param {string} name tool_use name
+ * @param {object} [input] tool_use input
+ * @returns {{ tool: string, prompt: string } | null}
+ */
+export function mcpPromptOf(name, input) {
+    if (String(name || '') !== 'CallDynamicTool') return null;
+    const toolName = typeof input?.toolName === 'string' ? input.toolName.trim() : '';
+    if (!/^ask_deepseek/.test(toolName)) return null;
+    const prompt = input?.arguments?.prompt;
+    if (typeof prompt !== 'string' || !prompt.trim()) return null;
+    return { tool: mcpToolLabel(name, input), prompt };
+}
+
 function pushToolUse(names, tools, emitChars, name, input) {
     tools += 1;
-    if (name) names.push(String(name));
+    const label = mcpToolLabel(name, input);
+    if (label) names.push(label);
     if (input !== undefined && input !== null) {
         try {
             emitChars += JSON.stringify(input).length;
@@ -107,28 +204,31 @@ function pushToolUse(names, tools, emitChars, name, input) {
 
 export function assistantStats(msg) {
     const content = (msg && msg.content) || [];
-    if (!Array.isArray(content)) return { tools: 0, names: [], textChars: 0, emitChars: 0, preview: '' };
+    if (!Array.isArray(content)) {
+        return { tools: 0, names: [], textChars: 0, emitChars: 0, preview: '', mcpPrompts: [] };
+    }
     let tools = 0;
     let textChars = 0;
     let emitChars = 0;
     let preview = '';
     const names = [];
+    const mcpPrompts = [];
     for (const b of content) {
         if (!b || typeof b !== 'object') continue;
         if (b.type === 'tool_use') {
             const part = pushToolUse(names, tools, emitChars, b.name, b.input);
             tools = part.tools;
             emitChars = part.emitChars;
+            const prompt = mcpPromptOf(b.name, b.input);
+            if (prompt) mcpPrompts.push(prompt);
         } else if (b.type === 'function_call' || b.type === 'tool-call' || b.type === 'tool_call') {
-            const part = pushToolUse(
-                names,
-                tools,
-                emitChars,
-                b.name || b.function?.name,
-                b.input ?? b.arguments ?? b.function?.arguments,
-            );
+            const name = b.name || b.function?.name;
+            const input = b.input ?? b.arguments ?? b.function?.arguments;
+            const part = pushToolUse(names, tools, emitChars, name, input);
             tools = part.tools;
             emitChars = part.emitChars;
+            const prompt = mcpPromptOf(name, input);
+            if (prompt) mcpPrompts.push(prompt);
         } else if (b.type === 'text' && typeof b.text === 'string') {
             textChars += b.text.length;
             emitChars += b.text.length;
@@ -153,7 +253,7 @@ export function assistantStats(msg) {
             emitChars = part.emitChars;
         }
     }
-    return { tools, names, textChars, emitChars, preview };
+    return { tools, names, textChars, emitChars, preview, mcpPrompts };
 }
 
 /**
@@ -178,21 +278,22 @@ function getState(db, projectId, sourcePath) {
         db.get(
             'SELECT * FROM ingest_state WHERE project_id = ? AND source_kind = ? AND source_path = ?',
             [projectId, 'transcript', sourcePath],
-        ) || { last_size: 0, last_offset: 0, last_line_no: 0 }
+        ) || { last_size: 0, last_offset: 0, last_line_no: 0, seam_hash: null }
     );
 }
 
-function putState(db, projectId, sourcePath, size, offset, lineNo, error) {
+function putState(db, projectId, sourcePath, size, offset, lineNo, error, seamHash = null) {
     db.run(
-        `INSERT INTO ingest_state (project_id, source_kind, source_path, last_size, last_offset, last_line_no, last_error, updated_at)
-         VALUES (?, 'transcript', ?, ?, ?, ?, ?, ?)
+        `INSERT INTO ingest_state (project_id, source_kind, source_path, last_size, last_offset, last_line_no, last_error, seam_hash, updated_at)
+         VALUES (?, 'transcript', ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(project_id, source_kind, source_path) DO UPDATE SET
              last_size = excluded.last_size,
              last_offset = excluded.last_offset,
              last_line_no = excluded.last_line_no,
              last_error = excluded.last_error,
+             seam_hash = excluded.seam_hash,
              updated_at = excluded.updated_at`,
-        [projectId, sourcePath, size, offset, lineNo, error || null, isoNow()],
+        [projectId, sourcePath, size, offset, lineNo, error || null, seamHash, isoNow()],
     );
 }
 
@@ -215,6 +316,30 @@ function resetConversation(db, projectId, conversationId) {
     db.run('DELETE FROM event WHERE conversation_id = ? AND project_id = ?', [conversationId, projectId]);
     db.run('DELETE FROM request_stop WHERE conversation_id = ? AND project_id = ?', [conversationId, projectId]);
     db.run('UPDATE conversation SET request_count = 0 WHERE id = ?', [conversationId]);
+}
+
+/**
+ * Throw away everything derived from one transcript and re-read it from byte 0.
+ *
+ * The seam check above detects a rewritten file from the bytes at the cursor. A cursor written before
+ * `seam_hash` existed carries nothing to compare, so a stale offset that happens to land on a newline
+ * cannot be detected — for those rows this is the repair.
+ *
+ * Re-reading from 0 without clearing first would be unsafe, not merely untidy: `nextIndex` continues
+ * past the highest existing boundary index, so the first prompt in the file would be stored as request
+ * N+1 rather than 1, renumbering the conversation and orphaning the events that reference those ids.
+ */
+export function rebuildTranscript(db, cfg, transcriptPath) {
+    const projectId = cfg.project.id;
+    const agyMatch = transcriptPath.match(/\/brain\/([^/]+)\/\.system_generated\/logs\/transcript\.jsonl$/);
+    const conversationId = agyMatch ? agyMatch[1] : path.basename(transcriptPath).replace(/\.jsonl$/, '');
+    resetConversation(db, projectId, conversationId);
+    db.run('DELETE FROM ingest_state WHERE project_id = ? AND source_kind = ? AND source_path = ?', [
+        projectId,
+        'transcript',
+        transcriptPath,
+    ]);
+    return ingestTranscript(db, cfg, transcriptPath);
 }
 
 /**
@@ -261,6 +386,32 @@ export function ingestTranscript(db, cfg, transcriptPath) {
         resetConversation(db, projectId, conversationId);
         state = { last_size: 0, last_offset: 0, last_line_no: 0 };
         rebuilt = true;
+    } else if (state.last_offset > 0) {
+        /*
+         * The cursor is a byte offset, and it is only meaningful if the bytes before it are still the
+         * ones already consumed. `size < last_offset` catches a truncation, but NOT a rewrite that is
+         * at least as long — and then the pass reads the tail from a stale offset, so the prompt line
+         * (which is before the cursor) is never seen: nothing is created, the cursor advances to the
+         * new size, and the prompt is lost permanently. Observed on a real conversation: cursor at
+         * EOF, zero requests, zero llm_calls, `<user_query>` present in the file. Reproduced by
+         * rewriting a transcript in place to a longer one.
+         *
+         * Two checks, cheapest first. The offset must sit directly after a newline, because only
+         * complete lines are ever consumed. And the 64 bytes ending at it must hash to what they did
+         * when consumed. A row written before `seam_hash` existed has nothing to compare, so it gets
+         * the newline check only — `rebuildTranscript` is the repair for the remainder.
+         */
+        const start = Math.max(0, state.last_offset - SEAM_BYTES);
+        const seam = readRange(transcriptPath, start, state.last_offset - start);
+        const endsOnNewline = seam.length > 0 && seam[seam.length - 1] === 0x0a;
+        const seamMatches = state.seam_hash
+            ? crypto.createHash('sha256').update(seam).digest('hex') === state.seam_hash
+            : null;
+        if (!endsOnNewline || seamMatches === false) {
+            resetConversation(db, projectId, conversationId);
+            state = { last_size: 0, last_offset: 0, last_line_no: 0 };
+            rebuilt = true;
+        }
     }
 
     const text = readRange(transcriptPath, state.last_offset, size - state.last_offset).toString('utf8');
@@ -477,6 +628,7 @@ export function ingestTranscript(db, cfg, transcriptPath) {
                     ],
                 );
                 report.newCalls += 1;
+                recordMcpPrompts(db, projectId, conversationId, current.id, callId, st.mcpPrompts, now);
                 touched.add(current.id);
             }
         }
@@ -509,11 +661,24 @@ export function ingestTranscript(db, cfg, transcriptPath) {
              WHERE id = ?`,
             [size, lineNo, agg ? agg.n : 0, agg ? agg.started : null, agg ? agg.ended : null, now, conversationId],
         );
-        putState(db, projectId, transcriptPath, size, offset, lineNo, null);
+        putState(db, projectId, transcriptPath, size, offset, lineNo, null, seamHashOf(transcriptPath, offset));
     });
 
     report.touchedRequests = [...touched];
     return report;
+}
+
+/**
+ * Persist the prompts a model MCP call was made with, keyed by prompt hash.
+ *
+ * The MCP server records `sha256(prompt)` in its usage ledger because a prompt is the only thing it
+ * receives; this is the other half, saying which request sent that prompt.
+ */
+function recordMcpPrompts(db, projectId, conversationId, requestId, llmCallId, prompts, now) {
+    if (!Array.isArray(prompts) || !prompts.length) return;
+    for (const { tool, prompt } of prompts) {
+        insertPromptRow(db, { projectId, conversationId, requestId, llmCallId, tool, prompt, now });
+    }
 }
 
 function relPath(cfg, p) {

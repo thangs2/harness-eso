@@ -2,11 +2,13 @@
 
 Repo này **ship** sản phẩm Harness ESO (`@mu/harness-*`). Agent làm việc **trong monorepo** theo file này — **không** chạy full pipeline ESO (preflight sidecar, `init profile`) trên chính `harness-eso`.
 
-**Consumer đầy đủ:** repo **x79** (sibling `../x79`) — observe, hooks, `decision-policy.json`. SoT thiết kế: `x79/document/harness/02.harness-eso/`.
+**Consumer đầy đủ:** repo **x79** (sibling `../x79`) — observe, hooks, `decision-policy.json`. Thiết kế ban đầu: `x79/document/harness/02.harness-eso/` — **đã out of date, không dùng làm law**; nguồn hiện hành là code repo này + gói `documents/`.
 
 **Cursor Windows:** mở **folder gốc = harness-eso**; xem `docs/02.cursor-windows.md`. Docker: `docker/observatory.ps1` (không dùng `observe.sh`).
 
 **Cursor agent (forced):** IDE loads `.cursor/rules/` → **`core.law-gate.mdc`** bắt buộc **Read file này (`AGENTS.md`)** mỗi phiên trước khi làm việc; rule khác chỉ bổ sung, không thay law. Catalog: `.cursor/instructions.md` · MCP `.cursor/mcp.json` (`docs/03.cursor-mcp.md`).
+
+**Documentation pack (đọc trước khi sửa luồng dữ liệu):** `documents/00.README.md` — mô tả sản phẩm là gì, chạy thế nào, và **`documents/05.development/02.invariants.md`** liệt kê các bất biến kèm defect đã sinh ra chúng. Đây là gói bàn giao độc lập: không cần đọc repo consumer để hiểu sản phẩm.
 
 ---
 

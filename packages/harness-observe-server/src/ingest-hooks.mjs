@@ -19,9 +19,11 @@ import path from 'node:path';
 import { isoNow } from './observe-config.mjs';
 import {
     backfillAntigravityGenerationIds,
+    hasRealGenerationLink,
     linkEventsByGenerationOrRequestId,
     rollRequestToolsFromLlmCalls,
 } from './ag-request-enrich.mjs';
+import { shellCommandOf, shellHasWriteIntent, shellWriteTargets } from '@mu/harness-foundation/pure';
 
 const FILE_PATH_KEYS = ['file_path', 'path', 'target_file', 'notebook_path', 'absolute_path'];
 
@@ -250,7 +252,13 @@ function norm(s) {
 export function linkRequests(db, cfg) {
     const projectId = cfg.project.id;
     const now = isoNow();
-    backfillAntigravityGenerationIds(db, projectId);
+
+    /*
+     * The placeholder stamp deliberately does NOT run here. It writes to the same column the link
+     * guard below reads, so running it first made every match impossible: `if (hit.generation_id)
+     * continue` saw the placeholder on every turn and skipped every prompt. `request_rule` was empty
+     * for the whole project as a result. It now runs at the end, once real matching has been tried.
+     */
 
     // Self-heal: one generation can belong to exactly ONE request. Anything else
     // is damage from a cross-conversation mis-link (the prompt list was fetched
@@ -298,12 +306,14 @@ export function linkRequests(db, cfg) {
 
     // A generation belongs to one request for good. Seeding the used-set from the
     // surviving links stops the loop from re-attaching an already-correct prompt.
+    // Only REAL links count: the placeholder (generation_id === id) means "not linked", and treating
+    // it as a survivor would both block the loop and claim a match that never happened.
     const used = new Set(
         db
-            .all(
-                'SELECT generation_id FROM request WHERE project_id = ? AND generation_id IS NOT NULL',
-                [projectId],
-            )
+            .all('SELECT id, generation_id FROM request WHERE project_id = ? AND generation_id IS NOT NULL', [
+                projectId,
+            ])
+            .filter((r) => hasRealGenerationLink(r))
             .map((r) => r.generation_id),
     );
 
@@ -329,13 +339,15 @@ export function linkRequests(db, cfg) {
         // No usable clock for this prompt — a unique text match is the only signal
         // left, and an ambiguous one is refused rather than guessed.
         if (!hit && p.prompt_text) {
-            const matches = pool.filter((r) => !r.generation_id && norm(r.user_query) === norm(p.prompt_text));
+            const matches = pool.filter((r) => !hasRealGenerationLink(r) && norm(r.user_query) === norm(p.prompt_text));
             if (matches.length === 1) hit = matches[0];
         }
         if (!hit) continue;
         // That turn is already accounted for: two prompts inside one request window
         // is a duplicate submission and a request can only name one generation.
-        if (hit.generation_id) continue;
+        // `hasRealGenerationLink` distinguishes a genuine earlier link from the placeholder this
+        // module writes, which must NOT count as "already accounted for".
+        if (hasRealGenerationLink(hit)) continue;
         // A time hit whose text disagrees is not a link — it is two different turns.
         if (p.prompt_text && norm(hit.user_query) !== norm(p.prompt_text)) continue;
 
@@ -345,13 +357,37 @@ export function linkRequests(db, cfg) {
     }
 
     linkEventsByGenerationOrRequestId(db, projectId);
-    db.run(
-        `UPDATE event SET request_id = (
-            SELECT r.id FROM request r
-            WHERE r.project_id = event.project_id AND r.generation_id = event.generation_id
-            LIMIT 1)
-         WHERE project_id = ? AND request_id IS NULL AND generation_id IS NOT NULL
-           AND EXISTS (SELECT 1 FROM request r WHERE r.project_id = event.project_id AND r.generation_id = event.generation_id)`,
+    /*
+     * The event's OWN `generation_id` is first-hand evidence, and it is authoritative.
+     *
+     * This used to be a fill (`request_id IS NULL`), which meant a wrong guess was permanent. The guess
+     * that produced the wrong values is the turn-window fallback below: hooks are written by the IDE as
+     * calls happen, while requests come from the transcript on a 15s poll, so a tool event routinely
+     * arrives **before** the turn it belongs to exists as a row. The window fallback then attached it to
+     * the previous request in the conversation, and when the transcript caught up and the prompt was
+     * linked, nothing revisited the event — so it stayed on the wrong turn forever.
+     *
+     * Measured on x79: **3,438** events whose `generation_id` conflicted with the generation of the
+     * request they were filed under, across 7 conversations. The visible symptom was a turn showing 2 of
+     * its 21 tool calls, its file edits attributed to the previous turn, and a conformance check
+     * reporting "no protected path was edited" about a turn that had edited `backend/mu-fusion/`.
+     *
+     * Generation is safe to treat as authoritative because exactly one request can hold it:
+     * `linkRequests` enforces that with its `used` set and the duplicate repair above. So this resolves
+     * to one row or none, and it may therefore overwrite — a guess must yield to the event's own record.
+     *
+     * The final `request_id != (...)` guard keeps this from re-writing identical rows, so it is a no-op
+     * once converged and does not force a full recompute on every pass.
+     */
+    const resolved = `(SELECT r.id FROM request r
+                       WHERE r.project_id = event.project_id AND r.generation_id = event.generation_id
+                       LIMIT 1)`;
+    const corrected = db.run(
+        `UPDATE event SET request_id = ${resolved}
+         WHERE project_id = ? AND generation_id IS NOT NULL
+           AND EXISTS (SELECT 1 FROM request r
+                       WHERE r.project_id = event.project_id AND r.generation_id = event.generation_id)
+           AND (request_id IS NULL OR request_id != ${resolved})`,
         [projectId],
     );
 
@@ -423,7 +459,22 @@ export function linkRequests(db, cfg) {
         [projectId],
     );
 
-    return { linked, repaired };
+    /*
+     * Only now stamp the placeholder on turns that still have no real link. Placed last because it
+     * writes the column the guards above read: running it first is what silently disabled every
+     * prompt match and left `request_rule` empty for the whole project.
+     */
+    backfillAntigravityGenerationIds(db, projectId);
+
+    /*
+     * Corrections count as repairs. `repaired > 0` is what makes the cycle recompute everything instead
+     * of only the turns it touched, and re-attributing an event changes that turn's files, tools and
+     * conformance verdicts — none of which would be revisited under a narrow scope. Reporting the count
+     * is what turns a silent data fix into a visible rebuild.
+     */
+    const correctedCount = corrected ? Number(corrected.changes || 0) : 0;
+
+    return { linked, repaired: repaired + correctedCount, corrected: correctedCount };
 }
 
 function applyLink(db, projectId, requestId, prompt, now) {
@@ -514,6 +565,40 @@ export function overlayEvidence(db, cfg, scope) {
             if (act === 'edit') cur.edits += f.n;
             byPath.set(f.path, cur);
         }
+
+        /*
+         * Shell writes. `actionOf` can only see the tool name, and Shell is a different tool from
+         * Write/StrReplace — so a `cat > protected/file.md` was recorded as a **read** of that file.
+         * Measured on x79: one turn wrote 7 protected files through Shell and every one of them landed
+         * in `request_file` with `edits = 0`, which is how the conformance checks came to report
+         * "no protected path was edited" while the files sat on disk.
+         *
+         * The command is the only place the intent exists, so it is read here and the targets are
+         * attributed to the request the same way a Write would be.
+         */
+        const shellEvents = db.all(
+            `SELECT path, raw_json FROM event
+             WHERE request_id = ? AND tool IN ('Shell', 'Bash', 'Terminal') AND raw_json IS NOT NULL`,
+            [r.id],
+        );
+        const rootPrefix = `${cfg.root}/`;
+        for (const ev of shellEvents) {
+            const cmd = shellCommandOf(ev.raw_json);
+            if (!shellHasWriteIntent(cmd)) continue;
+            const parsed = shellWriteTargets(cmd).map((t) =>
+                t.startsWith(rootPrefix) ? t.slice(rootPrefix.length) : t,
+            );
+            // A Python heredoc writes a path held in a variable: no target parses, and the event's own
+            // path is the only signal. Use it rather than counting nothing.
+            const targets = parsed.length ? parsed : ev.path ? [ev.path] : [];
+            for (const t of targets) {
+                const cur = byPath.get(t) || { actions: new Set(), reads: 0, edits: 0 };
+                cur.actions.add('edit');
+                cur.edits += 1;
+                byPath.set(t, cur);
+            }
+        }
+
         for (const [p, v] of byPath) {
             db.run(
                 `INSERT INTO request_file (request_id, path, actions, reads, edits) VALUES (?, ?, ?, ?, ?)

@@ -99,7 +99,33 @@ Mounts for the Docker plane:
 |-------|------|---------|
 | `HARNESS_REPO_ROOT` → `/data/repo` | **read-only** | `harness.config.json`, hooks (`route-trace.jsonl`), policy |
 | Compose volume `observe-data` → `/data/observe` | rw | `harness.db` at `/data/observe/<projectId>/harness.db` |
+| `HARNESS_PRODUCT_STATE_HOST` (default `~/.harness`) → `/data/product-state` | rw | `workspace.json`, `tenants.json`, **MCP usage ledger** |
 | `~/.cursor` → `/host-cursor` | ro | Agent transcript JSONL (REQUEST spine) |
+
+### MCP model usage ledger
+
+A Cursor turn's cost is mostly spent inside MCP model calls, so the DeepSeek MCP server writes one
+JSONL line per model call and the observe plane reads it to attribute that spend to a request.
+
+Both sides resolve it through **product state**, as `<product-state>/deepseek-usage.jsonl`:
+
+| Where | Resolves to |
+|-------|-------------|
+| Host (the MCP server runs here, under Cursor) | `~/.harness/deepseek-usage.jsonl` |
+| Docker observe plane | `/data/product-state/deepseek-usage.jsonl` → host `~/.harness/deepseek-usage.jsonl` |
+
+No extra mount is needed: the product-state bind mount above already carries it. This is deliberate —
+an earlier version put the ledger under `HARNESS_DATA_ROOT`, which is the *same directory* on the
+host (so local development looked correct) but a **named volume** in Docker, a container-only
+filesystem the host MCP server cannot see. Nothing was ever attributed in a container.
+
+Override both sides with `DEEPSEEK_USAGE_LEDGER=/abs/path` if you want the ledger on a shared volume
+or need to point a second deployment at one file. The MCP server is installed standalone
+(`~/.gemini/antigravity/deepseek_direct.js` via `x79/installation/deepseek/install.sh`) and cannot
+import workspace packages, so it mirrors this rule rather than sharing it — keep the two in step.
+
+Rows the observer cannot attribute are kept with a null `request_id` rather than dropped, so spend
+that cannot be placed is still visible as spend.
 
 The consumer is mounted read-only because a bind-mounted SQLite DB written from a macOS host
 into a Linux container is what corrupted it. First `up` starts an empty DB and re-ingests from

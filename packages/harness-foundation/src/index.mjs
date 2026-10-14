@@ -31,3 +31,26 @@ export {
     syncTenantsFromWorkspace,
     workspaceFile,
 } from './workspace-store.mjs';
+export {
+    CONSENT_DIR_NAME,
+    consentCovers,
+    consentDir,
+    consentFile,
+    grantConsent,
+    liveConsents,
+    readConsentStore,
+    revokeConsent,
+} from './consent.mjs';
+
+export {
+    ATTEST_MAX_AGE_SECONDS,
+    BRAIN_ROLES,
+    attestDir,
+    brainAttested,
+    esoAttestationFile,
+    projectIdFrom,
+    readEsoAttestation,
+    usageLedgerFile,
+    writeEsoAttestation,
+} from './attest.mjs';
+
