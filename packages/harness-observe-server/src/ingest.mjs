@@ -121,6 +121,7 @@ export async function runIngestOnce(cfg, opts = {}) {
         const changed =
             migrations.length > 0 ||
             link.repaired > 0 ||
+            link.linked > 0 ||
             transcripts.some((t) => t.rebuilt || t.newLines > 0 || t.newRequests > 0 || t.newCalls > 0) ||
             hooks.some((h) => h.rebuilt || h.newEvents > 0);
         cycleCount += 1;
@@ -131,23 +132,21 @@ export async function runIngestOnce(cfg, opts = {}) {
          * mis-link invalidates everything, so those pass null = "all". An idle pass therefore costs
          * almost nothing, which is what lets a 2s poll and 2600 historical requests coexist.
          *
-         * A newly LINKED prompt belongs in the same category as a rebuild: linking is what populates
-         * `request_rule` from the captured prompt, so it changes the rules list, the evidence overlay
-         * and every attachment check for that turn. Scoping those away left the checks reporting
-         * "prompt attachment was not captured" while `request_rule` was already filled in — the fix
-         * looked like it had not worked. Linking is rare (it can only happen once per prompt), so the
-         * full recompute is bounded by the number of prompts, not by the poll rate.
+         * Newly LINKED prompts: linking populates `request_rule` from the captured prompt and attaches
+         * the real generation_id. We include `link.linkedRequestIds` directly into `scope.requestIds`
+         * so the touched and newly linked turns are visited and recomputed without forcing a full-table
+         * rebuild (which touches all rows, overwrites updated_at, and degrades ordering).
          */
         const forceFull =
             migrations.length > 0 ||
             link.repaired > 0 ||
-            link.linked > 0 ||
             transcripts.some((t) => t.rebuilt) ||
             hooks.some((h) => h.rebuilt);
         let scope = null;
         if (!forceFull) {
             const requestIds = new Set();
             for (const t of transcripts) for (const id of t.touchedRequests || []) requestIds.add(id);
+            for (const id of link.linkedRequestIds || []) requestIds.add(id);
             const generations = new Set();
             for (const h of hooks) for (const g of h.touchedGenerations || []) generations.add(g);
             scope = { requestIds, generations };

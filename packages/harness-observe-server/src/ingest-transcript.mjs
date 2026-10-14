@@ -746,16 +746,87 @@ function docPath(line) {
     return String(line).replace(AG_DOC_SUFFIX_RE, '').trim();
 }
 
-/** Nearest ancestor of `filePath` that holds a `harness.config.json`, or null. */
+/** Nearest ancestor of `filePath` that holds a `harness.config.json`, or a repo root (.git / .agents), or null. */
 function projectRootOf(filePath) {
     let cur = path.dirname(filePath);
+    let repoRoot = null;
     for (let i = 0; i < 24; i += 1) {
         if (fs.existsSync(path.join(cur, 'harness.config.json'))) return cur;
+        if (!repoRoot && (fs.existsSync(path.join(cur, '.git')) || fs.existsSync(path.join(cur, '.agents')))) {
+            repoRoot = cur;
+        }
         const up = path.dirname(cur);
         if (up === cur) break;
         cur = up;
     }
-    return null;
+    return repoRoot;
+}
+
+/**
+ * Detailed owner resolution result including whether the transcript has IDE window metadata.
+ *
+ * @param {string} transcriptPath
+ * @returns {{ owner: string | null, hasMetadata: boolean }}
+ */
+export function resolveTranscriptOwnerInfo(transcriptPath) {
+    let text;
+    try {
+        const fd = fs.openSync(transcriptPath, 'r');
+        const buf = Buffer.alloc(131072);
+        const read = fs.readSync(fd, buf, 0, 131072, 0);
+        fs.closeSync(fd);
+        text = buf.subarray(0, read).toString('utf8');
+    } catch {
+        return { owner: null, hasMetadata: false };
+    }
+
+    // Records are newline-delimited JSON; the metadata arrives with the first user turn.
+    let metadata = '';
+    for (const line of text.split('\n')) {
+        if (!line.trim()) continue;
+        let record;
+        try {
+            record = JSON.parse(line);
+        } catch {
+            continue; // a half-written trailing line
+        }
+        if (typeof record?.content !== 'string') continue;
+        if (record.content.includes('Active Document:')) {
+            metadata = record.content;
+            break;
+        }
+    }
+    if (!metadata) return { owner: null, hasMetadata: false };
+
+    const votes = new Map();
+    const vote = (docLine) => {
+        const root = projectRootOf(docPath(docLine));
+        if (root) votes.set(root, (votes.get(root) ?? 0) + 1);
+    };
+
+    const active = /Active Document: ([^\n]+)/.exec(metadata);
+    if (active) vote(active[1]);
+
+    const listStart = metadata.indexOf('Other open documents:');
+    if (listStart !== -1) {
+        for (const line of metadata.slice(listStart).split('\n').slice(1)) {
+            const m = /^\s*-\s+(.+?)\s*$/.exec(line);
+            if (!m) break; // the list is contiguous; anything else ends it
+            vote(m[1]);
+        }
+    }
+
+    if (!votes.size) return { owner: null, hasMetadata: true };
+    // The focused document wins ties: insertion order puts it first.
+    let winner = null;
+    let best = 0;
+    for (const [root, count] of votes) {
+        if (count > best) {
+            best = count;
+            winner = root;
+        }
+    }
+    return { owner: winner, hasMetadata: true };
 }
 
 /**
@@ -783,64 +854,7 @@ function projectRootOf(filePath) {
  * @returns {string | null} absolute project root
  */
 export function resolveTranscriptOwner(transcriptPath) {
-    let text;
-    try {
-        const fd = fs.openSync(transcriptPath, 'r');
-        const buf = Buffer.alloc(131072);
-        const read = fs.readSync(fd, buf, 0, 131072, 0);
-        fs.closeSync(fd);
-        text = buf.subarray(0, read).toString('utf8');
-    } catch {
-        return null;
-    }
-
-    // Records are newline-delimited JSON; the metadata arrives with the first user turn.
-    let metadata = '';
-    for (const line of text.split('\n')) {
-        if (!line.trim()) continue;
-        let record;
-        try {
-            record = JSON.parse(line);
-        } catch {
-            continue; // a half-written trailing line
-        }
-        if (typeof record?.content !== 'string') continue;
-        if (record.content.includes('Active Document:')) {
-            metadata = record.content;
-            break;
-        }
-    }
-    if (!metadata) return null;
-
-    const votes = new Map();
-    const vote = (docLine) => {
-        const root = projectRootOf(docPath(docLine));
-        if (root) votes.set(root, (votes.get(root) ?? 0) + 1);
-    };
-
-    const active = /Active Document: ([^\n]+)/.exec(metadata);
-    if (active) vote(active[1]);
-
-    const listStart = metadata.indexOf('Other open documents:');
-    if (listStart !== -1) {
-        for (const line of metadata.slice(listStart).split('\n').slice(1)) {
-            const m = /^\s*-\s+(.+?)\s*$/.exec(line);
-            if (!m) break; // the list is contiguous; anything else ends it
-            vote(m[1]);
-        }
-    }
-
-    if (!votes.size) return null;
-    // The focused document wins ties: insertion order puts it first.
-    let winner = null;
-    let best = 0;
-    for (const [root, count] of votes) {
-        if (count > best) {
-            best = count;
-            winner = root;
-        }
-    }
-    return winner;
+    return resolveTranscriptOwnerInfo(transcriptPath).owner;
 }
 
 export function discoverTranscripts(cfg) {
@@ -866,13 +880,22 @@ export function discoverTranscripts(cfg) {
             const logFile = path.join(bDir, entry.name, '.system_generated', 'logs', 'transcript.jsonl');
             if (!fs.existsSync(logFile)) continue;
 
-            const owner = resolveTranscriptOwner(logFile);
+            const { owner, hasMetadata } = resolveTranscriptOwnerInfo(logFile);
             if (owner) {
                 /*
                  * The transcript names its workspace: that is authoritative. A project that is merely
                  * mentioned in the conversation does not get to claim it.
                  */
                 if (path.resolve(owner) === root) out.push(logFile);
+                continue;
+            }
+
+            if (hasMetadata) {
+                /*
+                 * The transcript has window metadata, but none of its documents belong to this project
+                 * (e.g. documents are in a sibling repo without harness or outside any project).
+                 * Do NOT fall back to substring matching — mentioning a sibling project path must never claim it.
+                 */
                 continue;
             }
 

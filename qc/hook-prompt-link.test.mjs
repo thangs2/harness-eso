@@ -94,6 +94,7 @@ test('a captured prompt links even when the request already carries the placehol
 
         const out = linkRequests(db, cfg);
         assert.equal(out.linked, 1, 'the prompt must be linked, not skipped as "already accounted for"');
+        assert.deepEqual(out.linkedRequestIds, [requestId], 'linkedRequestIds must report which requests were linked');
 
         const req = db.get('SELECT id, generation_id FROM request WHERE id = ?', [requestId]);
         assert.equal(req.generation_id, GEN, 'the real generation id must replace the placeholder');

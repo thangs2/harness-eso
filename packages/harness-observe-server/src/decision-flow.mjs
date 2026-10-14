@@ -5,6 +5,7 @@ import { buildDesignViewGraph } from './decision-design-view.mjs';
 import { computeObservedActivityHighlight } from './observed-activity-highlight.mjs';
 import { buildSequenceViewGraph } from './decision-sequence-view.mjs';
 import { formatEsoSummary, parseBundleFromLedgerRow } from './eso-view.mjs';
+import { hasRealGenerationLink } from './ag-request-enrich.mjs';
 
 function safeJson(raw) {
     if (!raw) return null;
@@ -365,9 +366,13 @@ export function loadDecisionFlowForRequest(db, projectId, requestId, observe = {
             droppedTurns > 0
                 ? `${droppedTurns} older turn_start row(s) hidden — ingest re-ran while files were still accumulating (same turn, new touchedPaths).`
                 : displayRows.length === 0 && observedFallback?.nodes?.size
-                  ? 'No decision_ledger row — green path from transcript tools + ingest spine (hooks not linked).'
+                  ? hasRealGenerationLink(request)
+                      ? 'No decision_ledger row — green path from transcript tools + ingest spine.'
+                      : 'No decision_ledger row — green path from transcript tools + ingest spine (hooks not linked).'
                   : displayRows.length === 0
-                    ? 'No decision_ledger row — provision consumer hooks + sidecar for turn_start highlight.'
+                    ? hasRealGenerationLink(request)
+                        ? 'No decision_ledger row — awaiting decision facade or ESO preflight.'
+                        : 'No decision_ledger row — provision consumer hooks + sidecar for turn_start highlight.'
                     : null,
         graph,
         designGraph,

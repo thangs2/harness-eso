@@ -318,6 +318,7 @@ export function linkRequests(db, cfg) {
     );
 
     let linked = 0;
+    const linkedRequestIds = [];
     for (const p of prompts) {
         if (used.has(p.generation_id) || !p.conversation_id) continue;
         const pool = db.all(
@@ -354,6 +355,7 @@ export function linkRequests(db, cfg) {
         used.add(p.generation_id);
         applyLink(db, projectId, hit.id, p, now);
         linked += 1;
+        linkedRequestIds.push(hit.id);
     }
 
     linkEventsByGenerationOrRequestId(db, projectId);
@@ -474,7 +476,7 @@ export function linkRequests(db, cfg) {
      */
     const correctedCount = corrected ? Number(corrected.changes || 0) : 0;
 
-    return { linked, repaired: repaired + correctedCount, corrected: correctedCount };
+    return { linked, repaired: repaired + correctedCount, corrected: correctedCount, linkedRequestIds };
 }
 
 function applyLink(db, projectId, requestId, prompt, now) {

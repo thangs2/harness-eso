@@ -167,3 +167,37 @@ test('signal-less conversations keep the historical substring fallback', () => {
     const other = consumer('owner-unrelated');
     assert.deepEqual(discoverTranscripts(cfgFor(other, brain)), []);
 });
+
+test('a transcript in another git repo mentioning a sibling harness root is not claimed', () => {
+    // Sibling repo without harness.config.json (e.g. harness-eso dev repo or non-harness project)
+    const siblingRepo = consumer('sibling-git', { withConfig: false });
+    fs.mkdirSync(path.join(siblingRepo, '.git'));
+    const x79 = consumer('owner-x79-claimed');
+
+    const { file, brain } = transcriptWithDocs(siblingRepo, [path.join(siblingRepo, 'src', 'server.mjs')]);
+
+    // The chat mentions x79 path
+    const fh = fs.openSync(file, 'a');
+    fs.writeSync(fh, `${JSON.stringify({ step_index: 1, source: 'USER_EXPLICIT', type: 'USER_INPUT', content: `check bug in ${x79}` })}\n`);
+    fs.closeSync(fh);
+
+    const owner = resolveTranscriptOwner(file);
+    assert.equal(path.resolve(owner), path.resolve(siblingRepo));
+    assert.deepEqual(discoverTranscripts(cfgFor(x79, brain)), [], 'must not claim sibling repo conversation');
+});
+
+test('a transcript with metadata outside any project mentioning a harness root is not claimed', () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-outside-'));
+    const x79 = consumer('owner-x79-claimed-2');
+
+    const { file, brain } = transcriptWithDocs(outside, [path.join(outside, 'notes.md')]);
+
+    // Chat mentions x79
+    const fh = fs.openSync(file, 'a');
+    fs.writeSync(fh, `${JSON.stringify({ step_index: 1, source: 'USER_EXPLICIT', type: 'USER_INPUT', content: `look at ${x79}` })}\n`);
+    fs.closeSync(fh);
+
+    assert.equal(resolveTranscriptOwner(file), null);
+    assert.deepEqual(discoverTranscripts(cfgFor(x79, brain)), [], 'must not fall back to substring check when metadata exists');
+});
+

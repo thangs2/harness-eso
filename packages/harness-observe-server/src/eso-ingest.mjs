@@ -11,7 +11,7 @@ function requestsForScope(db, cfg, scope) {
     if (!scope) {
         return db.all(
             `SELECT id FROM request WHERE project_id = ? AND user_query IS NOT NULL AND trim(user_query) != ''
-             ORDER BY updated_at DESC LIMIT 80`,
+             ORDER BY COALESCE(started_at, created_at) DESC, id DESC LIMIT 80`,
             [projectId],
         );
     }
@@ -35,7 +35,7 @@ function requestsMissingEso(db, cfg, limit) {
              WHERE dl.project_id = r.project_id AND dl.request_id = r.id
                AND dl.event_type = 'evidence_sufficiency'
            )
-         ORDER BY r.updated_at DESC
+         ORDER BY COALESCE(r.started_at, r.created_at) DESC, r.id DESC
          LIMIT ?`,
         [cfg.project.id, limit],
     );

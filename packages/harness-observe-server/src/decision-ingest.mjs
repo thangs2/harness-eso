@@ -13,7 +13,7 @@ function requestsForScope(db, cfg, scope) {
     const projectId = cfg.project.id;
     if (!scope) {
         return db.all(
-            `SELECT id FROM request WHERE project_id = ? AND generation_id IS NOT NULL ORDER BY updated_at DESC LIMIT 80`,
+            `SELECT id FROM request WHERE project_id = ? AND generation_id IS NOT NULL ORDER BY COALESCE(started_at, created_at) DESC, id DESC LIMIT 80`,
             [projectId],
         );
     }
@@ -50,7 +50,7 @@ function requestsMissingFacade(db, cfg, limit) {
              WHERE dl.project_id = r.project_id AND dl.request_id = r.id
                AND dl.event_type IN ${FACADE_EVENT_TYPES}
            )
-         ORDER BY r.updated_at DESC
+         ORDER BY COALESCE(r.started_at, r.created_at) DESC, r.id DESC
          LIMIT ?`,
         [cfg.project.id, limit],
     );
