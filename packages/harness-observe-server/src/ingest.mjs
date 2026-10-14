@@ -149,6 +149,18 @@ export async function runIngestOnce(cfg, opts = {}) {
             for (const id of link.linkedRequestIds || []) requestIds.add(id);
             const generations = new Set();
             for (const h of hooks) for (const g of h.touchedGenerations || []) generations.add(g);
+
+            // Bounded backfill: ensure turns with missing verdict cache or unrun checks converge
+            if (requestIds.size > 0 || runBackfill) {
+                const uncomputed = db.all(
+                    `SELECT id FROM request
+                     WHERE project_id = ? AND (list_decision_verdict IS NULL OR (checks_pass = 0 AND checks_fail = 0 AND has_failures = 0))
+                     ORDER BY started_at DESC LIMIT 50`,
+                    [cfg.project.id],
+                );
+                for (const u of uncomputed) requestIds.add(u.id);
+            }
+
             scope = { requestIds, generations };
         }
         const overlaid = overlayEvidence(db, cfg, scope);
@@ -401,16 +413,25 @@ export function ingestStatus(cfg) {
     }
 }
 
-// ---- CLI entry: `bun lib/ingest.mjs [--force] [--json]`
-if (import.meta.main) {
+const ENTRY = fileURLToPath(import.meta.url);
+function isDirectRun() {
+    if (import.meta.main) return true;
+    const entry = process.argv[1];
+    if (!entry) return false;
+    return path.resolve(entry) === path.resolve(ENTRY);
+}
+
+if (isDirectRun()) {
     const main = async () => {
-    const force = process.argv.includes('--force');
-    const asJson = process.argv.includes('--json');
-    const esoBackfillOnly = process.argv.includes('--eso-backfill');
-    const esoBackfillArg = process.argv.find((a) => a.startsWith('--eso-backfill-limit='));
+    const argv = process.argv.slice(2);
+    const rootIdx = argv.indexOf('--root');
+    const start = rootIdx >= 0 ? argv[rootIdx + 1] : process.cwd();
+    const force = argv.includes('--force');
+    const asJson = argv.includes('--json');
+    const esoBackfillOnly = argv.includes('--eso-backfill');
+    const esoBackfillArg = argv.find((a) => a.startsWith('--eso-backfill-limit='));
     const esoBackfillLimit = esoBackfillArg ? Number(esoBackfillArg.split('=')[1]) : undefined;
-    // Same fallback as the server: cwd first, then this file's own repo.
-    let cfg = loadConfig(process.cwd());
+    let cfg = loadConfig(start);
     if (!cfg.ok) cfg = loadConfig(path.dirname(fileURLToPath(import.meta.url)));
     if (!cfg.ok) {
         console.error(`harness ingest: ${cfg.reason}`);
@@ -425,9 +446,12 @@ if (import.meta.main) {
      * to land on a newline is invisible to it. This is the repair for those rows; it is not part of a
      * normal pass, because it discards and re-derives the conversation's requests.
      */
-    const rebuildArg = process.argv.find((a) => a.startsWith('--rebuild='));
+    const rebuildIdx = argv.findIndex((a) => a === '--rebuild' || a.startsWith('--rebuild='));
+    const rebuildArg = rebuildIdx >= 0 ? argv[rebuildIdx] : null;
     if (rebuildArg) {
-        const target = rebuildArg.slice('--rebuild='.length).trim();
+        const target = rebuildArg.startsWith('--rebuild=')
+            ? rebuildArg.slice('--rebuild='.length).trim()
+            : (argv[rebuildIdx + 1] || '').trim();
         if (!target) {
             console.error('harness ingest: --rebuild needs a conversation id or path fragment');
             process.exit(2);
@@ -442,6 +466,18 @@ if (import.meta.main) {
         for (const p of matches) {
             const r = rebuildTranscript(db, cfg, p);
             console.log(`  rebuilt ${r.conversationId}: +${r.newRequests} requests, +${r.newCalls} calls`);
+            const scope = { requestIds: new Set(r.touchedRequests || []), generations: new Set() };
+            overlayEvidence(db, cfg, scope);
+            computeChecks(db, cfg, scope);
+            if (process.env.HARNESS_DECISION_FACADE !== '0') {
+                const { runDecisionFacadeForScope } = await import('./decision-ingest.mjs');
+                await runDecisionFacadeForScope(db, cfg, scope);
+            }
+            if (process.env.HARNESS_ESO !== '0') {
+                const { runEsoForScope } = await import('./eso-ingest.mjs');
+                await runEsoForScope(db, cfg, scope);
+            }
+            refreshRequestListCache(db, cfg.project.id, scope);
         }
         closeIngestDb();
         process.exit(0);

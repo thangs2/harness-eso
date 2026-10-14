@@ -169,15 +169,34 @@
     .obs-table--requests .obs-col-open {
         width: 1%;
     }
+    .obs-table--requests .obs-col-num {
+        min-width: 2.5rem;
+    }
+    .obs-table--requests .obs-col-when {
+        min-width: 4.5rem;
+    }
+    .obs-table--requests .obs-col-status {
+        min-width: 5.5rem;
+    }
+    .obs-table--requests .obs-col-verdict {
+        min-width: 5.5rem;
+    }
+    .obs-table--requests .obs-col-model {
+        width: 1%;
+        min-width: 6rem;
+        max-width: 9rem;
+    }
+    .obs-table--requests .obs-col-checks {
+        min-width: 3.5rem;
+    }
+    .obs-table--requests .obs-col-open {
+        min-width: 7.5rem;
+    }
     .obs-table--requests .obs-col-query {
         width: 100%;
         white-space: normal;
         min-width: 14rem;
         max-width: none;
-    }
-    .obs-table--requests .obs-col-model {
-        width: 1%;
-        max-width: 7rem;
     }
     /* Keep the row's action links on one line — wrapping inflated row height. */
     .obs-table--requests .obs-col-open .obs-cmd-group {
@@ -192,28 +211,11 @@
     .obs-table--compact td {
         @apply py-1.5 text-xs;
     }
-    /* A sticky box is measured against its nearest SCROLLPORT, and `.obs-table-wrap` is
-       one: `overflow-x: auto` makes the wrapper the sticky ancestor for BOTH axes, so an
-       inset measured from the viewport is applied from the WRAPPER's top instead and paints
-       the header down over the first rows. The offset only means what it says once the
-       wrapper is not a scrollport — i.e. at widths where the table actually fits. */
+    .obs-table-wrap--sticky {
+        overflow-x: auto;
+    }
     .obs-table-wrap--sticky thead th {
-        @apply sticky z-10 shadow-sm;
-    }
-    @media (min-width: 1200px) {
-        .obs-table-wrap--sticky {
-            overflow: visible;
-        }
-        .obs-table-wrap--sticky thead th {
-            top: var(--obs-header-h, 3.25rem);
-        }
-    }
-    @media (max-width: 1199.98px) {
-        /* Narrower than the table: it must scroll sideways, so the wrapper owns the
-           scrollport and the head can only stick to its own top. */
-        .obs-table-wrap--sticky thead th {
-            top: 0;
-        }
+        @apply sticky top-0 z-10 shadow-sm;
     }
     .obs-row--fail {
         @apply bg-danger/5;
@@ -1074,7 +1076,40 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
     }
+    .tooltip,
+    .g6-tooltip {
+        background-color: #0d1118 !important;
+        border: 1px solid #2b3550 !important;
+        border-radius: 6px !important;
+        color: #e2e8f0 !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
+        padding: 8px 12px !important;
+        max-width: 24rem !important;
+        font-size: 11px !important;
+        line-height: 1.45 !important;
+        z-index: 100 !important;
+        pointer-events: none !important;
+    }
+    .tooltip .g6-tip,
     .g6-tip {
-        @apply text-xs text-slate-200 whitespace-pre-wrap max-w-xs p-1;
+        @apply text-xs whitespace-pre-wrap max-w-xs;
+        color: #e2e8f0 !important;
+        font-size: 11px !important;
+        line-height: 1.45 !important;
+        word-break: break-word !important;
+    }
+    .g6-tip-header {
+        color: #4ec97a !important;
+        font-weight: 600 !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        margin-bottom: 4px;
+        border-bottom: 1px solid #253047;
+        padding-bottom: 2px;
+    }
+    .g6-tip-body {
+        color: #cbd5e1 !important;
+        font-size: 11px !important;
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
     }
 }

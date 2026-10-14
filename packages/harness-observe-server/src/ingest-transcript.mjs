@@ -169,6 +169,81 @@ export function mcpToolLabel(name, input) {
     return `mcp:${toolName}`;
 }
 
+export function cleanArgStr(s) {
+    if (typeof s !== 'string') return '';
+    let t = s.trim();
+    if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+        t = t.slice(1, -1).trim();
+    }
+    return t;
+}
+
+export function extractToolPath(args) {
+    if (!args || typeof args !== 'object') return '';
+    const keys = [
+        'TargetFile', 'target_file', 'targetFile',
+        'AbsolutePath', 'absolute_path', 'absolutePath',
+        'SearchPath', 'search_path', 'searchPath',
+        'DirectoryPath', 'directory_path', 'directoryPath',
+        'path', 'filePath', 'file_path', 'notebook_path', 'Url', 'url',
+    ];
+    for (const k of keys) {
+        if (typeof args[k] === 'string' && args[k].trim()) return cleanArgStr(args[k]);
+    }
+    if (args.Arguments && typeof args.Arguments === 'object') {
+        for (const k of keys) {
+            if (typeof args.Arguments[k] === 'string' && args.Arguments[k].trim()) {
+                return cleanArgStr(args.Arguments[k]);
+            }
+        }
+    }
+    return '';
+}
+
+export function extractToolCommand(args) {
+    if (!args || typeof args !== 'object') return '';
+    const keys = ['CommandLine', 'commandLine', 'command', 'cmd', 'script', 'Query', 'query', 'Prompt', 'prompt'];
+    for (const k of keys) {
+        if (typeof args[k] === 'string' && args[k].trim()) return cleanArgStr(args[k]);
+    }
+    if (args.Arguments && typeof args.Arguments === 'object') {
+        for (const k of keys) {
+            if (typeof args.Arguments[k] === 'string' && args.Arguments[k].trim()) {
+                return cleanArgStr(args.Arguments[k]);
+            }
+        }
+    }
+    return '';
+}
+
+export function extractPromptRules(contentText, workspaceRoot) {
+    const rules = new Set();
+    const text = String(contentText || '');
+    for (const m of text.matchAll(/<RULE\[(.*?)\]>/g)) {
+        if (m[1]) rules.add(m[1].trim());
+    }
+    for (const m of text.matchAll(/@\[(.*?)\]/g)) {
+        const p = m[1].trim();
+        if (/\.mdc$/i.test(p) || /(^|\/)(rules|skills)\//i.test(p) || /(^|\/)AGENTS\.md$/i.test(p)) {
+            rules.add(p);
+        }
+    }
+    if (workspaceRoot) {
+        const agentsPath = path.join(workspaceRoot, 'AGENTS.md');
+        if (fs.existsSync(agentsPath)) {
+            rules.add('AGENTS.md');
+        }
+    }
+    const root = String(workspaceRoot || '').replace(/\\/g, '/');
+    const out = [];
+    for (const r of rules) {
+        let s = r.replace(/\\/g, '/');
+        if (root && s.startsWith(`${root}/`)) s = s.slice(root.length + 1);
+        out.push(s);
+    }
+    return out;
+}
+
 /**
  * The prompt a model MCP call was made with, when this `tool_use` is one.
  *
@@ -440,6 +515,12 @@ export function ingestTranscript(db, cfg, transcriptPath) {
             ? db.get('SELECT COUNT(*) AS n FROM llm_call WHERE request_id = ?', [current.id]).n
             : 0;
 
+        let currentModel = db.get(
+            'SELECT model_id FROM request WHERE conversation_id = ? AND model_id IS NOT NULL ORDER BY boundary_index DESC LIMIT 1',
+            [conversationId],
+        )?.model_id || null;
+        let conversationChars = 0;
+
         let offset = state.last_offset;
         let lineNo = state.last_line_no;
 
@@ -458,35 +539,62 @@ export function ingestTranscript(db, cfg, transcriptPath) {
             }
 
             if (isAntigravity) {
+                const lineCharCount = line.length;
+                const contentText = typeof rec.content === 'string' ? rec.content : '';
+                const modelM = /The user changed setting [`']?Model Selection[`']? from .+? to [`']?(.+?)[`']?(?:\.\s+(?:No need|[A-Z])|\.\s*$|\n|$)/i.exec(contentText);
+                if (modelM && modelM[1]) {
+                    currentModel = modelM[1].trim();
+                }
+
                 // ---- Antigravity: user prompt
                 if (rec.source === 'USER_EXPLICIT' && rec.type === 'USER_INPUT') {
-                    const contentText = typeof rec.content === 'string' ? rec.content : '';
                     const ur = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i.exec(contentText);
                     const uq = UQ_RE.exec(contentText);
                     const query = ur ? ur[1].trim() : (uq ? uq[1].trim() : contentText.trim());
-                    if (!query) continue;
+                    if (!query) {
+                        conversationChars += lineCharCount;
+                        continue;
+                    }
                     const rawTs = rec.created_at || now;
                     const key = `${rawTs}\u0000${query}`;
-                    if (key === lastBoundaryKey) continue;
+                    if (key === lastBoundaryKey) {
+                        conversationChars += lineCharCount;
+                        continue;
+                    }
                     lastBoundaryKey = key;
                     const startedAt = parsePromptTs(rawTs) || rawTs;
 
                     if (current) {
+                        const callStats = db.get(
+                            `SELECT COUNT(*) AS calls, COALESCE(SUM(tool_count), 0) AS tools,
+                                    COALESCE(SUM(text_chars), 0) AS textChars,
+                                    COALESCE(SUM(emit_chars), 0) AS emitChars
+                             FROM llm_call WHERE request_id = ?`,
+                            [current.id],
+                        );
+                        const outTokens = callStats?.emitChars ? Math.round(callStats.emitChars / 4) : null;
+                        const inTokens = Math.round(conversationChars / 4);
                         db.run(
                             `UPDATE request SET status = CASE WHEN status = 'in_progress' THEN 'completed' ELSE status END,
-                                ended_at = COALESCE(ended_at, ?), updated_at = ? WHERE id = ?`,
-                            [startedAt, now, current.id],
+                                ended_at = COALESCE(ended_at, ?),
+                                input_tokens = COALESCE(input_tokens, ?),
+                                output_tokens = COALESCE(output_tokens, ?),
+                                model_id = COALESCE(model_id, ?),
+                                updated_at = ? WHERE id = ?`,
+                            [startedAt, inTokens > 0 ? inTokens : null, outTokens > 0 ? outTokens : null, currentModel, now, current.id],
                         );
                     }
 
                     const reqId = `${conversationId}:${nextIndex}`;
                     db.run(
                         `INSERT INTO request (id, project_id, conversation_id, boundary_index, user_query, prompt_at,
-                            started_at, status, generation_id, created_at, updated_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?, ?)
+                            started_at, status, generation_id, model_id, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?, ?, ?)
                          ON CONFLICT(id) DO UPDATE SET user_query = excluded.user_query, started_at = excluded.started_at,
-                            generation_id = COALESCE(request.generation_id, excluded.generation_id), updated_at = excluded.updated_at`,
-                        [reqId, projectId, conversationId, nextIndex, query, rawTs, startedAt, reqId, now, now],
+                            generation_id = COALESCE(request.generation_id, excluded.generation_id),
+                            model_id = COALESCE(request.model_id, excluded.model_id),
+                            updated_at = excluded.updated_at`,
+                        [reqId, projectId, conversationId, nextIndex, query, rawTs, startedAt, reqId, currentModel, now, now],
                     );
                     current = {
                         id: reqId,
@@ -498,12 +606,26 @@ export function ingestTranscript(db, cfg, transcriptPath) {
                     callIndex = 0;
                     report.newRequests += 1;
                     touched.add(reqId);
+
+                    const promptRules = extractPromptRules(contentText, cfg.root);
+                    for (const r of promptRules) {
+                        db.run(
+                            `INSERT INTO request_rule (request_id, rule_id, attached_at) VALUES (?, ?, ?)
+                             ON CONFLICT(request_id, rule_id) DO NOTHING`,
+                            [reqId, r, startedAt],
+                        );
+                    }
+
+                    conversationChars += lineCharCount;
                     continue;
                 }
 
                 // ---- Antigravity: LLM call (assistant response)
                 if (rec.source === 'MODEL' && rec.type === 'PLANNER_RESPONSE') {
-                    if (!current) continue;
+                    if (!current) {
+                        conversationChars += lineCharCount;
+                        continue;
+                    }
                     const toolCalls = Array.isArray(rec.tool_calls) ? rec.tool_calls : [];
                     const tools = toolCalls.length;
                     const names = toolCalls.map((tc) => tc.name).filter(Boolean);
@@ -517,7 +639,14 @@ export function ingestTranscript(db, cfg, transcriptPath) {
                             } catch {}
                         }
                     }
-                    const preview = contentText.slice(0, 240);
+                    let preview = contentText.slice(0, 240);
+                    if (!preview.trim() && toolCalls.length > 0) {
+                        preview = toolCalls.map((tc) => {
+                            const p = extractToolPath(tc.args);
+                            const c = extractToolCommand(tc.args);
+                            return [tc.name, p || c].filter(Boolean).join(' ');
+                        }).join('; ').slice(0, 240);
+                    }
                     callIndex += 1;
                     const callId = `${current.id}:${callIndex}`;
                     db.run(
@@ -540,14 +669,71 @@ export function ingestTranscript(db, cfg, transcriptPath) {
                             now,
                         ],
                     );
+
+                    const relLog = path.relative(cfg.root, transcriptPath).replace(/\\/g, '/');
+                    for (let ti = 0; ti < toolCalls.length; ti += 1) {
+                        const tc = toolCalls[ti];
+                        const toolName = tc.name === 'call_mcp_tool' && tc.args?.ToolName
+                            ? tc.args.ToolName
+                            : (tc.name || 'tool');
+                        let pathVal = extractToolPath(tc.args);
+                        const cmdVal = extractToolCommand(tc.args);
+                        if (cfg.root && pathVal.replace(/\\/g, '/').startsWith(`${cfg.root}/`)) {
+                            pathVal = pathVal.replace(/\\/g, '/').slice(cfg.root.length + 1);
+                        }
+                        const rawObj = {
+                            harness: 'agents',
+                            eventType: 'postToolUse',
+                            tool: toolName,
+                            path: pathVal || null,
+                            command: cmdVal || null,
+                            payload: {
+                                tool_input: {
+                                    command: cmdVal || null,
+                                    path: pathVal || null,
+                                },
+                            },
+                        };
+                        db.run(
+                            `INSERT INTO event (project_id, harness, event_type, tool, path, generation_id,
+                                conversation_id, request_id, hook_at, source_path, source_line_no, raw_json)
+                             VALUES (?, 'agents', 'postToolUse', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             ON CONFLICT(project_id, harness, source_path, source_line_no) DO UPDATE SET
+                                tool = excluded.tool, path = excluded.path, request_id = excluded.request_id,
+                                generation_id = excluded.generation_id, hook_at = excluded.hook_at, raw_json = excluded.raw_json`,
+                            [
+                                projectId,
+                                toolName,
+                                pathVal || null,
+                                current.id,
+                                conversationId,
+                                current.id,
+                                rec.created_at || now,
+                                relLog,
+                                lineNo * 1000 + ti,
+                                JSON.stringify(rawObj),
+                            ],
+                        );
+
+                        if (pathVal && (/\.mdc$/i.test(pathVal) || /(^|\/)(rules|skills)\//i.test(pathVal) || /(^|\/)AGENTS\.md$/i.test(pathVal))) {
+                            db.run(
+                                `INSERT INTO request_rule (request_id, rule_id, attached_at) VALUES (?, ?, ?)
+                                 ON CONFLICT(request_id, rule_id) DO NOTHING`,
+                                [current.id, pathVal, rec.created_at || now],
+                            );
+                        }
+                    }
+
                     report.newCalls += 1;
                     touched.add(current.id);
+                    conversationChars += lineCharCount;
                     continue;
                 }
 
                 if (rec.status === 'ERROR' && current) {
                     db.run(`UPDATE request SET has_failures = 1 WHERE id = ?`, [current.id]);
                 }
+                conversationChars += lineCharCount;
                 continue;
             }
 
@@ -640,15 +826,50 @@ export function ingestTranscript(db, cfg, transcriptPath) {
                 call_count = (SELECT COUNT(*) FROM llm_call WHERE request_id = request.id),
                 tool_count = (SELECT COALESCE(SUM(tool_count), 0) FROM llm_call WHERE request_id = request.id),
                 text_chars = (SELECT COALESCE(SUM(text_chars), 0) FROM llm_call WHERE request_id = request.id),
+                output_tokens = CASE
+                    WHEN output_tokens IS NULL THEN (SELECT ROUND(COALESCE(SUM(emit_chars), 0) / 4.0) FROM llm_call WHERE request_id = request.id)
+                    ELSE output_tokens
+                END,
+                model_id = COALESCE(?, model_id),
                 updated_at = ?
              WHERE conversation_id = ?`,
-            [now, conversationId],
+            [currentModel, now, conversationId],
         );
         if (current) {
-            db.run(
-                `UPDATE request SET status = CASE WHEN status = '' THEN 'in_progress' ELSE status END WHERE id = ?`,
+            const lastStats = db.get(
+                `SELECT COALESCE(SUM(emit_chars), 0) AS emitChars FROM llm_call WHERE request_id = ?`,
                 [current.id],
             );
+            const inTokens = Math.round(conversationChars / 4);
+            const outTokens = lastStats?.emitChars ? Math.round(lastStats.emitChars / 4) : null;
+            db.run(
+                `UPDATE request SET status = CASE WHEN status = '' THEN 'in_progress' ELSE status END,
+                    input_tokens = COALESCE(input_tokens, ?),
+                    output_tokens = COALESCE(output_tokens, ?),
+                    model_id = COALESCE(model_id, ?)
+                 WHERE id = ?`,
+                [inTokens > 0 ? inTokens : null, outTokens > 0 ? outTokens : null, currentModel, current.id],
+            );
+        }
+
+        // Backfill input_tokens for any requests in this conversation that still have input_tokens IS NULL
+        const reqsWithoutInput = db.all(
+            `SELECT id, boundary_index, length(user_query) AS qlen FROM request
+             WHERE conversation_id = ? AND input_tokens IS NULL AND call_count > 0 ORDER BY boundary_index`,
+            [conversationId],
+        );
+        for (const rw of reqsWithoutInput) {
+            const prevStats = db.get(
+                `SELECT COALESCE(SUM(lc.text_chars + lc.emit_chars), 0) AS priorChars
+                 FROM llm_call lc
+                 JOIN request r ON r.id = lc.request_id
+                 WHERE r.conversation_id = ? AND r.boundary_index < ?`,
+                [conversationId, rw.boundary_index],
+            );
+            const estIn = Math.round(((prevStats?.priorChars || 0) + rw.qlen + 1500) / 4);
+            if (estIn > 0) {
+                db.run('UPDATE request SET input_tokens = ? WHERE id = ?', [estIn, rw.id]);
+            }
         }
 
         const agg = db.get(

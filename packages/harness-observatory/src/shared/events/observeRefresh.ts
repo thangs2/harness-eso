@@ -10,8 +10,13 @@ export function subscribeObserveRefresh(listener: Listener): () => void {
     return () => listeners.delete(listener);
 }
 
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 function emit(reason: ObserveRefreshReason) {
-    for (const fn of listeners) fn(reason);
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        for (const fn of listeners) fn(reason);
+    }, 150);
 }
 
 export function connectObserveSse(): () => void {

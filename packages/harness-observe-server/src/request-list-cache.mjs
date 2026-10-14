@@ -27,11 +27,19 @@ export function refreshRequestListCache(db, projectId, scope = {}) {
             list_emit_chars_sum = (
                 SELECT COALESCE(SUM(lc.emit_chars), 0) FROM llm_call lc WHERE lc.request_id = request.id
             ),
-            list_decision_verdict = (
-                SELECT dl.enforced_verdict FROM decision_ledger dl
-                WHERE dl.project_id = request.project_id AND dl.request_id = request.id
-                  AND dl.event_type = 'turn_start'
-                ORDER BY dl.created_at DESC LIMIT 1
+            list_decision_verdict = COALESCE(
+                (
+                    SELECT dl.enforced_verdict FROM decision_ledger dl
+                    WHERE dl.project_id = request.project_id AND dl.request_id = request.id
+                      AND dl.event_type = 'turn_start'
+                    ORDER BY dl.created_at DESC LIMIT 1
+                ),
+                (
+                    SELECT dl.enforced_verdict FROM decision_ledger dl
+                    WHERE dl.project_id = request.project_id AND dl.request_id = request.id
+                      AND dl.event_type = 'evidence_sufficiency'
+                    ORDER BY dl.created_at DESC LIMIT 1
+                )
             ),
             list_stop_input_tokens = ${STOP_INPUT_SQL},
             list_stop_output_tokens = ${STOP_OUTPUT_SQL}

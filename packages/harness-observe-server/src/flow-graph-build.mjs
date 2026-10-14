@@ -90,14 +90,14 @@ function stageOf(tool, command) {
     if (/^ask_deepseek/.test(t)) return 'brain';
     if (/^memory_/.test(t)) return /save$/.test(t) ? 'store' : 'memory';
     if (t === 'codegraph_explore') return 'codegraph';
-    if (t === 'Shell') {
+    if (t === 'Shell' || t === 'run_command' || t === 'command') {
         const c = String(command || '');
         if (/\bdocgraph\b/.test(c)) return 'docgraph';
         if (VERIFY_LIKE.test(c)) return 'verify';
         return 'shell';
     }
-    if (/^(Read|Grep|Glob|ReadLints|WebFetch|WebSearch|CallDynamicTool)$/.test(t)) return 'inspect';
-    if (/^(Write|StrReplace|Delete)$/.test(t)) return 'edit';
+    if (/^(Read|Grep|Glob|ReadLints|WebFetch|WebSearch|CallDynamicTool|view_file|grep_search|list_dir|read_url_content)$/.test(t)) return 'inspect';
+    if (/^(Write|StrReplace|Delete|replace_file_content|write_to_file|multi_replace_file_content)$/.test(t)) return 'edit';
     if (/^browser_/.test(t)) return 'browser';
     if (/^(penpot|figma)/.test(t)) return 'design';
     if (/^(Task|subagent)/.test(t)) return 'agent';

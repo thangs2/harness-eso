@@ -2,7 +2,21 @@
  * Promax flow evidence: prompt attachments + enriched hook paths (observe API).
  */
 
-const FILE_PATH_KEYS = ['file_path', 'path', 'target_file', 'notebook_path', 'absolute_path'];
+const FILE_PATH_KEYS = [
+    'file_path',
+    'path',
+    'target_file',
+    'notebook_path',
+    'absolute_path',
+    'AbsolutePath',
+    'TargetFile',
+    'SearchPath',
+    'DirectoryPath',
+    'filePath',
+    'targetFile',
+    'searchPath',
+    'directoryPath',
+];
 
 export function relPath(rootPath, p) {
     const root = String(rootPath || '').replace(/\\/g, '/');
@@ -15,7 +29,7 @@ export function extractPathFromRecord(rec) {
     if (!rec || typeof rec !== 'object') return '';
     if (rec.path) return String(rec.path);
     const payload = rec.payload && typeof rec.payload === 'object' ? rec.payload : {};
-    const input = payload.tool_input || rec.tool_input;
+    const input = payload.tool_input || rec.tool_input || payload.arguments || rec.arguments;
     if (input && typeof input === 'object') {
         for (const k of FILE_PATH_KEYS) {
             if (typeof input[k] === 'string' && input[k]) return input[k];
@@ -160,6 +174,18 @@ export function loadAttachedForRequest(db, projectId, request) {
         }
     }
 
+    if (!map.size) {
+        const eventPaths = db.all(
+            `SELECT DISTINCT path FROM event WHERE request_id = ? AND path IS NOT NULL`,
+            [requestId],
+        );
+        for (const ep of eventPaths) {
+            if (ep.path && /(rules?|skills?|agents?)\/|\.(mdc|md)$/i.test(ep.path)) {
+                addAttachment(map, 'rule', ep.path);
+            }
+        }
+    }
+
     return [...map.values()].sort((a, b) => a.filePath.localeCompare(b.filePath));
 }
 
@@ -176,9 +202,11 @@ export function enrichRequestEvents(rows, rootPath) {
             if (!path) path = extractPathFromRecord(rec) || '';
             if (!command) {
                 const payload = rec.payload || {};
-                const input = payload.tool_input || rec.tool_input || {};
+                const input = payload.tool_input || rec.tool_input || payload.arguments || rec.arguments || {};
                 command =
                     input.command ||
+                    input.CommandLine ||
+                    input.cmd ||
                     jsonExtractCommand(rec) ||
                     jsonExtractCommand(payload) ||
                     '';
@@ -199,7 +227,12 @@ export function enrichRequestEvents(rows, rootPath) {
 
 function jsonExtractCommand(obj) {
     if (!obj || typeof obj !== 'object') return '';
-    const input = obj.tool_input || obj.payload?.tool_input;
-    if (input && typeof input.command === 'string') return input.command;
+    const input = obj.tool_input || obj.payload?.tool_input || obj.arguments || obj.payload?.arguments;
+    if (input) {
+        if (typeof input.command === 'string') return input.command;
+        if (typeof input.CommandLine === 'string') return input.CommandLine;
+        if (typeof input.cmd === 'string') return input.cmd;
+    }
     return '';
 }
+

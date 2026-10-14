@@ -66,9 +66,9 @@ function extractPath(rec) {
 
 function actionOf(tool) {
     const t = (tool || '').replace(/^MCP:/, '');
-    if (/^(Read|read|Grep|Glob|List)/.test(t)) return 'read';
-    if (/(Write|StrReplace|Edit|MultiEdit|Delete|NotebookEdit)/.test(t)) return 'edit';
-    if (/(Shell|Bash|Terminal)/.test(t)) return 'shell';
+    if (/^(Read|read|Grep|Glob|List|view_file|list_dir|grep_search|read_url_content)/.test(t)) return 'read';
+    if (/(Write|StrReplace|Edit|MultiEdit|Delete|NotebookEdit|replace_file_content|write_to_file|multi_replace_file_content)/.test(t)) return 'edit';
+    if (/(Shell|Bash|Terminal|run_command|command)/.test(t)) return 'shell';
     return 'other';
 }
 
@@ -655,15 +655,18 @@ export function overlayEvidence(db, cfg, scope) {
                 );
             }
         } else {
-            // No stop covers this request. Clear rather than keep whatever a
-            // previous, wrongly-attributed pass wrote here: a stale token total is
-            // exactly the kind of thing this tool exists to rule out.
-            db.run(
-                `UPDATE request SET input_tokens = NULL, output_tokens = NULL, cache_read_tokens = NULL,
-                    cache_write_tokens = NULL, stop_status = NULL
-                 WHERE id = ? AND input_tokens IS NOT NULL`,
-                [r.id],
-            );
+            // No stop covers this request. Only clear tokens if this request has no
+            // transcript-derived LLM calls (e.g. Cursor requests with stale tokens).
+            // Antigravity and transcript-derived turns derive their token count from llm_call.
+            const hasCalls = db.get('SELECT COUNT(*) AS n FROM llm_call WHERE request_id = ?', [r.id])?.n > 0;
+            if (!hasCalls) {
+                db.run(
+                    `UPDATE request SET input_tokens = NULL, output_tokens = NULL, cache_read_tokens = NULL,
+                        cache_write_tokens = NULL, stop_status = NULL
+                     WHERE id = ? AND input_tokens IS NOT NULL`,
+                    [r.id],
+                );
+            }
         }
 
         // transcript is the ground truth for completion; note a disagreement

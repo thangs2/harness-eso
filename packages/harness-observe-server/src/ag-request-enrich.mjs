@@ -178,24 +178,13 @@ export function tokenSummaryForRequest(request, llmCalls, stops) {
     }
     const est = (llmCalls || []).reduce((a, c) => a + (Number(c.estTokens) || 0), 0);
     if (est > 0) {
-        const textChars = Number(request.text_chars);
-        const outputEst = Number.isFinite(textChars) && textChars > 0
-            ? Math.round(textChars / 4)
-            : est;
         return {
-            // Input tokens are NOT derivable from a transcript. The model's input is the whole
-            // context — system prompt + attached rules + open files + history + tool results —
-            // and only a hook `stop` payload reports it. The previous fallback reported the
-            // user's own prompt length ÷4 as "input", which rendered as a real measurement:
-            // 9 next to 628 out, i.e. orders of magnitude too small and actively misleading.
-            // Reporting null lets the UI say "—" (unknown) instead of inventing a number.
-            input: null,
-            output: outputEst,
+            input: request.input_tokens ?? null,
+            output: est,
             cacheRead: null,
             source: 'transcript-est',
             estimated: true,
             outputEstimated: true,
-            inputUnavailable: 'no_token_usage_in_transcript',
         };
     }
     return { input: null, output: null, cacheRead: null, source: 'none' };

@@ -52,10 +52,38 @@ function blueprintLabelFill(d: FlowNodeData): string {
     return '#6b7280';
 }
 
+const PROMAX_TOOLTIP_STYLE = {
+    '.tooltip': {
+        backgroundColor: '#0d1118',
+        border: '1px solid #2b3550',
+        borderRadius: '6px',
+        color: '#e2e8f0',
+        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7)',
+        padding: '8px 12px',
+        fontSize: '11px',
+        lineHeight: '1.45',
+        zIndex: 100,
+        pointerEvents: 'none',
+    },
+};
+
 function flowTip(items: unknown) {
-    const list = Array.isArray(items) ? items : [];
-    const nd = nodePayload((list[0] as Record<string, unknown>) ?? {});
-    return nd.tip ? `<div class="g6-tip">${String(nd.tip).replace(/</g, '&lt;')}</div>` : '';
+    const list = Array.isArray(items) ? items : items ? [items] : [];
+    const first = (list[0] as Record<string, unknown>) ?? {};
+    const nd = nodePayload(first);
+    const raw = nd.tip || nd.label || (first.id ? String(first.id) : '');
+    if (!raw) return '';
+    const text = String(raw).trim();
+    const lines = text.split('\n');
+    const header = lines[0] ?? '';
+    const rest = lines.slice(1).join('\n');
+    const safeHeader = header.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeRest = rest.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    if (lines.length > 1) {
+        return `<div class="g6-tip"><div class="g6-tip-header">${safeHeader}</div><div class="g6-tip-body">${safeRest}</div></div>`;
+    }
+    return `<div class="g6-tip">${safeHeader}</div>`;
 }
 
 function toFlowData(graph: FlowGraphVm) {
@@ -190,7 +218,12 @@ export async function mountPromaxFlowGraph(
             { type: 'hover-activate', degree: 1 },
         ],
         plugins: [
-            { type: 'tooltip', key: 'tip', getContent: (_e: unknown, items: unknown) => flowTip(items) },
+            {
+                type: 'tooltip',
+                key: 'tip',
+                getContent: (_e: unknown, items: unknown) => flowTip(items),
+                style: PROMAX_TOOLTIP_STYLE,
+            },
         ],
     });
     await g.render();
@@ -288,7 +321,12 @@ export async function mountPromaxBlueprintCombo(
         },
         behaviors: ['zoom-canvas', 'drag-canvas', { type: 'drag-element', enable: true }],
         plugins: [
-            { type: 'tooltip', key: 's1tip', getContent: (_e: unknown, items: unknown) => flowTip(items) },
+            {
+                type: 'tooltip',
+                key: 's1tip',
+                getContent: (_e: unknown, items: unknown) => flowTip(items),
+                style: PROMAX_TOOLTIP_STYLE,
+            },
         ],
     });
     await g.render();
@@ -367,6 +405,7 @@ export async function mountPromaxDesignGraph(
                 type: 'tooltip',
                 key: 'design',
                 getContent: (_e: unknown, items: unknown) => flowTip(items),
+                style: PROMAX_TOOLTIP_STYLE,
             },
         ],
     });

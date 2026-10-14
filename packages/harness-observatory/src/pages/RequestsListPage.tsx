@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchRequests } from '@/shared/api/client';
 import type { RequestListItem } from '@/shared/api/types';
@@ -43,6 +43,7 @@ function checksCell(row: RequestListItem) {
     if (row.checksPass == null && row.checksFail == null) return <span className="obs-sub">—</span>;
     const fail = row.checksFail ?? 0;
     const pass = row.checksPass ?? 0;
+    if (pass === 0 && fail === 0) return <span className="obs-sub">—</span>;
     if (fail > 0) {
         return (
             <span className="obs-checks obs-checks--fail" title={`${pass} pass · ${fail} fail`}>
@@ -88,7 +89,7 @@ function RequestRow({ row, showConversation }: { row: RequestListItem; showConve
                 )}
             </td>
             <td className="obs-sub obs-mono obs-col-model" title={row.modelId ?? undefined}>
-                {row.modelId?.split('/').pop() ?? '—'}
+                <span className="truncate block max-w-[8.5rem]">{row.modelId?.split('/').pop() ?? '—'}</span>
             </td>
             <td className="obs-sub tabular-nums obs-col-tok">{fmtTokens(row.inputTokens)}</td>
             <td
@@ -128,8 +129,11 @@ export function RequestsListPage() {
     const [query, setQuery] = useState('');
     const [failuresOnly, setFailuresOnly] = useState(false);
 
+    const inFlightRef = useRef(false);
     const load = useCallback((background = false) => {
         if (!background) setLoading(true);
+        if (inFlightRef.current && background) return;
+        inFlightRef.current = true;
         fetchRequests({
             limit: PAGE_SIZE,
             offset,
@@ -141,13 +145,21 @@ export function RequestsListPage() {
                 setTotal(res.page.total);
                 setError(null);
             })
-            .catch((e: Error) => setError(e.message))
-            .finally(() => setLoading(false));
+            .catch((e: Error) => {
+                if (!background) setError(e.message);
+            })
+            .finally(() => {
+                inFlightRef.current = false;
+                setLoading(false);
+            });
     }, [offset, query, failuresOnly]);
 
     useEffect(() => {
         load(false);
-        return subscribeObserveRefresh(() => load(true));
+        return subscribeObserveRefresh((reason) => {
+            if (reason === 'live') return;
+            load(true);
+        });
     }, [load]);
 
     const groups = useMemo(() => (groupByConv ? groupRequestsByConversation(items) : null), [groupByConv, items]);

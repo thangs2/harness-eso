@@ -448,13 +448,15 @@ export async function startObserveServer(cfg, opts = {}) {
     if (pollIngest) {
         const onReport = (report) => {
             app.noteLastIngestCounts(report.counts);
-            app.broadcast({
-                type: 'ingest',
-                at: report.at || isoNow(),
-                ok: report.ok,
-                counts: report.counts || null,
-                skipped: !!report.skipped,
-            });
+            if (!report.skipped && report.changed) {
+                app.broadcast({
+                    type: 'ingest',
+                    at: report.at || isoNow(),
+                    ok: report.ok,
+                    counts: report.counts || null,
+                    skipped: false,
+                });
+            }
             app.publishLive();
         };
         /*
