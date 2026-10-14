@@ -1,5 +1,11 @@
 # Docker / operator scripts
 
+> **Known debt:** this folder's operator surface is duplicated across `harness`, these scripts,
+> `docker/process/` and the npm `compose:*` aliases — and two documented commands are already broken on
+> Windows. Register with evidence and a cleanup sequence:
+> [`../documents/05.development/04.docker-tech-debt.md`](../documents/05.development/04.docker-tech-debt.md).
+> Read it before adding a script here, and before trusting the Console table below.
+
 ## Harness Console (monorepo product)
 
 **`console.sh`** / **`console.ps1`** — wizard API + SPA on **Docker** (`compose.console.yml`, cổng **8791**).

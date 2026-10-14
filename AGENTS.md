@@ -27,7 +27,7 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 | Nguồn | Khi dùng | Gợi ý |
 |--------|-----------|--------|
 | **Codegraph** | Luồng gọi, symbol, blast radius trong **product** | MCP `codegraph` trong **`.cursor/mcp.json`** (index harness-eso). `codegraph_explore` · `projectPath` = root harness-eso; consumer-only → `../x79`. Không `.codegraph/` → `codegraph init -i` hoặc Read/Grep. |
-| **Docgraph** | Law / spec x79 (read-only) | MCP **`docgraph`** → `docgraph_query` (`DOCGRAPH_REPO=../x79`). Hoặc CLI `docgraph --q` cwd x79. |
+| **Docgraph** | Kiến thức, tài liệu, invariants trong **product** (hoặc law x79) | Index cục bộ tại `.docgraph/` (scope: `documents/`, `docs/`, rules). MCP **`docgraph`** → `docgraph_query` (`DOCGRAPH_REPO=.`). Tra cứu consumer x79: truyền `repo="../x79"` hoặc CLI `docgraph --q ... --repo ../x79`. |
 | **AgentMemory** | Context phiên, preference operator | MCP **`agentmemory-mcp`** trong `.cursor/mcp.json` (`memory_smart_search` / `memory_save`). |
 | **DeepSeek** | Phân tích sâu, thiết kế, debug khó | MCP **`deepseek-direct`** trong `.cursor/mcp.json`: **`ask_deepseek_flash`** (default), **`ask_deepseek_pro`** khi cần. |
 
@@ -37,13 +37,17 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 
 ---
 
-## Thứ tự làm việc (gợi ý)
+## Thứ tự làm việc & Kỷ luật Token
 
-1. Đọc yêu cầu + file liên quan (Read/Grep hoặc Codegraph).
-2. Docgraph nếu câu hỏi về contract / WBS / observe API.
-3. AgentMemory nếu có context dài từ phiên trước.
-4. Implement trong repo; chạy test cục bộ.
-5. DeepSeek chỉ khi cần suy luận nhiều bước hoặc review kiến trúc — không gọi cho thay đổi 1–2 dòng đã rõ.
+1. **Khảo sát tài liệu (Docgraph first):** Tra cứu concept, invariant, contract bằng `docgraph --q "<terms>"` (hoặc MCP `docgraph_query`) để lấy đúng đoạn cần đọc, không dùng `view_file` mở tràn lan các file doc/WBS dài hàng ngàn dòng.
+2. **Khảo sát code (Codegraph first):** Dùng `codegraph_explore` (với `projectPath` = harness-eso) để lấy AST, call path và symbols mục tiêu trong 1 round-trip. Không grep/read lặp nhiều file gây phình context.
+3. **Kỷ luật Shell Output (Bắt buộc giới hạn):**
+   - Không chạy lệnh in ra output thô > 40 dòng vào context.
+   - Luôn pipe giới hạn khi kiểm tra: `git status -s`, `bun test 2>&1 | tail -n 25`, `head -n 30`, `grep -m 10`.
+   - Khi test pass chỉ cần tóm tắt kết quả (ví dụ `213 pass`).
+4. **AgentMemory:** `memory_smart_search` nếu có context phiên trước hoặc cần lưu quyết định kiến trúc (`memory_save`).
+5. **Implement & Test:** Sửa file gọn gàng, test cục bộ với output có kiểm soát.
+6. **DeepSeek:** Chỉ gọi `ask_deepseek_flash` / `pro` khi cần suy luận kiến trúc phức tạp hoặc debug lỗi hóc búa — không gọi cho thay đổi 1–2 dòng rõ ràng.
 
 ---
 

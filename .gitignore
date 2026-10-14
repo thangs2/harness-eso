@@ -7,3 +7,5 @@ dist/
 # Machine-local MCP config: it carries the API keys for this operator's servers, so it stays out
 # and `.cursor/mcp.example.json` is the committed template. Same reasoning as `.codegraph/`.
 .cursor/mcp.json
+.codegraph/
+.docgraph/

@@ -1,0 +1,38 @@
+# docgraph.scope — SINGLE SOURCE OF TRUTH for what docgraph covers in harness-eso.
+#
+# Lives at REPO ROOT and is TRACKED in git.
+# Discovered by: walking up from cwd for docgraph.scope, or $DOCGRAPH_REPO.
+
+# --- Extensions -------------------------------------------------------------
+ext:.md
+ext:.mdc
+ext:.json
+
+# --- Documentation pack & operator runbooks ---------------------------------
+path:documents
+path:docs
+path:docker/README.md
+
+# --- Agent law & skills -----------------------------------------------------
+path:AGENTS.md
+path:README.md
+path:.cursor/rules
+path:.cursor/skills
+path:.cursor/instructions.md
+path:.agents/rules
+path:.agents/skills
+path:.agents/instructions.md
+
+# --- Policy & profiles ------------------------------------------------------
+path:profiles
+path:package.json
+
+# --- Exclusions -------------------------------------------------------------
+exclude:**/tsconfig*.json
+exclude:**/package-lock.json
+exclude:**/bun.lock
+exclude:**/bun.lockb
+exclude:node_modules/**
+exclude:.harness/**
+exclude:.docgraph/**
+exclude:.codegraph/**
