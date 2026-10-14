@@ -169,6 +169,69 @@ export function ensureConsumerGuards(root, treeKey) {
 }
 
 /**
+ * Ensure baseline token-diet compliant micro-rules exist in target IDE tree.
+ * Creates .<treeKey>/rules/core.conversation-hygiene.mdc, core.pipeline-gate.mdc,
+ * and core.scope-fallback.mdc only if missing on disk.
+ */
+export function ensureConsumerRules(root, treeKey) {
+    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
+    const templatesDir = path.join(baseProfiles, 'templates', 'rules');
+    if (!fs.existsSync(templatesDir)) return [];
+
+    const actions = [];
+    const targetRulesDir = path.join(root, `.${treeKey}`, 'rules');
+    fs.mkdirSync(targetRulesDir, { recursive: true });
+
+    const ruleNames = [
+        'core.conversation-hygiene.mdc',
+        'core.pipeline-gate.mdc',
+        'core.scope-fallback.mdc',
+    ];
+
+    for (const name of ruleNames) {
+        const dest = path.join(targetRulesDir, name);
+        const altDest = treeKey === 'agents' ? path.join(targetRulesDir, name.replace(/\.mdc$/, '.md')) : null;
+        if (!fs.existsSync(dest) && (!altDest || !fs.existsSync(altDest))) {
+            const src = path.join(templatesDir, name);
+            if (fs.existsSync(src)) {
+                fs.copyFileSync(src, dest);
+                actions.push({ relative: `.${treeKey}/rules/${name}`, action: 'created' });
+            }
+        }
+    }
+
+    // Seed instructions.md in .cursor/ or .agents/ if missing
+    const instructionsDest = path.join(root, `.${treeKey}`, 'instructions.md');
+    if (!fs.existsSync(instructionsDest)) {
+        const instructionsSrc = path.join(baseProfiles, 'templates', 'instructions.md');
+        if (fs.existsSync(instructionsSrc)) {
+            fs.copyFileSync(instructionsSrc, instructionsDest);
+            actions.push({ relative: `.${treeKey}/instructions.md`, action: 'created' });
+        }
+    }
+
+    return actions;
+}
+
+/**
+ * Ensure comprehensive consumer workflow guide exists in .harness/WORKFLOW_GUIDE.md.
+ */
+export function ensureConsumerWorkflowGuide(root) {
+    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
+    const guideSrc = path.join(baseProfiles, 'templates', 'WORKFLOW_GUIDE.md');
+    if (!fs.existsSync(guideSrc)) return [];
+
+    const harnessDir = path.join(root, '.harness');
+    fs.mkdirSync(harnessDir, { recursive: true });
+    const guideDest = path.join(harnessDir, 'WORKFLOW_GUIDE.md');
+    if (!fs.existsSync(guideDest)) {
+        fs.copyFileSync(guideSrc, guideDest);
+        return [{ relative: '.harness/WORKFLOW_GUIDE.md', action: 'created' }];
+    }
+    return [];
+}
+
+/**
  * Merge one IDE tree's hook config, three-way.
  *
  * `pairs` is a list of `{ event, entries, blockId? }` so Cursor (flat `{hooks:{event:[…]}}`) and
@@ -186,6 +249,7 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
     if (!treeSpec) return { actions, report: {} };
 
     actions.push(...ensureConsumerGuards(root, treeKey));
+    actions.push(...ensureConsumerRules(root, treeKey));
 
     const hooksPath = path.join(root, treeSpec.hooksJsonPath || `.${treeKey}/hooks.json`);
     let hooksDoc = { version: 1, hooks: {} };
@@ -411,7 +475,11 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
     const root = path.resolve(consumerRoot);
     const port = opts.observePort || 8792;
     const profileIds = profiles.map((p) => p.id);
-    const actions = [...installHostPack(root).actions, writeSidecarEnv(root, profileIds, port)];
+    const actions = [
+        ...installHostPack(root).actions,
+        writeSidecarEnv(root, profileIds, port),
+        ...ensureConsumerWorkflowGuide(root),
+    ];
 
     const sidecarUrl = `http://127.0.0.1:${port}`;
     const bootstrap = {

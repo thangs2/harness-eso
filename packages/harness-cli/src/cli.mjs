@@ -7,6 +7,7 @@ import { configureListCli, configureUseCli } from './project-init.mjs';
 import { runInitProfile } from './init-profile-cmd.mjs';
 import { runHostPack } from './host-pack-cmd.mjs';
 import { runStorageGc, storageStatus } from './storage-gc.mjs';
+import { runTokenDiet } from './token-diet-cmd.mjs';
 
 applyWorkspaceEnv();
 
@@ -18,6 +19,7 @@ function usage() {
 
   harnessctl init profile <consumer-path> [--plan] [--id <id>] [--name <name>] [--host-mode dual-ide|superset]
   harnessctl host-pack status|refresh|add-ide|remove-ide [consumer | --project <id>]
+  harnessctl token-diet [consumer | --project <id>] [--json]
   harnessctl configure list | harnessctl configure use <id>
   harnessctl observatory up|down|restart|status|health|logs|build|smoke [--project <id>]
   harnessctl console up|down|restart|status|health|logs|build
@@ -119,6 +121,12 @@ async function main() {
         }
         usage();
         process.exit(2);
+    }
+
+    if (cmd === 'token-diet' || (cmd === 'check' && argv[1] === 'token-diet')) {
+        const sliceFrom = cmd === 'check' ? 2 : 1;
+        runTokenDiet(argv.slice(sliceFrom));
+        return;
     }
 
     usage();

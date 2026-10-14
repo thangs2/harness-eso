@@ -1,7 +1,7 @@
 ---
 description: harness-eso — ship @mu/harness-* (observe, Observatory, CLI). Consumer verify on x79.
 layer: core
-alwaysApply: true
+alwaysApply: false
 version: "1.0.0"
 canonical: AGENTS.md
 globs: packages/**,docker/**,qc/**,profiles/**,compose.harness.yml,install.sh,harness,docs/**

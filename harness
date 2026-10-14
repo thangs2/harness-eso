@@ -26,6 +26,14 @@ case "$cmd" in
         shift
         exec node packages/harness-cli/src/cli.mjs host-pack "$@"
         ;;
+    token-diet)
+        shift
+        exec node packages/harness-cli/src/cli.mjs token-diet "$@"
+        ;;
+    check)
+        shift
+        exec node packages/harness-cli/src/cli.mjs check "$@"
+        ;;
     up)
         node packages/harness-cli/src/cli.mjs observatory up
         port="${HARNESS_OBSERVE_PORT:-8792}"

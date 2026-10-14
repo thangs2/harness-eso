@@ -54,3 +54,8 @@ export {
     writeEsoAttestation,
 } from './attest.mjs';
 
+export {
+    estimateTokens,
+    parseFrontmatter,
+    scanTokenDiet,
+} from './token-diet.mjs';

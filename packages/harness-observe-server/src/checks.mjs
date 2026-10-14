@@ -88,7 +88,8 @@ export function computeChecks(db, cfg, scope) {
      * skills/agents directories, so a write to the verifiers reported as "no protected path was edited".
      * One list, in the consumer's policy, read by the guard and the observer alike.
      */
-    const pathPolicy = resolvePathPolicy(loadDecisionPolicy(cfg).policy);
+    const policy = loadDecisionPolicy(cfg).policy;
+    const pathPolicy = resolvePathPolicy(policy);
     // Same scoping rule as overlayEvidence: recomputing every request each poll
     // is what made a pass take seconds.
     let requests;
@@ -162,6 +163,31 @@ export function computeChecks(db, cfg, scope) {
             results['rules-attached'] = verdict('skip', 1, 'prompt attachment was not captured — cannot judge');
         } else {
             results['rules-attached'] = verdict('fail', 0, 'prompt carried no rule attachment');
+        }
+
+        // --- eager-prefix-budget: token-diet conformance
+        const tokenDiet = policy.tokenDiet || {};
+        if (tokenDiet.enabled === false) {
+            results['eager-prefix-budget'] = verdict('skip', 0, 'tokenDiet check disabled in policy');
+        } else if (!promptCaptured) {
+            results['eager-prefix-budget'] = verdict('skip', 1, 'prompt attachment was not captured — cannot judge');
+        } else if (rules.length === 0) {
+            results['eager-prefix-budget'] = verdict('skip', 0, 'no rules attached at prompt time');
+        } else {
+            const maxEagerRules = Number(tokenDiet.maxEagerRules) || 6;
+            if (rules.length > maxEagerRules) {
+                results['eager-prefix-budget'] = verdict(
+                    'warn',
+                    1,
+                    `eager prefix exceeds budget: ${rules.length} rules attached (budget <= ${maxEagerRules})`,
+                );
+            } else {
+                results['eager-prefix-budget'] = verdict(
+                    'pass',
+                    0,
+                    `${rules.length} eager rule(s) attached within budget (<= ${maxEagerRules})`,
+                );
+            }
         }
 
         // --- edits-covered-by-attached-rules (heuristic: rule globs are not
@@ -320,6 +346,7 @@ export function computeChecks(db, cfg, scope) {
 
 export const CHECK_IDS = [
     'rules-attached',
+    'eager-prefix-budget',
     'edits-covered-by-attached-rules',
     'read-before-edit',
     'verify-after-edit',

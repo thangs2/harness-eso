@@ -13,6 +13,11 @@ export const DEFAULT_POLICY = {
         mode: 'observe',
         cognition: { insufficientPromptGate: 'consent' },
     },
+    tokenDiet: {
+        enabled: true,
+        maxEagerRules: 6,
+        maxEagerTokens: 5000,
+    },
 };
 
 function deepMerge(base, over) {

@@ -11,6 +11,11 @@
     "ledger": {
         "enabled": true
     },
+    "tokenDiet": {
+        "enabled": true,
+        "maxEagerRules": 6,
+        "maxEagerTokens": 5000
+    },
     "eso": {
         "enabled": true,
         "mode": "observe",

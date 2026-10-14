@@ -11,7 +11,8 @@
         "./project-registry": "./src/project-registry.mjs",
         "./host-install": "./src/host-install.mjs",
         "./init-profile": "./src/init-profile.mjs",
-        "./consent": "./src/consent.mjs"
+        "./consent": "./src/consent.mjs",
+        "./token-diet": "./src/token-diet.mjs"
     },
     "files": [
         "src"

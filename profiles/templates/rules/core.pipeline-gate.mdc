@@ -1,0 +1,13 @@
+---
+description: Sacred execution pipeline gate — dispatcher, brain, and executor boundaries
+layer: core
+alwaysApply: true
+version: "1.0.0"
+---
+
+# Pipeline Execution Gate
+
+- **Dispatcher:** Coordinates turns, reads context via MCP tools, routes tasks.
+- **Brain Tier:** DeepSeek / reasoning tier handles complex architecture, design, and non-trivial debugging.
+- **Executor Tier:** Local tool operations perform discrete, validated edits and test commands.
+- **Zero Hallucination Gate:** Never guess paths, imports, or API signatures. Verify with codegraph/docgraph before writing.

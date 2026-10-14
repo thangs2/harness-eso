@@ -39,15 +39,18 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 
 ## Thứ tự làm việc & Kỷ luật Token
 
-1. **Khảo sát tài liệu (Docgraph first):** Tra cứu concept, invariant, contract bằng `docgraph --q "<terms>"` (hoặc MCP `docgraph_query`) để lấy đúng đoạn cần đọc, không dùng `view_file` mở tràn lan các file doc/WBS dài hàng ngàn dòng.
-2. **Khảo sát code (Codegraph first):** Dùng `codegraph_explore` (với `projectPath` = harness-eso) để lấy AST, call path và symbols mục tiêu trong 1 round-trip. Không grep/read lặp nhiều file gây phình context.
-3. **Kỷ luật Shell Output (Bắt buộc giới hạn):**
+1. **AgentMemory first (Tra cứu sớm):** Luôn gọi `memory_smart_search` ngay đầu turn để thu thập context phiên trước, ticket ID, symbol, file path và từ khóa then chốt. Dùng từ khóa này làm đầu vào chính xác cho Docgraph và Codegraph, tránh query mò mẫm làm tăng token.
+2. **Khảo sát tài liệu (Docgraph first):** Tra cứu concept, invariant, contract bằng `docgraph --q "<terms>"` (hoặc MCP `docgraph_query`) để lấy đúng đoạn cần đọc (30–50 dòng). **Chỉ dùng `view_file` / `Read` khi Docgraph không trả về kết quả hoặc bắt buộc phải xem toàn văn file**.
+3. **Khảo sát code (Codegraph first):** Dùng `codegraph_explore` (với `projectPath` = harness-eso) để lấy AST, call hierarchy và symbols mục tiêu trong 1 round-trip. **Chỉ dùng `Grep` + `Read` khi Codegraph thiếu thông tin hoặc cần quét regex cụ thể**.
+4. **Kỷ luật Range-Read (Slice Reading):** Khi bắt buộc dùng `view_file` / `Read` cho file lớn (> 100 dòng), tuyệt đối không mở toàn bộ file vào context. Phải chỉ định rõ `StartLine` và `EndLine` (hoặc lệnh shell `sed -n 'X,Yp'`) để chỉ nạp đúng phân đoạn cần xử lý.
+5. **Kỷ luật Shell Output (Bắt buộc giới hạn):**
    - Không chạy lệnh in ra output thô > 40 dòng vào context.
    - Luôn pipe giới hạn khi kiểm tra: `git status -s`, `bun test 2>&1 | tail -n 25`, `head -n 30`, `grep -m 10`.
    - Khi test pass chỉ cần tóm tắt kết quả (ví dụ `213 pass`).
-4. **AgentMemory:** `memory_smart_search` nếu có context phiên trước hoặc cần lưu quyết định kiến trúc (`memory_save`).
-5. **Implement & Test:** Sửa file gọn gàng, test cục bộ với output có kiểm soát.
-6. **DeepSeek:** Chỉ gọi `ask_deepseek_flash` / `pro` khi cần suy luận kiến trúc phức tạp hoặc debug lỗi hóc búa — không gọi cho thay đổi 1–2 dòng rõ ràng.
+6. **Implement & Test:** Sửa file gọn gàng, test cục bộ với output có kiểm soát.
+7. **DeepSeek:** Chỉ gọi `ask_deepseek_flash` / `pro` khi cần suy luận kiến trúc phức tạp hoặc debug lỗi hóc búa — không gọi cho thay đổi 1–2 dòng rõ ràng.
+8. **Distillation & Memory Save (Đóng gói tri thức):** Cuối mỗi turn xử lý logic quan trọng, gọi `memory_save` cô đọng quyết định, trạng thái và bài học. Giúp các turn kế tiếp kế thừa trực tiếp từ memory mà không cần đọc lại hàng loạt file cũ.
+
 
 ---
 

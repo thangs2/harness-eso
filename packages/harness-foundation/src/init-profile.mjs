@@ -7,6 +7,7 @@ import {
     defaultPlugins,
     defaultProjectDraft,
 } from './project-registry.mjs';
+import { scanTokenDiet } from './token-diet.mjs';
 import { writeJsonAtomic } from './workspace-store.mjs';
 
 const POLICY_RELATIVE = '.harness/decision-policy.json';
@@ -113,12 +114,20 @@ export function initProfile(project, profilesDir, tenantsRegistryPath, opts = {}
         results.push({ relative: a.relative, status: 'created', reason: a.action });
     }
 
+    const diet = scanTokenDiet(plan.root);
+
     return {
         ok: true,
         root: plan.root,
         hostProfileIds: plan.hostProfileIds,
         files: results,
         observeUrl: `http://127.0.0.1:${project.observe?.port || 8792}`,
+        tokenDiet: {
+            status: diet.status,
+            eagerRulesCount: diet.summary.eagerRulesCount,
+            totalEagerTokens: diet.summary.totalEagerTokens,
+            budget: diet.summary.budget,
+        },
     };
 }
 
