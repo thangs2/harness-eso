@@ -57,3 +57,50 @@ test('GET /health reports degraded ingest spine when transcript dir missing', as
         else process.env.HARNESS_CURSOR_MOUNT = prev;
     }
 });
+
+test('GET /health reports healthy (not degraded) when transcript dir exists with 0 files', async () => {
+    const cfg = tempTenant();
+    const transDir = path.join(cfg.root, 'empty-transcripts');
+    fs.mkdirSync(transDir, { recursive: true });
+    cfg.ingest.transcriptDir = transDir;
+    bootObserveDb(cfg);
+
+    const app = createObserveApp(cfg, { pollIngest: false });
+    app.setPort(8802);
+    const res = await app.handler(new Request('http://127.0.0.1/health'));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.degraded, false);
+    assert.equal(body.ingestSpine?.spineOk, true);
+    assert.equal(body.ingestSpine?.transcriptDirExists, true);
+    assert.equal(body.ingestSpine?.transcriptFiles, 0);
+    assert.deepEqual(body.ingestSpine?.warnings, []);
+});
+
+test('GET /health reports healthy when cursor mount exists even if project subfolder is pending', async () => {
+    const cfg = tempTenant();
+    const fakeMount = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-cursor-mount-'));
+    cfg.ingest.transcriptDir = path.join(fakeMount, 'projects', 'dummy-slug', 'agent-transcripts');
+    bootObserveDb(cfg);
+
+    const prev = process.env.HARNESS_CURSOR_MOUNT;
+    process.env.HARNESS_CURSOR_MOUNT = fakeMount;
+    const app = createObserveApp(cfg, { pollIngest: false });
+    app.setPort(8803);
+    try {
+        const res = await app.handler(new Request('http://127.0.0.1/health'));
+        assert.equal(res.status, 200);
+        const body = await res.json();
+        assert.equal(body.ok, true);
+        assert.equal(body.degraded, false);
+        assert.equal(body.ingestSpine?.spineOk, true);
+        assert.equal(body.ingestSpine?.transcriptDirExists, false);
+        assert.equal(body.ingestSpine?.transcriptFiles, 0);
+        assert.deepEqual(body.ingestSpine?.warnings, []);
+    } finally {
+        if (prev === undefined) delete process.env.HARNESS_CURSOR_MOUNT;
+        else process.env.HARNESS_CURSOR_MOUNT = prev;
+        fs.rmSync(fakeMount, { recursive: true, force: true });
+    }
+});

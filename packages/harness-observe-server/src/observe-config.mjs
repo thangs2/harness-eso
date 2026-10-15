@@ -77,10 +77,18 @@ export function resolveIngestTranscriptDir(root, configIngest) {
 }
 
 export function antigravityBrainDirs() {
-    return [
-        path.join(os.homedir(), '.gemini', 'antigravity-ide', 'brain'),
-        path.join(os.homedir(), '.gemini', 'antigravity', 'brain'),
-    ].filter((d) => fs.existsSync(d));
+    const bases = [];
+    const geminiMount = process.env.HARNESS_GEMINI_MOUNT || '/host-gemini';
+    if (fs.existsSync(geminiMount)) {
+        bases.push(geminiMount);
+    }
+    bases.push(path.join(os.homedir(), '.gemini'));
+    const candidates = [];
+    for (const b of bases) {
+        candidates.push(path.join(b, 'antigravity-ide', 'brain'));
+        candidates.push(path.join(b, 'antigravity', 'brain'));
+    }
+    return [...new Set(candidates.filter((d) => fs.existsSync(d)))];
 }
 
 /** `~/.harness/observe` — one home for every project's database, outside every consumer repo. */

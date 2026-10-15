@@ -64,7 +64,7 @@ export function ShellLayout() {
                         <div>
                             <h1 className="text-base font-semibold m-0">Harness Observatory</h1>
                             <p className="obs-sub m-0 text-xs">
-                                Read-only audit · port 8792
+                                Read-only audit · {typeof window !== 'undefined' && window.location.port ? `port ${window.location.port}` : 'port 8792'}
                                 {tenantLabel ? ` · ${tenantLabel}` : ''}
                             </p>
                         </div>

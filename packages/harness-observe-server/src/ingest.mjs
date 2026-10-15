@@ -335,31 +335,35 @@ export function transcriptSpineDiagnostics(cfg) {
     const trackingOff = isTrackingDisabled(cfg);
     const transcriptDir = cfg.ingest?.transcriptDir ?? null;
     const transcriptDirExists = Boolean(transcriptDir && fs.existsSync(transcriptDir));
+    const cursorMount = process.env.HARNESS_CURSOR_MOUNT || null;
+    const cursorMountExists = Boolean(cursorMount && fs.existsSync(cursorMount));
+    const brainDirs = cfg.ingest?.brainDirs || [];
+    const brainDirsExist = brainDirs.some((d) => fs.existsSync(d));
+
     let transcriptFiles = 0;
     try {
         transcriptFiles = discoverTranscripts(cfg).length;
     } catch {
         transcriptFiles = 0;
     }
+
+    const hasTranscriptSource =
+        transcriptDirExists || cursorMountExists || brainDirsExist || transcriptFiles > 0;
     const warnings = [];
     if (!trackingOff) {
-        if (!transcriptDirExists) {
+        if (!hasTranscriptSource) {
             warnings.push(
-                'REQUEST spine: transcript directory missing inside observe-server. Mount host ~/.cursor to /host-cursor (compose.harness.yml) or set HARNESS_INGEST_TRANSCRIPT_DIR.',
-            );
-        } else if (transcriptFiles === 0) {
-            warnings.push(
-                'REQUEST spine: no agent-transcript JSONL files discovered yet. Chat in Cursor for this repo, then Run ingest on Status.',
+                'REQUEST spine: transcript directory missing inside observe-server. Mount host ~/.cursor or ~/.gemini to container, or set HARNESS_INGEST_TRANSCRIPT_DIR.',
             );
         }
     }
-    const ok = trackingOff || (transcriptDirExists && transcriptFiles > 0);
+    const ok = trackingOff || hasTranscriptSource;
     return {
         ok,
         transcriptDir,
         transcriptDirExists,
         transcriptFiles,
-        cursorMount: process.env.HARNESS_CURSOR_MOUNT || null,
+        cursorMount,
         trackingOff,
         warnings,
     };

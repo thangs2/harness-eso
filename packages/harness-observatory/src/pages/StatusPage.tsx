@@ -119,7 +119,9 @@ export function StatusPage() {
                     <dt>Transcript dir</dt>
                     <dd className="obs-mono">
                         {ingest?.transcriptDir ?? '—'}
-                        {ingest?.transcriptDirExists === false ? ' (missing — no REQUEST rows)' : ''}
+                        {ingest?.transcriptDirExists === false && (ingest?.transcriptFiles ?? 0) === 0
+                            ? ' (waiting for sessions)'
+                            : ''}
                         {ingest?.transcriptFiles != null
                             ? ` · ${ingest.transcriptFiles} file(s) discovered`
                             : ''}

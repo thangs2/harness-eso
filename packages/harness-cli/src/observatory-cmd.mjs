@@ -57,6 +57,7 @@ function composeEnv(opts = {}) {
     // know where the checkout is.
     env.HARNESS_AGENT_ROOT = env.HARNESS_AGENT_ROOT || path.join(env.HOME, 'Workspaces');
     env.HARNESS_CURSOR_HOME = env.HARNESS_CURSOR_HOME || path.join(env.HOME, '.cursor');
+    env.HARNESS_GEMINI_HOME = env.HARNESS_GEMINI_HOME || path.join(env.HOME, '.gemini');
     env.COMPOSE_PROJECT_NAME = env.COMPOSE_PROJECT_NAME || `harness-observatory-${port}`;
 
     if (!env.HARNESS_REPO_ROOT && opts.consumerPath) {
@@ -119,7 +120,7 @@ function cmdUp(rest, opts) {
     console.log(`Observatory: http://127.0.0.1:${port}/  (compose project: ${env.COMPOSE_PROJECT_NAME})`);
     console.log(`Consumer mount: ${env.HARNESS_REPO_ROOT} → /data/repo (read-only)`);
     console.log(`Observe SQLite: Docker volume observe-data → /data/observe/<projectId>/harness.db`);
-    console.log(`Cursor transcripts: ${env.HARNESS_CURSOR_HOME} → /host-cursor (REQUEST spine)`);
+    console.log(`Transcripts: Cursor (${env.HARNESS_CURSOR_HOME}) / Antigravity (${env.HARNESS_GEMINI_HOME}) → container (REQUEST spine)`);
     console.log(`Stop only this stack: HARNESS_OBSERVE_PORT=${port} harnessctl observatory down`);
 }
 

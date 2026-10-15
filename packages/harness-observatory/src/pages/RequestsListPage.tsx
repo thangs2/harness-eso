@@ -212,13 +212,13 @@ export function RequestsListPage() {
             {loading && items.length === 0 && <LoadingState label="Loading requests…" />}
             {error && (
                 <ErrorBanner
-                    message={`Could not load requests: ${error}. Run ./scripts/dev-observe.sh or observe on :8792.`}
+                    message={`Could not load requests: ${error}. Run ./scripts/dev-observe.sh or check Observatory service.`}
                 />
             )}
             {!loading && !error && items.length === 0 && (
                 <EmptyState
-                    title="No requests yet"
-                    hint="Turns come from Cursor agent-transcripts ingest. Chat in Cursor, then Status → Run ingest now, or wait for poll."
+                    title="No requests found yet"
+                    hint="Waiting for agent activity. Start a session in your IDE (Cursor / Antigravity) to begin recording requests."
                 />
             )}
 
