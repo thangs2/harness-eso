@@ -201,3 +201,40 @@ test('a transcript with metadata outside any project mentioning a harness root i
     assert.deepEqual(discoverTranscripts(cfgFor(x79, brain)), [], 'must not fall back to substring check when metadata exists');
 });
 
+test('Docker path remapping resolves host transcript paths to container project', () => {
+    const fakeAgentHost = '/fake/mac/Workspaces';
+    const fakeMount = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-agent-mount-'));
+    const finesoInMount = path.join(fakeMount, 'FinESO');
+    fs.mkdirSync(finesoInMount, { recursive: true });
+    fs.writeFileSync(
+        path.join(finesoInMount, 'harness.config.json'),
+        JSON.stringify({ version: 1, project: { id: 'FinESO' } }),
+    );
+
+    const hostDoc = path.join(fakeAgentHost, 'FinESO', 'src', 'index.mjs');
+    const { file, brain } = transcriptWithDocs(fakeAgentHost, [hostDoc]);
+
+    const prevAgentHost = process.env.HARNESS_AGENT_ROOT_HOST;
+    const prevAgentMount = process.env.HARNESS_AGENT_MOUNT;
+    try {
+        process.env.HARNESS_AGENT_ROOT_HOST = fakeAgentHost;
+        process.env.HARNESS_AGENT_MOUNT = fakeMount;
+
+        const owner = resolveTranscriptOwner(file);
+        assert.equal(owner, path.join(fakeAgentHost, 'FinESO'));
+
+        // Project configured with container root (finesoInMount) discovers the transcript
+        const cfg = cfgFor(finesoInMount, brain);
+        assert.deepEqual(discoverTranscripts(cfg), [file]);
+
+        // Sibling repo does not discover it
+        const otherMount = consumer('other-project');
+        assert.deepEqual(discoverTranscripts(cfgFor(otherMount, brain)), []);
+    } finally {
+        if (prevAgentHost !== undefined) process.env.HARNESS_AGENT_ROOT_HOST = prevAgentHost;
+        else delete process.env.HARNESS_AGENT_ROOT_HOST;
+        if (prevAgentMount !== undefined) process.env.HARNESS_AGENT_MOUNT = prevAgentMount;
+        else delete process.env.HARNESS_AGENT_MOUNT;
+    }
+});
+

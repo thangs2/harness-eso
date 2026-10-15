@@ -967,20 +967,81 @@ function docPath(line) {
     return String(line).replace(AG_DOC_SUFFIX_RE, '').trim();
 }
 
+/**
+ * Remap a document path from the transcript to a path accessible on the current filesystem
+ * (especially inside Docker where host workspace paths are mounted at /data/repo or /agent-repos).
+ */
+function toContainerPath(filePath) {
+    if (!filePath) return filePath;
+    const resolved = path.resolve(filePath);
+    if (fs.existsSync(resolved)) return resolved;
+
+    const repoHost = process.env.HARNESS_REPO_ROOT_HOST ? path.resolve(process.env.HARNESS_REPO_ROOT_HOST) : null;
+    if (repoHost && (resolved === repoHost || resolved.startsWith(`${repoHost}${path.sep}`))) {
+        return path.join('/data/repo', path.relative(repoHost, resolved));
+    }
+
+    const agentHost = process.env.HARNESS_AGENT_ROOT_HOST ? path.resolve(process.env.HARNESS_AGENT_ROOT_HOST) : null;
+    const mount = process.env.HARNESS_AGENT_MOUNT || '/agent-repos';
+    if (agentHost && (resolved === agentHost || resolved.startsWith(`${agentHost}${path.sep}`))) {
+        return path.join(mount, path.relative(agentHost, resolved));
+    }
+
+    return resolved;
+}
+
+/**
+ * Remap a container path back to its canonical host path, if running in a mounted container.
+ */
+function toHostPath(dirPath) {
+    if (!dirPath) return dirPath;
+    const resolved = path.resolve(dirPath);
+
+    if (process.env.HARNESS_REPO_ROOT_HOST && (resolved === '/data/repo' || resolved.startsWith(`/data/repo${path.sep}`))) {
+        return path.join(path.resolve(process.env.HARNESS_REPO_ROOT_HOST), path.relative('/data/repo', resolved));
+    }
+
+    const mount = process.env.HARNESS_AGENT_MOUNT || '/agent-repos';
+    if (process.env.HARNESS_AGENT_ROOT_HOST && (resolved === mount || resolved.startsWith(`${mount}${path.sep}`))) {
+        return path.join(path.resolve(process.env.HARNESS_AGENT_ROOT_HOST), path.relative(mount, resolved));
+    }
+
+    return resolved;
+}
+
 /** Nearest ancestor of `filePath` that holds a `harness.config.json`, or a repo root (.git / .agents), or null. */
 function projectRootOf(filePath) {
-    let cur = path.dirname(filePath);
+    const cPath = toContainerPath(filePath);
+    let cur = path.dirname(cPath);
     let repoRoot = null;
     for (let i = 0; i < 24; i += 1) {
-        if (fs.existsSync(path.join(cur, 'harness.config.json'))) return cur;
+        if (fs.existsSync(path.join(cur, 'harness.config.json'))) return toHostPath(cur);
         if (!repoRoot && (fs.existsSync(path.join(cur, '.git')) || fs.existsSync(path.join(cur, '.agents')))) {
-            repoRoot = cur;
+            repoRoot = toHostPath(cur);
         }
         const up = path.dirname(cur);
         if (up === cur) break;
         cur = up;
     }
     return repoRoot;
+}
+
+function isOwnerMatchingProject(owner, cfgRoot) {
+    if (!owner) return false;
+    const normOwner = path.resolve(owner);
+    const normRoot = path.resolve(cfgRoot);
+    if (normOwner === normRoot) return true;
+
+    const hostRoot = process.env.HARNESS_REPO_ROOT_HOST ? path.resolve(process.env.HARNESS_REPO_ROOT_HOST) : null;
+    if (hostRoot && normOwner === hostRoot) return true;
+
+    try {
+        const sOwner = fs.statSync(toContainerPath(normOwner));
+        const sRoot = fs.statSync(toContainerPath(normRoot));
+        if (sOwner.dev === sRoot.dev && sOwner.ino === sRoot.ino) return true;
+    } catch {}
+
+    return false;
 }
 
 /**
@@ -1107,7 +1168,7 @@ export function discoverTranscripts(cfg) {
                  * The transcript names its workspace: that is authoritative. A project that is merely
                  * mentioned in the conversation does not get to claim it.
                  */
-                if (path.resolve(owner) === root) out.push(logFile);
+                if (isOwnerMatchingProject(owner, root)) out.push(logFile);
                 continue;
             }
 
@@ -1130,7 +1191,11 @@ export function discoverTranscripts(cfg) {
                 const buf = Buffer.alloc(131072);
                 const read = fs.readSync(fd, buf, 0, 131072, 0);
                 fs.closeSync(fd);
-                if (buf.subarray(0, read).toString('utf8').includes(cfg.root)) out.push(logFile);
+                const text = buf.subarray(0, read).toString('utf8');
+                const hostRoot = process.env.HARNESS_REPO_ROOT_HOST ? path.resolve(process.env.HARNESS_REPO_ROOT_HOST) : root;
+                if (text.includes(hostRoot) || (root !== '/data/repo' && text.includes(root))) {
+                    out.push(logFile);
+                }
             } catch {
                 /* skip unreadable file */
             }
