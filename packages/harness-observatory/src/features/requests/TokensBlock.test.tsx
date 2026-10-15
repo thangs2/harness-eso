@@ -232,5 +232,22 @@ describe('TokensBlock', () => {
             );
             expect(container.querySelector('[data-testid="mcp-tool-calls"]')).toBeNull();
         });
+
+        it('shows net input (input minus cache read) in dispatcher tiles and stop breakdown', () => {
+            render(
+                <TokensBlock
+                    detail={detail({
+                        tokenSummary: { input: 1000, output: 200, cacheRead: 800, source: 'stop' },
+                        requestMetrics: { inputTokens: 1000, outputTokens: 200, cacheReadTokens: 800 },
+                        stops: [{ harness: 'cursor', inputTokens: 1000, outputTokens: 200, cacheRead: 800, modelId: 'composer-2.5' }],
+                    })}
+                />,
+            );
+            const card = screen.getByTestId('tokens-block');
+            expect(card.textContent).toContain('Net input');
+            expect(card.textContent).toContain('200'); // 1000 - 800
+            expect(card.textContent).toContain('input − cache');
+            expect(card.textContent).toContain('net in');
+        });
     });
 });

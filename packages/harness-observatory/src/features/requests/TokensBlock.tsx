@@ -95,6 +95,10 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
         metrics?.outputTokens ?? tokenSummary?.output ?? stops[0]?.outputTokens ?? null;
     const cacheRead =
         metrics?.cacheReadTokens ?? tokenSummary?.cacheRead ?? stops[0]?.cacheRead ?? null;
+    const netInput =
+        input != null && cacheRead != null
+            ? Math.max(0, input - cacheRead)
+            : null;
 
     const estimated = tokenSummary?.estimated === true;
     const inputUnknown = input == null;
@@ -115,6 +119,10 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
     const brainIn = mcp?.brainPromptTokens ?? null;
     const brainOut = mcp?.brainCompletionTokens ?? null;
     const brainCache = mcp?.brainCacheHitTokens ?? null;
+    const brainNetIn =
+        brainIn != null && brainCache != null
+            ? Math.max(0, brainIn - brainCache)
+            : null;
     const brainTokensUnknown = brainCalls > 0 && brainUsageCalls === 0;
     const brainTokensPartial = brainUsageCalls > 0 && brainUsageCalls < brainCalls;
 
@@ -232,6 +240,17 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
                             value={fmt(cacheRead)}
                             hint={cacheRead == null ? 'not reported' : undefined}
                         />
+                        <StatTile
+                            label="Net input"
+                            value={fmt(netInput)}
+                            hint={
+                                netInput != null
+                                    ? 'input − cache'
+                                    : inputUnknown
+                                      ? 'not reported'
+                                      : 'cache not reported'
+                            }
+                        />
                     </div>
 
                     {hasBoth ? (
@@ -265,20 +284,28 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
                                         <th style={{ textAlign: 'right' }}>in</th>
                                         <th style={{ textAlign: 'right' }}>out</th>
                                         <th style={{ textAlign: 'right' }}>cache</th>
+                                        <th style={{ textAlign: 'right' }}>net in</th>
                                         <th>model</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {stopRows.slice(0, 6).map((s, i) => (
-                                        <tr key={`${s.harness ?? 'h'}-${i}`}>
-                                            <td>{s.harness ?? '—'}</td>
-                                            <td>{s.status ?? '—'}</td>
-                                            <td style={{ textAlign: 'right' }}>{fmt(s.inputTokens) ?? '—'}</td>
-                                            <td style={{ textAlign: 'right' }}>{fmt(s.outputTokens) ?? '—'}</td>
-                                            <td style={{ textAlign: 'right' }}>{fmt(s.cacheRead) ?? '—'}</td>
-                                            <td className="obs-mono">{s.modelId ?? '—'}</td>
-                                        </tr>
-                                    ))}
+                                    {stopRows.slice(0, 6).map((s, i) => {
+                                        const netIn =
+                                            s.inputTokens != null && s.cacheRead != null
+                                                ? Math.max(0, s.inputTokens - s.cacheRead)
+                                                : null;
+                                        return (
+                                            <tr key={`${s.harness ?? 'h'}-${i}`}>
+                                                <td>{s.harness ?? '—'}</td>
+                                                <td>{s.status ?? '—'}</td>
+                                                <td style={{ textAlign: 'right' }}>{fmt(s.inputTokens) ?? '—'}</td>
+                                                <td style={{ textAlign: 'right' }}>{fmt(s.outputTokens) ?? '—'}</td>
+                                                <td style={{ textAlign: 'right' }}>{fmt(s.cacheRead) ?? '—'}</td>
+                                                <td style={{ textAlign: 'right' }}>{fmt(netIn) ?? '—'}</td>
+                                                <td className="obs-mono">{s.modelId ?? '—'}</td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -345,6 +372,17 @@ export function TokensBlock({ detail }: { detail: RequestDetailResponse }) {
                                     label="Brain cache read"
                                     value={fmt(brainCache)}
                                     hint={brainCache == null ? 'not reported' : undefined}
+                                />
+                                <StatTile
+                                    label="Brain net input"
+                                    value={fmt(brainNetIn)}
+                                    hint={
+                                        brainNetIn != null
+                                            ? 'input − cache'
+                                            : brainIn == null
+                                              ? 'not reported'
+                                              : 'cache not reported'
+                                    }
                                 />
                             </div>
                             <p className="tokens-note">

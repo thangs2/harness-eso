@@ -557,7 +557,12 @@
     }
     .tokens-tiles {
         @apply grid gap-2 mt-4;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    @media (max-width: 640px) {
+        .tokens-tiles {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
     .tokens-tile {
         @apply rounded-lg px-3 py-2.5 flex flex-col gap-0.5;
