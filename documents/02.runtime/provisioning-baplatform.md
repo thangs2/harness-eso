@@ -82,7 +82,7 @@ Add **Token‑Diet** and **Cognition** blocks (already present in the latest gen
   "profile": "promax",
   "jev": { "mode": "active", "baseUrl": "https://api.typesafe.ai", "model": "jev-latest" },
   "fallback": { "l3_flash": true, "l3_model": "deepseek-flash" },
-  "tokenDiet": { "enabled": true, "maxEagerRules": 6, "maxEagerTokens": 5000 },
+  "tokenDiet": { "enabled": true, "maxEagerRules": 7, "maxEagerTokens": 5000 },
   "cognition": { "enforceBrain": "fail_closed", "gapAttestation": true },
   "eso": {
     "enabled": true,

@@ -22,7 +22,7 @@ function fixture({ policyPatch = {} } = {}) {
             version: 1,
             tokenDiet: {
                 enabled: true,
-                maxEagerRules: 6,
+                maxEagerRules: 7,
                 maxEagerTokens: 5000,
                 ...policyPatch,
             },
@@ -87,7 +87,7 @@ test('eager-prefix-budget passes when rules attached <= maxEagerRules', () => {
     const { cfg, db } = fixture();
     const reqId = `${CONV}:1`;
     try {
-        seedTurn(db, reqId, 5); // 5 rules <= 6
+        seedTurn(db, reqId, 5); // 5 rules <= 7
         computeChecks(db, cfg, null);
 
         const row = db.get(
@@ -107,7 +107,7 @@ test('eager-prefix-budget warns when rules attached > maxEagerRules', () => {
     const { cfg, db } = fixture();
     const reqId = `${CONV}:2`;
     try {
-        seedTurn(db, reqId, 8); // 8 rules > 6
+        seedTurn(db, reqId, 8); // 8 rules > 7
         computeChecks(db, cfg, null);
 
         const row = db.get(
@@ -117,7 +117,7 @@ test('eager-prefix-budget warns when rules attached > maxEagerRules', () => {
         assert.ok(row, 'check_result row must exist');
         assert.equal(row.status, 'warn');
         assert.equal(row.heuristic, 1);
-        assert.match(row.detail, /eager prefix exceeds budget: 8 rules attached \(budget <= 6\)/);
+        assert.match(row.detail, /eager prefix exceeds budget: 8 rules attached \(budget <= 7\)/);
     } finally {
         db.close();
     }

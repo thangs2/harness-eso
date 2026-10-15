@@ -174,7 +174,7 @@ export function computeChecks(db, cfg, scope) {
         } else if (rules.length === 0) {
             results['eager-prefix-budget'] = verdict('skip', 0, 'no rules attached at prompt time');
         } else {
-            const maxEagerRules = Number(tokenDiet.maxEagerRules) || 6;
+            const maxEagerRules = Number(tokenDiet.maxEagerRules) || 7;
             if (rules.length > maxEagerRules) {
                 results['eager-prefix-budget'] = verdict(
                     'warn',

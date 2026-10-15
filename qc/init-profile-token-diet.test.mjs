@@ -54,7 +54,7 @@ test('initProfile seeds micro-rules and returns tokenDiet audit report', () => {
             fs.readFileSync(path.join(consumerRepo, '.harness/decision-policy.json'), 'utf8')
         );
         assert.equal(policy.tokenDiet?.enabled, true);
-        assert.equal(policy.tokenDiet?.maxEagerRules, 6);
+        assert.equal(policy.tokenDiet?.maxEagerRules, 7);
         assert.equal(policy.tokenDiet?.maxEagerTokens, 5000);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });

@@ -227,12 +227,12 @@ export function scanTokenDiet(root = process.cwd(), opts = {}) {
     const policyResult = opts.policy ? { policy: opts.policy } : loadDecisionPolicyForCwd(root);
     const tokenDietCfg = policyResult?.policy?.tokenDiet || {
         enabled: true,
-        maxEagerRules: 6,
+        maxEagerRules: 7,
         maxEagerTokens: 5000,
     };
 
     const budget = {
-        maxEagerRules: Number(tokenDietCfg.maxEagerRules ?? 6),
+        maxEagerRules: Number(tokenDietCfg.maxEagerRules ?? 7),
         maxEagerTokens: Number(tokenDietCfg.maxEagerTokens ?? 5000),
     };
 
