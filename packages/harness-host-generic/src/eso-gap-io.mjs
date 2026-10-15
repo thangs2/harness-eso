@@ -47,7 +47,20 @@ export function resetGapClosure(preflightAt, root = process.cwd(), tree = harnes
     return doc;
 }
 
-function gapKindsForTool(toolName, toolInput) {
+const READ_COUNT_GAP_RE = /^need at least \d+ file read\(s\); have \d+$/;
+
+function extractFilePath(input) {
+    if (!input || typeof input !== 'object') return null;
+    const direct = input.path ?? input.file_path ?? input.target_file ?? input.TargetFile ?? input.AbsolutePath ?? input.targetFile ?? input.filePath;
+    if (typeof direct === 'string' && direct.trim().length > 0) return direct.trim();
+    if (input.arguments && typeof input.arguments === 'object') {
+        const nested = input.arguments.path ?? input.arguments.file_path ?? input.arguments.target_file ?? input.arguments.TargetFile ?? input.arguments.AbsolutePath ?? input.arguments.targetFile ?? input.arguments.filePath;
+        if (typeof nested === 'string' && nested.trim().length > 0) return nested.trim();
+    }
+    return null;
+}
+
+export function gapKindsForTool(toolName, toolInput) {
     const name = String(toolName || '');
     const blob = JSON.stringify(toolInput || {}).toLowerCase();
     const kinds = new Set();
@@ -56,18 +69,40 @@ function gapKindsForTool(toolName, toolInput) {
         kinds.add('code');
         kinds.add('check');
     }
-    if (CODEGRAPH_RE.test(name) || CODEGRAPH_RE.test(blob)) kinds.add('code', 'symbol');
-    if (MEMORY_RE.test(name) || MEMORY_RE.test(blob)) kinds.add('memory');
-    if (DOCGRAPH_RE.test(name) || DOCGRAPH_RE.test(blob)) kinds.add('law', 'doc');
-    if (/^Grep$/i.test(name)) kinds.add('code', 'law', 'doc');
+    if (CODEGRAPH_RE.test(name) || CODEGRAPH_RE.test(blob)) {
+        kinds.add('code');
+        kinds.add('symbol');
+    }
+    if (MEMORY_RE.test(name) || MEMORY_RE.test(blob)) {
+        kinds.add('memory');
+    }
+    if (DOCGRAPH_RE.test(name) || DOCGRAPH_RE.test(blob)) {
+        kinds.add('law');
+        kinds.add('doc');
+    }
+    if (/^Grep$/i.test(name)) {
+        kinds.add('code');
+        kinds.add('law');
+        kinds.add('doc');
+    }
     return kinds;
 }
 
-function closesGap(gap, kinds, toolInput) {
+export function closesGap(gap, kinds, toolInput, toolName = '') {
     const kind = gap?.kind || 'other';
     if (!kinds.has(kind)) {
         if (kind === 'symbol' && kinds.has('code')) return true;
         if (kind === 'doc' && kinds.has('law')) return true;
+        return false;
+    }
+    const query = String(gap?.query || '');
+    if (kind === 'code' && READ_COUNT_GAP_RE.test(query)) {
+        if (extractFilePath(toolInput)) return true;
+        const blob = (String(toolName || '') + ' ' + JSON.stringify(toolInput || {})).toLowerCase();
+        if (CODEGRAPH_RE.test(blob)) {
+            const cgQuery = toolInput?.query ?? toolInput?.arguments?.query ?? toolInput?.symbol ?? toolInput?.arguments?.symbol;
+            if (typeof cgQuery === 'string' && cgQuery.trim().length > 0) return true;
+        }
         return false;
     }
     const target = String(gap?.query || gap?.path || '').toLowerCase();
@@ -98,14 +133,14 @@ export function recordGapToolUse(toolName, toolInput, opts = {}) {
     for (const g of gaps) {
         const id = gapId(g);
         if (closed.has(id)) continue;
-        if (closesGap(g, kinds, toolInput)) closed.add(id);
+        if (closesGap(g, kinds, toolInput, toolName)) closed.add(id);
     }
 
     const toolUses = Array.isArray(closure.toolUses) ? [...closure.toolUses] : [];
     toolUses.push({
         at: isoNow(),
         tool: String(toolName || ''),
-        path: String(toolInput?.path || toolInput?.file_path || ''),
+        path: extractFilePath(toolInput) || '',
     });
     if (toolUses.length > 32) toolUses.splice(0, toolUses.length - 32);
 

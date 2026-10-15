@@ -25,6 +25,7 @@ const SUITES = [
     'packages/harness-eso-core/src',
     'packages/harness-decision/src',
     'packages/harness-system-one/src',
+    'packages/harness-host-generic/src',
     'packages/harness-observe-server/src',
     'qc',
 ];
