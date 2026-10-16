@@ -264,7 +264,11 @@ console.log("Dual-IDE hooks synchronized and verified.");
 
 ## 8. Provision MCP Configurations for Both IDEs
 
-Both Cursor and Antigravity require project-level MCP configurations to access `agentmemory` (port `3211`), `codegraph`, and `deepseek-direct`.
+Both Cursor and Antigravity require project-level MCP configurations to access `agentmemory` (port `3211`), `codegraph`, and `deepseek-direct`. For detailed reconnaissance ordering and execution matrix, refer to [Recon Trinity & Cognition Flows](./06.recon-and-cognition-flows.md).
+
+> [!NOTE]
+> **Docgraph Architecture:**  
+> `docgraph` executes via the **global CLI** (`docgraph --q "<terms>"`), not via an MCP server. This eliminates the `@modelcontextprotocol/sdk` runtime dependency and completely eliminates stdio daemon disconnect risks.
 
 ### 8.1 Cursor MCP Configuration (`.cursor/mcp.json`)
 Create `baplatform/.cursor/mcp.json`:
@@ -344,7 +348,96 @@ EOF
 ```
 
 ### 8.2 Antigravity MCP Configuration (`.agents/mcp_config.json`)
-Ensure `.agents/mcp_config.json` is aligned with container port `3211` for `agentmemory`.
+
+> [!CAUTION]
+> **IDE Isolation Invariant:**  
+> `.agents/` and `.cursor/` are two strictly independent configuration trees. **Cross-referencing paths between them (A → B or B → A) is strictly prohibited**.  
+> Specifically: `.agents/mcp_config.json` must never reference or execute script files located inside `.cursor/mcp/` and vice versa. Each IDE manages its own MCP runtime configuration independently.
+
+Create `baplatform/.agents/mcp_config.json`:
+
+```bash
+cat <<'EOF' > .agents/mcp_config.json
+{
+  "mcpServers": {
+    "agentmemory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@agentmemory/mcp"
+      ],
+      "env": {
+        "AGENTMEMORY_URL": "http://localhost:3211",
+        "AGENTMEMORY_VIEWER_URL": "http://localhost:3213"
+      }
+    },
+    "codegraph": {
+      "command": "/opt/homebrew/bin/codegraph",
+      "args": [
+        "serve",
+        "--mcp"
+      ],
+      "env": {
+        "CODEGRAPH_ALLOW_UNSAFE_NODE": "1"
+      }
+    },
+    "deepseek-direct": {
+      "command": "/opt/homebrew/bin/bun",
+      "args": [
+        "run",
+        "/Users/thangs2net/.gemini/antigravity/deepseek_direct.js"
+      ],
+      "env": {
+        "DEEPSEEK_ENV_FILE": "/Users/thangs2net/.gemini/antigravity/deepseek.env"
+      }
+    },
+    "chrome-devtools": {
+      "command": "/Users/thangs2net/.bun/bin/chrome-devtools-mcp",
+      "args": [
+        "--executablePath",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "--headless",
+        "--viewport",
+        "1920x1080"
+      ],
+      "env": {
+        "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1"
+      }
+    },
+    "penpot-write": {
+      "serverUrl": "https://design.penpot.app/mcp/stream?userToken=eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2R0NNIn0.ROHKoaWEL0Tl7cJb8iJdnEDtGm1t_qk5xtC9aDk0aYhDXgPg2LeFvg.8KHdSugvQEvIffi7.2mUEK0H65e_OxJSKq4X5Lk__q22eDxGTdO22RuGlIQ93Dz0ZKx7uBoFG4SeoQV_1tyHuRbC8NHnGzmakDESQDx25KdSblszC28sktGMdvlmSbeBliy-Hbo1t_8n7bTBFI1-waeG0SV5MWwCwMM5e9KvjSrA1hHTAj7EAAUW6IUQ6SGwMV4Pf9J7bM67UMSyVEdKxcBJ4-au6.6zsLlmt9hzJ1hC4-ciXJ5Q"
+    },
+    "jira": {
+      "command": "/opt/homebrew/bin/bunx",
+      "args": [
+        "-y",
+        "@rokealvo/jira-mcp"
+      ],
+      "env": {
+        "JIRA_BASE_URL": "https://thangs2net.atlassian.net",
+        "JIRA_USER_EMAIL": "thangs2.net@gmail.com",
+        "JIRA_API_TOKEN": "ATATT3xFfGF01auvw5brvuRK1xDCdKvdp0lOymbSdFHzHqq-wVwIvYq2bA8ry5rVtRCW-nTXAWf1D2LgxUVJdYpXJvEmVvs7NVV7IGDfZCoLLzb4lY2wFMELjCyXtzqtFah00Wyo4WxDMPK_TWQSfPwo3vxO6WrT6_VXUNxjXlvzsFJAgQUe7V8=4C8F85C8",
+        "JIRA_TYPE": "cloud",
+        "JIRA_AUTH_TYPE": "basic",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+  }
+}
+EOF
+```
+
+### 8.3 Docgraph CLI Integration
+- Local index resides at `baplatform/.docgraph/`.
+- Both IDE environments (Cursor and Antigravity) use the shared **global CLI** `docgraph` instead of an MCP daemon.
+- Re-index command:
+  ```bash
+  cd ~/Workspaces/baplatform && docgraph build
+  ```
+- Query command:
+  ```bash
+  docgraph --q "<search_terms>"
+  ```
 
 ---
 

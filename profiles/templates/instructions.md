@@ -23,5 +23,5 @@ IDE Agent Session Start
 | **Workflow Guide** | **`.harness/WORKFLOW_GUIDE.md`** | Sổ tay vận hành ESO, Token-Diet, Preflight & Guards |
 | **Decision Policy** | `.harness/decision-policy.json` | Cấu hình rào chắn, ngưỡng preflight và token diet |
 | **Rules Directory** | `.cursor/rules/` & `.agents/rules/` | Bộ micro-rules chuẩn hóa |
-| **MCP Config** | `.cursor/mcp.json` / `.agents/mcp_config.json` | Cấu hình docgraph, codegraph, agentmemory, deepseek |
+| **MCP Config** | `.cursor/mcp.json` / `.agents/mcp_config.json` | Cấu hình MCP: codegraph, agentmemory, deepseek (docgraph chạy CLI) |
 | **Observatory** | `http://127.0.0.1:8792` | Dashboard giám sát tiến trình và conformance checks |

@@ -15,7 +15,7 @@ description: Implements and extends @mu/harness-* in harness-eso monorepo using 
 
 - **`core.law-gate`:** `Read AGENTS.md` đã xong phiên này (bắt buộc trước skill này)
 - **Window:** folder gốc = **harness-eso** — rules/skills/MCP **chỉ** từ repo này (`core.workspace-isolation.mdc`)
-- **MCP:** `.cursor/mcp.json` (codegraph, docgraph→x79, agentmemory, deepseek) — không symlink `x79/.cursor/mcp.json`
+- **MCP:** `.cursor/mcp.json` (codegraph, agentmemory, deepseek; docgraph dùng CLI `docgraph --q`) — không symlink `x79/.cursor/mcp.json`
 - Spec (read-only): `../x79/document/harness/02.harness-eso/00.index.md` hoặc `docgraph --q` với cwd x79
 - Rules: `core.harness-product`, `core.harness-agents`, scoped rules theo path
 - Consumer E2E: sibling **x79** với `harness.config.json` sau `harness init profile`

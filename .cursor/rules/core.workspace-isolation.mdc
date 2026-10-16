@@ -16,7 +16,7 @@ canonical: AGENTS.md
 |------------|----------|
 | Law agent | `AGENTS.md`, `.cursor/rules/*` **trong repo này** |
 | Skills | `.cursor/skills/harness-*` — **không** `mu-*`, `brain-dispatch` |
-| MCP | `.cursor/mcp.json` — codegraph (**harness-eso**), docgraph repo **x79**, agentmemory, deepseek |
+| MCP | `.cursor/mcp.json` — codegraph (**harness-eso**), agentmemory, deepseek (docgraph dùng CLI) |
 | Codegraph `projectPath` | Root **harness-eso** (`packages/*`, `qc/*`) |
 | Implement | `@mu/harness-*` trong monorepo |
 

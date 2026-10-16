@@ -122,7 +122,7 @@ export async function run() {
     };
     const block = buildEvidencePreflightBlock(projection);
     if (block && projection.level !== 'sufficient') {
-        out.additional_context = `[ESO COGNITION] Close gaps before Brain / protected writes.\n\n${block}`;
+        out.additional_context = `[ESO COGNITION] Evidence sufficiency notice: For code/implementation, close gaps before code generation. For docs/analysis/planning, Brain deep-thinking is permitted immediately; close gaps before protected writes.\n\n${block}`;
     }
     if (projection.ok === false && projection.enforceWrites === 'fail_closed') {
         out.permission = 'deny';

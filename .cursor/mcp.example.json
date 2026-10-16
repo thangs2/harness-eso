@@ -16,14 +16,6 @@
         "CODEGRAPH_ALLOW_UNSAFE_NODE": "1"
       }
     },
-    "docgraph": {
-      "command": "bun",
-      "args": ["run", "/absolute/path/to/harness-eso/.cursor/mcp/docgraph-mcp.mjs"],
-      "env": {
-        "DOCGRAPH_REPO": "/absolute/path/to/x79",
-        "DOCGRAPH_HARNESS": "cursor"
-      }
-    },
     "deepseek-direct": {
       "command": "bun",
       "args": ["run", "/path/to/.gemini/antigravity/deepseek_direct.js"],

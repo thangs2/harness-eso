@@ -19,10 +19,9 @@ Adapter id (COLLECT): `docgraph-cli`, `codegraph-cli`, `agentmemory-mcp`, `deeps
 |--------|------|---------|
 | `codegraph` | `codegraph_explore` | `--path` = **harness-eso** |
 | `agentmemory-mcp` | `memory_smart_search`, `memory_save` | `:3111` |
-| `docgraph` | `docgraph_query` | `DOCGRAPH_REPO` = **x79** (law/spec read-only) |
 | `deepseek-direct` | `ask_deepseek_flash`, `ask_deepseek_pro` | `x79/installation/deepseek` |
 
-Setup: `docs/03.cursor-mcp.md` · `cd .cursor/mcp && bun install` · mẫu: `mcp.example.json`.
+Setup: `documents/01.overview/03.cursor-mcp.md` · mẫu: `mcp.example.json` (docgraph chạy CLI `docgraph --q`).
 
 ## Khi nào gọi gì
 
@@ -30,7 +29,7 @@ Setup: `docs/03.cursor-mcp.md` · `cd .cursor/mcp && bun install` · mẫu: `mcp
 |-----|------|
 | Symbol / flow / blast radius **product** | `codegraph_explore` + `projectPath` harness-eso |
 | Consumer-only paths (ingest, hooks trên x79) | `codegraph_explore` + `projectPath` `../x79` (một lần, không đổi MCP server) |
-| Spec ESO, observe API | `docgraph_query` hoặc CLI `docgraph --q` (cwd x79) |
+| Spec ESO, observe API | CLI `docgraph --q` (cwd x79 hoặc `--repo ../x79`) |
 | Context phiên | `memory_smart_search` |
 | Thiết kế/debug sâu | DeepSeek (nếu đã cấu hình) — không dùng để chọn route |
 

@@ -22,9 +22,9 @@ const PACKS = {
     },
     docs: {
         bucket: 'docs',
-        requiredDocTerms: ['harness-eso'],
+        requiredDocTerms: [],
         minReadPaths: 0,
-        lawQueries: ['harness-eso'],
+        lawQueries: [],
         codeQueries: [],
     },
     general: {

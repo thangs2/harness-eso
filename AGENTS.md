@@ -27,7 +27,7 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 | Nguồn | Khi dùng | Gợi ý |
 |--------|-----------|--------|
 | **Codegraph** | Luồng gọi, symbol, blast radius trong **product** | MCP `codegraph` trong **`.cursor/mcp.json`** (index harness-eso). `codegraph_explore` · `projectPath` = root harness-eso; consumer-only → `../x79`. Không `.codegraph/` → `codegraph init -i` hoặc Read/Grep. |
-| **Docgraph** | Kiến thức, tài liệu, invariants trong **product** (hoặc law x79) | Index cục bộ tại `.docgraph/` (scope: `documents/`, `docs/`, rules). MCP **`docgraph`** → `docgraph_query` (`DOCGRAPH_REPO=.`). Tra cứu consumer x79: truyền `repo="../x79"` hoặc CLI `docgraph --q ... --repo ../x79`. |
+| **Docgraph** | Kiến thức, tài liệu, invariants trong **product** (hoặc law x79) | Index cục bộ tại `.docgraph/` (scope: `documents/`, rules). Dùng CLI **`docgraph --q "<terms>"`**. Tra cứu consumer x79: truyền CLI `docgraph --q ... --repo ../x79`. |
 | **AgentMemory** | Context phiên, preference operator | MCP **`agentmemory-mcp`** trong `.cursor/mcp.json` (`memory_smart_search` / `memory_save`). |
 | **DeepSeek** | Phân tích sâu, thiết kế, debug khó | MCP **`deepseek-direct`** trong `.cursor/mcp.json`: **`ask_deepseek_flash`** (default), **`ask_deepseek_pro`** khi cần. |
 
@@ -40,7 +40,7 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 ## Thứ tự làm việc & Kỷ luật Token
 
 1. **AgentMemory first (Tra cứu sớm):** Luôn gọi `memory_smart_search` ngay đầu turn để thu thập context phiên trước, ticket ID, symbol, file path và từ khóa then chốt. Dùng từ khóa này làm đầu vào chính xác cho Docgraph và Codegraph, tránh query mò mẫm làm tăng token.
-2. **Khảo sát tài liệu (Docgraph first):** Tra cứu concept, invariant, contract bằng `docgraph --q "<terms>"` (hoặc MCP `docgraph_query`) để lấy đúng đoạn cần đọc (30–50 dòng). **Chỉ dùng `view_file` / `Read` khi Docgraph không trả về kết quả hoặc bắt buộc phải xem toàn văn file**.
+2. **Khảo sát tài liệu (Docgraph first):** Tra cứu concept, invariant, contract bằng CLI `docgraph --q "<terms>"` để lấy đúng đoạn cần đọc (30–50 dòng). **Chỉ dùng `view_file` / `Read` khi Docgraph không trả về kết quả hoặc bắt buộc phải xem toàn văn file**.
 3. **Khảo sát code (Codegraph first):** Dùng `codegraph_explore` (với `projectPath` = harness-eso) để lấy AST, call hierarchy và symbols mục tiêu trong 1 round-trip. **Chỉ dùng `Grep` + `Read` khi Codegraph thiếu thông tin hoặc cần quét regex cụ thể**.
 4. **Kỷ luật Range-Read (Slice Reading):** Khi bắt buộc dùng `view_file` / `Read` cho file lớn (> 100 dòng), tuyệt đối không mở toàn bộ file vào context. Phải chỉ định rõ `StartLine` và `EndLine` (hoặc lệnh shell `sed -n 'X,Yp'`) để chỉ nạp đúng phân đoạn cần xử lý.
 5. **Kỷ luật Shell Output (Bắt buộc giới hạn):**
