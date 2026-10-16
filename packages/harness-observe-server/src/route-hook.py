@@ -135,14 +135,34 @@ def iso_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+SECRET_REDACT_PATTERNS = [
+    (re.compile(r"(-u|--user)\s+(['\"]?[^:\s'\"]+:)([^'\"]+)(['\"]?)", re.I), r"\1 \2[REDACTED]\4"),
+    (re.compile(r"(Bearer\s+)[A-Za-z0-9._\-~+/]+=*", re.I), r"\1[REDACTED]"),
+    (re.compile(r"(Basic\s+)[A-Za-z0-9+/=]{16,}", re.I), r"\1[REDACTED]"),
+    (re.compile(r"\bATATT3[A-Za-z0-9_\-=]{20,}\b"), "[REDACTED_JIRA_TOKEN]"),
+    (re.compile(r"(\b[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|APIKEY)\b\s*[:=]\s*['\"]?)([^'\";\s&]+)(['\"]?)", re.I), r"\1[REDACTED]\3"),
+    (re.compile(r"-----BEGIN [A-Z ]+ PRIVATE KEY-----.*?-----END [A-Z ]+ PRIVATE KEY-----", re.S), "[REDACTED_PRIVATE_KEY]"),
+]
+
+
+def redact_sensitive(text: str) -> str:
+    if not isinstance(text, str) or not text:
+        return text
+    res = text
+    for pattern, repl in SECRET_REDACT_PATTERNS:
+        res = pattern.sub(repl, res)
+    return res
+
+
 def scrub(value, depth=0):
-    """Trim payload so a trace line stays small and never carries file bodies."""
+    """Trim payload so a trace line stays small, never carries file bodies, and scrubs secrets."""
     if depth > 6:
         return "…"
     if isinstance(value, str):
-        if len(value) > MAX_STR:
-            return value[:MAX_STR] + f"…(len={len(value)})"
-        return value
+        cleaned = redact_sensitive(value)
+        if len(cleaned) > MAX_STR:
+            return cleaned[:MAX_STR] + f"…(len={len(cleaned)})"
+        return cleaned
     if isinstance(value, dict):
         out = {}
         for k, v in value.items():

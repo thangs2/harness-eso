@@ -16,8 +16,12 @@ function readStdin() {
     });
 }
 
-function emit() {
-    process.stdout.write(`${JSON.stringify({ permission: 'allow' })}\n`);
+function emit(tree = harnessTree()) {
+    if (tree === 'agents') {
+        process.stdout.write('{"injectSteps":[]}\n');
+    } else {
+        process.stdout.write(`${JSON.stringify({ permission: 'allow' })}\n`);
+    }
 }
 
 function findConsumerRoot() {

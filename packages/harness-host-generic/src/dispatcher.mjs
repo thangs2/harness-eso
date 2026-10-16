@@ -14,13 +14,25 @@
  * `--tree` selects the session directory and the response shape; the hook code itself is
  * IDE-agnostic, so adding an IDE is a config change rather than a new copy of the pack.
  */
+import path from 'node:path';
 import { HOOKS, HOOK_NAMES, errorPosture, runHook } from './dispatch.mjs';
 import { deny, emitHook } from './hook-io.mjs';
 import { loadPolicyForCwd } from './hook-io.mjs';
 
+// Self-heal working directory: if runner (such as Antigravity) spawns the hook with
+// cwd set to .agents/ or .cursor/, normalize process.cwd() back to the workspace root.
+const cwdBase = path.basename(process.cwd());
+if (cwdBase === '.agents' || cwdBase === '.cursor') {
+    try {
+        process.chdir(path.resolve(process.cwd(), '..'));
+    } catch {
+        // Fallback silently if chdir fails
+    }
+}
+
 /** @param {string[]} argv */
 export function parseArgs(argv) {
-    const flags = { hook: '', tree: '', rest: [] };
+    const flags = { hook: '', tree: '', event: '', rest: [] };
     for (let i = 0; i < argv.length; i += 1) {
         const a = argv[i];
         if (a === '--hook' && argv[i + 1]) {
@@ -33,6 +45,11 @@ export function parseArgs(argv) {
             i += 1;
         } else if (a.startsWith('--tree=')) {
             flags.tree = a.slice('--tree='.length);
+        } else if (a === '--event' && argv[i + 1]) {
+            flags.event = argv[i + 1];
+            i += 1;
+        } else if (a.startsWith('--event=')) {
+            flags.event = a.slice('--event='.length);
         } else {
             flags.rest.push(a);
         }
@@ -46,29 +63,35 @@ export function shapeFor(tree) {
 }
 
 export function usage() {
-    return `usage: harness-hook --hook <${HOOK_NAMES.join('|')}> --tree <cursor|agents> [hook args]`;
+    return `usage: harness-hook --hook <${HOOK_NAMES.join('|')}> --tree <cursor|agents> [--event <event>] [hook args]`;
 }
 
 async function main() {
-    const { hook, tree, rest } = parseArgs(process.argv.slice(2));
-    // Hooks read the tree from the environment (they also handle it being absent).
+    const { hook, tree, event, rest } = parseArgs(process.argv.slice(2));
+    // Hooks read the tree and hook name from the environment (they also handle it being absent).
+    if (hook) process.env.HARNESS_HOOK = hook;
     if (tree) process.env.HARNESS_TREE = tree;
+    if (event) {
+        process.env.HARNESS_EVENT = event;
+        process.env.ROUTE_AGY_EVENT = event;
+    }
     const shape = shapeFor(tree);
 
     if (!hook) {
         // A pack built without `--hook` is a broken install, not a developer error: say so
         // instead of guessing which guard the host meant to run.
-        deny(shape, `${usage()}\nRe-run host pack refresh to repair the hook configuration.`);
+        deny(shape, `${usage()}\nRe-run host pack refresh to repair the hook configuration.`, {}, event);
         return;
     }
 
     if (!HOOKS[hook]) {
-        deny(shape, `harness hook pack: unknown hook "${hook}" (known: ${HOOK_NAMES.join(', ')})`);
+        deny(shape, `harness hook pack: unknown hook "${hook}" (known: ${HOOK_NAMES.join(', ')})`, {}, event);
         return;
     }
 
     try {
-        await runHook(hook, rest);
+        const hookArgs = event && !rest.includes('--event') ? ['--event', event, ...rest] : rest;
+        await runHook(hook, hookArgs);
     } catch (err) {
         /*
          * A guard that throws has not decided whether the operation is safe, and treating that as
@@ -78,7 +101,7 @@ async function main() {
         const message = `harness hook pack: ${hook} failed — ${String(err?.message || err)}`;
         const posture = errorPosture(hook, guardPolicy());
         if (posture === 'deny') {
-            deny(shape, message, { hookError: true });
+            deny(shape, message, { hookError: true }, event);
         } else if (posture === 'warn') {
             // Loud but non-blocking: the operator asked for availability over enforcement, so the
             // call proceeds and the turn carries a visible note that no guard ran.
@@ -89,9 +112,10 @@ async function main() {
                     additional_context: `[HARNESS GUARD UNAVAILABLE] ${message}`,
                 },
                 shape,
+                event,
             );
         } else {
-            emitHook({ permission: 'allow', hookError: message }, shape);
+            emitHook({ permission: 'allow', hookError: message }, shape, event);
         }
     }
 }

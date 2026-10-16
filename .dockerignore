@@ -2,7 +2,6 @@
 .github
 node_modules
 **/node_modules
-packages/harness-observatory/dist
 qc
 **/*.test.mjs
 **/*.test.js

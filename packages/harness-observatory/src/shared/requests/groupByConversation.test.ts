@@ -14,13 +14,15 @@ function row(partial: Partial<RequestListItem> & { id: string; conversationId: s
 describe('groupRequestsByConversation', () => {
     it('groups and sorts by latest startedAt', () => {
         const items = [
-            row({ id: 'a', conversationId: 'c1', startedAt: '2026-01-02T00:00:00Z', boundaryIndex: 2 }),
-            row({ id: 'b', conversationId: 'c1', startedAt: '2026-01-01T00:00:00Z', boundaryIndex: 1 }),
-            row({ id: 'c', conversationId: 'c2', startedAt: '2026-01-03T00:00:00Z', boundaryIndex: 1 }),
+            row({ id: 'a', conversationId: 'c1', startedAt: '2026-01-02T00:00:00Z', boundaryIndex: 2, ide: 'cursor' }),
+            row({ id: 'b', conversationId: 'c1', startedAt: '2026-01-01T00:00:00Z', boundaryIndex: 1, ide: 'cursor' }),
+            row({ id: 'c', conversationId: 'c2', startedAt: '2026-01-03T00:00:00Z', boundaryIndex: 1, ide: 'antigravity' }),
         ];
         const groups = groupRequestsByConversation(items);
         expect(groups).toHaveLength(2);
         expect(groups[0].conversationId).toBe('c2');
+        expect(groups[0].ide).toBe('antigravity');
+        expect(groups[1].ide).toBe('cursor');
         expect(groups[1].items.map((i) => i.id)).toEqual(['a', 'b']);
     });
 });

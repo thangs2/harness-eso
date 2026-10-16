@@ -32,11 +32,17 @@ function parseEventArg(argv) {
         if (argv[i] === '--event' && argv[i + 1]) return argv[i + 1];
         if (argv[i].startsWith('--event=')) return argv[i].split('=')[1];
     }
-    return process.env.ROUTE_AGY_EVENT || '';
+    return process.env.HARNESS_EVENT || process.env.ROUTE_AGY_EVENT || '';
 }
 
 function failOpenStdout(event) {
+    const hid = harnessId();
     const ev = event || '';
+    if (hid === 'agents') {
+        if (ev === 'PreToolUse') return '{"decision":"allow"}\n';
+        if (ev === 'PreInvocation' || ev === 'PostInvocation') return '{"injectSteps":[]}\n';
+        return '{}\n';
+    }
     if (ev === 'PreToolUse') return '{"decision":"allow"}\n';
     if (ev === 'PreInvocation' || ev === 'PostInvocation') return '{"injectSteps":[]}\n';
     return '{"permission":"allow"}\n';

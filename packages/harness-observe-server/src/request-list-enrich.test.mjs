@@ -34,4 +34,27 @@ test('enrichRequestListRow keeps request columns', () => {
     assert.equal(row.inputTokens, 5);
     assert.equal(row.outputTokens, 9);
     assert.equal(row.tokensEstimated, false);
+    assert.equal(row.ide, 'unknown');
+});
+
+test('enrichRequestListRow detects cursor vs antigravity from transcriptPath', () => {
+    const cursorRow = enrichRequestListRow({
+        id: 'c:1',
+        conversationId: 'c',
+        boundaryIndex: 1,
+        userQuery: 'q',
+        status: 'completed',
+        transcriptPath: '/host-cursor/projects/workspace/agent-transcripts/abc.jsonl',
+    });
+    assert.equal(cursorRow.ide, 'cursor');
+
+    const agyRow = enrichRequestListRow({
+        id: 'c:2',
+        conversationId: 'c',
+        boundaryIndex: 2,
+        userQuery: 'q',
+        status: 'completed',
+        transcriptPath: '/host-gemini/antigravity-ide/brain/xyz/.system_generated/logs/transcript.jsonl',
+    });
+    assert.equal(agyRow.ide, 'antigravity');
 });

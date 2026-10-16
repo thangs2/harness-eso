@@ -89,7 +89,7 @@ export function scoreSufficiency(pack, retrieval, gaps, stem, thresholds) {
  * @param {{ policy: object, eso: object, surface: object, stem: string, root?: string, reads?: object, registry?: object, injectSnippets?: object[] }} ctx
  */
 export async function runCollect(input, ctx) {
-    const pack = resolveSkillPack(ctx.surface);
+    const pack = resolveSkillPack(ctx.surface, ctx.policy || ctx.eso);
     const registry = ctx.registry || createSourceRegistry(ctx.policy);
     const snippets = [...(ctx.injectSnippets || [])];
     const trace = [];

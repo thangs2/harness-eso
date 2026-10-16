@@ -194,19 +194,25 @@ def detect_shape(data: dict) -> str:
 def extract_command(data: dict) -> str:
     if not isinstance(data, dict):
         return ""
-    direct = data.get("command")
+    direct = data.get("command") or data.get("CommandLine")
     if isinstance(direct, str) and direct.strip():
         return direct.strip()
 
     call = data.get("toolCall") if isinstance(data.get("toolCall"), dict) else {}
     name = str(call.get("name") or "")
     args = call.get("args") if isinstance(call.get("args"), dict) else {}
-    for key in ("command", "Command", "cmd", "script", "input", "text"):
+    for key in ("CommandLine", "commandLine", "command", "Command", "cmd", "script", "input", "text"):
         val = args.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
     if name and SHELL_TOOL_RE.search(name):
-        return str(args.get("command") or args.get("Command") or "").strip()
+        return str(
+            args.get("CommandLine")
+            or args.get("commandLine")
+            or args.get("command")
+            or args.get("Command")
+            or ""
+        ).strip()
     return ""
 
 

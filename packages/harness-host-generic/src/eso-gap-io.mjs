@@ -1,7 +1,7 @@
 import { isoNow, projectIdFrom, writeEsoAttestation } from '@mu/harness-foundation/pure';
 import { harnessTree, readJsonFile, sessionDir, writeJsonFile } from './hook-io.mjs';
 
-const READ_TOOL_RE = /^(Read|Grep|Glob|CallDynamicTool)$/i;
+const READ_TOOL_RE = /^(Read|Grep|Glob|CallDynamicTool|view_file|grep_search|find_by_name|call_mcp_tool)$/i;
 const CODEGRAPH_RE = /codegraph/i;
 const MEMORY_RE = /memory_smart|memory_recall|agentmemory/i;
 const DOCGRAPH_RE = /docgraph/i;
@@ -51,10 +51,28 @@ const READ_COUNT_GAP_RE = /^need at least \d+ file read\(s\); have \d+$/;
 
 function extractFilePath(input) {
     if (!input || typeof input !== 'object') return null;
-    const direct = input.path ?? input.file_path ?? input.target_file ?? input.TargetFile ?? input.AbsolutePath ?? input.targetFile ?? input.filePath;
+    const direct =
+        input.path ??
+        input.file_path ??
+        input.target_file ??
+        input.TargetFile ??
+        input.AbsolutePath ??
+        input.SearchPath ??
+        input.DirectoryPath ??
+        input.targetFile ??
+        input.filePath;
     if (typeof direct === 'string' && direct.trim().length > 0) return direct.trim();
     if (input.arguments && typeof input.arguments === 'object') {
-        const nested = input.arguments.path ?? input.arguments.file_path ?? input.arguments.target_file ?? input.arguments.TargetFile ?? input.arguments.AbsolutePath ?? input.arguments.targetFile ?? input.arguments.filePath;
+        const nested =
+            input.arguments.path ??
+            input.arguments.file_path ??
+            input.arguments.target_file ??
+            input.arguments.TargetFile ??
+            input.arguments.AbsolutePath ??
+            input.arguments.SearchPath ??
+            input.arguments.DirectoryPath ??
+            input.arguments.targetFile ??
+            input.arguments.filePath;
         if (typeof nested === 'string' && nested.trim().length > 0) return nested.trim();
     }
     return null;
@@ -64,7 +82,7 @@ export function gapKindsForTool(toolName, toolInput) {
     const name = String(toolName || '');
     const blob = JSON.stringify(toolInput || {}).toLowerCase();
     const kinds = new Set();
-    if (READ_TOOL_RE.test(name) || name === 'Shell') {
+    if (READ_TOOL_RE.test(name) || name === 'Shell' || /^run_command$/i.test(name)) {
         kinds.add('law');
         kinds.add('code');
         kinds.add('check');
@@ -80,7 +98,7 @@ export function gapKindsForTool(toolName, toolInput) {
         kinds.add('law');
         kinds.add('doc');
     }
-    if (/^Grep$/i.test(name)) {
+    if (/^(Grep|grep_search)$/i.test(name)) {
         kinds.add('code');
         kinds.add('law');
         kinds.add('doc');
@@ -157,6 +175,23 @@ export function recordGapToolUse(toolName, toolInput, opts = {}) {
         toolUses,
     };
     writeJsonFile(gapClosurePath(root, tree), doc);
+    if (doc.allClosed && pre) {
+        try {
+            writeBundleStampFromPreflight(
+                {
+                    ...pre,
+                    allowWrite: true,
+                    level: 'sufficient',
+                    score: Math.max(Number(pre.score || 0), 0.85),
+                },
+                opts.policy || {},
+                root,
+                tree,
+            );
+        } catch {
+            // non-fatal
+        }
+    }
     return doc;
 }
 

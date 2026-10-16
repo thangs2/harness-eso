@@ -24,6 +24,7 @@ export interface FetchRequestsParams {
     q?: string;
     from?: string;
     to?: string;
+    ide?: string;
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -60,6 +61,7 @@ export function fetchRequests(params?: FetchRequestsParams) {
     if (params?.q) q.set('q', params.q);
     if (params?.from) q.set('from', params.from);
     if (params?.to) q.set('to', params.to);
+    if (params?.ide) q.set('ide', params.ide);
     const suffix = q.toString() ? `?${q}` : '';
     return getJson<RequestListResponse>(`/api/requests${suffix}`);
 }

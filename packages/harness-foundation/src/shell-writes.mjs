@@ -165,7 +165,13 @@ export function shellCommandOf(rawJson) {
     } catch {
         return '';
     }
-    const c = j?.payload?.tool_input?.command ?? j?.tool_input?.command ?? j?.command;
+    const c =
+        j?.payload?.tool_input?.command ??
+        j?.tool_input?.command ??
+        j?.command ??
+        j?.toolCall?.args?.CommandLine ??
+        j?.toolCall?.args?.command ??
+        j?.CommandLine;
     return typeof c === 'string' ? c : '';
 }
 

@@ -2,6 +2,7 @@ import type { RequestListItem } from '@/shared/api/types';
 
 export interface ConversationGroup {
     conversationId: string;
+    ide: string;
     items: RequestListItem[];
     latestStartedAt: string | null;
 }
@@ -21,8 +22,10 @@ export function groupRequestsByConversation(items: RequestListItem[]): Conversat
             const tb = b.startedAt || '';
             return tb.localeCompare(ta) || (b.boundaryIndex ?? 0) - (a.boundaryIndex ?? 0);
         });
+        const detectedIde = sorted.find((r) => r.ide && r.ide !== 'unknown')?.ide || sorted[0]?.ide || 'unknown';
         groups.push({
             conversationId,
+            ide: detectedIde,
             items: sorted,
             latestStartedAt: sorted[0]?.startedAt ?? null,
         });

@@ -26,6 +26,11 @@ function isBrainTool(toolName, toolInput) {
         const tool = toolInput?.toolName || toolInput?.tool || '';
         return BRAIN_TOOL_RE.test(`${ns}/${tool}`);
     }
+    if (/^call_mcp_tool$/i.test(name)) {
+        const server = toolInput?.ServerName || toolInput?.serverName || '';
+        const tool = toolInput?.ToolName || toolInput?.toolName || '';
+        return BRAIN_TOOL_RE.test(`${server}/${tool}`);
+    }
     return false;
 }
 

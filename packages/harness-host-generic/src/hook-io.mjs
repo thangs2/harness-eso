@@ -26,16 +26,45 @@ export function sessionDir(root = process.cwd(), tree = harnessTree()) {
 }
 
 export function detectShape(data) {
-    if (!data || typeof data !== 'object') return 'cursor';
+    if (!data || typeof data !== 'object') return harnessTree() === 'agents' ? 'antigravity' : 'cursor';
     if (data.hook_event_name || data.hookEventName) return 'cursor';
     if (typeof data.toolCall === 'object') return 'antigravity';
     if (data.conversationId != null && data.stepIdx != null) return 'antigravity';
-    return 'cursor';
+    return harnessTree() === 'agents' ? 'antigravity' : 'cursor';
 }
 
-export function emitHook(payload, shape) {
+export function currentEvent(explicitEvent) {
+    if (explicitEvent) return explicitEvent;
+    if (process.env.HARNESS_EVENT) return process.env.HARNESS_EVENT;
+    const hook = process.env.HARNESS_HOOK;
+    if (hook === 'gap-tracker' || hook === 'post-tool-hint') return 'PostToolUse';
+    if (hook === 'guard-brain' || hook === 'guard-shell') return 'PreToolUse';
+    if (hook === 'preflight' || hook === 'pre-compact') return 'PreInvocation';
+    return '';
+}
+
+export function emitHook(payload, shape, explicitEvent) {
     const out = { ...payload };
-    if (shape === 'antigravity') {
+    const isAntigravity = shape === 'antigravity' || harnessTree() === 'agents';
+
+    if (isAntigravity) {
+        const ev = currentEvent(explicitEvent);
+
+        // PostToolUse / Stop in Antigravity: Protobuf schema strictly forbids "decision".
+        // Must return {} and exit 0.
+        if (ev === 'PostToolUse' || ev === 'Stop') {
+            process.stdout.write('{}\n');
+            return;
+        }
+
+        // PreInvocation or PostInvocation in Antigravity:
+        if (ev === 'PreInvocation' || ev === 'PostInvocation') {
+            const steps = Array.isArray(out.injectSteps) ? out.injectSteps : [];
+            process.stdout.write(`${JSON.stringify({ injectSteps: steps })}\n`);
+            return;
+        }
+
+        // PreToolUse (or default for Antigravity):
         if (out.permission === 'deny') {
             process.stdout.write(
                 `${JSON.stringify({
@@ -43,10 +72,6 @@ export function emitHook(payload, shape) {
                     reason: out.user_message || out.agent_message || 'denied',
                 })}\n`,
             );
-            return;
-        }
-        if (out.permission === 'allow') {
-            process.stdout.write('{"decision":"allow"}\n');
             return;
         }
         if (out.additional_context) {
@@ -58,14 +83,15 @@ export function emitHook(payload, shape) {
         process.stdout.write('{"decision":"allow"}\n');
         return;
     }
+
     process.stdout.write(`${JSON.stringify(out)}\n`);
 }
 
-export function allow(shape, extra = {}) {
-    emitHook({ permission: 'allow', ...extra }, shape);
+export function allow(shape, extra = {}, explicitEvent = undefined) {
+    emitHook({ permission: 'allow', ...extra }, shape, explicitEvent);
 }
 
-export function deny(shape, message, extra = {}) {
+export function deny(shape, message, extra = {}, explicitEvent = undefined) {
     emitHook(
         {
             permission: 'deny',
@@ -74,22 +100,23 @@ export function deny(shape, message, extra = {}) {
             ...extra,
         },
         shape,
+        explicitEvent,
     );
 }
 
 export function extractShellCommand(data) {
     if (!data || typeof data !== 'object') return '';
-    const direct = data.command;
+    const direct = data.command || data.CommandLine;
     if (typeof direct === 'string' && direct.trim()) return direct.trim();
     const call = typeof data.toolCall === 'object' ? data.toolCall : {};
     const name = String(call.name || '');
     const args = typeof call.args === 'object' ? call.args : {};
-    for (const key of ['command', 'Command', 'cmd', 'script', 'input', 'text']) {
+    for (const key of ['CommandLine', 'commandLine', 'command', 'Command', 'cmd', 'script', 'input', 'text']) {
         const val = args[key];
         if (typeof val === 'string' && val.trim()) return val.trim();
     }
     if (name && SHELL_TOOL_RE.test(name)) {
-        return String(args.command || args.Command || '').trim();
+        return String(args.CommandLine || args.commandLine || args.command || args.Command || '').trim();
     }
     return '';
 }
@@ -115,6 +142,10 @@ export function extractToolMeta(data) {
         data.path ||
         toolInput.path ||
         toolInput.file_path ||
+        toolInput.AbsolutePath ||
+        toolInput.SearchPath ||
+        toolInput.DirectoryPath ||
+        toolInput.TargetFile ||
         '';
     return { toolName: String(toolName), toolInput, path: String(filePath || '') };
 }

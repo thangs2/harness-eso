@@ -7,6 +7,7 @@ import { subscribeObserveRefresh } from '@/shared/events/observeRefresh';
 import { Badge } from '@/ui/Badge';
 import { EmptyState, ErrorBanner, LoadingState } from '@/ui/Feedback';
 import { PageHeader } from '@/ui/PageHeader';
+import { IdeBadge } from '@/ui/IdeBadge';
 import {
     fmtTokens,
     formatRelativeWhen,
@@ -23,6 +24,7 @@ function RequestTableHead({ showConversation }: { showConversation?: boolean }) 
             <tr>
                 <th className="obs-col-num">#</th>
                 <th className="obs-col-when">When</th>
+                {showConversation ? <th>IDE</th> : null}
                 <th className="obs-col-query">Query</th>
                 <th className="obs-col-status">Status</th>
                 <th className="obs-col-verdict">Verdict</th>
@@ -61,13 +63,19 @@ function checksCell(row: RequestListItem) {
 function RequestRow({ row, showConversation }: { row: RequestListItem; showConversation?: boolean }) {
     const fail = Boolean(row.hasFailures) || (row.checksFail ?? 0) > 0;
     const verdict = row.decisionVerdict ?? '—';
+    const ideClass = row.ide ? `obs-row--${row.ide}` : '';
 
     return (
-        <tr className={fail ? 'obs-row--fail' : undefined}>
+        <tr className={`${fail ? 'obs-row--fail' : ''} ${ideClass}`.trim() || undefined}>
             <td className="obs-sub tabular-nums obs-col-num">{row.boundaryIndex}</td>
             <td className="obs-sub whitespace-nowrap obs-col-when" title={formatWhenFull(row.startedAt)}>
                 {formatRelativeWhen(row.startedAt)}
             </td>
+            {showConversation ? (
+                <td className="whitespace-nowrap">
+                    <IdeBadge ide={row.ide} size="sm" />
+                </td>
+            ) : null}
             <td className="obs-col-query">
                 <Link to={`/requests/${row.id}`} className="obs-query-link">
                     {row.userQuery?.slice(0, 140) || row.id}
@@ -128,6 +136,7 @@ export function RequestsListPage() {
     const [groupByConv, setGroupByConv] = useState(true);
     const [query, setQuery] = useState('');
     const [failuresOnly, setFailuresOnly] = useState(false);
+    const [ideFilter, setIdeFilter] = useState<string>('all');
 
     const inFlightRef = useRef(false);
     const load = useCallback((background = false) => {
@@ -139,6 +148,7 @@ export function RequestsListPage() {
             offset,
             q: query.trim() || undefined,
             hasFailures: failuresOnly || undefined,
+            ide: ideFilter === 'all' ? undefined : ideFilter,
         })
             .then((res) => {
                 setItems(res.items);
@@ -152,7 +162,7 @@ export function RequestsListPage() {
                 inFlightRef.current = false;
                 setLoading(false);
             });
-    }, [offset, query, failuresOnly]);
+    }, [offset, query, failuresOnly, ideFilter]);
 
     useEffect(() => {
         load(false);
@@ -168,14 +178,14 @@ export function RequestsListPage() {
     const pageEnd = Math.min(offset + items.length, total);
 
     return (
-        <section>
+        <section className="requests-page">
             <PageHeader
                 title="Requests"
                 description="One row per agent turn. Token out may be ~estimated when hooks did not report usage."
             />
 
-            <div className="requests-toolbar">
-                <label className="requests-toolbar-search">
+            <div className="requests-toolbar flex flex-wrap items-center gap-3">
+                <label className="requests-toolbar-search flex-1 min-w-[200px]">
                     <span className="obs-sub text-xs">Search</span>
                     <input
                         type="search"
@@ -188,25 +198,79 @@ export function RequestsListPage() {
                         placeholder="Substring in user query…"
                     />
                 </label>
-                <label className="requests-toolbar-check">
-                    <input
-                        type="checkbox"
-                        checked={groupByConv}
-                        onChange={(e) => setGroupByConv(e.target.checked)}
-                    />
-                    Group by conversation
-                </label>
-                <label className="requests-toolbar-check">
-                    <input
-                        type="checkbox"
-                        checked={failuresOnly}
-                        onChange={(e) => {
-                            setFailuresOnly(e.target.checked);
-                            setOffset(0);
-                        }}
-                    />
-                    Failures only
-                </label>
+
+                {/* IDE Filter segment */}
+                <div className="flex flex-col gap-1">
+                    <span className="obs-sub text-xs">IDE Filter</span>
+                    <div className="flex items-center gap-1 bg-surface-card p-1 rounded-lg border border-surface-border text-xs">
+                        <button
+                            type="button"
+                            className={`px-2.5 py-1 rounded transition-colors ${
+                                ideFilter === 'all'
+                                    ? 'bg-surface-raised font-semibold text-slate-100 shadow-sm border border-surface-border'
+                                    : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                            onClick={() => {
+                                setIdeFilter('all');
+                                setOffset(0);
+                            }}
+                        >
+                            All IDEs
+                        </button>
+                        <button
+                            type="button"
+                            className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1.5 ${
+                                ideFilter === 'cursor'
+                                    ? 'bg-cyan-950/60 font-semibold text-cyan-200 border border-cyan-500/40 shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                            onClick={() => {
+                                setIdeFilter('cursor');
+                                setOffset(0);
+                            }}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                            Cursor
+                        </button>
+                        <button
+                            type="button"
+                            className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1.5 ${
+                                ideFilter === 'antigravity'
+                                    ? 'bg-purple-950/60 font-semibold text-purple-200 border border-purple-500/40 shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                            onClick={() => {
+                                setIdeFilter('antigravity');
+                                setOffset(0);
+                            }}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                            Antigravity
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-4">
+                    <label className="requests-toolbar-check">
+                        <input
+                            type="checkbox"
+                            checked={groupByConv}
+                            onChange={(e) => setGroupByConv(e.target.checked)}
+                        />
+                        Group by conversation
+                    </label>
+                    <label className="requests-toolbar-check">
+                        <input
+                            type="checkbox"
+                            checked={failuresOnly}
+                            onChange={(e) => {
+                                setFailuresOnly(e.target.checked);
+                                setOffset(0);
+                            }}
+                        />
+                        Failures only
+                    </label>
+                </div>
             </div>
 
             {loading && items.length === 0 && <LoadingState label="Loading requests…" />}
@@ -228,17 +292,34 @@ export function RequestsListPage() {
                         Showing {pageStart}–{pageEnd} of {total}
                     </p>
                     {groupByConv && groups ? (
-                        <div className="request-groups">
+                        <div className="request-groups space-y-3">
                             {groups.map((g) => (
-                                <details key={g.conversationId} className="request-group" open>
-                                    <summary>
-                                        <span className="obs-mono">{g.conversationId.slice(0, 16)}…</span>
-                                        <span className="obs-sub">
-                                            {g.items.length} turn(s) · latest {formatRelativeWhen(g.latestStartedAt)}
+                                <details
+                                    key={g.conversationId}
+                                    className={`request-group request-group--${g.ide || 'unknown'}`}
+                                    open
+                                >
+                                    <summary className={`request-group-summary request-group-summary--${g.ide || 'unknown'} flex items-center justify-between gap-3 py-3 px-4 select-none cursor-pointer transition-all`}>
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            <span className="request-group-chevron inline-flex items-center justify-center transition-transform duration-200">
+                                                <svg className="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                                                </svg>
+                                            </span>
+                                            <IdeBadge ide={g.ide} />
+                                            <span className="obs-mono font-semibold" title={g.conversationId}>
+                                                {g.conversationId.slice(0, 16)}…
+                                            </span>
+                                            <span className="request-group-turns-badge text-[11px] px-2.5 py-0.5 rounded-full font-medium">
+                                                {g.items.length} turn(s)
+                                            </span>
+                                        </div>
+                                        <span className="request-group-time text-xs tabular-nums font-medium">
+                                            latest {formatRelativeWhen(g.latestStartedAt)}
                                         </span>
                                     </summary>
-                                    <div className="obs-table-wrap mt-2">
-                                        <table className="obs-table obs-table--requests">
+                                    <div className="obs-table-wrap">
+                                        <table className={`obs-table obs-table--requests obs-table--ide-${g.ide || 'unknown'}`}>
                                             <RequestTableHead />
                                             <tbody>
                                                 {g.items.map((row) => (

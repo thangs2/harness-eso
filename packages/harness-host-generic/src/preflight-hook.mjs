@@ -15,7 +15,7 @@ import path from 'node:path';
 import { buildPreflightProjection, orchestrateTurn } from '@mu/harness-eso-core';
 import { findRepoRoot } from '@mu/harness-foundation/pure';
 import { detectShape, emitHook, harnessTree, loadPolicyForCwd, readStdin, sessionDir } from './hook-io.mjs';
-import { resetGapClosure, writeBundleStampFromPreflight } from './eso-gap-io.mjs';
+import { readGapClosure, readPreflight, resetGapClosure, writeBundleStampFromPreflight } from './eso-gap-io.mjs';
 
 function buildEvidencePreflightBlock(pre) {
     if (!pre) return '';
@@ -28,7 +28,23 @@ function buildEvidencePreflightBlock(pre) {
 }
 
 function stemFromPrompt(data) {
-    const prompt = data.prompt ?? data.user_message ?? data.message ?? '';
+    let prompt = data.prompt ?? data.user_message ?? data.message ?? '';
+    if (!prompt && typeof data.transcriptPath === 'string' && fs.existsSync(data.transcriptPath)) {
+        try {
+            const lines = fs.readFileSync(data.transcriptPath, 'utf8').trim().split('\n');
+            for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const step = JSON.parse(line);
+                if (step.type === 'USER_INPUT' && step.content) {
+                    prompt = step.content;
+                    break;
+                }
+            }
+        } catch {
+            // ignore transcript read error
+        }
+    }
     return String(prompt)
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
@@ -59,6 +75,22 @@ export async function run() {
         data.conversation_id ?? data.session_id ?? data.conversationId ?? data.sessionId ?? '';
     const generationId = data.generation_id ?? data.generationId ?? '';
     const requestId = generationId || sessionId || `preflight-${Date.now()}`;
+
+    // Antigravity fires PreInvocation before EVERY LLM call (invocationNum: 0, 1, 2...).
+    // For continuation steps (invocationNum > 0) in the same session, do not wipe gap closure!
+    if (shape === 'antigravity' && typeof data.invocationNum === 'number' && data.invocationNum > 0) {
+        const existingPre = readPreflight(root, tree);
+        if (existingPre?.at && (existingPre.conversationId === sessionId || !sessionId)) {
+            emitHook(
+                {
+                    permission: 'allow',
+                    esoPreflight: { level: existingPre.level, score: existingPre.score, continuation: true },
+                },
+                shape,
+            );
+            return;
+        }
+    }
 
     /*
      * `event` is the kernel event the facade decides on — always `turn_start`. The host's own
@@ -109,6 +141,7 @@ export async function run() {
     }
 
     try {
+        if (projection) projection.conversationId = sessionId;
         writePreflightFile(root, tree, projection);
         resetGapClosure(projection.at, root, tree);
         writeBundleStampFromPreflight(projection, policy, root, tree);

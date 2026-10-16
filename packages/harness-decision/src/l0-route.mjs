@@ -7,10 +7,10 @@ export function inferBucketFromEvent(event) {
     const stem = String(event.userQueryStem || '').toLowerCase();
     const blob = [...paths, stem].join(' ').toLowerCase();
 
-    if (/backend\/mu-|mu-bible|nestjs|mongodb/.test(blob)) return 'backend';
-    if (/frontend\/|angular|\.component\./.test(blob)) return 'frontend';
-    if (/tools\/harness|harness-eso|decision-facade|eso/.test(blob)) return 'tools';
-    if (/sdlc\/|document\/harness/.test(blob)) return 'docs';
+    if (/backend\/|dotnet|\.cs\b|abp|entityframework|postgres|mu-bible|nestjs|mongodb/i.test(blob)) return 'backend';
+    if (/frontend\/|apps\/web|fe-app|fe-lib|react|\.tsx?\b|angular|\.component\./i.test(blob)) return 'frontend';
+    if (/tools\/|harness|scripts\/|decision-facade|eso/i.test(blob)) return 'tools';
+    if (/sdlc\/|docs\/|documents?\/|document\/harness/i.test(blob)) return 'docs';
     if (paths.length) return 'general';
     return 'root';
 }

@@ -95,10 +95,12 @@ def extract_tool_input(data: dict) -> dict:
             path = args[pk]
             break
     contents = ""
-    for ck in ("contents", "new_string", "content", "NewContent", "text", "body"):
+    for ck in ("contents", "new_string", "content", "NewContent", "text", "body", "CodeContent", "ReplacementContent"):
         if ck in args and args[ck] is not None:
             contents = args[ck]
             break
+    if not contents and isinstance(args.get("ReplacementChunks"), list):
+        contents = "\n".join(str(chunk.get("ReplacementContent", "")) for chunk in args["ReplacementChunks"] if isinstance(chunk, dict))
     if path or contents:
         return {"path": path, "contents": contents}
     return {}
@@ -432,6 +434,9 @@ def eso_fail_closed_blocks() -> bool:
         return False
     if data.get("allowWrite") is True:
         return False
+    closure = _read_json(ROOT / SESSION_REL / ".eso-gap-closure.json")
+    if closure.get("allClosed") is True and (not data.get("preflightAt") or closure.get("preflightAt") == data.get("preflightAt")):
+        return False
     level = data.get("level") or ""
     return level in ("insufficient", "partial")
 
@@ -534,9 +539,16 @@ def brain_attested() -> dict:
     return {"ok": True, "at": newest.isoformat()}
 
 
+def brain_session_stamp() -> dict:
+    """The pipeline-brain stamp recording recent model/direct calls."""
+    return _read_json(ROOT / STAMP_REL)
+
+
 def brain_attested_legacy() -> bool:
     """The session-stamp check, kept as the fallback while a consumer migrates to attestations."""
-    data = session_stamp()
+    data = brain_session_stamp()
+    if not data.get("ok"):
+        data = session_stamp()
     if not data.get("ok"):
         return False
     via = data.get("via")
@@ -613,8 +625,8 @@ def main() -> int:
             "the last of which the agent's own gates depend on."
         )
         return 0
-    if locked(rel, locks):
-        deny(f"Locked path: {rel}. document/mu/be/00.law is not agent-writable.")
+    if locked(rel, locks) or path_mode(rel) == "locked":
+        deny(f"Locked path: {rel}. This path is not agent-writable.")
         return 0
     if secret_file(rel):
         deny(f"Secret file write blocked: {rel}.")

@@ -9,5 +9,7 @@ dist/
 .cursor/mcp.json
 .codegraph/
 .docgraph/
+.agents/session/
+.cursor/session/
 __pycache__/
 *.pyc

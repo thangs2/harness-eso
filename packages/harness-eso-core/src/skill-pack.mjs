@@ -45,9 +45,21 @@ const PACKS = {
 
 /**
  * @param {{ bucket?: string }} surface
+ * @param {object} [policy]
  */
-export function resolveSkillPack(surface) {
+export function resolveSkillPack(surface, policy = {}) {
     const bucket = surface?.bucket === 'root' ? 'tools' : surface?.bucket || 'general';
+    const packs = policy?.skillPacks || policy?.eso?.skillPacks;
+    const policyPack = packs?.[bucket];
+    if (policyPack && typeof policyPack === 'object') {
+        return {
+            bucket,
+            requiredDocTerms: Array.isArray(policyPack.requiredDocTerms) ? policyPack.requiredDocTerms : [],
+            minReadPaths: typeof policyPack.minReadPaths === 'number' ? policyPack.minReadPaths : 0,
+            lawQueries: Array.isArray(policyPack.lawQueries) ? policyPack.lawQueries : [],
+            codeQueries: Array.isArray(policyPack.codeQueries) ? policyPack.codeQueries : [],
+        };
+    }
     const pack = PACKS[bucket] || PACKS.general;
     return { ...pack, bucket };
 }

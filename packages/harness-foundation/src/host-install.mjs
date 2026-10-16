@@ -276,6 +276,7 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
             });
         }
     } else if (treeKey === 'agents') {
+        const tracerCmd = "bash -lc '[ -f harness.config.json ] || cd ..; exec python3 .agents/hooks/pre-tool-use.py'";
         if (!hooksDoc['harness-tracer'] && !hooksDoc['consumer-guards']) {
             hooksDoc['harness-tracer'] = {
                 PreToolUse: [
@@ -284,12 +285,20 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
                         hooks: [
                             {
                                 type: 'command',
-                                command: 'python3 .agents/hooks/pre-tool-use.py',
+                                command: tracerCmd,
                             },
                         ],
                     },
                 ],
             };
+        } else if (hooksDoc['harness-tracer']?.PreToolUse) {
+            for (const item of hooksDoc['harness-tracer'].PreToolUse) {
+                for (const hook of item.hooks || []) {
+                    if (hook.command === 'python3 .agents/hooks/pre-tool-use.py') {
+                        hook.command = tracerCmd;
+                    }
+                }
+            }
         }
     }
 

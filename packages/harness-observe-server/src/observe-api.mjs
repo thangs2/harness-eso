@@ -68,10 +68,18 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
             where.push('r.started_at <= ?');
             params.push(p.get('to'));
         }
+        if (p.get('ide') === 'cursor') {
+            where.push("(c.transcript_path LIKE '%cursor%' OR c.transcript_path LIKE '%agent-transcripts%')");
+        } else if (p.get('ide') === 'antigravity') {
+            where.push("(c.transcript_path LIKE '%antigravity%' OR c.transcript_path LIKE '%/brain/%')");
+        }
         const clause = where.join(' AND ');
 
         return withDb((db) => {
-            const total = db.get(`SELECT COUNT(*) AS n FROM request r WHERE ${clause}`, params).n;
+            const total = db.get(
+                `SELECT COUNT(*) AS n FROM request r LEFT JOIN conversation c ON r.conversation_id = c.id WHERE ${clause}`,
+                params,
+            ).n;
             const rows = db.all(
                 `SELECT r.id, r.generation_id AS generationId, r.conversation_id AS conversationId, r.boundary_index AS boundaryIndex,
                         r.user_query AS userQuery, r.started_at AS startedAt, r.ended_at AS endedAt, r.status,
@@ -84,8 +92,10 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
                         r.list_decision_verdict AS decisionVerdict,
                         r.list_emit_chars_sum AS emitCharsSum,
                         r.list_stop_input_tokens AS stopInputTokens,
-                        r.list_stop_output_tokens AS stopOutputTokens
+                        r.list_stop_output_tokens AS stopOutputTokens,
+                        c.transcript_path AS transcriptPath
                  FROM request r
+                 LEFT JOIN conversation c ON r.conversation_id = c.id
                  WHERE ${clause}
                  ORDER BY COALESCE(r.started_at, r.created_at) DESC, r.boundary_index DESC
                  LIMIT ? OFFSET ?`,

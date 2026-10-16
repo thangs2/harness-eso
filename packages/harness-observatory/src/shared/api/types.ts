@@ -76,6 +76,8 @@ export interface RequestListItem {
     /** Output from emit_chars÷4 when hook tokens missing */
     tokensEstimated?: boolean;
     emitChars?: number | null;
+    /** Originating IDE: 'cursor' | 'antigravity' | 'unknown' */
+    ide?: string;
 }
 
 export interface FlowGraphVm {

@@ -218,3 +218,71 @@ test('errorPosture honours guards.unavailable and never loosens a telemetry hook
     assert.equal(errorPosture('not-a-hook'), 'deny');
 });
 
+test('antigravity PostToolUse hooks emit {} with zero decision field for protojson compliance', () => {
+    const root = tempConsumer();
+    fs.mkdirSync(path.join(root, '.agents', 'session'), { recursive: true });
+
+    // 1. gap-tracker on agents tree
+    const gt = runHook('gap-tracker', { tool_name: 'view_file', tool_input: {} }, { cwd: root, tree: 'agents' });
+    assert.equal(gt.status, 0);
+    assert.deepEqual(gt.json, {});
+    assert.equal(gt.json.decision, undefined, 'protojson forbids unknown field "decision" on PostToolUse');
+
+    // 2. post-tool-hint on agents tree
+    const pth = runHook('post-tool-hint', { tool_name: 'view_file' }, { cwd: root, tree: 'agents' });
+    assert.equal(pth.status, 0);
+    assert.deepEqual(pth.json, {});
+    assert.equal(pth.json.decision, undefined, 'protojson forbids unknown field "decision" on PostToolUse');
+
+    // 3. route on agents tree with --event PostToolUse
+    const rt = runHook('route', { toolCall: { name: 'view_file' } }, { cwd: root, tree: 'agents', args: ['--event', 'PostToolUse'] });
+    assert.equal(rt.status, 0);
+    assert.deepEqual(rt.json, {});
+    assert.equal(rt.json.decision, undefined, 'protojson forbids unknown field "decision" on PostToolUse');
+
+    // 4. route on agents tree with --event PreToolUse emits decision: allow
+    const rtPre = runHook('route', { toolCall: { name: 'view_file' } }, { cwd: root, tree: 'agents', args: ['--event', 'PreToolUse'] });
+    assert.equal(rtPre.status, 0);
+    assert.equal(rtPre.json.decision, 'allow', 'PreToolUse must emit {"decision":"allow"} for protojson');
+
+    // 5. guard-shell on agents tree extracts CommandLine argument
+    const gs = runHook('guard-shell', { toolCall: { name: 'run_command', args: { CommandLine: 'echo safe' } } }, { cwd: root, tree: 'agents', args: ['--event', 'PreToolUse'] });
+    assert.equal(gs.status, 0);
+    assert.equal(gs.json.decision, 'allow');
+});
+
+test('antigravity PreInvocation continuation step preserves existing gap closure', () => {
+    const root = tempConsumer();
+    const sessionPath = path.join(root, '.agents', 'session');
+    fs.mkdirSync(sessionPath, { recursive: true });
+
+    // Seed preflight and gap closure
+    const preAt = new Date().toISOString();
+    fs.writeFileSync(path.join(sessionPath, '.eso-preflight.json'), JSON.stringify({
+        at: preAt,
+        conversationId: 'conv-test-123',
+        level: 'partial',
+        score: 0.5,
+        gaps: [{ kind: 'code', query: 'view_file' }]
+    }));
+    fs.writeFileSync(path.join(sessionPath, '.eso-gap-closure.json'), JSON.stringify({
+        ok: true,
+        at: preAt,
+        preflightAt: preAt,
+        closedGapIds: ['code:view_file']
+    }));
+
+    // Run PreInvocation with invocationNum: 1 (continuation step)
+    const cont = runHook('preflight', {
+        conversationId: 'conv-test-123',
+        invocationNum: 1,
+        toolCall: {} // triggers antigravity shape detection
+    }, { cwd: root, tree: 'agents', args: ['--event', 'PreInvocation'] });
+
+    assert.equal(cont.status, 0);
+
+    // Verify gap closure was NOT wiped
+    const closure = JSON.parse(fs.readFileSync(path.join(sessionPath, '.eso-gap-closure.json'), 'utf8'));
+    assert.deepEqual(closure.closedGapIds, ['code:view_file'], 'continuation step must not wipe closed gaps');
+});
+

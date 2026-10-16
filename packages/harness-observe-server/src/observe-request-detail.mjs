@@ -9,6 +9,7 @@ import {
 import { buildConsentVm } from './observe-consent-vm.mjs';
 import { buildPromaxFlowGraph } from './flow-graph-build.mjs';
 import { enrichRequestEvents, loadAttachedForRequest } from './request-flow-evidence.mjs';
+import { detectIde } from './request-list-enrich.mjs';
 
 export function callKindSql(t) {
     return `CASE
@@ -21,6 +22,9 @@ export function callKindSql(t) {
 export function requestDetail(db, cfg, id) {
     const request = db.get('SELECT * FROM request WHERE id = ? AND project_id = ?', [id, cfg.project.id]);
     if (!request) return null;
+
+    const conversation = db.get('SELECT * FROM conversation WHERE id = ?', [request.conversation_id]) || null;
+    request.ide = detectIde(conversation?.transcript_path);
 
     const evidenceRaw = loadEvidenceForRequest(db, cfg.project.id, id);
     const esoDesignGraph = evidenceRaw.summary?.level
@@ -123,7 +127,7 @@ export function requestDetail(db, cfg, id) {
             designGraph: esoDesignGraph,
         },
         ...consentSlice,
-        conversation: db.get('SELECT * FROM conversation WHERE id = ?', [request.conversation_id]) || null,
+        conversation,
         llmCalls,
         checks: db.all(
             'SELECT check_id AS checkId, status, heuristic, detail FROM check_result WHERE request_id = ?',
