@@ -145,3 +145,104 @@ test('runIngestOnce twice does not duplicate requests', async () => {
         else process.env.HARNESS_ESO = prevEso;
     }
 });
+
+test('ingestTranscript correctly ingests Claude Code JSONL turn structure', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-claude-ingest-'));
+    const claudeDir = path.join(root, '.claude', 'projects', '-Users-test-myproject');
+    fs.mkdirSync(claudeDir, { recursive: true });
+    const transcriptPath = path.join(claudeDir, 'session-abc.jsonl');
+
+    const claudeLines = [
+        JSON.stringify({
+            type: 'user',
+            timestamp: '2026-10-16T15:00:00.000Z',
+            cwd: '/Users/test/myproject',
+            message: {
+                role: 'user',
+                content: '<USER_REQUEST>Implement feature X</USER_REQUEST>',
+            },
+        }),
+        JSON.stringify({
+            type: 'assistant',
+            timestamp: '2026-10-16T15:00:05.000Z',
+            message: {
+                role: 'assistant',
+                model: 'claude-3-7-sonnet-20250219',
+                content: [
+                    { type: 'text', text: 'I will inspect the files.' },
+                    {
+                        type: 'tool_use',
+                        id: 'toolu_1',
+                        name: 'Bash',
+                        input: { command: 'git status' },
+                    },
+                    {
+                        type: 'tool_use',
+                        id: 'toolu_2',
+                        name: 'Read',
+                        input: { file_path: 'AGENTS.md' },
+                    },
+                ],
+                usage: {
+                    input_tokens: 1200,
+                    output_tokens: 150,
+                    cache_read_input_tokens: 3500,
+                    cache_creation_input_tokens: 250,
+                },
+            },
+        }),
+        JSON.stringify({
+            type: 'turn_ended',
+            status: 'completed',
+        }),
+    ].join('\n');
+
+    fs.writeFileSync(transcriptPath, claudeLines, 'utf8');
+
+    const dbPath = path.join(root, '.harness', 'harness.db');
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    const cfg = {
+        ok: true,
+        root: '/Users/test/myproject',
+        configPath: path.join(root, 'harness.config.json'),
+        project: { id: 'claude-qc', displayName: 'Claude QC' },
+        storage: { driver: 'sqlite', target: dbPath },
+        ingest: {
+            pollMs: 2000,
+            claudeProjectsDirs: [path.join(root, '.claude', 'projects')],
+            hookFiles: [],
+        },
+    };
+
+    const db = openDb(cfg.storage.target);
+    migrate(db);
+    upsertProject(db, cfg);
+
+    const out = ingestTranscript(db, cfg, transcriptPath);
+    assert.equal(out.ok, true);
+    assert.equal(out.newRequests, 1);
+    assert.equal(out.newCalls, 1);
+
+    const req = db.get('SELECT * FROM request WHERE project_id = ?', [cfg.project.id]);
+    assert.ok(req);
+    assert.equal(req.user_query, 'Implement feature X');
+    assert.equal(req.input_tokens, 1200);
+    assert.equal(req.output_tokens, 150);
+    assert.equal(req.cache_read_tokens, 3500);
+    assert.equal(req.cache_write_tokens, 250);
+    assert.equal(req.model_id, 'claude-3-7-sonnet-20250219');
+
+    const events = db.all('SELECT * FROM event WHERE project_id = ? ORDER BY id ASC', [cfg.project.id]);
+    assert.equal(events.length, 2);
+    assert.equal(events[0].tool, 'Bash');
+    assert.equal(events[0].harness, 'claude');
+    assert.equal(events[1].tool, 'Read');
+    assert.equal(events[1].path, 'AGENTS.md');
+
+    const rules = db.all('SELECT * FROM request_rule WHERE request_id = ?', [req.id]);
+    assert.equal(rules.length, 1);
+    assert.equal(rules[0].rule_id, 'AGENTS.md');
+
+    db.close();
+});
+

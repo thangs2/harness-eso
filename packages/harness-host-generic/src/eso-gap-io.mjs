@@ -1,7 +1,7 @@
 import { isoNow, projectIdFrom, writeEsoAttestation } from '@mu/harness-foundation/pure';
 import { harnessTree, readJsonFile, sessionDir, writeJsonFile } from './hook-io.mjs';
 
-const READ_TOOL_RE = /^(Read|Grep|Glob|CallDynamicTool|view_file|grep_search|find_by_name|call_mcp_tool)$/i;
+const READ_TOOL_RE = /^(Read|Grep|Glob|CallDynamicTool|view_file|grep_search|find_by_name|call_mcp_tool|mcp__.*)$/i;
 const CODEGRAPH_RE = /codegraph/i;
 const MEMORY_RE = /memory_smart|memory_recall|agentmemory/i;
 const DOCGRAPH_RE = /docgraph/i;
@@ -60,7 +60,8 @@ function extractFilePath(input) {
         input.SearchPath ??
         input.DirectoryPath ??
         input.targetFile ??
-        input.filePath;
+        input.filePath ??
+        input.projectPath;
     if (typeof direct === 'string' && direct.trim().length > 0) return direct.trim();
     if (input.arguments && typeof input.arguments === 'object') {
         const nested =
@@ -72,7 +73,8 @@ function extractFilePath(input) {
             input.arguments.SearchPath ??
             input.arguments.DirectoryPath ??
             input.arguments.targetFile ??
-            input.arguments.filePath;
+            input.arguments.filePath ??
+            input.arguments.projectPath;
         if (typeof nested === 'string' && nested.trim().length > 0) return nested.trim();
     }
     return null;
@@ -82,7 +84,7 @@ export function gapKindsForTool(toolName, toolInput) {
     const name = String(toolName || '');
     const blob = JSON.stringify(toolInput || {}).toLowerCase();
     const kinds = new Set();
-    if (READ_TOOL_RE.test(name) || name === 'Shell' || /^run_command$/i.test(name)) {
+    if (READ_TOOL_RE.test(name) || name === 'Shell' || /^run_command$/i.test(name) || name === 'Bash') {
         kinds.add('law');
         kinds.add('code');
         kinds.add('check');

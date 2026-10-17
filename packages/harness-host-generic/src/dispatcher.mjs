@@ -19,10 +19,10 @@ import { HOOKS, HOOK_NAMES, errorPosture, runHook } from './dispatch.mjs';
 import { deny, emitHook } from './hook-io.mjs';
 import { loadPolicyForCwd } from './hook-io.mjs';
 
-// Self-heal working directory: if runner (such as Antigravity) spawns the hook with
-// cwd set to .agents/ or .cursor/, normalize process.cwd() back to the workspace root.
+// Self-heal working directory: if runner (such as Antigravity or Claude Code) spawns the hook with
+// cwd set to .agents/, .cursor/, or .claude/, normalize process.cwd() back to the workspace root.
 const cwdBase = path.basename(process.cwd());
-if (cwdBase === '.agents' || cwdBase === '.cursor') {
+if (cwdBase === '.agents' || cwdBase === '.cursor' || cwdBase === '.claude') {
     try {
         process.chdir(path.resolve(process.cwd(), '..'));
     } catch {
@@ -59,11 +59,13 @@ export function parseArgs(argv) {
 
 /** Response dialect for a tree. Unknown trees fall back to the cursor shape. */
 export function shapeFor(tree) {
-    return tree === 'agents' ? 'antigravity' : 'cursor';
+    if (tree === 'agents') return 'antigravity';
+    if (tree === 'claude') return 'claude';
+    return 'cursor';
 }
 
 export function usage() {
-    return `usage: harness-hook --hook <${HOOK_NAMES.join('|')}> --tree <cursor|agents> [--event <event>] [hook args]`;
+    return `usage: harness-hook --hook <${HOOK_NAMES.join('|')}> --tree <cursor|agents|claude> [--event <event>] [hook args]`;
 }
 
 async function main() {

@@ -425,8 +425,9 @@ export function rebuildTranscript(db, cfg, transcriptPath) {
 export function ingestTranscript(db, cfg, transcriptPath) {
     const projectId = cfg.project.id;
     const agyMatch = transcriptPath.match(/\/brain\/([^/]+)\/\.system_generated\/logs\/transcript\.jsonl$/);
+    const isClaude = transcriptPath.includes('.claude/projects') || transcriptPath.includes('host-claude-projects') || transcriptPath.includes('/.claude/');
+    const isAntigravity = !isClaude && (!!agyMatch || transcriptPath.includes('.gemini/antigravity'));
     const conversationId = agyMatch ? agyMatch[1] : path.basename(transcriptPath).replace(/\.jsonl$/, '');
-    const isAntigravity = !!agyMatch || transcriptPath.includes('.gemini/antigravity');
     const now = isoNow();
 
     if (!fs.existsSync(transcriptPath)) {
@@ -536,6 +537,212 @@ export function ingestTranscript(db, cfg, transcriptPath) {
                 rec = JSON.parse(line);
             } catch {
                 continue; // a half-flushed line is not fatal; the next pass retries it
+            }
+
+            if (isClaude) {
+                const rawTs = rec.timestamp || now;
+                const startedAt = parsePromptTs(rawTs) || rawTs;
+
+                // ---- Claude Code: User prompt
+                if (rec.type === 'user') {
+                    let promptText = '';
+                    if (typeof rec.message?.content === 'string') {
+                        promptText = rec.message.content.trim();
+                    } else if (Array.isArray(rec.message?.content)) {
+                        promptText = rec.message.content
+                            .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
+                            .map((b) => b.text.trim())
+                            .filter(Boolean)
+                            .join('\n');
+                    }
+                    if (!promptText) {
+                        continue;
+                    }
+
+                    const ur = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i.exec(promptText);
+                    const query = ur ? ur[1].trim() : promptText;
+                    const key = `${rawTs}\u0000${query}`;
+                    if (key === lastBoundaryKey) {
+                        continue;
+                    }
+                    lastBoundaryKey = key;
+
+                    if (current) {
+                        db.run(
+                            `UPDATE request SET status = CASE WHEN status = 'in_progress' THEN 'completed' ELSE status END,
+                                ended_at = COALESCE(ended_at, ?), updated_at = ? WHERE id = ?`,
+                            [startedAt, now, current.id],
+                        );
+                    }
+
+                    const reqId = `${conversationId}:${nextIndex}`;
+                    db.run(
+                        `INSERT INTO request (id, project_id, conversation_id, boundary_index, user_query, prompt_at,
+                            started_at, status, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?)
+                         ON CONFLICT(id) DO UPDATE SET user_query = excluded.user_query, updated_at = excluded.updated_at`,
+                        [reqId, projectId, conversationId, nextIndex, query, rawTs, startedAt, now, now],
+                    );
+                    current = {
+                        id: reqId,
+                        boundary_index: nextIndex,
+                        status: 'in_progress',
+                        call_count: 0,
+                    };
+                    nextIndex += 1;
+                    callIndex = 0;
+                    report.newRequests += 1;
+                    touched.add(reqId);
+                    continue;
+                }
+
+                // ---- Claude Code: Assistant turn (LLM Call + tools)
+                if (rec.type === 'assistant') {
+                    if (rec.message?.model) {
+                        currentModel = rec.message.model;
+                    }
+                    if (!current) {
+                        const reqId = `${conversationId}:${nextIndex}`;
+                        db.run(
+                            `INSERT INTO request (id, project_id, conversation_id, boundary_index, user_query, prompt_at,
+                                started_at, status, created_at, updated_at)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?)
+                             ON CONFLICT(id) DO NOTHING`,
+                            [reqId, projectId, conversationId, nextIndex, '(claude turn)', rawTs, startedAt, now, now],
+                        );
+                        current = {
+                            id: reqId,
+                            boundary_index: nextIndex,
+                            status: 'in_progress',
+                            call_count: 0,
+                        };
+                        nextIndex += 1;
+                        callIndex = 0;
+                        report.newRequests += 1;
+                        touched.add(reqId);
+                    }
+
+                    const content = Array.isArray(rec.message?.content) ? rec.message.content : [];
+                    const toolUses = content.filter((b) => b && b.type === 'tool_use');
+                    const textBlocks = content.filter((b) => b && b.type === 'text' && typeof b.text === 'string');
+                    const textChars = textBlocks.reduce((acc, b) => acc + (b.text?.length || 0), 0);
+                    const toolNames = toolUses.map((t) => t.name || 'tool').filter(Boolean);
+                    const preview = (
+                        textBlocks.map((b) => b.text).join(' ').trim() ||
+                        (toolNames[0] ? `Tool: ${toolNames[0]}` : '')
+                    ).slice(0, 300);
+
+                    const usage = rec.message?.usage || {};
+                    const inTok = usage.input_tokens || 0;
+                    const outTok = usage.output_tokens || 0;
+                    const cacheRead = usage.cache_read_input_tokens || 0;
+                    const cacheWrite = usage.cache_creation_input_tokens || 0;
+
+                    callIndex += 1;
+                    const callId = `${current.id}:${callIndex}`;
+                    db.run(
+                        `INSERT INTO llm_call (id, project_id, request_id, call_index, file_line_no, tool_count, text_chars, emit_chars, tool_names, preview, created_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ON CONFLICT(id) DO UPDATE SET
+                             tool_count = excluded.tool_count, text_chars = excluded.text_chars,
+                             emit_chars = excluded.emit_chars, tool_names = excluded.tool_names, preview = excluded.preview`,
+                        [
+                            callId,
+                            projectId,
+                            current.id,
+                            callIndex,
+                            lineNo,
+                            toolUses.length,
+                            textChars,
+                            outTok * 4 || textChars,
+                            toolNames.join(','),
+                            preview,
+                            rawTs,
+                        ],
+                    );
+
+                    db.run(
+                        `UPDATE request SET
+                            input_tokens = COALESCE(input_tokens, 0) + ?,
+                            output_tokens = COALESCE(output_tokens, 0) + ?,
+                            cache_read_tokens = COALESCE(cache_read_tokens, 0) + ?,
+                            cache_write_tokens = COALESCE(cache_write_tokens, 0) + ?,
+                            model_id = COALESCE(?, model_id),
+                            updated_at = ?
+                         WHERE id = ?`,
+                        [inTok, outTok, cacheRead, cacheWrite, currentModel, now, current.id],
+                    );
+
+                    const relLog = path.relative(path.resolve(cfg.root), transcriptPath).replace(/\\/g, '/');
+                    for (let ti = 0; ti < toolUses.length; ti += 1) {
+                        const tu = toolUses[ti];
+                        const toolName = tu.name || '';
+                        let pathVal = tu.input?.file_path || tu.input?.path || tu.input?.notebook_path || '';
+                        const cmdVal = tu.input?.command || '';
+                        if (cfg.root && pathVal.replace(/\\/g, '/').startsWith(`${cfg.root}/`)) {
+                            pathVal = pathVal.replace(/\\/g, '/').slice(cfg.root.length + 1);
+                        }
+                        const rawObj = {
+                            harness: 'claude',
+                            eventType: 'postToolUse',
+                            tool: toolName,
+                            path: pathVal || null,
+                            command: cmdVal || null,
+                            payload: {
+                                tool_input: {
+                                    command: cmdVal || null,
+                                    path: pathVal || null,
+                                },
+                            },
+                        };
+                        db.run(
+                            `INSERT INTO event (project_id, harness, event_type, tool, path, generation_id,
+                                conversation_id, request_id, hook_at, source_path, source_line_no, raw_json)
+                             VALUES (?, 'claude', 'postToolUse', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             ON CONFLICT(project_id, harness, source_path, source_line_no) DO UPDATE SET
+                                tool = excluded.tool, path = excluded.path, request_id = excluded.request_id,
+                                generation_id = excluded.generation_id, hook_at = excluded.hook_at, raw_json = excluded.raw_json`,
+                            [
+                                projectId,
+                                toolName,
+                                pathVal || null,
+                                current.id,
+                                conversationId,
+                                current.id,
+                                rawTs,
+                                relLog,
+                                lineNo * 1000 + ti,
+                                JSON.stringify(rawObj),
+                            ],
+                        );
+
+                        if (pathVal && (/\.mdc$/i.test(pathVal) || /(^|\/)(rules|skills)\//i.test(pathVal) || /(^|\/)AGENTS\.md$/i.test(pathVal) || /(^|\/)CLAUDE\.md$/i.test(pathVal))) {
+                            db.run(
+                                `INSERT INTO request_rule (request_id, rule_id, attached_at) VALUES (?, ?, ?)
+                                 ON CONFLICT(request_id, rule_id) DO NOTHING`,
+                                [current.id, pathVal, rawTs],
+                            );
+                        }
+                    }
+
+                    report.newCalls += 1;
+                    touched.add(current.id);
+                    continue;
+                }
+
+                if (rec.type === 'turn_ended' || rec.type === 'stop') {
+                    if (current) {
+                        const status = rec.status === 'error' ? 'error' : 'completed';
+                        db.run(
+                            `UPDATE request SET status = ?, has_failures = ?, ended_at = COALESCE(ended_at, ?), updated_at = ?
+                             WHERE id = ?`,
+                            [status, rec.status === 'error' ? 1 : 0, rawTs, now, current.id],
+                        );
+                        current.status = status;
+                    }
+                    continue;
+                }
+                continue;
             }
 
             if (isAntigravity) {
@@ -1198,6 +1405,51 @@ export function discoverTranscripts(cfg) {
                 }
             } catch {
                 /* skip unreadable file */
+            }
+        }
+    }
+
+    const claudeDirs = cfg.ingest.claudeProjectsDirs || [];
+    for (const cDir of claudeDirs) {
+        if (!fs.existsSync(cDir)) continue;
+        const hostRoot = process.env.HARNESS_REPO_ROOT_HOST ? path.resolve(process.env.HARNESS_REPO_ROOT_HOST) : root;
+        const encodedRoot = root.replace(/^[a-zA-Z]:/, '').replace(/[\/\\]+/g, '-');
+        const encodedHost = hostRoot.replace(/^[a-zA-Z]:/, '').replace(/[\/\\]+/g, '-');
+
+        for (const entry of fs.readdirSync(cDir, { withFileTypes: true })) {
+            if (!entry.isDirectory()) continue;
+            const matchesDir =
+                entry.name === encodedRoot ||
+                entry.name === encodedHost ||
+                entry.name.endsWith(encodedRoot) ||
+                entry.name.endsWith(encodedHost);
+            const pDir = path.join(cDir, entry.name);
+            let isTargetProject = matchesDir;
+
+            if (!isTargetProject) {
+                const sampleFiles = fs.readdirSync(pDir).filter((f) => f.endsWith('.jsonl')).slice(0, 1);
+                if (sampleFiles.length > 0) {
+                    try {
+                        const fd = fs.openSync(path.join(pDir, sampleFiles[0]), 'r');
+                        const buf = Buffer.alloc(4096);
+                        const read = fs.readSync(fd, buf, 0, 4096, 0);
+                        fs.closeSync(fd);
+                        const sampleText = buf.subarray(0, read).toString('utf8');
+                        if (sampleText.includes(hostRoot) || (root !== '/data/repo' && sampleText.includes(root))) {
+                            isTargetProject = true;
+                        }
+                    } catch {
+                        /* skip unreadable sample */
+                    }
+                }
+            }
+
+            if (isTargetProject) {
+                for (const file of fs.readdirSync(pDir, { withFileTypes: true })) {
+                    if (file.isFile() && file.name.endsWith('.jsonl')) {
+                        out.push(path.join(pDir, file.name));
+                    }
+                }
             }
         }
     }

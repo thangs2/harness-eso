@@ -180,8 +180,19 @@ def protected_hit(targets: list) -> str:
 
 
 def detect_shape(data: dict) -> str:
+    tree = str(os.environ.get("HARNESS_TREE") or "").strip().lower()
+    if tree == "agents":
+        return "antigravity"
+    if tree == "claude":
+        return "claude"
     if not isinstance(data, dict):
         return "cursor"
+    if data.get("transcript_path") or data.get("permission_mode"):
+        return "claude"
+    ev = str(data.get("hook_event_name") or data.get("hookEventName") or "")
+    if ev in ("UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact"):
+        if data.get("session_id") and data.get("cwd"):
+            return "claude"
     if data.get("hook_event_name") or data.get("hookEventName"):
         return "cursor"
     if isinstance(data.get("toolCall"), dict):
@@ -219,6 +230,8 @@ def extract_command(data: dict) -> str:
 def allow():
     if _OUTPUT_SHAPE == "antigravity":
         sys.stdout.write('{"decision":"allow"}\n')
+    elif _OUTPUT_SHAPE == "claude":
+        sys.stdout.write('{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n')
     else:
         sys.stdout.write('{"permission":"allow"}\n')
 
@@ -226,6 +239,16 @@ def allow():
 def deny(message: str):
     if _OUTPUT_SHAPE == "antigravity":
         payload = {"decision": "deny", "reason": message}
+        sys.stdout.write(json.dumps(payload) + "\n")
+        return
+    if _OUTPUT_SHAPE == "claude":
+        payload = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": message,
+            }
+        }
         sys.stdout.write(json.dumps(payload) + "\n")
         return
     payload = {

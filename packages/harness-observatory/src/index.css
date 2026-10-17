@@ -334,6 +334,9 @@
     .obs-badge--antigravity {
         @apply bg-purple-950/40 text-purple-200 border border-purple-500/40;
     }
+    .obs-badge--claude {
+        @apply bg-[#3d2218]/50 text-[#f5a788] border border-[#d97757]/40;
+    }
     .obs-badge--dot {
         @apply normal-case tracking-normal;
     }
@@ -358,6 +361,9 @@
     }
     .obs-badge--antigravity.obs-badge--dot::before {
         @apply bg-purple-400;
+    }
+    .obs-badge--claude.obs-badge--dot::before {
+        @apply bg-[#d97757];
     }
     .obs-error {
         @apply text-red-200 text-sm p-3 rounded-lg border border-danger/40 bg-danger/10;

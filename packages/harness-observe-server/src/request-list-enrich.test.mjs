@@ -57,4 +57,15 @@ test('enrichRequestListRow detects cursor vs antigravity from transcriptPath', (
         transcriptPath: '/host-gemini/antigravity-ide/brain/xyz/.system_generated/logs/transcript.jsonl',
     });
     assert.equal(agyRow.ide, 'antigravity');
+
+    const claudeRow = enrichRequestListRow({
+        id: 'c:3',
+        conversationId: 'c',
+        boundaryIndex: 3,
+        userQuery: 'q',
+        status: 'completed',
+        transcriptPath: '/host-claude-projects/-Users-me-Workspaces-x79/session123.jsonl',
+    });
+    assert.equal(claudeRow.ide, 'claude');
 });
+

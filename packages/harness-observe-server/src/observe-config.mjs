@@ -91,6 +91,19 @@ export function antigravityBrainDirs() {
     return [...new Set(candidates.filter((d) => fs.existsSync(d)))];
 }
 
+export function claudeProjectsDirs() {
+    const dirs = [];
+    const claudeMount = process.env.HARNESS_CLAUDE_MOUNT || '/host-claude-projects';
+    if (fs.existsSync(claudeMount)) {
+        dirs.push(claudeMount);
+    }
+    const homeProjects = path.join(os.homedir(), '.claude', 'projects');
+    if (fs.existsSync(homeProjects)) {
+        dirs.push(homeProjects);
+    }
+    return [...new Set(dirs)];
+}
+
 /** `~/.harness/observe` — one home for every project's database, outside every consumer repo. */
 export function defaultObserveDataRoot() {
     return path.join(os.homedir(), '.harness', 'observe');
@@ -192,9 +205,11 @@ export function loadConfig(startDir = process.cwd()) {
                 : (config.ingest && config.ingest.pollMs) || 2000,
             transcriptDir,
             brainDirs: antigravityBrainDirs(),
+            claudeProjectsDirs: claudeProjectsDirs(),
             hookFiles: ((config.ingest && config.ingest.hookFiles) || [
                 '.cursor/session/route-trace.jsonl',
                 '.agents/session/route-trace.jsonl',
+                '.claude/session/route-trace.jsonl',
             ]).map((f) => (path.isAbsolute(f) ? f : path.join(root, f))),
         },
         tenancy: {

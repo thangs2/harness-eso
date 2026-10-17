@@ -286,3 +286,82 @@ test('antigravity PreInvocation continuation step preserves existing gap closure
     assert.deepEqual(closure.closedGapIds, ['code:view_file'], 'continuation step must not wipe closed gaps');
 });
 
+test('claude guard-shell denies dangerous command with hookSpecificOutput', () => {
+    const root = tempConsumer();
+    fs.mkdirSync(path.join(root, '.claude', 'session'), { recursive: true });
+    const { json, status } = runHook('guard-shell', {
+        session_id: 'claude-sess-1',
+        cwd: root,
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Bash',
+        tool_input: { command: 'drop database test' },
+    }, { cwd: root, tree: 'claude' });
+
+    assert.equal(status, 0);
+    assert.ok(json.hookSpecificOutput, 'claude hook must return hookSpecificOutput');
+    assert.equal(json.hookSpecificOutput.permissionDecision, 'deny');
+});
+
+test('claude guard-shell allows benign command with hookSpecificOutput', () => {
+    const root = tempConsumer();
+    fs.mkdirSync(path.join(root, '.claude', 'session'), { recursive: true });
+    const { json, status } = runHook('guard-shell', {
+        session_id: 'claude-sess-1',
+        cwd: root,
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Bash',
+        tool_input: { command: 'bun test' },
+    }, { cwd: root, tree: 'claude' });
+
+    assert.equal(status, 0);
+    assert.ok(json.hookSpecificOutput, 'claude hook must return hookSpecificOutput');
+    assert.equal(json.hookSpecificOutput.permissionDecision, 'allow');
+});
+
+test('claude preflight on UserPromptSubmit writes .claude/session/.eso-preflight.json', () => {
+    const root = tempConsumer();
+    fs.mkdirSync(path.join(root, '.claude', 'session'), { recursive: true });
+    const { status } = runHook('preflight', {
+        session_id: 'claude-sess-2',
+        cwd: root,
+        hook_event_name: 'UserPromptSubmit',
+        prompt: 'test prompt for claude',
+    }, { cwd: root, tree: 'claude' });
+
+    assert.equal(status, 0);
+    assert.ok(fs.existsSync(path.join(root, '.claude', 'session', '.eso-preflight.json')));
+});
+
+test('claude gap-tracker closes gap on tool use', () => {
+    const root = tempConsumer();
+    const sessionDir = path.join(root, '.claude', 'session');
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const preflightAt = new Date().toISOString();
+    fs.writeFileSync(
+        path.join(sessionDir, '.eso-preflight.json'),
+        JSON.stringify({
+            ok: true,
+            at: preflightAt,
+            level: 'partial',
+            score: 0.5,
+            gaps: [{ kind: 'law', query: 'harness-eso' }],
+        }),
+    );
+
+    const { status } = runHook('gap-tracker', {
+        session_id: 'claude-sess-3',
+        cwd: root,
+        hook_event_name: 'PostToolUse',
+        tool_name: 'Read',
+        tool_input: { file_path: 'document/harness/02.harness-eso/00.index.md' },
+    }, { cwd: root, tree: 'claude' });
+
+    assert.equal(status, 0);
+    const closure = JSON.parse(
+        fs.readFileSync(path.join(sessionDir, '.eso-gap-closure.json'), 'utf8'),
+    );
+    assert.equal(closure.preflightAt, preflightAt);
+    assert.ok(closure.closedGapIds.includes('law:harness-eso'));
+});
+
+

@@ -17,6 +17,7 @@ services:
             HARNESS_AGENT_MOUNT: /agent-repos
             HARNESS_CURSOR_MOUNT: /host-cursor
             HARNESS_GEMINI_MOUNT: /host-gemini
+            HARNESS_CLAUDE_MOUNT: /host-claude-projects
             HARNESS_REPO_ROOT_HOST: ${HARNESS_REPO_ROOT:?Set HARNESS_REPO_ROOT}
         volumes:
             # Consumer repo — read-only. This is the only path that identifies a project.
@@ -37,6 +38,7 @@ services:
             # Agent transcripts (REQUEST spine) — read-only; see docker/README.md
             - ${HARNESS_CURSOR_HOME:-${HOME}/.cursor}:/host-cursor:ro
             - ${HARNESS_GEMINI_HOME:-${HOME}/.gemini}:/host-gemini:ro
+            - ${HARNESS_CLAUDE_HOME:-${HOME}/.claude/projects}:/host-claude-projects:ro
         extra_hosts:
             - "host.docker.internal:host-gateway"
         healthcheck:

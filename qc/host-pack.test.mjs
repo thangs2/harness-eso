@@ -471,11 +471,45 @@ test('both superset profiles wire the same hook implementations', () => {
 
     const cursor = loadHostProfile(PROFILES_DIR, 'cursor-superset').cursor;
     const agents = loadHostProfile(PROFILES_DIR, 'agents-superset').agents;
+    const claude = loadHostProfile(PROFILES_DIR, 'claude-superset').claude;
 
     assert.deepEqual(
         hooksIn(cursor),
         hooksIn(agents),
-        'both IDEs must run the same hooks — a hook wired for one and not the other silently never runs',
+        'Cursor and Antigravity must run the same hooks',
+    );
+    assert.deepEqual(
+        hooksIn(cursor),
+        hooksIn(claude),
+        'Cursor and Claude Code must run the same hooks',
     );
     assert.ok(hooksIn(agents).includes('pre-compact'), 'preCompact must be wired for Antigravity too');
+    assert.ok(hooksIn(claude).includes('pre-compact'), 'preCompact must be wired for Claude too');
 });
+
+test('claude-superset provisions .claude/settings.json, guards and CLAUDE.md', () => {
+    const root = tempConsumer();
+    writeConsumerConfig(root);
+    const claudeProfile = loadHostProfile(PROFILES_DIR, 'claude-superset');
+    const { actions } = applyHostProfiles(root, [claudeProfile], { observePort: 8792, verify: false });
+
+    assert.ok(actions.length > 0);
+    const settingsPath = path.join(root, '.claude', 'settings.json');
+    assert.ok(fs.existsSync(settingsPath), '.claude/settings.json must exist');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    assert.ok(settings.hooks, '.claude/settings.json must contain hooks');
+    assert.ok(Array.isArray(settings.hooks.UserPromptSubmit), 'UserPromptSubmit must be array');
+    assert.ok(Array.isArray(settings.hooks.PreToolUse), 'PreToolUse must be array');
+    assert.ok(Array.isArray(settings.hooks.PostToolUse), 'PostToolUse must be array');
+    assert.ok(Array.isArray(settings.hooks.PreCompact), 'PreCompact must be array');
+
+    // Verify CLAUDE.md
+    const claudeMdPath = path.join(root, 'CLAUDE.md');
+    assert.ok(fs.existsSync(claudeMdPath), 'CLAUDE.md must exist');
+    assert.ok(fs.readFileSync(claudeMdPath, 'utf8').includes('# harness-eso: law-gate'));
+
+    // Verify consumer guards copied
+    assert.ok(fs.existsSync(path.join(root, '.claude', 'hooks', 'guard-shell.py')));
+    assert.ok(fs.existsSync(path.join(root, '.claude', 'hooks', 'guard-write.py')));
+});
+

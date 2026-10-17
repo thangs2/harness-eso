@@ -14,23 +14,31 @@ export function readStdin() {
 }
 
 export function harnessTree() {
-    return (process.env.HARNESS_TREE || 'cursor').replace(/^\./, '').toLowerCase() === 'agents'
-        ? 'agents'
-        : 'cursor';
+    const raw = (process.env.HARNESS_TREE || 'cursor').replace(/^\./, '').toLowerCase();
+    if (raw === 'agents') return 'agents';
+    if (raw === 'claude') return 'claude';
+    return 'cursor';
 }
 
 export function sessionDir(root = process.cwd(), tree = harnessTree()) {
-    return tree === 'agents'
-        ? path.join(root, '.agents', 'session')
-        : path.join(root, '.cursor', 'session');
+    if (tree === 'agents') return path.join(root, '.agents', 'session');
+    if (tree === 'claude') return path.join(root, '.claude', 'session');
+    return path.join(root, '.cursor', 'session');
 }
 
 export function detectShape(data) {
-    if (!data || typeof data !== 'object') return harnessTree() === 'agents' ? 'antigravity' : 'cursor';
+    if (harnessTree() === 'agents') return 'antigravity';
+    if (harnessTree() === 'claude') return 'claude';
+    if (!data || typeof data !== 'object') return 'cursor';
+    if (data.transcript_path || data.permission_mode) return 'claude';
+    const ev = String(data.hook_event_name || data.hookEventName || '');
+    if (ev === 'UserPromptSubmit' || ev === 'PreToolUse' || ev === 'PostToolUse' || ev === 'PreCompact') {
+        if (data.session_id && data.cwd) return 'claude';
+    }
     if (data.hook_event_name || data.hookEventName) return 'cursor';
     if (typeof data.toolCall === 'object') return 'antigravity';
     if (data.conversationId != null && data.stepIdx != null) return 'antigravity';
-    return harnessTree() === 'agents' ? 'antigravity' : 'cursor';
+    return 'cursor';
 }
 
 export function currentEvent(explicitEvent) {
@@ -39,13 +47,98 @@ export function currentEvent(explicitEvent) {
     const hook = process.env.HARNESS_HOOK;
     if (hook === 'gap-tracker' || hook === 'post-tool-hint') return 'PostToolUse';
     if (hook === 'guard-brain' || hook === 'guard-shell') return 'PreToolUse';
-    if (hook === 'preflight' || hook === 'pre-compact') return 'PreInvocation';
+    if (hook === 'preflight') return harnessTree() === 'claude' ? 'UserPromptSubmit' : 'PreInvocation';
+    if (hook === 'pre-compact') return harnessTree() === 'claude' ? 'PreCompact' : 'PreInvocation';
     return '';
 }
 
 export function emitHook(payload, shape, explicitEvent) {
     const out = { ...payload };
     const isAntigravity = shape === 'antigravity' || harnessTree() === 'agents';
+    const isClaude = shape === 'claude' || harnessTree() === 'claude';
+
+    if (isClaude) {
+        const ev = currentEvent(explicitEvent);
+        if (ev === 'UserPromptSubmit') {
+            if (out.permission === 'deny') {
+                process.stdout.write(
+                    `${JSON.stringify({
+                        decision: 'block',
+                        reason: out.user_message || out.agent_message || 'denied',
+                    })}\n`,
+                );
+                return;
+            }
+            if (out.additional_context) {
+                process.stdout.write(
+                    `${JSON.stringify({
+                        hookSpecificOutput: {
+                            hookEventName: 'UserPromptSubmit',
+                            additionalContext: out.additional_context,
+                        },
+                    })}\n`,
+                );
+                return;
+            }
+            process.stdout.write('{}\n');
+            return;
+        }
+
+        if (ev === 'PreToolUse') {
+            if (out.permission === 'deny') {
+                process.stdout.write(
+                    `${JSON.stringify({
+                        hookSpecificOutput: {
+                            hookEventName: 'PreToolUse',
+                            permissionDecision: 'deny',
+                            permissionDecisionReason: out.user_message || out.agent_message || 'denied',
+                        },
+                    })}\n`,
+                );
+                return;
+            }
+            if (out.additional_context) {
+                process.stdout.write(
+                    `${JSON.stringify({
+                        hookSpecificOutput: {
+                            hookEventName: 'PreToolUse',
+                            permissionDecision: 'allow',
+                            additionalContext: out.additional_context,
+                        },
+                    })}\n`,
+                );
+                return;
+            }
+            process.stdout.write(
+                `${JSON.stringify({
+                    hookSpecificOutput: {
+                        hookEventName: 'PreToolUse',
+                        permissionDecision: 'allow',
+                    },
+                })}\n`,
+            );
+            return;
+        }
+
+        if (ev === 'PostToolUse') {
+            if (out.additional_context) {
+                process.stdout.write(
+                    `${JSON.stringify({
+                        hookSpecificOutput: {
+                            hookEventName: 'PostToolUse',
+                            additionalContext: out.additional_context,
+                        },
+                    })}\n`,
+                );
+                return;
+            }
+            process.stdout.write('{}\n');
+            return;
+        }
+
+        process.stdout.write('{}\n');
+        return;
+    }
 
     if (isAntigravity) {
         const ev = currentEvent(explicitEvent);
@@ -106,16 +199,16 @@ export function deny(shape, message, extra = {}, explicitEvent = undefined) {
 
 export function extractShellCommand(data) {
     if (!data || typeof data !== 'object') return '';
-    const direct = data.command || data.CommandLine;
+    const direct = data.command || data.CommandLine || data.tool_input?.command || data.tool_input?.CommandLine;
     if (typeof direct === 'string' && direct.trim()) return direct.trim();
     const call = typeof data.toolCall === 'object' ? data.toolCall : {};
-    const name = String(call.name || '');
-    const args = typeof call.args === 'object' ? call.args : {};
+    const name = String(call.name || data.tool_name || '');
+    const args = typeof call.args === 'object' ? call.args : (typeof data.tool_input === 'object' ? data.tool_input : {});
     for (const key of ['CommandLine', 'commandLine', 'command', 'Command', 'cmd', 'script', 'input', 'text']) {
         const val = args[key];
         if (typeof val === 'string' && val.trim()) return val.trim();
     }
-    if (name && SHELL_TOOL_RE.test(name)) {
+    if (name && (SHELL_TOOL_RE.test(name) || name.toLowerCase() === 'bash')) {
         return String(args.CommandLine || args.commandLine || args.command || args.Command || '').trim();
     }
     return '';
@@ -146,6 +239,7 @@ export function extractToolMeta(data) {
         toolInput.SearchPath ||
         toolInput.DirectoryPath ||
         toolInput.TargetFile ||
+        toolInput.projectPath ||
         '';
     return { toolName: String(toolName), toolInput, path: String(filePath || '') };
 }

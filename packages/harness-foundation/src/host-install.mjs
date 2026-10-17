@@ -190,7 +190,7 @@ export function ensureConsumerRules(root, treeKey) {
 
     for (const name of ruleNames) {
         const dest = path.join(targetRulesDir, name);
-        const altDest = treeKey === 'agents' ? path.join(targetRulesDir, name.replace(/\.mdc$/, '.md')) : null;
+        const altDest = (treeKey === 'agents' || treeKey === 'claude') ? path.join(targetRulesDir, name.replace(/\.mdc$/, '.md')) : null;
         if (!fs.existsSync(dest) && (!altDest || !fs.existsSync(altDest))) {
             const src = path.join(templatesDir, name);
             if (fs.existsSync(src)) {
@@ -232,14 +232,77 @@ export function ensureConsumerWorkflowGuide(root) {
 }
 
 /**
+ * Ensure Claude Code baseline integration exists in consumer:
+ * 1. CLAUDE.md with law-gate marker pointing to AGENTS.md
+ * 2. .mcp.json at root copied from .cursor/mcp.json if missing
+ * 3. Root .gitignore ignoring .claude/session/ and .claude/settings.local.json
+ */
+export function ensureConsumerClaudeSupport(root) {
+    const actions = [];
+
+    // 1. Ensure CLAUDE.md exists with law-gate marker
+    const claudeMdPath = path.join(root, 'CLAUDE.md');
+    const marker = '# harness-eso: law-gate';
+    if (!fs.existsSync(claudeMdPath)) {
+        const body = `# Claude Code Guidelines\n\n${marker}\nTất cả các phiên làm việc phải tuân thủ nghiêm ngặt quy định tại [AGENTS.md](AGENTS.md) và các quy tắc trong \`.claude/rules/\`.\n`;
+        fs.writeFileSync(claudeMdPath, body, 'utf8');
+        actions.push({ relative: 'CLAUDE.md', action: 'created' });
+    } else {
+        const existing = fs.readFileSync(claudeMdPath, 'utf8');
+        if (!existing.includes(marker)) {
+            const body = `${existing.trimEnd()}\n\n${marker}\nTất cả các phiên làm việc phải tuân thủ nghiêm ngặt quy định tại [AGENTS.md](AGENTS.md) và các quy tắc trong \`.claude/rules/\`.\n`;
+            fs.writeFileSync(claudeMdPath, body, 'utf8');
+            actions.push({ relative: 'CLAUDE.md', action: 'updated' });
+        }
+    }
+
+    // 2. Sync root .mcp.json if missing (e.g. from .cursor/mcp.json)
+    const rootMcpPath = path.join(root, '.mcp.json');
+    if (!fs.existsSync(rootMcpPath)) {
+        const cursorMcpPath = path.join(root, '.cursor', 'mcp.json');
+        if (fs.existsSync(cursorMcpPath)) {
+            try {
+                const cursorMcp = JSON.parse(fs.readFileSync(cursorMcpPath, 'utf8'));
+                const claudeMcp = cursorMcp.mcpServers ? cursorMcp : { mcpServers: cursorMcp };
+                fs.writeFileSync(rootMcpPath, `${JSON.stringify(claudeMcp, null, 2)}\n`, 'utf8');
+                actions.push({ relative: '.mcp.json', action: 'created' });
+            } catch {
+                /* skip */
+            }
+        }
+    }
+
+    // 3. Ensure root .gitignore ignores .claude/session/ and .claude/settings.local.json
+    const rootGitignore = path.join(root, '.gitignore');
+    if (fs.existsSync(rootGitignore)) {
+        let content = fs.readFileSync(rootGitignore, 'utf8');
+        let updated = false;
+        if (!content.includes('.claude/session')) {
+            content = `${content.trimEnd()}\n.claude/session/\n`;
+            updated = true;
+        }
+        if (!content.includes('.claude/settings.local.json')) {
+            content = `${content.trimEnd()}\n.claude/settings.local.json\n`;
+            updated = true;
+        }
+        if (updated) {
+            fs.writeFileSync(rootGitignore, content, 'utf8');
+            actions.push({ relative: '.gitignore', action: 'updated' });
+        }
+    }
+
+    return actions;
+}
+
+/**
  * Merge one IDE tree's hook config, three-way.
  *
- * `pairs` is a list of `{ event, entries, blockId? }` so Cursor (flat `{hooks:{event:[…]}}`) and
- * Antigravity (nested `{blockId:{event:[…]}}`) go through the same ownership logic instead of two
- * separate merge implementations — which is how the two drifted apart in the first place.
+ * `pairs` is a list of `{ event, entries, blockId? }` so Cursor (flat `{hooks:{event:[…]}}`),
+ * Antigravity (nested `{blockId:{event:[…]}}`), and Claude Code (`.claude/settings.json`)
+ * go through the same ownership logic instead of separate merge implementations.
  *
  * @param {string} root consumer root
- * @param {string} treeKey `cursor` | `agents`
+ * @param {string} treeKey `cursor` | `agents` | `claude`
  * @param {object} treeSpec host profile tree spec
  * @returns {{ actions: object[], report: object }}
  */
@@ -250,11 +313,18 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
 
     actions.push(...ensureConsumerGuards(root, treeKey));
     actions.push(...ensureConsumerRules(root, treeKey));
+    if (treeKey === 'claude') {
+        actions.push(...ensureConsumerClaudeSupport(root));
+    }
 
-    const hooksPath = path.join(root, treeSpec.hooksJsonPath || `.${treeKey}/hooks.json`);
+    const hooksPath = path.join(root, treeSpec.settingsJsonPath || treeSpec.hooksJsonPath || `.${treeKey}/hooks.json`);
     let hooksDoc = { version: 1, hooks: {} };
     if (fs.existsSync(hooksPath)) {
-        hooksDoc = JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
+        try {
+            hooksDoc = JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
+        } catch {
+            hooksDoc = { version: 1, hooks: {} };
+        }
     }
 
     // Seed consumer guard hooks if not present
@@ -467,6 +537,9 @@ export function applyHostProfile(consumerRoot, profile, opts = {}) {
     if (profile.agents) {
         actions.push(...applyHostTree(root, 'agents', profile.agents, profile.id).actions);
     }
+    if (profile.claude) {
+        actions.push(...applyHostTree(root, 'claude', profile.claude, profile.id).actions);
+    }
 
     return { actions, bootstrap };
 }
@@ -506,6 +579,9 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
         }
         if (profile.agents) {
             actions.push(...applyHostTree(root, 'agents', profile.agents, profile.id).actions);
+        }
+        if (profile.claude) {
+            actions.push(...applyHostTree(root, 'claude', profile.claude, profile.id).actions);
         }
     }
 
@@ -728,7 +804,7 @@ export function addHostProfile(root, profileId, profilesDir, opts = {}) {
     );
     profileIds.add(profileId);
 
-    for (const treeKey of ['cursor', 'agents']) {
+    for (const treeKey of ['cursor', 'agents', 'claude']) {
         if (!hp[treeKey]) continue;
         actions.push(...applyHostTree(root, treeKey, hp[treeKey], profileId).actions);
     }
@@ -814,11 +890,11 @@ export function verifyHostPack(root, opts = {}) {
                 json = null;
             }
             const decided =
-                !!json && (typeof json.permission === 'string' || typeof json.decision === 'string');
+                !!json && (typeof json.permission === 'string' || typeof json.decision === 'string' || typeof json.hookSpecificOutput === 'object');
             hooks.push({
                 hook,
                 ok: decided,
-                decision: json?.permission ?? json?.decision ?? null,
+                decision: json?.permission ?? json?.decision ?? (json?.hookSpecificOutput ? 'allow' : null),
                 // A hook that exits non-zero without a decision is the exact silent-failure this
                 // check exists to catch.
                 status: proc.status,

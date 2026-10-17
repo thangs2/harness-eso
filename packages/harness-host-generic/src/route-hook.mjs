@@ -21,10 +21,12 @@ function resolveRouteHookPy() {
 }
 
 function harnessId() {
-    const tree = String(process.env.HARNESS_TREE || process.env.ROUTE_HARNESS || 'agents')
+    const tree = String(process.env.HARNESS_TREE || process.env.ROUTE_HARNESS || 'cursor')
         .replace(/^\./, '')
         .toLowerCase();
-    return tree === 'cursor' ? 'cursor' : 'agents';
+    if (tree === 'agents') return 'agents';
+    if (tree === 'claude') return 'claude';
+    return 'cursor';
 }
 
 function parseEventArg(argv) {
@@ -38,6 +40,10 @@ function parseEventArg(argv) {
 function failOpenStdout(event) {
     const hid = harnessId();
     const ev = event || '';
+    if (hid === 'claude') {
+        if (ev === 'PreToolUse') return '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n';
+        return '{}\n';
+    }
     if (hid === 'agents') {
         if (ev === 'PreToolUse') return '{"decision":"allow"}\n';
         if (ev === 'PreInvocation' || ev === 'PostInvocation') return '{"injectSteps":[]}\n';

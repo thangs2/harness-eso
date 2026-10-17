@@ -268,10 +268,16 @@ export function resolveHostProfileIds(project) {
     if (mode === 'dual-ide') {
         return ['cursor-superset', 'agents-superset'];
     }
+    if (mode === 'all-ide' || mode === 'tri-ide') {
+        return ['cursor-superset', 'agents-superset', 'claude-superset'];
+    }
+    if (mode === 'claude') {
+        return ['claude-superset'];
+    }
     if (mode === 'superset') {
         const id = project.hostProfile ?? 'cursor-superset';
         if (id === 'none') {
-            throw new Error('hostProfile "none" is not supported — use hostMode superset or dual-ide');
+            throw new Error('hostProfile "none" is not supported — use hostMode superset, dual-ide, claude or all-ide');
         }
         return [id];
     }

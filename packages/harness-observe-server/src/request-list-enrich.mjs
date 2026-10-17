@@ -8,6 +8,9 @@ export function detectIde(transcriptPath) {
     if (lower.includes('antigravity') || lower.includes('/brain/')) {
         return 'antigravity';
     }
+    if (lower.includes('.claude') || lower.includes('host-claude-projects') || lower.includes('/claude/')) {
+        return 'claude';
+    }
     if (lower.includes('cursor') || lower.includes('agent-transcripts')) {
         return 'cursor';
     }

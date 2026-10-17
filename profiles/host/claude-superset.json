@@ -1,0 +1,128 @@
+{
+    "id": "claude-superset",
+    "label": "Claude Code — Promax superset (standalone host pack)",
+    "description": "Guards, routing and preflight run from the bundled host pack — no checkout, no Docker",
+    "policyPatch": {
+        "eso": {
+            "preflight": {
+                "enabled": true
+            },
+            "mode": "hint",
+            "cognition": {
+                "enforceBrain": "fail_closed",
+                "gapAttestation": true
+            }
+        }
+    },
+    "claude": {
+        "sessionDir": ".claude/session",
+        "settingsJsonPath": ".claude/settings.json",
+        "merge": {
+            "UserPromptSubmit": [
+                {
+                    "id": "harness-eso-preflight",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook preflight --tree claude'"
+                        }
+                    ]
+                },
+                {
+                    "id": "harness-eso-route-prompt",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook route --tree claude'"
+                        }
+                    ]
+                }
+            ],
+            "PreToolUse": [
+                {
+                    "id": "harness-eso-guard-shell",
+                    "matcher": "Bash",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree claude'"
+                        }
+                    ]
+                },
+                {
+                    "id": "harness-eso-guard-write",
+                    "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "python3 .claude/hooks/guard-write.py"
+                        }
+                    ]
+                },
+                {
+                    "id": "harness-eso-guard-brain",
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree claude'"
+                        }
+                    ]
+                },
+                {
+                    "id": "harness-eso-route-tool",
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook route --tree claude'"
+                        }
+                    ]
+                }
+            ],
+            "PostToolUse": [
+                {
+                    "id": "harness-eso-gap-tracker",
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree claude'"
+                        }
+                    ]
+                },
+                {
+                    "id": "harness-eso-post-tool-hint",
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree claude'"
+                        }
+                    ]
+                },
+                {
+                    "id": "harness-eso-route-post",
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook route --tree claude'"
+                        }
+                    ]
+                }
+            ],
+            "PreCompact": [
+                {
+                    "id": "harness-eso-pre-compact-cost",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree claude'"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

@@ -50,7 +50,7 @@ export function runInitProfile(argv) {
     }
 
     if (positional.length !== 1) {
-        throw new Error('usage: init profile <consumer-path> [--plan] [--force] [--id <id>] [--name <name>] [--host-mode dual-ide|superset] [--project <console-project-id>]');
+        throw new Error('usage: init profile <consumer-path> [--plan] [--force] [--id <id>] [--name <name>] [--host-mode dual-ide|all-ide|claude|superset] [--project <console-project-id>]');
     }
 
     const consumerPath = path.resolve(positional[0]);

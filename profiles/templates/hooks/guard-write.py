@@ -68,8 +68,19 @@ _OUTPUT_SHAPE = "cursor"
 
 
 def detect_shape(data: dict) -> str:
+    tree = str(os.environ.get("HARNESS_TREE") or "").strip().lower()
+    if tree == "agents":
+        return "antigravity"
+    if tree == "claude":
+        return "claude"
     if not isinstance(data, dict):
         return "cursor"
+    if data.get("transcript_path") or data.get("permission_mode"):
+        return "claude"
+    ev = str(data.get("hook_event_name") or data.get("hookEventName") or "")
+    if ev in ("UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact"):
+        if data.get("session_id") and data.get("cwd"):
+            return "claude"
     if data.get("hook_event_name") or data.get("hookEventName"):
         return "cursor"
     if isinstance(data.get("toolCall"), dict):
@@ -85,12 +96,16 @@ def extract_tool_input(data: dict) -> dict:
     for key in ("tool_input", "input", "arguments"):
         val = data.get(key)
         if isinstance(val, dict):
-            if val.get("path") or val.get("file_path") or val.get("target_file"):
-                return val
+            if val.get("path") or val.get("file_path") or val.get("target_file") or val.get("notebook_path"):
+                p = val.get("path") or val.get("file_path") or val.get("target_file") or val.get("notebook_path")
+                c = val.get("contents") or val.get("new_string") or val.get("content") or val.get("new_cell") or ""
+                if not c and isinstance(val.get("edits"), list):
+                    c = "\n".join(str(e.get("new_string", "")) for e in val["edits"] if isinstance(e, dict))
+                return {"path": p, "contents": c}
     call = data.get("toolCall") if isinstance(data.get("toolCall"), dict) else {}
     args = call.get("args") if isinstance(call.get("args"), dict) else {}
     path = ""
-    for pk in ("path", "file_path", "target_file", "AbsolutePath", "TargetFile"):
+    for pk in ("path", "file_path", "target_file", "AbsolutePath", "TargetFile", "notebook_path"):
         if isinstance(args.get(pk), str) and args[pk]:
             path = args[pk]
             break
@@ -101,6 +116,8 @@ def extract_tool_input(data: dict) -> dict:
             break
     if not contents and isinstance(args.get("ReplacementChunks"), list):
         contents = "\n".join(str(chunk.get("ReplacementContent", "")) for chunk in args["ReplacementChunks"] if isinstance(chunk, dict))
+    if not contents and isinstance(args.get("edits"), list):
+        contents = "\n".join(str(e.get("new_string", "")) for e in args["edits"] if isinstance(e, dict))
     if path or contents:
         return {"path": path, "contents": contents}
     return {}
@@ -109,6 +126,8 @@ def extract_tool_input(data: dict) -> dict:
 def allow():
     if _OUTPUT_SHAPE == "antigravity":
         sys.stdout.write('{"decision":"allow"}\n')
+    elif _OUTPUT_SHAPE == "claude":
+        sys.stdout.write('{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n')
     else:
         sys.stdout.write('{"permission":"allow"}\n')
 
@@ -116,6 +135,16 @@ def allow():
 def deny(message: str):
     if _OUTPUT_SHAPE == "antigravity":
         sys.stdout.write(json.dumps({"decision": "deny", "reason": message}) + "\n")
+        return
+    if _OUTPUT_SHAPE == "claude":
+        payload = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": message,
+            }
+        }
+        sys.stdout.write(json.dumps(payload) + "\n")
         return
     payload = {
         "permission": "deny",

@@ -1,10 +1,13 @@
-export type IdeKind = 'cursor' | 'antigravity' | 'unknown' | string;
+export type IdeKind = 'cursor' | 'antigravity' | 'claude' | 'unknown' | string;
 
-export function normalizeIde(ide?: string | null): { key: 'cursor' | 'antigravity' | 'unknown'; label: string } {
+export function normalizeIde(ide?: string | null): { key: 'cursor' | 'antigravity' | 'claude' | 'unknown'; label: string } {
     if (!ide) return { key: 'unknown', label: 'Unknown' };
     const lower = ide.toLowerCase();
     if (lower.includes('antigravity') || lower.includes('gemini') || lower.includes('brain')) {
         return { key: 'antigravity', label: 'Antigravity' };
+    }
+    if (lower.includes('claude')) {
+        return { key: 'claude', label: 'Claude' };
     }
     if (lower.includes('cursor')) {
         return { key: 'cursor', label: 'Cursor' };
@@ -27,7 +30,9 @@ export function IdeBadge({
             ? 'obs-badge--cursor'
             : key === 'antigravity'
               ? 'obs-badge--antigravity'
-              : 'obs-badge--neutral';
+              : key === 'claude'
+                ? 'obs-badge--claude'
+                : 'obs-badge--neutral';
 
     const sizeClass = size === 'sm' ? 'text-[11px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5';
 

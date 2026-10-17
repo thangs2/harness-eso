@@ -52,6 +52,7 @@ DROP_KEYS = {"contents", "content", "new_string", "old_string", "text", "code"}
 DEFAULT_PRODUCERS = (
     {"id": "cursor", "tree": ".cursor", "shape": "cursor"},
     {"id": "agents", "tree": ".agents", "shape": "antigravity"},
+    {"id": "claude", "tree": ".claude", "shape": "claude"},
 )
 
 _PRODUCERS = None
@@ -270,6 +271,7 @@ AGY_CACHE_MAX = 500
 # share the normalizer and the output contract below, with no new code.
 CURSOR_SHAPE = "cursor"
 ANTIGRAVITY_SHAPE = "antigravity"
+CLAUDE_SHAPE = "claude"
 
 
 def parse_event(argv) -> str:
@@ -296,10 +298,16 @@ def detect_shape(data) -> str:
     on its own identity, and that breaks the moment a hook is invoked by hand, proxied,
     or reused by a fork. Cursor always carries `hook_event_name`; Antigravity carries
     `conversationId` + `stepIdx` and never a `toolCall`-less shell step.
+    Claude carries `transcript_path` or `permission_mode`.
     """
     if not isinstance(data, dict):
         return ""
-    if data.get("hook_event_name") or data.get("hookEventName"):
+    if data.get("transcript_path") or data.get("permission_mode"):
+        return CLAUDE_SHAPE
+    ev = data.get("hook_event_name") or data.get("hookEventName")
+    if ev in ("UserPromptSubmit", "PreCompact"):
+        return CLAUDE_SHAPE
+    if ev:
         return CURSOR_SHAPE
     if data.get("conversationId") and data.get("stepIdx") is not None:
         return ANTIGRAVITY_SHAPE
@@ -323,19 +331,21 @@ def hook_response(shape: str, event: str) -> str:
 
     Cursor accepts `{"permission":"allow"}` on every event. Antigravity does not:
     `PreToolUse` REQUIRES `decision`, and the invocation events expect an object
-    (optionally carrying `injectSteps`). Emitting Cursor's shape at an Antigravity
-    hook leaves a REQUIRED field undefined, which is not a harmless no-op — the call
-    risks being prompted or blocked. Keyed on SHAPE rather than on the harness id, so
-    any producer that declares `shape: antigravity` — the CLI, a fork, a future IDE
-    reusing the vocabulary — is covered without a code change.
+    (optionally carrying `injectSteps`). Claude expects `hookSpecificOutput`.
     """
-    if shape != ANTIGRAVITY_SHAPE:
-        return '{"permission":"allow"}\n'
-    if event == "PreToolUse":
-        return '{"decision":"allow"}\n'
-    if event in ("PreInvocation", "PostInvocation"):
-        return '{"injectSteps":[]}\n'
-    return "{}\n"
+    if shape == ANTIGRAVITY_SHAPE:
+        if event == "PreToolUse":
+            return '{"decision":"allow"}\n'
+        if event in ("PreInvocation", "PostInvocation"):
+            return '{"injectSteps":[]}\n'
+        return "{}\n"
+    if shape == CLAUDE_SHAPE:
+        if event == "PreToolUse":
+            return json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}) + "\n"
+        if event in ("PostToolUse", "UserPromptSubmit", "PreCompact"):
+            return json.dumps({"hookSpecificOutput": {"hookEventName": event}}) + "\n"
+        return "{}\n"
+    return '{"permission":"allow"}\n'
 
 
 def agy_cache_path(trace: Path) -> Path:
@@ -477,7 +487,7 @@ def decision_event_types(
     ev = (event or "").strip()
     tool_l = (tool or "").lower()
     out: list = []
-    if ev in ("beforeSubmitPrompt", "preInvocation", "PreInvocation"):
+    if ev in ("beforeSubmitPrompt", "preInvocation", "PreInvocation", "UserPromptSubmit"):
         out.append("turn_start")
         if rule_files:
             out.append("route_attach")

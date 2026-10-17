@@ -339,6 +339,8 @@ export function transcriptSpineDiagnostics(cfg) {
     const cursorMountExists = Boolean(cursorMount && fs.existsSync(cursorMount));
     const brainDirs = cfg.ingest?.brainDirs || [];
     const brainDirsExist = brainDirs.some((d) => fs.existsSync(d));
+    const claudeDirs = cfg.ingest?.claudeProjectsDirs || [];
+    const claudeDirsExist = claudeDirs.some((d) => fs.existsSync(d));
 
     let transcriptFiles = 0;
     try {
@@ -348,12 +350,12 @@ export function transcriptSpineDiagnostics(cfg) {
     }
 
     const hasTranscriptSource =
-        transcriptDirExists || cursorMountExists || brainDirsExist || transcriptFiles > 0;
+        transcriptDirExists || cursorMountExists || brainDirsExist || claudeDirsExist || transcriptFiles > 0;
     const warnings = [];
     if (!trackingOff) {
         if (!hasTranscriptSource) {
             warnings.push(
-                'REQUEST spine: transcript directory missing inside observe-server. Mount host ~/.cursor or ~/.gemini to container, or set HARNESS_INGEST_TRANSCRIPT_DIR.',
+                'REQUEST spine: transcript directory missing inside observe-server. Mount host ~/.cursor, ~/.gemini, or ~/.claude to container, or set HARNESS_INGEST_TRANSCRIPT_DIR.',
             );
         }
     }

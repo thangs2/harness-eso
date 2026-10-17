@@ -17,7 +17,7 @@ function usage() {
   ./install.sh
   ./harness up
 
-  harnessctl init profile <consumer-path> [--plan] [--id <id>] [--name <name>] [--host-mode dual-ide|superset]
+  harnessctl init profile <consumer-path> [--plan] [--id <id>] [--name <name>] [--host-mode dual-ide|all-ide|claude|superset]
   harnessctl host-pack status|refresh|add-ide|remove-ide [consumer | --project <id>]
   harnessctl token-diet [consumer | --project <id>] [--json]
   harnessctl configure list | harnessctl configure use <id>
