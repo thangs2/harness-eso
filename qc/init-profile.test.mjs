@@ -68,7 +68,7 @@ test('init profile preserves operator edits to consumer guard scripts', () => {
     assert.equal(fs.readFileSync(guardFile, 'utf8'), customContent, 'operator customizations must survive provision');
 });
 
-test('reloadHostConfig rewrites host-bootstrap.json with a fresh appliedAt', async () => {
+test('reloadHostConfig rewrites host-bootstrap.json with a fresh appliedAt', { timeout: 15000 }, async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-reload-'));
     const project = projectDraftForConsumer(root, {
         hostMode: 'dual-ide',
@@ -93,7 +93,7 @@ test('reloadHostConfig rewrites host-bootstrap.json with a fresh appliedAt', asy
     assert.ok(fs.existsSync(path.join(root, 'harness.config.json')));
 });
 
-test('init profile --force rewrites a stale harness.config.json', () => {
+test('init profile --force rewrites a stale harness.config.json', { timeout: 15000 }, () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-init-force-'));
     const stale = {
         version: 1,
@@ -274,4 +274,63 @@ print("ENV_FALSE")
     assert.equal(res3.status, 0);
     assert.match(res3.stdout, /ENV_FALSE/);
 });
+
+test('init profile dual-ide provisions Antigravity rules, core skills and session gitignore', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-antigravity-prov-'));
+    fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n');
+
+    const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-antigravity' });
+    const res = initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+
+    assert.equal(res.ok, true);
+
+    // Verify Antigravity law-gate rule (.md)
+    assert.ok(fs.existsSync(path.join(root, '.agents/rules/core.law-gate.md')));
+    assert.ok(fs.existsSync(path.join(root, '.cursor/rules/core.law-gate.mdc')));
+
+    // Verify ESO core skills
+    assert.ok(fs.existsSync(path.join(root, '.agents/skills/eso-recon/SKILL.md')));
+    assert.ok(fs.existsSync(path.join(root, '.agents/skills/eso-verify/SKILL.md')));
+    assert.ok(fs.existsSync(path.join(root, '.cursor/skills/eso-recon/SKILL.md')));
+
+    // Verify root .gitignore contains session ignore
+    const gitignoreContent = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
+    assert.ok(gitignoreContent.includes('.agents/session/'));
+    assert.ok(gitignoreContent.includes('.cursor/session/'));
+});
+
+test('init profile all-ide provisions triple-host parity across Cursor, Antigravity, and Claude Code', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-all-ide-prov-'));
+    fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n');
+
+    const project = projectDraftForConsumer(root, { hostMode: 'all-ide', projectId: 'qc-all-ide' });
+    const res = initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+
+    assert.equal(res.ok, true);
+
+    // 1. Cursor
+    assert.ok(fs.existsSync(path.join(root, '.cursor/rules/core.law-gate.mdc')));
+    assert.ok(fs.existsSync(path.join(root, '.cursor/skills/eso-recon/SKILL.md')));
+    assert.ok(fs.existsSync(path.join(root, '.cursor/hooks.json')));
+
+    // 2. Antigravity
+    assert.ok(fs.existsSync(path.join(root, '.agents/rules/core.law-gate.md')));
+    assert.ok(fs.existsSync(path.join(root, '.agents/skills/eso-recon/SKILL.md')));
+    assert.ok(fs.existsSync(path.join(root, '.agents/hooks.json')));
+
+    // 3. Claude Code
+    assert.ok(fs.existsSync(path.join(root, '.claude/rules/core.law-gate.md')));
+    assert.ok(fs.existsSync(path.join(root, '.claude/skills/eso-recon/SKILL.md')));
+    assert.ok(fs.existsSync(path.join(root, '.claude/settings.json')));
+    assert.ok(fs.existsSync(path.join(root, 'CLAUDE.md')));
+    assert.ok(fs.existsSync(path.join(root, '.claude/hooks/guard-write.py')));
+    assert.ok(fs.existsSync(path.join(root, '.claude/hooks/guard-shell.py')));
+
+    // 4. Gitignore contains all 3 session directories
+    const gitignoreContent = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
+    assert.ok(gitignoreContent.includes('.cursor/session/'));
+    assert.ok(gitignoreContent.includes('.agents/session/'));
+    assert.ok(gitignoreContent.includes('.claude/session/'));
+});
+
 

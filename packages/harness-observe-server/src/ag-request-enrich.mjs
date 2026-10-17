@@ -58,6 +58,19 @@ export function linkEventsByGenerationOrRequestId(db, projectId) {
          WHERE project_id = ? AND request_id IS NULL AND generation_id IS NOT NULL`,
         [projectId],
     );
+
+    // Fallback for Antigravity: match unlinked events by conversation_id to the most recent turn in the conversation
+    db.run(
+        `UPDATE event SET request_id = (
+            SELECT r.id FROM request r
+             WHERE r.project_id = event.project_id
+               AND r.conversation_id = event.conversation_id
+               AND (r.started_at IS NULL OR event.hook_at IS NULL OR r.started_at <= event.hook_at)
+             ORDER BY r.boundary_index DESC
+             LIMIT 1)
+         WHERE project_id = ? AND request_id IS NULL AND conversation_id IS NOT NULL`,
+        [projectId],
+    );
 }
 
 /** @param {import('./db.mjs').Db} db */

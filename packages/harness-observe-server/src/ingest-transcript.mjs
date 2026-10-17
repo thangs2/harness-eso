@@ -1218,8 +1218,16 @@ function toHostPath(dirPath) {
 
 /** Nearest ancestor of `filePath` that holds a `harness.config.json`, or a repo root (.git / .agents), or null. */
 function projectRootOf(filePath) {
+    if (!filePath) return null;
     const cPath = toContainerPath(filePath);
-    let cur = path.dirname(cPath);
+    let cur = cPath;
+    try {
+        if (!fs.existsSync(cur) || !fs.statSync(cur).isDirectory()) {
+            cur = path.dirname(cur);
+        }
+    } catch {
+        cur = path.dirname(cur);
+    }
     let repoRoot = null;
     for (let i = 0; i < 24; i += 1) {
         if (fs.existsSync(path.join(cur, 'harness.config.json'))) return toHostPath(cur);
@@ -1269,9 +1277,18 @@ export function resolveTranscriptOwnerInfo(transcriptPath) {
         return { owner: null, hasMetadata: false };
     }
 
-    // Records are newline-delimited JSON; the metadata arrives with the first user turn.
-    let metadata = '';
-    for (const line of text.split('\n')) {
+    const votes = new Map();
+    const vote = (docLine) => {
+        if (!docLine) return;
+        const root = projectRootOf(docPath(docLine));
+        if (root) votes.set(root, (votes.get(root) ?? 0) + 1);
+    };
+
+    let hasMetadata = false;
+    const lines = text.split('\n');
+    let recordCount = 0;
+
+    for (const line of lines) {
         if (!line.trim()) continue;
         let record;
         try {
@@ -1279,34 +1296,64 @@ export function resolveTranscriptOwnerInfo(transcriptPath) {
         } catch {
             continue; // a half-written trailing line
         }
-        if (typeof record?.content !== 'string') continue;
-        if (record.content.includes('Active Document:')) {
-            metadata = record.content;
-            break;
+        recordCount += 1;
+
+        if (typeof record?.content === 'string') {
+            if (record.content.includes('Active Document:') || record.content.includes('<user_information>')) {
+                hasMetadata = true;
+            }
+
+            const active = /Active Document: ([^\n]+)/.exec(record.content);
+            if (active) vote(active[1]);
+
+            const listStart = record.content.indexOf('Other open documents:');
+            if (listStart !== -1) {
+                for (const dLine of record.content.slice(listStart).split('\n').slice(1)) {
+                    const m = /^\s*-\s+(.+?)\s*$/.exec(dLine);
+                    if (!m) break; // the list is contiguous; anything else ends it
+                    vote(m[1]);
+                }
+            }
+
+            // Fallback: active workspaces mapping in user_information
+            const wsIdx = record.content.indexOf('[URI] -> [CorpusName]:');
+            if (wsIdx !== -1) {
+                const rest = record.content.slice(wsIdx + '[URI] -> [CorpusName]:'.length);
+                for (const wsLine of rest.split('\n')) {
+                    const trimmed = wsLine.trim();
+                    if (!trimmed) continue;
+                    if (trimmed.includes('->')) {
+                        const wsPath = trimmed.split('->')[0].trim();
+                        if (wsPath) vote(wsPath);
+                    }
+                    break;
+                }
+            }
         }
-    }
-    if (!metadata) return { owner: null, hasMetadata: false };
 
-    const votes = new Map();
-    const vote = (docLine) => {
-        const root = projectRootOf(docPath(docLine));
-        if (root) votes.set(root, (votes.get(root) ?? 0) + 1);
-    };
-
-    const active = /Active Document: ([^\n]+)/.exec(metadata);
-    if (active) vote(active[1]);
-
-    const listStart = metadata.indexOf('Other open documents:');
-    if (listStart !== -1) {
-        for (const line of metadata.slice(listStart).split('\n').slice(1)) {
-            const m = /^\s*-\s+(.+?)\s*$/.exec(line);
-            if (!m) break; // the list is contiguous; anything else ends it
-            vote(m[1]);
+        // Fallback: check tool call arguments in the first 10 records
+        const calls = Array.isArray(record?.tool_calls) ? record.tool_calls : (record?.toolCall ? [record.toolCall] : []);
+        for (const tc of calls) {
+            const args = tc.args || tc.arguments || {};
+            const candidate =
+                args.Cwd ||
+                args.cwd ||
+                args.AbsolutePath ||
+                args.TargetFile ||
+                args.SearchPath ||
+                args.DirectoryPath ||
+                args.projectPath;
+            if (typeof candidate === 'string' && candidate.trim()) {
+                vote(candidate.trim());
+            }
         }
+
+        if (votes.size > 0 && recordCount >= 10) break;
     }
 
-    if (!votes.size) return { owner: null, hasMetadata: true };
-    // The focused document wins ties: insertion order puts it first.
+    if (!votes.size) return { owner: null, hasMetadata };
+
+    // The focused document / highest count wins ties
     let winner = null;
     let best = 0;
     for (const [root, count] of votes) {
@@ -1315,7 +1362,7 @@ export function resolveTranscriptOwnerInfo(transcriptPath) {
             winner = root;
         }
     }
-    return { owner: winner, hasMetadata: true };
+    return { owner: winner, hasMetadata };
 }
 
 /**

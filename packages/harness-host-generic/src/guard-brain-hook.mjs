@@ -9,6 +9,7 @@ import {
     extractToolMeta,
     loadPolicyForCwd,
     readStdin,
+    saveAgyToolCache,
 } from './hook-io.mjs';
 import { readGapClosure, readPreflight, shouldBlockBrain } from './eso-gap-io.mjs';
 
@@ -45,6 +46,8 @@ export async function run() {
         allow(shape);
         return;
     }
+
+    saveAgyToolCache(data);
 
     const { toolName, toolInput } = extractToolMeta(data);
     if (!isBrainTool(toolName, toolInput)) {

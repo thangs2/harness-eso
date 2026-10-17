@@ -1,7 +1,7 @@
 /**
  * Gap tracker — `postToolUse`. Attests recon tool use into `.eso-gap-closure.json`.
  */
-import { allow, detectShape, extractToolMeta, loadPolicyForCwd, readStdin } from './hook-io.mjs';
+import { allow, detectShape, extractToolMeta, loadPolicyForCwd, popAgyToolCache, readStdin } from './hook-io.mjs';
 import { readPreflight, recordGapToolUse, resetGapClosure } from './eso-gap-io.mjs';
 
 export async function run() {
@@ -29,7 +29,27 @@ export async function run() {
         return;
     }
 
-    const { toolName, toolInput } = extractToolMeta(data);
+    let { toolName, toolInput } = extractToolMeta(data);
+    const hasInput = Boolean(
+        toolInput &&
+        (toolInput.path ||
+            toolInput.file_path ||
+            toolInput.AbsolutePath ||
+            toolInput.SearchPath ||
+            toolInput.DirectoryPath ||
+            toolInput.TargetFile ||
+            toolInput.query ||
+            toolInput.symbol ||
+            (toolInput.arguments && Object.keys(toolInput.arguments).length > 0) ||
+            Object.keys(toolInput).length > 1)
+    );
+    if (!toolName || !hasInput) {
+        const cached = popAgyToolCache(data);
+        if (cached) {
+            toolName = toolName || cached.toolName;
+            toolInput = hasInput ? toolInput : { ...(cached.toolInput || {}), ...(toolInput || {}) };
+        }
+    }
     const closure = recordGapToolUse(toolName, toolInput) || resetGapClosure(pre.at);
     allow(shape, {
         esoGapClosure: {

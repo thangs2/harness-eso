@@ -19,6 +19,8 @@ function readStdin() {
 function emit(tree = harnessTree()) {
     if (tree === 'agents') {
         process.stdout.write('{"injectSteps":[]}\n');
+    } else if (tree === 'claude') {
+        process.stdout.write('{}\n');
     } else {
         process.stdout.write(`${JSON.stringify({ permission: 'allow' })}\n`);
     }
@@ -38,12 +40,15 @@ function findConsumerRoot() {
 
 function harnessTree() {
     const t = (process.env.HARNESS_TREE || 'cursor').replace(/^\./, '').toLowerCase();
-    return t === 'agents' ? 'agents' : 'cursor';
+    if (t === 'agents') return 'agents';
+    if (t === 'claude') return 'claude';
+    return 'cursor';
 }
 
 function tracePath(root, tree) {
-    const session = tree === 'agents' ? '.agents/session' : '.cursor/session';
-    return path.join(root, session, 'route-trace.jsonl');
+    if (tree === 'agents') return path.join(root, '.agents', 'session', 'route-trace.jsonl');
+    if (tree === 'claude') return path.join(root, '.claude', 'session', 'route-trace.jsonl');
+    return path.join(root, '.cursor', 'session', 'route-trace.jsonl');
 }
 
 function isoNow() {

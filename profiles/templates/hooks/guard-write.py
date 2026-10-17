@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Deny agent writes to mu bible law, secrets, and paths without Brain stamp."""
 
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -35,6 +37,7 @@ BRAIN_VIA = frozenset({
 HOOK_EXEMPT_PREFIXES = (
     ".cursor/session/",
     ".agents/session/",
+    ".claude/session/",
 )
 
 SECRET_NAMES = {

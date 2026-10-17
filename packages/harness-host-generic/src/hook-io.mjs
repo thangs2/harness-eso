@@ -261,3 +261,120 @@ export function writeJsonFile(fp, doc) {
     fs.mkdirSync(path.dirname(fp), { recursive: true });
     fs.writeFileSync(fp, `${JSON.stringify(doc, null, 2)}\n`, 'utf8');
 }
+
+export const AGY_CACHE_FILE = '.agy-tool-cache.json';
+const AGY_CACHE_MAX_ENTRIES = 32;
+const AGY_CACHE_MAX_AGE_MS = 60_000;
+
+export function agyCachePath(root = process.cwd(), tree = harnessTree()) {
+    return path.join(sessionDir(root, tree), AGY_CACHE_FILE);
+}
+
+export function saveAgyToolCache(data, opts = {}) {
+    const root = opts.root || process.cwd();
+    const tree = opts.tree || harnessTree();
+    if (tree !== 'agents') return;
+
+    const { toolName, toolInput } = extractToolMeta(data);
+    if (!toolName) return;
+
+    const callId =
+        data.toolCall?.id ||
+        data.tool_call_id ||
+        data.toolCallId ||
+        (data.conversationId && data.stepIdx != null ? `${data.conversationId}:${data.stepIdx}` : null);
+
+    const fp = agyCachePath(root, tree);
+    let doc = readJsonFile(fp);
+    let queue = [];
+    if (Array.isArray(doc)) {
+        queue = doc;
+    } else if (doc && typeof doc === 'object' && Array.isArray(doc.__queue__)) {
+        queue = doc.__queue__;
+    } else {
+        doc = doc && typeof doc === 'object' ? doc : {};
+    }
+
+    const now = Date.now();
+    queue = queue.filter((e) => typeof e.ts === 'number' && now - e.ts < AGY_CACHE_MAX_AGE_MS);
+
+    const idx = callId ? queue.findIndex((e) => e.callId === callId) : -1;
+    const entry = {
+        callId: callId || undefined,
+        toolName,
+        toolInput: toolInput || {},
+        ts: now,
+    };
+
+    if (idx >= 0) {
+        queue[idx] = entry;
+    } else {
+        queue.push(entry);
+    }
+
+    if (queue.length > AGY_CACHE_MAX_ENTRIES) {
+        queue.splice(0, queue.length - AGY_CACHE_MAX_ENTRIES);
+    }
+
+    if (Array.isArray(doc)) {
+        writeJsonFile(fp, queue);
+    } else {
+        doc.__queue__ = queue;
+        writeJsonFile(fp, doc);
+    }
+}
+
+export function popAgyToolCache(data, opts = {}) {
+    const root = opts.root || process.cwd();
+    const tree = opts.tree || harnessTree();
+    const fp = agyCachePath(root, tree);
+    let doc = readJsonFile(fp);
+    if (!doc) return null;
+
+    let queue = [];
+    if (Array.isArray(doc)) {
+        queue = doc;
+    } else if (typeof doc === 'object' && Array.isArray(doc.__queue__)) {
+        queue = doc.__queue__;
+    } else {
+        return null;
+    }
+
+    if (!queue.length) return null;
+
+    const now = Date.now();
+    const freshQueue = queue.filter((e) => typeof e.ts === 'number' && now - e.ts < AGY_CACHE_MAX_AGE_MS);
+
+    const callId =
+        data?.toolCall?.id ||
+        data?.tool_call_id ||
+        data?.toolCallId ||
+        (data?.conversationId && data?.stepIdx != null ? `${data.conversationId}:${data.stepIdx}` : null);
+
+    const requestedName = data?.tool_name || data?.toolName || data?.toolCall?.name || '';
+
+    let matchIdx = -1;
+    if (callId) {
+        matchIdx = freshQueue.findIndex((e) => e.callId === callId);
+    }
+    if (matchIdx === -1 && requestedName && requestedName !== '*') {
+        matchIdx = freshQueue.findIndex((e) => e.toolName.toLowerCase() === requestedName.toLowerCase());
+    }
+    if (matchIdx === -1 && (!requestedName || requestedName === '*')) {
+        matchIdx = 0; // FIFO pop
+    }
+
+    if (matchIdx === -1) {
+        return null;
+    }
+
+    const [matched] = freshQueue.splice(matchIdx, 1);
+    if (Array.isArray(doc)) {
+        writeJsonFile(fp, freshQueue);
+    } else {
+        doc.__queue__ = freshQueue;
+        writeJsonFile(fp, doc);
+    }
+    return matched;
+}
+

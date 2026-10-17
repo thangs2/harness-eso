@@ -238,3 +238,34 @@ test('Docker path remapping resolves host transcript paths to container project'
     }
 });
 
+test('the owner resolves from user_information workspace mapping when no document is open', () => {
+    const proj = consumer('proj-no-doc');
+    const brain = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-brain-ws-'));
+    const conv = path.join(brain, 'conv-ws', '.system_generated', 'logs');
+    fs.mkdirSync(conv, { recursive: true });
+    const content = `<user_information>\nThe user has 1 active workspaces, each defined by a URI and a CorpusName. Multiple URIs potentially map to the same CorpusName. The mapping is shown as follows in the format [URI] -> [CorpusName]:\n${proj} -> proj-corpus\n</user_information>\n<USER_REQUEST>hi</USER_REQUEST>`;
+    const file = path.join(conv, 'transcript.jsonl');
+    fs.writeFileSync(file, `${JSON.stringify({ step_index: 0, content })}\n`);
+
+    assert.equal(path.resolve(resolveTranscriptOwner(file)), path.resolve(proj));
+});
+
+test('the owner resolves from tool calls Cwd when window metadata is absent', () => {
+    const proj = consumer('proj-tool-call');
+    const brain = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-brain-tc-'));
+    const conv = path.join(brain, 'conv-tc', '.system_generated', 'logs');
+    fs.mkdirSync(conv, { recursive: true });
+    const file = path.join(conv, 'transcript.jsonl');
+    const r1 = { step_index: 0, content: 'user turn' };
+    const r2 = {
+        step_index: 1,
+        tool_calls: [
+            { tool: 'run_command', args: { Cwd: proj, CommandLine: 'ls' } },
+        ],
+    };
+    fs.writeFileSync(file, `${JSON.stringify(r1)}\n${JSON.stringify(r2)}\n`);
+
+    assert.equal(path.resolve(resolveTranscriptOwner(file)), path.resolve(proj));
+});
+
+

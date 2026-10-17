@@ -183,6 +183,7 @@ export function ensureConsumerRules(root, treeKey) {
     fs.mkdirSync(targetRulesDir, { recursive: true });
 
     const ruleNames = [
+        'core.law-gate.mdc',
         'core.conversation-hygiene.mdc',
         'core.pipeline-gate.mdc',
         'core.scope-fallback.mdc',
@@ -191,11 +192,18 @@ export function ensureConsumerRules(root, treeKey) {
     for (const name of ruleNames) {
         const dest = path.join(targetRulesDir, name);
         const altDest = (treeKey === 'agents' || treeKey === 'claude') ? path.join(targetRulesDir, name.replace(/\.mdc$/, '.md')) : null;
-        if (!fs.existsSync(dest) && (!altDest || !fs.existsSync(altDest))) {
+        if (!fs.existsSync(dest)) {
             const src = path.join(templatesDir, name);
             if (fs.existsSync(src)) {
                 fs.copyFileSync(src, dest);
                 actions.push({ relative: `.${treeKey}/rules/${name}`, action: 'created' });
+            }
+        }
+        if (altDest && !fs.existsSync(altDest)) {
+            const src = path.join(templatesDir, name);
+            if (fs.existsSync(src)) {
+                fs.copyFileSync(src, altDest);
+                actions.push({ relative: `.${treeKey}/rules/${path.basename(altDest)}`, action: 'created' });
             }
         }
     }
@@ -211,6 +219,59 @@ export function ensureConsumerRules(root, treeKey) {
     }
 
     return actions;
+}
+
+/**
+ * Ensure core ESO skills (eso-recon, eso-verify) exist in consumer IDE tree.
+ */
+export function ensureConsumerSkills(root, treeKey) {
+    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
+    const templatesDir = path.join(baseProfiles, 'templates', 'skills');
+    if (!fs.existsSync(templatesDir)) return [];
+
+    const actions = [];
+    const targetSkillsDir = path.join(root, `.${treeKey}`, 'skills');
+
+    try {
+        const entries = fs.readdirSync(templatesDir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            const skillName = entry.name;
+            const destDir = path.join(targetSkillsDir, skillName);
+            const destSkillFile = path.join(destDir, 'SKILL.md');
+            const srcSkillFile = path.join(templatesDir, skillName, 'SKILL.md');
+            if (!fs.existsSync(destSkillFile) && fs.existsSync(srcSkillFile)) {
+                fs.mkdirSync(destDir, { recursive: true });
+                fs.copyFileSync(srcSkillFile, destSkillFile);
+                actions.push({ relative: `.${treeKey}/skills/${skillName}/SKILL.md`, action: 'created' });
+            }
+        }
+    } catch {
+        /* best-effort skill provisioning */
+    }
+
+    return actions;
+}
+
+/**
+ * Ensure .<treeKey>/session/ is in consumer root .gitignore.
+ */
+export function ensureSessionGitignore(root, treeKey) {
+    const rootGitignore = path.join(root, '.gitignore');
+    if (!fs.existsSync(rootGitignore)) return [];
+
+    const entry = `.${treeKey}/session/`;
+    try {
+        let content = fs.readFileSync(rootGitignore, 'utf8');
+        if (!content.includes(entry)) {
+            content = `${content.trimEnd()}\n${entry}\n`;
+            fs.writeFileSync(rootGitignore, content, 'utf8');
+            return [{ relative: '.gitignore', action: 'updated' }];
+        }
+    } catch {
+        /* best-effort gitignore update */
+    }
+    return [];
 }
 
 /**
@@ -313,6 +374,8 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
 
     actions.push(...ensureConsumerGuards(root, treeKey));
     actions.push(...ensureConsumerRules(root, treeKey));
+    actions.push(...ensureConsumerSkills(root, treeKey));
+    actions.push(...ensureSessionGitignore(root, treeKey));
     if (treeKey === 'claude') {
         actions.push(...ensureConsumerClaudeSupport(root));
     }

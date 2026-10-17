@@ -286,6 +286,62 @@ test('antigravity PreInvocation continuation step preserves existing gap closure
     assert.deepEqual(closure.closedGapIds, ['code:view_file'], 'continuation step must not wipe closed gaps');
 });
 
+test('antigravity parallel tool calls preserve file paths via .agy-tool-cache.json queue and close gaps', () => {
+    const root = tempConsumer();
+    const sessionPath = path.join(root, '.agents', 'session');
+    fs.mkdirSync(sessionPath, { recursive: true });
+
+    const preAt = new Date().toISOString();
+    fs.writeFileSync(path.join(sessionPath, '.eso-preflight.json'), JSON.stringify({
+        at: preAt,
+        conversationId: 'conv-parallel-1',
+        level: 'partial',
+        score: 0.3,
+        gaps: [
+            { kind: 'code', query: 'package.json' },
+            { kind: 'law', query: 'AGENTS.md' },
+            { kind: 'code', query: 'dispatcher.mjs' },
+        ]
+    }));
+
+    // Step 1: 3 parallel PreToolUse calls arrive (e.g. from guard-brain)
+    const calls = [
+        { id: 'call_1', name: 'view_file', args: { AbsolutePath: '/path/to/package.json' } },
+        { id: 'call_2', name: 'view_file', args: { AbsolutePath: '/path/to/AGENTS.md' } },
+        { id: 'call_3', name: 'view_file', args: { AbsolutePath: '/path/to/dispatcher.mjs' } },
+    ];
+
+    for (const c of calls) {
+        const res = runHook('guard-brain', {
+            conversationId: 'conv-parallel-1',
+            toolCall: c,
+        }, { cwd: root, tree: 'agents', args: ['--event', 'PreToolUse'] });
+        assert.equal(res.status, 0);
+        assert.equal(res.json.decision, 'allow');
+    }
+
+    // Verify .agy-tool-cache.json has calls queued
+    const cacheFile = path.join(sessionPath, '.agy-tool-cache.json');
+    assert.ok(fs.existsSync(cacheFile));
+
+    // Step 2: 3 parallel PostToolUse calls arrive at gap-tracker (without args payload)
+    for (const c of calls) {
+        const res = runHook('gap-tracker', {
+            conversationId: 'conv-parallel-1',
+            toolCall: { id: c.id, name: 'view_file' },
+        }, { cwd: root, tree: 'agents', args: ['--event', 'PostToolUse'] });
+        assert.equal(res.status, 0);
+        assert.deepEqual(res.json, {});
+    }
+
+    // Verify gap closure has all 3 gaps closed!
+    const closure = JSON.parse(fs.readFileSync(path.join(sessionPath, '.eso-gap-closure.json'), 'utf8'));
+    assert.ok(closure.closedGapIds.includes('code:package.json'), 'gap for package.json must be closed');
+    assert.ok(closure.closedGapIds.includes('law:AGENTS.md'), 'gap for AGENTS.md must be closed');
+    assert.ok(closure.closedGapIds.includes('code:dispatcher.mjs'), 'gap for dispatcher.mjs must be closed');
+    assert.equal(closure.allClosed, true);
+});
+
 test('claude guard-shell denies dangerous command with hookSpecificOutput', () => {
     const root = tempConsumer();
     fs.mkdirSync(path.join(root, '.claude', 'session'), { recursive: true });
@@ -318,7 +374,7 @@ test('claude guard-shell allows benign command with hookSpecificOutput', () => {
     assert.equal(json.hookSpecificOutput.permissionDecision, 'allow');
 });
 
-test('claude preflight on UserPromptSubmit writes .claude/session/.eso-preflight.json', () => {
+test('claude preflight on UserPromptSubmit writes .claude/session/.eso-preflight.json', { timeout: 15000 }, () => {
     const root = tempConsumer();
     fs.mkdirSync(path.join(root, '.claude', 'session'), { recursive: true });
     const { status } = runHook('preflight', {
@@ -362,6 +418,66 @@ test('claude gap-tracker closes gap on tool use', () => {
     );
     assert.equal(closure.preflightAt, preflightAt);
     assert.ok(closure.closedGapIds.includes('law:harness-eso'));
+});
+
+test('claude pre-compact emits {} and records trace in .claude/session/route-trace.jsonl', () => {
+    const root = tempConsumer();
+    const sessionDir = path.join(root, '.claude', 'session');
+    fs.mkdirSync(sessionDir, { recursive: true });
+
+    const { status, json } = runHook('pre-compact', {
+        session_id: 'claude-sess-compact',
+        cwd: root,
+        hook_event_name: 'PreCompact',
+    }, { cwd: root, tree: 'claude' });
+
+    assert.equal(status, 0);
+    assert.deepEqual(json, {});
+    const traceFile = path.join(sessionDir, 'route-trace.jsonl');
+    assert.ok(fs.existsSync(traceFile));
+    const lines = fs.readFileSync(traceFile, 'utf8').trim().split('\n');
+    assert.ok(lines.length >= 1);
+    const entry = JSON.parse(lines[lines.length - 1]);
+    assert.equal(entry.event, 'preCompact');
+});
+
+test('claude guard-write.py allows writing inside .claude/session/ without brain stamp', () => {
+    const root = tempConsumer();
+    fs.writeFileSync(
+        path.join(root, '.harness', 'decision-policy.json'),
+        JSON.stringify({
+            version: 1,
+            paths: { locked: [], gated: ['src/'], ask: [] },
+        }),
+    );
+    const claudeHooksDir = path.join(root, '.claude', 'hooks');
+    fs.mkdirSync(claudeHooksDir, { recursive: true });
+    const templateScript = path.resolve(import.meta.dirname, '../profiles/templates/hooks/guard-write.py');
+    const destScript = path.join(claudeHooksDir, 'guard-write.py');
+    fs.copyFileSync(templateScript, destScript);
+    fs.chmodSync(destScript, 0o755);
+
+    const inputData = JSON.stringify({
+        session_id: 'claude-sess-write',
+        cwd: root,
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Write',
+        tool_input: {
+            file_path: '.claude/session/.eso-test-stamp.json',
+            content: '{"ok": true}',
+        },
+    });
+
+    const res = spawnSync('python3', [destScript], {
+        input: inputData,
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...process.env, HARNESS_TREE: 'claude' },
+    });
+
+    assert.equal(res.status, 0);
+    const output = JSON.parse(res.stdout || '{}');
+    assert.equal(output?.hookSpecificOutput?.permissionDecision, 'allow');
 });
 
 
