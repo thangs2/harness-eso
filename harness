@@ -5,7 +5,7 @@ cd "$ROOT"
 
 cmd="${1:-}"
 if [[ -z "$cmd" ]]; then
-    echo "usage: ./harness console|init profile <path>|host-pack|up|down|restart|status|health|logs"
+    echo "usage: ./harness deploy <consumer>|console|init profile <path>|host-pack|up|down|restart|status|health|logs"
     exit 2
 fi
 
@@ -17,6 +17,10 @@ case "$cmd" in
     init)
         shift
         exec node packages/harness-cli/src/cli.mjs init "$@"
+        ;;
+    deploy)
+        shift
+        exec ./deploy.sh "$@"
         ;;
     observatory)
         shift
