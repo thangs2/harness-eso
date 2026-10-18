@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { applyWorkspaceEnv, ESO_ROOT } from './workspace-env.mjs';
-import { loadWorkspace, resolveProject } from '@mu/harness-foundation/workspace';
+import { findProject, findProjectByRoot, loadWorkspace, resolveProject } from '@mu/harness-foundation/workspace';
 
 const COMPOSE_FILE = path.join(ESO_ROOT, 'compose.harness.yml');
 const DEFAULT_PORT = 8792;
@@ -159,14 +159,27 @@ export function runObservatory(subcommand, restArgs = [], opts = {}) {
     applyWorkspaceEnv();
     requireDocker();
 
-    let consumerPath = opts.consumerPath;
-    let port = opts.port;
+    let consumerPath = opts.consumerPath || process.env.HARNESS_REPO_ROOT;
+    let port = opts.port || (process.env.HARNESS_OBSERVE_PORT ? Number.parseInt(process.env.HARNESS_OBSERVE_PORT, 10) : undefined);
 
-    if (!consumerPath) {
+    const ws = loadWorkspace();
+    let project = null;
+
+    if (opts.projectId) {
+        project = findProject(ws, opts.projectId);
+    } else if (consumerPath) {
+        project = findProjectByRoot(ws, consumerPath);
+    } else {
+        const fromCwd = tryResolveConsumerFromCwd();
+        if (fromCwd) {
+            project = findProjectByRoot(ws, fromCwd);
+            if (project) consumerPath = fromCwd;
+        }
+    }
+
+    if (!project && !consumerPath && !opts.projectId) {
         try {
-            const p = resolveProject(loadWorkspace(), opts.projectId || null);
-            consumerPath = p.rootHost || p.root;
-            port = port ?? p.port;
+            project = resolveProject(ws, null);
         } catch (e) {
             const hasRepo = Boolean(process.env.HARNESS_REPO_ROOT);
             if ((subcommand === 'up' || subcommand === 'restart') && !hasRepo) {
@@ -175,7 +188,18 @@ export function runObservatory(subcommand, restArgs = [], opts = {}) {
         }
     }
 
-    if (port) process.env.HARNESS_OBSERVE_PORT = String(port);
+    if (project) {
+        consumerPath = consumerPath || project.rootHost || project.root;
+        port = port ?? project.port;
+    }
+
+    if (port) {
+        process.env.HARNESS_OBSERVE_PORT = String(port);
+        process.env.COMPOSE_PROJECT_NAME = `harness-observatory-${port}`;
+    }
+    if (consumerPath) {
+        process.env.HARNESS_REPO_ROOT = path.resolve(consumerPath);
+    }
 
     const composeOpts = {
         consumerPath,
@@ -187,21 +211,21 @@ export function runObservatory(subcommand, restArgs = [], opts = {}) {
             cmdUp(restArgs, { consumerPath });
             return;
         case 'down':
-            process.exit(compose(['down', ...restArgs], { repoOptional: true }));
+            process.exit(compose(['down', ...restArgs], composeOpts));
         case 'restart':
-            compose(['down'], { repoOptional: true });
+            compose(['down'], composeOpts);
             cmdUp(restArgs, { consumerPath });
             return;
         case 'status':
         case 'ps':
-            process.exit(compose(['ps', ...restArgs], { repoOptional: true }));
+            process.exit(compose(['ps', ...restArgs], composeOpts));
         case 'health':
             cmdHealth();
             return;
         case 'logs':
-            process.exit(compose(['logs', '-f', '--tail=200', ...restArgs], { repoOptional: true }));
+            process.exit(compose(['logs', '-f', '--tail=200', ...restArgs], composeOpts));
         case 'build':
-            process.exit(compose(['build', ...restArgs], { repoOptional: true }));
+            process.exit(compose(['build', ...restArgs], composeOpts));
         case 'smoke':
             cmdSmoke();
             return;

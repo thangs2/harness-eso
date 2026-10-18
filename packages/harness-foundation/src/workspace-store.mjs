@@ -93,6 +93,16 @@ export function findProject(workspace, id) {
     return workspace.projects.find((p) => p.id === id) ?? null;
 }
 
+export function findProjectByRoot(workspace, rootPath) {
+    if (!rootPath || !Array.isArray(workspace?.projects)) return null;
+    const abs = path.resolve(rootPath);
+    return workspace.projects.find((p) => {
+        const r1 = p.root ? path.resolve(p.root) : '';
+        const r2 = p.rootHost ? path.resolve(p.rootHost) : '';
+        return r1 === abs || r2 === abs;
+    }) ?? null;
+}
+
 export function resolveProject(workspace, idOrNull) {
     const id = idOrNull || workspace.defaultProjectId;
     if (!id) {

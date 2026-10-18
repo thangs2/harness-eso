@@ -22,6 +22,10 @@ case "$cmd" in
         shift
         exec ./deploy.sh "$@"
         ;;
+    provision)
+        shift
+        exec ./provision.sh "$@"
+        ;;
     observatory)
         shift
         exec node packages/harness-cli/src/cli.mjs observatory "$@"

@@ -92,15 +92,12 @@ async function main() {
             const a = argv[i];
             if (a === '--project') projectId = argv[++i];
             else if (a === '--port') port = Number.parseInt(argv[++i], 10);
+            else if (a === '--consumer') consumerPath = argv[++i];
             else if (a.startsWith('-')) rest.push(a);
             else if (!consumerPath) consumerPath = a;
             else rest.push(a);
         }
-        if (consumerPath) {
-            console.error('observatory: dùng --project <id> hoặc cấu hình trong web :8792/projects');
-            process.exit(2);
-        }
-        runObservatory(sub, rest, { projectId, port });
+        runObservatory(sub, rest, { projectId, port, consumerPath });
         return;
     }
 

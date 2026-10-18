@@ -88,13 +88,20 @@ cmd_up() {
     if ((${#extra[@]})); then run_observatory up "${extra[@]}"; else run_observatory up; fi
 }
 
+cmd_down() {
+    consumer=""
+    extra=()
+    parse_consumer_and_flags "$@"
+    resolve_consumer "$consumer"
+    if ((${#extra[@]})); then run_observatory down "${extra[@]}"; else run_observatory down; fi
+}
+
 cmd_restart() {
     consumer=""
     extra=()
     parse_consumer_and_flags "$@"
     resolve_consumer "$consumer"
-    run_observatory down
-    if ((${#extra[@]})); then run_observatory up "${extra[@]}"; else run_observatory up; fi
+    if ((${#extra[@]})); then run_observatory restart "${extra[@]}"; else run_observatory restart; fi
 }
 
 main() {
@@ -103,11 +110,22 @@ main() {
     case "$cmd" in
         build) cmd_build "$@" ;;
         up|start) cmd_up "$@" ;;
+        down) cmd_down "$@" ;;
         restart) cmd_restart "$@" ;;
-        down|status|health|logs|smoke)
-            run_observatory "$cmd" "$@"
+        status|health|logs|smoke)
+            consumer=""
+            extra=()
+            parse_consumer_and_flags "$@"
+            resolve_consumer "$consumer"
+            if ((${#extra[@]})); then run_observatory "$cmd" "${extra[@]}"; else run_observatory "$cmd"; fi
             ;;
-        ps) run_observatory status "$@" ;;
+        ps)
+            consumer=""
+            extra=()
+            parse_consumer_and_flags "$@"
+            resolve_consumer "$consumer"
+            if ((${#extra[@]})); then run_observatory status "${extra[@]}"; else run_observatory status; fi
+            ;;
         help|-h|--help) sed -n '3,15p' "$0" | sed 's/^# \?//' ;;
         *) die "unknown command: $cmd (try: build up down restart status health logs smoke)" ;;
     esac

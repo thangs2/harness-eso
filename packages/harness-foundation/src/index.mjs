@@ -24,6 +24,8 @@ export {
     configureList,
     configureUse,
     ensureProductState,
+    findProject,
+    findProjectByRoot,
     loadWorkspace,
     productStateDir,
     resolveProject,

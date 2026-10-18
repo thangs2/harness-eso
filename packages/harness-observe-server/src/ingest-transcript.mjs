@@ -1278,10 +1278,11 @@ export function resolveTranscriptOwnerInfo(transcriptPath) {
     }
 
     const votes = new Map();
-    const vote = (docLine) => {
+    const fallbackVotes = new Map();
+    const vote = (map, docLine, weight = 1) => {
         if (!docLine) return;
         const root = projectRootOf(docPath(docLine));
-        if (root) votes.set(root, (votes.get(root) ?? 0) + 1);
+        if (root) map.set(root, (map.get(root) ?? 0) + weight);
     };
 
     let hasMetadata = false;
@@ -1303,15 +1304,15 @@ export function resolveTranscriptOwnerInfo(transcriptPath) {
                 hasMetadata = true;
             }
 
-            const active = /Active Document: ([^\n]+)/.exec(record.content);
-            if (active) vote(active[1]);
+            const active = /Active Document:\s*(.+?)(?:\r?\n|\\n|$)/.exec(record.content);
+            if (active) vote(votes, active[1], 5);
 
             const listStart = record.content.indexOf('Other open documents:');
             if (listStart !== -1) {
-                for (const dLine of record.content.slice(listStart).split('\n').slice(1)) {
+                for (const dLine of record.content.slice(listStart).split(/\r?\n|\\n/).slice(1)) {
                     const m = /^\s*-\s+(.+?)\s*$/.exec(dLine);
                     if (!m) break; // the list is contiguous; anything else ends it
-                    vote(m[1]);
+                    vote(votes, m[1], 1);
                 }
             }
 
@@ -1319,44 +1320,46 @@ export function resolveTranscriptOwnerInfo(transcriptPath) {
             const wsIdx = record.content.indexOf('[URI] -> [CorpusName]:');
             if (wsIdx !== -1) {
                 const rest = record.content.slice(wsIdx + '[URI] -> [CorpusName]:'.length);
-                for (const wsLine of rest.split('\n')) {
+                for (const wsLine of rest.split(/\r?\n/)) {
                     const trimmed = wsLine.trim();
                     if (!trimmed) continue;
                     if (trimmed.includes('->')) {
                         const wsPath = trimmed.split('->')[0].trim();
-                        if (wsPath) vote(wsPath);
+                        if (wsPath) vote(fallbackVotes, wsPath, 5);
                     }
                     break;
                 }
             }
         }
 
-        // Fallback: check tool call arguments in the first 10 records
+        // Fallback: check tool call arguments (e.g. Cwd, TargetFile) when document metadata is absent
         const calls = Array.isArray(record?.tool_calls) ? record.tool_calls : (record?.toolCall ? [record.toolCall] : []);
         for (const tc of calls) {
             const args = tc.args || tc.arguments || {};
             const candidate =
                 args.Cwd ||
                 args.cwd ||
-                args.AbsolutePath ||
+                args.projectPath ||
                 args.TargetFile ||
                 args.SearchPath ||
-                args.DirectoryPath ||
-                args.projectPath;
+                args.DirectoryPath;
             if (typeof candidate === 'string' && candidate.trim()) {
-                vote(candidate.trim());
+                if (!candidate.includes('.agents/skills') && !candidate.includes('/.gemini/')) {
+                    vote(fallbackVotes, candidate.trim(), 2);
+                }
             }
         }
 
-        if (votes.size > 0 && recordCount >= 10) break;
+        if (recordCount >= 150) break;
     }
 
-    if (!votes.size) return { owner: null, hasMetadata };
+    const effectiveVotes = votes.size > 0 ? votes : fallbackVotes;
+    if (!effectiveVotes.size) return { owner: null, hasMetadata };
 
     // The focused document / highest count wins ties
     let winner = null;
     let best = 0;
-    for (const [root, count] of votes) {
+    for (const [root, count] of effectiveVotes) {
         if (count > best) {
             best = count;
             winner = root;
@@ -1407,6 +1410,23 @@ export function discoverTranscripts(cfg) {
         }
     }
 
+    // Known conversations that this project's own hooks recorded locally
+    const localHookConvs = new Set();
+    const hookFiles = cfg.ingest?.hookFiles || [];
+    for (const hFile of hookFiles) {
+        if (!fs.existsSync(hFile)) continue;
+        try {
+            const hText = fs.readFileSync(hFile, 'utf8');
+            for (const hLine of hText.split('\n')) {
+                if (!hLine.includes('conversationId')) continue;
+                try {
+                    const parsed = JSON.parse(hLine);
+                    if (parsed.conversationId) localHookConvs.add(parsed.conversationId);
+                } catch {}
+            }
+        } catch {}
+    }
+
     const brainDirs = cfg.ingest.brainDirs || [];
     const root = path.resolve(cfg.root);
     for (const bDir of brainDirs) {
@@ -1415,6 +1435,12 @@ export function discoverTranscripts(cfg) {
             if (!entry.isDirectory()) continue;
             const logFile = path.join(bDir, entry.name, '.system_generated', 'logs', 'transcript.jsonl');
             if (!fs.existsSync(logFile)) continue;
+
+            // If the project's own local hooks recorded events for this conversation, it belongs to this project
+            if (localHookConvs.has(entry.name)) {
+                out.push(logFile);
+                continue;
+            }
 
             const { owner, hasMetadata } = resolveTranscriptOwnerInfo(logFile);
             if (owner) {
