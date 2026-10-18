@@ -1160,6 +1160,25 @@
     transform: rotate(90deg);
 }
 
+/* Base Group Summary styling matching Box 2 (table header) exactly */
+.requests-page .request-group-summary {
+    color: #94a3b8 !important;
+}
+
+.requests-page .request-group:not([open]) .request-group-summary {
+    border-bottom: 0 !important;
+}
+
+.requests-page .request-group-summary .obs-mono {
+    color: #94a3b8 !important;
+    font-weight: 500 !important;
+    text-shadow: none !important;
+}
+
+.requests-page .request-group-summary:hover .obs-mono {
+    color: #cbd5e1 !important;
+}
+
 /* --------------------------------------------------------------------------
    CURSOR: Vibrant Cyan Palette (#06b6d4)
    - Uniform border on all 4 sides (equal thickness)
@@ -1170,43 +1189,32 @@
 }
 
 .requests-page .request-group-summary--cursor {
-    background: linear-gradient(90deg, #0e7490 0%, #155e75 40%, #083344 100%) !important;
+    background: rgba(14, 116, 144, 0.35) !important;
     border-bottom: 1.5px solid #06b6d4 !important;
-    color: #ffffff !important;
+    color: #94a3b8 !important;
 }
 
 .requests-page .request-group-summary--cursor:hover {
-    background: linear-gradient(90deg, #0891b2 0%, #0e7490 40%, #155e75 100%) !important;
-}
-
-.requests-page .request-group-summary--cursor .obs-mono {
-    color: #a5f3fc !important;
-    font-weight: 700 !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    background: rgba(14, 116, 144, 0.48) !important;
 }
 
 .requests-page .request-group-summary--cursor .request-group-chevron {
-    color: #67e8f9 !important;
+    color: #94a3b8 !important;
 }
 
 .requests-page .request-group-summary--cursor .request-group-turns-badge {
-    background: #083344 !important;
-    color: #67e8f9 !important;
-    border: 1px solid #22d3ee !important;
-    font-weight: 700 !important;
+    background: rgba(14, 116, 144, 0.45) !important;
+    color: #a5f3fc !important;
+    border: 1px solid rgba(6, 182, 212, 0.35) !important;
+    font-weight: 500 !important;
 }
 
 .requests-page .request-group-summary--cursor .request-group-time {
-    color: #cffafe !important;
-    opacity: 0.95;
+    color: #94a3b8 !important;
     font-weight: 500;
 }
 
-.requests-page .obs-table--ide-cursor thead th {
-    background: rgba(14, 116, 144, 0.35) !important;
-    border-bottom: 1.5px solid #06b6d4 !important;
-    color: #a5f3fc !important;
-}
+
 
 .requests-page tr.obs-row--cursor:hover td {
     background-color: rgba(6, 182, 212, 0.08) !important;
@@ -1222,46 +1230,76 @@
 }
 
 .requests-page .request-group-summary--antigravity {
-    background: linear-gradient(90deg, #7e22ce 0%, #6b21a8 40%, #3b0764 100%) !important;
+    background: rgba(107, 33, 168, 0.35) !important;
     border-bottom: 1.5px solid #a855f7 !important;
-    color: #ffffff !important;
+    color: #94a3b8 !important;
 }
 
 .requests-page .request-group-summary--antigravity:hover {
-    background: linear-gradient(90deg, #9333ea 0%, #7e22ce 40%, #581c87 100%) !important;
-}
-
-.requests-page .request-group-summary--antigravity .obs-mono {
-    color: #f5d0fe !important;
-    font-weight: 700 !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    background: rgba(107, 33, 168, 0.48) !important;
 }
 
 .requests-page .request-group-summary--antigravity .request-group-chevron {
-    color: #d8b4fe !important;
+    color: #94a3b8 !important;
 }
 
 .requests-page .request-group-summary--antigravity .request-group-turns-badge {
-    background: #3b0764 !important;
+    background: rgba(107, 33, 168, 0.45) !important;
     color: #e9d5ff !important;
-    border: 1px solid #c084fc !important;
-    font-weight: 700 !important;
+    border: 1px solid rgba(168, 85, 247, 0.35) !important;
+    font-weight: 500 !important;
 }
 
 .requests-page .request-group-summary--antigravity .request-group-time {
-    color: #fae8ff !important;
-    opacity: 0.95;
+    color: #94a3b8 !important;
     font-weight: 500;
 }
 
-.requests-page .obs-table--ide-antigravity thead th {
-    background: rgba(107, 33, 168, 0.35) !important;
-    border-bottom: 1.5px solid #a855f7 !important;
-    color: #f5d0fe !important;
-}
+
 
 .requests-page tr.obs-row--antigravity:hover td {
     background-color: rgba(168, 85, 247, 0.08) !important;
+}
+
+/* --------------------------------------------------------------------------
+   CLAUDE: Amber Palette (#d97706)
+   - Uniform border on all 4 sides (equal thickness)
+   -------------------------------------------------------------------------- */
+.requests-page .request-group--claude {
+    border: 1.5px solid #d97706 !important;
+    box-shadow: 0 4px 20px -2px rgba(217, 119, 6, 0.2) !important;
+}
+
+.requests-page .request-group-summary--claude {
+    background: rgba(180, 83, 9, 0.35) !important;
+    border-bottom: 1.5px solid #d97706 !important;
+    color: #94a3b8 !important;
+}
+
+.requests-page .request-group-summary--claude:hover {
+    background: rgba(180, 83, 9, 0.48) !important;
+}
+
+.requests-page .request-group-summary--claude .request-group-chevron {
+    color: #94a3b8 !important;
+}
+
+.requests-page .request-group-summary--claude .request-group-turns-badge {
+    background: rgba(180, 83, 9, 0.45) !important;
+    color: #fef3c7 !important;
+    border: 1px solid rgba(217, 119, 6, 0.35) !important;
+    font-weight: 500 !important;
+}
+
+.requests-page .request-group-summary--claude .request-group-time {
+    color: #94a3b8 !important;
+    font-weight: 500;
+}
+
+
+
+.requests-page tr.obs-row--claude:hover td {
+    background-color: rgba(217, 119, 6, 0.08) !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -1272,28 +1310,40 @@
 }
 
 .requests-page .request-group-summary--unknown {
-    background: #1e293b !important;
-    border-bottom: 1px solid #475569 !important;
-    color: #e2e8f0 !important;
+    background: #131722 !important;
+    border-bottom: 1px solid #253047 !important;
+    color: #94a3b8 !important;
 }
 
 .requests-page .request-group-summary--unknown:hover {
-    background: #334155 !important;
+    background: #1a2030 !important;
 }
 
 .requests-page .request-group-summary--unknown .request-group-turns-badge {
     background: #0f172a !important;
     color: #94a3b8 !important;
     border: 1px solid #475569 !important;
+    font-weight: 500 !important;
 }
 
 .requests-page .request-group-summary--unknown .request-group-time {
     color: #94a3b8 !important;
+    font-weight: 500;
 }
 
 /* --------------------------------------------------------------------------
    Table Grid Format for /requests: Consistent, balanced borders across cells
+   Box 2 (Table Header Column): Neutral transparent, no colored IDE tint
    -------------------------------------------------------------------------- */
+.requests-page .obs-table--requests thead th,
+.requests-page .obs-table--ide-cursor thead th,
+.requests-page .obs-table--ide-antigravity thead th,
+.requests-page .obs-table--ide-claude thead th {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #94a3b8 !important;
+}
+
 .requests-page .obs-table--requests th,
 .requests-page .obs-table--requests td {
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);

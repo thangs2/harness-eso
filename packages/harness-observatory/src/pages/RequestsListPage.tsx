@@ -299,22 +299,22 @@ export function RequestsListPage() {
                                     className={`request-group request-group--${g.ide || 'unknown'}`}
                                     open
                                 >
-                                    <summary className={`request-group-summary request-group-summary--${g.ide || 'unknown'} flex items-center justify-between gap-3 py-3 px-4 select-none cursor-pointer transition-all`}>
-                                        <div className="flex items-center gap-3 flex-wrap">
+                                    <summary className={`request-group-summary request-group-summary--${g.ide || 'unknown'} flex items-center justify-between gap-3 py-2 px-3 text-xs select-none cursor-pointer transition-all`}>
+                                        <div className="flex items-center gap-2.5 flex-wrap">
                                             <span className="request-group-chevron inline-flex items-center justify-center transition-transform duration-200">
                                                 <svg className="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                                 </svg>
                                             </span>
                                             <IdeBadge ide={g.ide} />
-                                            <span className="obs-mono font-semibold" title={g.conversationId}>
+                                            <span className="obs-mono text-slate-400 font-medium" title={g.conversationId}>
                                                 {g.conversationId.slice(0, 16)}…
                                             </span>
-                                            <span className="request-group-turns-badge text-[11px] px-2.5 py-0.5 rounded-full font-medium">
+                                            <span className="request-group-turns-badge text-xs px-2 py-0.5 rounded-full font-medium">
                                                 {g.items.length} turn(s)
                                             </span>
                                         </div>
-                                        <span className="request-group-time text-xs tabular-nums font-medium">
+                                        <span className="request-group-time text-xs tabular-nums text-slate-400 font-medium">
                                             latest {formatRelativeWhen(g.latestStartedAt)}
                                         </span>
                                     </summary>
