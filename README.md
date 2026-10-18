@@ -23,6 +23,24 @@ This repository **ships** the product. It is not a consumer of it: do not run th
 `harness-eso` itself, and do not provision it — provisioning writes agent hooks, and writing them into
 the repo that ships them is a loop the planner refuses.
 
+## Prerequisites
+
+Before installing, ensure your host environment meets the following requirements:
+
+* **Bun** (`>= 1.1`) — primary package manager and test runner for monorepo development (`bun install`, `bun test`).
+* **Node.js** (`>= 20` LTS) — required runtime for standalone host pack hooks (`node:fs`, `node:crypto`) and CLI.
+* **Python 3** (`>= 3.9`) — required for consumer-side guard and tracer scripts (`guard-write.py`, `guard-shell.py`, `route-hook.py`).
+* **Docker & Docker Compose** (`>= v2`) — required for containerized Observatory monitor (`:8792`) and Console wizard (`:8791`).
+* **Git** (`>= 2.30`) — version control.
+* **Supported Platforms:** macOS (Apple Silicon / Intel), Linux (x86_64 / arm64), Windows (WSL2 / PowerShell).
+
+*(Optional — Recon & Cognition ecosystem for consumer repos)*:
+* **`docgraph` CLI** — for spec and invariant evidence retrieval.
+* **`codegraph` MCP** — for AST and symbol call hierarchy exploration.
+* **`agentmemory` MCP** — for cross-session long-term institutional memory.
+* **DeepSeek API Key** (`deepseek-direct` MCP) — Brain tier for deep reasoning (`ask_deepseek_flash` / `ask_deepseek_pro`).
+* **TypeSafe Jev API Key** (`TYPESAFE_API_KEY`) — if Jev System One route tie-breaking is enabled (`shadow` or `active`).
+
 ## Install
 
 ```bash

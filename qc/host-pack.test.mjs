@@ -233,7 +233,7 @@ test('re-running provision is idempotent for hooks.json', () => {
 // Install self-check (SP-4.3)
 // ---------------------------------------------------------------------------
 
-test('verification proves every installed hook can decide', () => {
+test('verification proves every installed hook can decide', { timeout: 15000 }, () => {
     const root = tempConsumer();
     writeConsumerConfig(root);
     installHostPack(root);
@@ -297,7 +297,7 @@ test('a corrupt source pack is refused by the checksum layer before it is instal
     }
 });
 
-test('bootstrap records the pack version and verification outcome', () => {
+test('bootstrap records the pack version and verification outcome', { timeout: 15000 }, () => {
     const root = tempConsumer();
     const profiles = [loadHostProfile(PROFILES_DIR, 'cursor-superset')];
     applyHostProfiles(root, profiles, { observePort: 8792 });

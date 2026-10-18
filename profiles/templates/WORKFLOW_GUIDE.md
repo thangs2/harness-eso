@@ -2,7 +2,7 @@
 
 > **Document Code:** `HARNESS-ESO-CONSUMER-GUIDE`  
 > **Applies to:** All consumer repositories integrated with Harness ESO (`x79`, `baplatform`, `FinESO`, etc.).  
-> **Objective:** Comprehensive guide for both Operators (human developers) and AI Agents (Cursor / Google Antigravity) detailing ESO operational mechanics, quality control gates, and token optimization discipline.
+> **Objective:** Comprehensive guide for both Operators (human developers) and AI Agents (Cursor / Google Antigravity) detailing ESO operational mechanics, the end-to-end pipeline data flow, quality control gates, and token optimization discipline.
 
 ---
 
@@ -15,7 +15,7 @@ flowchart TD
     subgraph OperatorPlane["1. Operator Plane (Human Developer)"]
         CLI["./harness CLI"]
         Console["Console Wizard (:8791)"]
-        Observatory["Observatory Monitor (:8792)"]
+        Observatory["Observatory Monitor (:8792 / :8793)"]
     end
 
     subgraph DispatcherPlane["2. Dispatcher Plane (IDE Agent)"]
@@ -36,7 +36,7 @@ flowchart TD
 ```
 
 1. **Operator Plane (Human Developer):**
-   - Controls the system via `./harness` and the Observatory monitor dashboard (`http://127.0.0.1:8792`).
+   - Controls the system via `./harness` and the Observatory monitor dashboard (`http://127.0.0.1:8792` or project-scoped port).
    - Retains supreme authority, configures `decision-policy.json`, assigns token budgets, and approves human-in-the-loop (HIL) exceptions.
 2. **Dispatcher Plane (IDE Agent - Cursor / Antigravity):**
    - Serves as the turn orchestrator and forwarder.
@@ -48,7 +48,156 @@ flowchart TD
 
 ---
 
-## 2. ESO Runtime Workflow: Preflight, Gap Closure & Guard Rails
+## 2. End-to-End Pipeline Data Flow & Decision Orchestration
+
+This section outlines the complete turn lifecycle of data within Harness ESO: from user prompt input, through deterministic classification, adapter reconnaissance, evidence sufficiency evaluation, cognitive routing, precision execution, to knowledge distillation.
+
+```text
+[USER SUBMITS PROMPT]
+  │
+  ▼
+[STEP 1: INITIALIZATION & LAW GATE (Law Gate & Context Load)]
+  │   - Mandatory Load: AGENTS.md (Workspace Invariants & Sacred Pipeline)
+  │   - Intent Classification: Pure Q&A? Jira Lookup? Code Modification?
+  │   - Protective Guardrails: Forbid unrequested git commits, preserve comments, enforce minimal diffs
+  │
+  ▼
+[STEP 2: CLASSIFICATION & AMBIGUITY RESOLUTION (Decision Facade: L0 vs Jev)]
+  │   - Configuration Scan: Read `decision-policy.json` (load `jev.mode`, `on_ambiguous`)
+  │
+  ├── 2.1 LEVEL L0 (Deterministic Rules — 0ms Latency, Zero Cost)
+  │     │   Regex Scan + Bucket Mapping:
+  │     │
+  │     ├── [Shell Command Evaluation]:
+  │     │     ├── IF prohibited command (rm -rf, git push --force, dropdb)
+  │     │     │     └──► L0 HARD BLOCK (`verdict = deny`, winner: `l1_shell_deny`) -> HALT
+  │     │     ├── IF safe read command (git status, ls, bun test)
+  │     │     │     └──► L0 IMMEDIATE ALLOW (`verdict = allow`, winner: `l1_shell_allow`)
+  │     │     └── IF unknown / gray-zone command
+  │     │           └──► Assign `verdict = ask` -> Escalate to Level 2.2
+  │     │
+  │     └── [Route Bucket Mapping (frontend / backend / docs / root)]:
+  │           ├── IF unambiguously matches exactly 1 bucket (no contention)
+  │           │     └──► L0 WINS (`winner = l0_resolver`, NO JEV CALL)
+  │           └── IF tied score / conflicting signals (`l0.tie`)
+  │                 └──► Assign `kind = ambiguous` -> Escalate to Level 2.2
+  │
+  └── 2.2 LEVEL L1/L2 (Jev System One — HTTP Call to api.typesafe.ai)
+        │
+        ├── IF `policy.jev.mode === 'off'`
+        │     └──► Bypass Jev -> Escalate directly to Human Approval (`HIL Required`)
+        │
+        └── IF `policy.jev.mode === 'active'` (or `'shadow'`)
+              │   Send HTTP request to Jev Classifier to break ambiguity tie
+              │
+              ├── IF Confidence ≥ 0.9 (High Confidence)
+              │     └──► JEV WINS (`winner = route_jev`, enforces target bucket)
+              │
+              └── IF Confidence < 0.9 (Low Confidence)
+                    └──► HALT AND PROMPT USER (`winner = jev_confirm`, `HIL Required`)
+  │
+  ▼
+[STEP 3: RECONNAISSANCE VIA ADAPTERS (Evidence Collection)]
+  │   - Activate matching Skill Pack according to Step 2 bucket
+  │   - Gather factual ground truth across 3 independent Adapters (avoid dumping full files):
+  │
+  ├── 3.1 `agentmemory-mcp` (Long-Term Episodic Memory):
+  │     └── Call `memory_smart_search` -> Retrieve: Ticket facts, past architectural decisions, touched paths
+  │
+  ├── 3.2 `docgraph-cli` (Authoritative Law & Invariants):
+  │     └── Run `docgraph --q "<terms>"` -> Extract: 30–50 line slices of Invariants, DoR, API Contracts
+  │
+  └── 3.3 `codegraph-cli` (Code Graph & Symbol AST):
+        └── Call `codegraph_explore` -> Extract: AST trees, Call Hierarchies, Blast Radius in 1 round-trip
+  │
+  ▼
+[STEP 4: EVIDENCE SUFFICIENCY GATE (Scoring & Gate Enforcement)]
+  │
+  ├── 4.1 DETECT CONTEXT GAPS (Detect Gaps):
+  │     │   Cross-examine Step 3 evidence against Skill Pack requirements:
+  │     ├── Missing required architectural law?   ──► Generate gap: `MISSING_LAW_EVIDENCE`
+  │     ├── Insufficient minimum path reads?      ──► Generate gap: `MISSING_READ_EVIDENCE`
+  │     └── Aggregate into consolidated gap list: `gaps = [...]`
+  │
+  ├── 4.2 QUANTITATIVE SCORING ENGINE:
+  │     └── Compute score: `score = (lawRatio * 0.55) + (readRatio * 0.45)`
+  │
+  ├── 4.3 SUFFICIENCY LEVEL CLASSIFICATION:
+  │     ├── IF score ≥ T_high AND gaps.length === 0 ──► SUFFICIENT (Full 100% Evidence Adequacy)
+  │     ├── IF score ≥ T_low                       ──► PARTIAL (Partially Grounded)
+  │     └── OTHERWISE (score < T_low or open gaps) ──► INSUFFICIENT (Lacks Necessary Context)
+  │
+  └── 4.4 GATE ENFORCEMENT & BRANCHING:
+        │
+        ├── Case 1: SUFFICIENT
+        │     └──► GREEN FLAG: Grant code write authorization (`allowWrite = true`) -> Proceed to Step 5
+        │
+        ├── Case 2: INSUFFICIENT AND `enforceWrites = fail_closed`
+        │     └──► RED FLAG (HARD BLOCK): Reject write with `ESO_INSUFFICIENT_EVIDENCE`
+        │          (Agent prohibited from editing files; must return to Step 3 to close gaps)
+        │
+        ├── Case 3: INSUFFICIENT AND `insufficientPromptGate = consent`
+        │     └──► YELLOW FLAG (AWAITING APPROVAL): Enter `ConsentPending` state
+        │          (Prompt user: "Context insufficient. Approve proceeding anyway?")
+        │
+        └── Case 4: INSUFFICIENT AND `eso.mode = observe / hint`
+              └──► ALLOW WITH ADVISORY: Inject context gap advisory block into prompt
+  │
+  ▼
+[STEP 5: BRAIN TIER ROUTING (Cognition Allocation)]
+  │   - Dispatcher evaluates task complexity based on task specs and gathered context:
+  │
+  ├── 5.1 ZERO BRAIN (Dispatcher / IDE Tools Only):
+  │     ├── Conditions: Jira/doc lookup, test execution, file listing, single-line typo/config fix
+  │     └──► Dispatcher operates directly via IDE tools (0 external model tokens consumed)
+  │
+  ├── 5.2 BRAIN FLASH (`ask_deepseek_flash`) (DEFAULT WORKHORSE):
+  │     ├── Conditions: Clear task specifications, Test-Driven Development (TDD), bugfix with concrete stack trace
+  │     └──► Invoke Flash for rapid, syntactically clean, cost-efficient code generation
+  │
+  └── 5.3 BRAIN PRO (`ask_deepseek_pro`) (DEEP REASONING):
+        ├── Conditions: New Domain Model design, invariant violations, deadlock/memory leak,
+        │              or Brain Flash failed 2 consecutive test runs
+        └──► Invoke Pro with Chain-of-Thought (multi-step reasoning) for holistic architectural synthesis
+  │
+  ▼
+[STEP 6: SAFE EXECUTION & RANGE-READ (Precision Patching & Output Discipline)]
+  │
+  ├── 6.1 SLICE READING DISCIPLINE:
+  │     └── Never dump files > 100 lines into conversation context.
+  │         Only use `view_file` specifying exact `StartLine` and `EndLine` slices.
+  │
+  ├── 6.2 SURGICAL CODE MODIFICATION:
+  │     └── Use `replace_file_content` to apply exact targeted patches, strictly preserving existing comments.
+  │
+  ├── 6.3 LOCAL VERIFICATION & BOUNDED TERMINAL OUTPUT:
+  │     │   Run test runner (`bun test`, `vitest`) with output piped (`| tail -n 25`)
+  │     │
+  │     ├── IF Tests Fail:
+  │     │     └──► Extract exact error stack trace -> Return to **Step 5** for Brain remediation
+  │     │
+  │     └── IF Tests Pass:
+  │           └──► Summarize results concisely (e.g., "All 241 tests passed") -> Proceed to Step 7
+  │
+  ▼
+[STEP 7: KNOWLEDGE DISTILLATION & MEMORY SAVE]
+  │   - Call `memory_save` via `agentmemory-mcp`
+  │   - Record concise distillation:
+  │       + Modified files, classes, and exported symbols
+  │       + Finalized architectural decisions
+  │       + Discovered lessons and defects (to prevent recurrence)
+  │   - Outcome: Future turns or sessions inherit this context immediately at Step 3.1
+  │
+  ▼
+[STEP 8: USER HANDOFF & RESPONSE]
+      - Render clickable markdown file links (`file:///...`)
+      - Succinctly report verified test execution outcomes
+      - Outline next steps or hand off control to user
+```
+
+---
+
+## 3. ESO Runtime Safeguards: Preflight, Gap Closure & Guard Rails
 
 ### A. Preflight Phase (Before Prompt Execution)
 Whenever the user submits a prompt, the `preflight` hook evaluates the turn intent:
@@ -73,7 +222,7 @@ When Preflight flags `level: partial` or `insufficient`:
 
 ---
 
-## 3. Context Discipline & Token-Diet Standard (STD-ESO-PERF-01)
+## 4. Context Discipline & Token-Diet Standard (STD-ESO-PERF-01)
 
 To eliminate **Token Burn** (runaway context inflation caused by dumping full files into conversation histories), all Agents must adhere to the **8-Step Discipline**:
 
@@ -102,7 +251,7 @@ To eliminate **Token Burn** (runaway context inflation caused by dumping full fi
 
 ---
 
-## 4. CLI Tooling & Runtime Monitoring
+## 5. CLI Tooling & Runtime Monitoring
 
 ### A. Token Budget Validation with the Linter CLI
 Run the Token-Diet auditor from the project root:
@@ -121,7 +270,7 @@ Run the Token-Diet auditor from the project root:
 ```
 
 ### B. Runtime Monitoring via Observatory (`http://127.0.0.1:8792`)
-- Access `:8792` in a browser to monitor Agent turn execution in real time.
+- Access `:8792` (or project port e.g. `:8793`) in a browser to monitor Agent turn execution in real time.
 - Check the **`eager-prefix-budget`** indicator under **Conformance Checks**:
   - `PASS`: Eager rules count and tokens remain within safety limits.
   - `WARN`: Eager prefix exceeded budget, risking context pollution.
@@ -138,7 +287,7 @@ Run the Token-Diet auditor from the project root:
 
 ---
 
-## 5. Troubleshooting Guide
+## 6. Troubleshooting Guide
 
 | Symptom | Root Cause | Standard Resolution |
 |---|---|---|
