@@ -396,10 +396,7 @@ test('add-ide rejects an unknown profile and names the shipped ones', () => {
 // Clone survivability: the pack must be committable
 // ---------------------------------------------------------------------------
 
-test('provision admits the pack through a consumer .harness/.gitignore', () => {
-    // The shipped convention ignores everything in `.harness/` and re-admits a few files. Applied to
-    // the host pack, that produces a clone whose hooks.json points at a bundle that is not in the
-    // repository — every hook then fails, and because guards fail closed the IDE is unusable.
+test('provision keeps the host pack gitignored in a consumer .harness/.gitignore', () => {
     const root = tempConsumer();
     fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
     fs.writeFileSync(
@@ -410,12 +407,9 @@ test('provision admits the pack through a consumer .harness/.gitignore', () => {
     installHostPack(root);
 
     const rules = fs.readFileSync(path.join(root, '.harness/.gitignore'), 'utf8');
-    assert.match(rules, /^!host-pack\/$/m, 'the pack directory must be re-admitted');
-    assert.match(rules, /^!host-pack\/\*\*$/m, 'and its contents');
-    // `host-install-state.json` matters just as much: without it a merge cannot tell "we wrote this"
-    // from "the operator edited it", so the next refresh would duplicate or clobber entries.
-    assert.match(rules, /^!host-install-state\.json$/m);
-    // Runtime state must stay out of git.
+    assert.doesNotMatch(rules, /^!host-pack\//m, 'the pack directory must stay gitignored');
+    assert.doesNotMatch(rules, /^!host-pack\/\*\*/m, 'and its contents');
+    assert.doesNotMatch(rules, /^!host-install-state\.json$/m, 'host-install-state must stay gitignored');
     assert.match(rules, /^\*$/m, 'the blanket ignore must survive');
 });
 
@@ -424,7 +418,7 @@ test('gitignore repair is additive and idempotent', () => {
     fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
     const ignorePath = path.join(root, '.harness/.gitignore');
     // An operator rule we must not touch or reorder.
-    fs.writeFileSync(ignorePath, '*\n!decision-policy.json\n!my-own-file.json\n');
+    fs.writeFileSync(ignorePath, '*\n!my-own-file.json\n');
     writeConsumerConfig(root);
 
     installHostPack(root);
@@ -442,8 +436,8 @@ test('a consumer with no .harness/.gitignore gets the convention plus our rules'
     installHostPack(root);
     const rules = fs.readFileSync(path.join(root, '.harness/.gitignore'), 'utf8');
     assert.match(rules, /^\*$/m, 'runtime state must be ignored by default');
-    assert.match(rules, /^!decision-policy\.json$/m);
-    assert.match(rules, /^!host-pack\/\*\*$/m);
+    assert.doesNotMatch(rules, /^!decision-policy\.json$/m, 'decision-policy must stay gitignored');
+    assert.doesNotMatch(rules, /^!host-pack\/\*\*$/m, 'host-pack must stay gitignored');
 });
 
 test('both superset profiles wire the same hook implementations', () => {

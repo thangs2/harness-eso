@@ -39,17 +39,25 @@ export const HOST_PACK_REL = '.harness/host-pack';
  */
 const GITIGNORE_MARKER = '# harness-eso: files this tool writes that must be committed';
 const GITIGNORE_ADMIT = [
+    '!.gitignore',
+    '!README.md',
+];
+const GITIGNORE_DENY = new Set([
+    '!decision-policy.json',
     '!integrations.json',
     '!WORKFLOW_GUIDE.md',
+    '!sidecar.env',
     '!sidecar.env.example',
+    '!eso-coverage.json',
     '!host-bootstrap.json',
     '!host-install-state.json',
     '!host-pack/',
     '!host-pack/**',
-];
+]);
 
 /**
- * Ensure `.harness/.gitignore` admits everything the host pack needs on a fresh clone.
+ * Ensure `.harness/.gitignore` ignores all runtime and provisioned files.
+ * Only `.gitignore` and `README.md` are admitted.
  *
  * @param {string} root consumer root
  * @returns {{ relative: string, action: 'write' | 'skip' }}
@@ -59,25 +67,40 @@ export function ensureHarnessGitignore(root) {
     const relative = '.harness/.gitignore';
 
     let existing = '';
+    let isNew = false;
     try {
         existing = fs.readFileSync(file, 'utf8');
     } catch {
-        // No ignore file: create one that follows the same convention, so runtime state stays out
-        // of git while the wiring goes in.
-        existing = `*\n!.gitignore\n!README.md\n!decision-policy.json\n`;
+        isNew = true;
+        existing = `*\n!.gitignore\n!README.md\n`;
     }
 
+    // Strip any lines that un-ignore provisioned/runtime files or the legacy marker
+    const lines = existing.split('\n');
+    const filteredLines = lines.filter((l) => {
+        const trimmed = l.trim();
+        if (trimmed === GITIGNORE_MARKER) return false;
+        return !GITIGNORE_DENY.has(trimmed);
+    });
+    const stripped = filteredLines.length !== lines.length;
+
     const present = new Set(
-        existing
-            .split('\n')
+        filteredLines
             .map((l) => l.trim())
             .filter(Boolean),
     );
     const missing = GITIGNORE_ADMIT.filter((rule) => !present.has(rule));
-    if (!missing.length) return { relative, action: 'skip' };
+    if (!isNew && !missing.length && !stripped) return { relative, action: 'skip' };
 
-    const lines = existing.endsWith('\n') ? existing : `${existing}\n`;
-    const body = `${lines}${present.has(GITIGNORE_MARKER) ? '' : `${GITIGNORE_MARKER}\n`}${missing.join('\n')}\n`;
+    let body = filteredLines.join('\n');
+    if (!body.endsWith('\n')) body += '\n';
+    if (!present.has('*')) {
+        body = `*\n${body}`;
+    }
+    for (const rule of missing) {
+        body += `${rule}\n`;
+    }
+
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, body, 'utf8');
     return { relative, action: 'write' };
