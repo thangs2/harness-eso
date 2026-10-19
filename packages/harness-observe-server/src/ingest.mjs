@@ -204,7 +204,14 @@ export async function runIngestOnce(cfg, opts = {}) {
          * transcript changes meant history was never walked at all on a CLI pass where nothing had
          * changed, which is exactly the case for data that predates this feature.
          */
-        let mcpUsage = { read: 0, inserted: 0, attributed: 0, unattributed: 0, skipped: 0 };
+        let mcpUsage = {
+            read: 0,
+            inserted: 0,
+            attributed: 0,
+            unattributed: 0,
+            skipped: 0,
+            reattributed: 0,
+        };
         let mcpBackfill = { scanned: 0, labels: 0, prompts: 0, remaining: 0 };
         try {
             const { backfillMcpCalls, ingestMcpUsage } = await import('./ingest-mcp-usage.mjs');
@@ -225,10 +232,15 @@ export async function runIngestOnce(cfg, opts = {}) {
         let mcpStats = { updated: 0, skipped: true };
         /*
          * Attribution can add usage to requests this cycle's transcript work never touched — a
-         * backfilled conversation, or a ledger line for an older turn. A scope-limited refresh would
-         * silently skip exactly those, so the presence of new usage forces a full rebuild.
+         * backfilled conversation, a ledger line for an older turn, or a previously-unattributed
+         * row whose prompt hash finally matches. A scope-limited refresh would silently skip
+         * exactly those, so any usage change forces a full rebuild.
          */
-        const usageChanged = mcpUsage.inserted > 0 || mcpBackfill.labels > 0 || mcpBackfill.prompts > 0;
+        const usageChanged =
+            mcpUsage.inserted > 0 ||
+            mcpUsage.reattributed > 0 ||
+            mcpBackfill.labels > 0 ||
+            mcpBackfill.prompts > 0;
         if (changed || usageChanged) {
             const { refreshMcpCallStats } = await import('./mcp-call-stats.mjs');
             const mcpScope =

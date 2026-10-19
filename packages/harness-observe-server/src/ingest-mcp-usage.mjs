@@ -8,10 +8,12 @@
  *
  * Attribution, and why it is done this way: an MCP server is handed a prompt and nothing else. It
  * knows no conversation, no generation, no workspace. The one identifier both sides share is the
- * prompt itself, so the server records `sha256(prompt)` and the transcript side records which
- * request sent that prompt (`mcp_prompt`). Joining on that is exact. The alternative — matching by
- * timestamp — misattributes whenever two turns overlap, which is the normal case for anyone running
- * more than one agent at a time.
+ * prompt body the server actually hashes — after it strips `[BRAIN FLASH]` / `[BRAIN FALLBACK]` /
+ * `[pro]` / `[flash]` (see `usageHashPrompt`). The ledger records `sha256` of that body; the
+ * transcript side records the same hash via `mcp_prompt`. Joining on the raw transcript argument
+ * (which still carries the prefix) attributes nothing for Brain calls. The alternative — matching
+ * by timestamp — misattributes whenever two turns overlap, which is the normal case for anyone
+ * running more than one agent at a time.
  *
  * Records that match nothing are kept with a null `request_id` rather than dropped: a prompt the
  * observer cannot place is still evidence that spend happened, and silently discarding it would
@@ -113,8 +115,9 @@ function numOrNull(v) {
  *
  *   1 — recorded model prompts
  *   2 — also re-resolved `llm_call.tool_names` from the wrapper name
+ *   3 — hash `usageHashPrompt(prompt)` (strip Brain/route prefixes) so ledger joins match
  */
-const MCP_BACKFILL_VERSION = 2;
+const MCP_BACKFILL_VERSION = 3;
 
 /**
  * Walk history once per conversation and recover what live ingest could not have known.
@@ -166,6 +169,15 @@ export function backfillMcpCalls(db, cfg, opts = {}) {
         try {
             const buf = fs.readFileSync(filePath);
             size = buf.byteLength;
+            /*
+             * Drop prompt rows written under an older hash rule. Leaving them would keep wrong
+             * `prompt_sha256` values that never join the ledger, while the new inserts use a
+             * different id (conversation + new sha) and cannot overwrite them.
+             */
+            db.run('DELETE FROM mcp_prompt WHERE conversation_id = ? AND project_id = ?', [
+                conv.id,
+                cfg.project.id,
+            ]);
             for (const row of parseTranscriptCalls(buf)) {
                 const llmCallId = `${conv.id}:${row.boundaryIndex}:${row.callIndex}`;
                 // Only touch rows whose stored label differs, so a re-walk is not a mass rewrite.
@@ -216,28 +228,42 @@ export function backfillMcpCalls(db, cfg, opts = {}) {
  * @param {import('./observe-db.mjs').Db} db
  * @param {object} cfg
  * @param {{ ledgerPath?: string }} [opts]
- * @returns {{ read: number, inserted: number, attributed: number, unattributed: number, skipped: number }}
+ * @returns {{
+ *   read: number, inserted: number, attributed: number, unattributed: number,
+ *   skipped: number, reattributed: number,
+ * }}
  */
 export function ingestMcpUsage(db, cfg, opts = {}) {
     const ledgerPath = opts.ledgerPath || defaultUsageLedgerPath();
     const records = readUsageLedger(ledgerPath);
-    const empty = { read: records.length, inserted: 0, attributed: 0, unattributed: 0, skipped: 0 };
+    const empty = {
+        read: records.length,
+        inserted: 0,
+        attributed: 0,
+        unattributed: 0,
+        skipped: 0,
+        reattributed: 0,
+    };
     if (!records.length) return empty;
 
-    const known = new Set(
-        db.all('SELECT id FROM mcp_call WHERE project_id = ?', [cfg.project.id]).map((r) => r.id),
+    /** @type {Map<string, string | null>} */
+    const known = new Map(
+        db
+            .all('SELECT id, request_id FROM mcp_call WHERE project_id = ?', [cfg.project.id])
+            .map((r) => [r.id, r.request_id ?? null]),
     );
 
     let inserted = 0;
     let attributed = 0;
     let unattributed = 0;
+    let skipped = 0;
+    let reattributed = 0;
 
     for (const record of records) {
         const sha = typeof record.promptSha256 === 'string' ? record.promptSha256 : '';
         if (!sha) continue;
 
         const id = recordId(cfg.project.id, record);
-        if (known.has(id)) continue;
 
         /*
          * Prompt hashes are project-scoped: two projects can legitimately send the same prompt, and
@@ -247,6 +273,33 @@ export function ingestMcpUsage(db, cfg, opts = {}) {
             'SELECT request_id, conversation_id, tool FROM mcp_prompt WHERE project_id = ? AND prompt_sha256 = ? LIMIT 1',
             [cfg.project.id, sha],
         );
+
+        if (known.has(id)) {
+            /*
+             * Rows inserted before the hash rule matched stay with null request_id forever under
+             * `ON CONFLICT DO NOTHING`. Once mcp_prompt catches up, stamp ownership in place.
+             */
+            if (known.get(id) == null && owner?.request_id) {
+                db.run(
+                    `UPDATE mcp_call
+                     SET request_id = ?, conversation_id = ?, tool = ?
+                     WHERE id = ? AND project_id = ? AND request_id IS NULL`,
+                    [
+                        owner.request_id,
+                        owner.conversation_id ?? null,
+                        owner.tool ?? `mcp:${record.model ?? 'unknown'}`,
+                        id,
+                        cfg.project.id,
+                    ],
+                );
+                known.set(id, owner.request_id);
+                reattributed += 1;
+                attributed += 1;
+            } else {
+                skipped += 1;
+            }
+            continue;
+        }
 
         const usage = record.usage || {};
         db.run(
@@ -278,11 +331,11 @@ export function ingestMcpUsage(db, cfg, opts = {}) {
                 'deepseek-ledger',
             ],
         );
-        known.add(id);
+        known.set(id, owner?.request_id ?? null);
         inserted += 1;
         if (owner?.request_id) attributed += 1;
         else unattributed += 1;
     }
 
-    return { ...empty, inserted, attributed, unattributed, skipped: records.length - inserted };
+    return { ...empty, inserted, attributed, unattributed, skipped, reattributed };
 }

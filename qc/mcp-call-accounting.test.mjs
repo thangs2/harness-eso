@@ -16,8 +16,11 @@ import {
     mcpCountsFromToolNames,
 } from '../packages/harness-observe-server/src/parse-transcript-calls.mjs';
 import { ingestMcpUsage, defaultUsageLedgerPath } from '../packages/harness-observe-server/src/ingest-mcp-usage.mjs';
+import { usageHashPrompt } from '../packages/harness-observe-server/src/mcp-prompt-store.mjs';
 
 const sha = (s) => crypto.createHash('sha256').update(String(s), 'utf8').digest('hex');
+/** Ledger hash = MCP server hash = stripped Brain/route body, not the raw transcript argument. */
+const ledgerSha = (prompt) => sha(usageHashPrompt(prompt));
 
 /** Cursor routes every MCP call through this one generic tool. */
 const wrap = (toolName, prompt) => ({
@@ -116,6 +119,18 @@ const USER_LINE = JSON.stringify({
 });
 
 const PROMPT = '[BRAIN FLASH]  [USER REQUEST] review the ticket';
+const PROMPT_BODY = usageHashPrompt(PROMPT);
+
+test('usageHashPrompt mirrors the DeepSeek MCP strip before ledger hash', () => {
+    assert.equal(usageHashPrompt('[BRAIN FLASH]\n\nbody'), 'body');
+    assert.equal(usageHashPrompt('[BRAIN FALLBACK] body'), 'body');
+    assert.equal(usageHashPrompt('[pro] force pro'), 'force pro');
+    assert.equal(usageHashPrompt('[flash] force flash'), 'force flash');
+    assert.equal(usageHashPrompt('plain executor'), 'plain executor');
+    // Classification still sees the raw prefix; hashing must not.
+    assert.notEqual(PROMPT_BODY, PROMPT);
+    assert.equal(PROMPT_BODY, '[USER REQUEST] review the ticket');
+});
 
 /**
  * @param {{
@@ -202,8 +217,9 @@ const ledgerLine = (overrides = {}) =>
         ledger: 1,
         at: '2026-01-01T00:00:00.000Z',
         role: 'brain_flash',
-        promptSha256: sha(PROMPT),
-        promptChars: PROMPT.length,
+        // Same body the MCP server hashes after stripping `[BRAIN FLASH]`.
+        promptSha256: ledgerSha(PROMPT),
+        promptChars: PROMPT_BODY.length,
         model: 'deepseek-flash',
         usage: {
             prompt_tokens: 4242,
@@ -233,11 +249,17 @@ test('a ledger record is attributed to the request that sent its prompt', async 
         // The prompt was recorded against the turn during the transcript pass.
         const { openDb } = await import('../packages/harness-observe-server/src/observe-db.mjs');
         const db = openDb(cfg.storage.target);
-        const prompt = db.get('SELECT * FROM mcp_prompt WHERE prompt_sha256 = ?', [sha(PROMPT)]);
-        assert.ok(prompt, 'mcp_prompt must hold the prompt the agent sent');
+        const prompt = db.get('SELECT * FROM mcp_prompt WHERE prompt_sha256 = ?', [ledgerSha(PROMPT)]);
+        assert.ok(prompt, 'mcp_prompt must hash the stripped body the ledger uses');
         assert.equal(prompt.tool, 'mcp:ask_deepseek_flash_brain');
+        assert.equal(Number(prompt.prompt_chars), PROMPT_BODY.length);
+        // Raw transcript hash must NOT be the join key — that was the Brain-token blind spot.
+        assert.equal(
+            db.get('SELECT * FROM mcp_prompt WHERE prompt_sha256 = ?', [sha(PROMPT)]) ?? null,
+            null,
+        );
 
-        const call = db.get('SELECT * FROM mcp_call WHERE prompt_sha256 = ?', [sha(PROMPT)]);
+        const call = db.get('SELECT * FROM mcp_call WHERE prompt_sha256 = ?', [ledgerSha(PROMPT)]);
         assert.equal(call.request_id, prompt.request_id, 'usage must land on that request');
         assert.equal(call.prompt_tokens, 4242);
         assert.equal(call.completion_tokens, 777);
@@ -272,6 +294,44 @@ test('re-running ingest does not double-count the ledger', async () => {
         assert.equal(db.get('SELECT COUNT(*) AS n FROM mcp_call').n, 1);
         const stats = db.get('SELECT brain_prompt_tokens FROM mcp_call_stats');
         assert.equal(stats.brain_prompt_tokens, 4242, 'totals must not accumulate across cycles');
+        db.close();
+    } finally {
+        restoreEnv();
+        closeIngestDb();
+    }
+});
+
+test('a previously unattributed ledger row is stamped once the prompt hash matches', async () => {
+    /*
+     * Before usageHashPrompt, Brain ledger lines landed with null request_id and stayed that way
+     * under ON CONFLICT DO NOTHING. After mcp_prompt catches up under the ledger hash, the next
+     * ingest must UPDATE ownership in place — otherwise historical Brain spend stays invisible.
+     */
+    const { cfg, ledger, restoreEnv } = fixture();
+    fs.writeFileSync(ledger, ledgerLine());
+    const { openDb, migrate } = await import('../packages/harness-observe-server/src/observe-db.mjs');
+    try {
+        const prep = openDb(cfg.storage.target);
+        migrate(prep);
+        const orphan = ingestMcpUsage(prep, cfg, { ledgerPath: ledger });
+        assert.equal(orphan.inserted, 1);
+        assert.equal(orphan.unattributed, 1);
+        assert.equal(prep.get('SELECT request_id FROM mcp_call').request_id, null);
+        prep.close();
+
+        // Transcript write + correct prompt hash; ledger line already present as an orphan.
+        const report = await runIngestOnce(cfg);
+        assert.equal(report.mcpUsage.reattributed, 1);
+
+        const db = openDb(cfg.storage.target);
+        const call = db.get('SELECT request_id, prompt_tokens FROM mcp_call');
+        assert.ok(call.request_id, 'orphan must be stamped onto the request that sent the prompt');
+        assert.equal(call.prompt_tokens, 4242);
+        assert.equal(
+            db.get('SELECT brain_usage_calls FROM mcp_call_stats WHERE request_id = ?', [call.request_id])
+                ?.brain_usage_calls,
+            1,
+        );
         db.close();
     } finally {
         restoreEnv();
@@ -466,8 +526,8 @@ test('history backfills prompts that live ingest already passed by', async () =>
             'history must stop reporting every MCP call as CallDynamicTool',
         );
 
-        const prompt = db.get('SELECT * FROM mcp_prompt WHERE prompt_sha256 = ?', [sha(PROMPT)]);
-        assert.ok(prompt, 'backfill must record the prompt');
+        const prompt = db.get('SELECT * FROM mcp_prompt WHERE prompt_sha256 = ?', [ledgerSha(PROMPT)]);
+        assert.ok(prompt, 'backfill must record the prompt under the ledger hash');
         assert.equal(prompt.tool, 'mcp:ask_deepseek_flash_brain');
         // The derived request id must match the one ingest assigns: `<conversation>:<boundary>`.
         assert.match(prompt.request_id, /^conv:1$/);
