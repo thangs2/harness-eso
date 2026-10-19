@@ -3,17 +3,19 @@
  *
  * Three inputs, each with a different owner, and the summary keeps them distinct on purpose:
  *
- *   - **tool calls** come from `llm_call.tool_names`, i.e. what the agent actually invoked. This is
- *     the single source for Brain / Pro / executor counts, and it only became accurate once ingest
- *     resolved Cursor's `CallDynamicTool` wrapper to the real tool.
- *   - **Brain tokens** come from `mcp_call`, the ledger the MCP server writes. Cursor's `stop` hook
- *     reports only the Dispatcher's usage, so without this a turn's DeepSeek cost was invisible.
+ *   - **DeepSeek model-call counts** come from attributed `mcp_call` rows (the MCP usage ledger),
+ *     not from `llm_call.tool_names`. Cursor's agent transcript can record a `tool_use` for
+ *     `ask_deepseek_pro` / flash that never reached `postToolUse` or the MCP server — counting
+ *     those as Pro/Brain made the Tokens card show "DeepSeek Pro" with `brainUsageCalls = 0`.
+ *     The ledger only exists when the server actually handled the call (`finally` always writes).
+ *   - **Brain tokens** also come from `mcp_call`. Cursor's `stop` hook reports only the
+ *     Dispatcher's usage, so without this a turn's DeepSeek cost was invisible.
  *   - **`jev_count` is not an MCP call at all.** Jev is invoked over HTTP by the decision facade, and
  *     this counts decision-ledger rows that carry a Jev response. It sits in the same row because the
  *     UI shows "model calls per turn" in one card; it is labelled as decisions there, not as calls.
  */
 import { isoNow } from './observe-config.mjs';
-import { mcpCountsFromToolNames } from './parse-transcript-calls.mjs';
+import { classifyMcpToolName, mcpCountsFromToolNames } from './parse-transcript-calls.mjs';
 
 /** Counters every request row starts from, so an absent call still writes explicit zeros. */
 function emptyCounts() {
@@ -24,6 +26,22 @@ function emptyCounts() {
         smart_route_count: 0,
         jev_count: 0,
     };
+}
+
+/**
+ * Map a ledger / mcp_call row onto the same vocabulary as `llm_call.tool_names`.
+ * Prefer the resolved tool label; fall back to provider model id when the row was unattributed
+ * at insert time and only `model` was known.
+ *
+ * @param {{ tool?: string | null, model?: string | null }} row
+ */
+export function mcpCallCountLabel(row) {
+    const tool = String(row?.tool || '').trim();
+    if (tool && classifyMcpToolName(tool)) return tool;
+    const model = String(row?.model || '').toLowerCase();
+    if (model.includes('pro')) return 'mcp:ask_deepseek_pro';
+    if (model.includes('flash')) return 'mcp:ask_deepseek_flash';
+    return tool || (model ? `mcp:${model}` : '');
 }
 
 /**
@@ -49,19 +67,22 @@ export function refreshMcpCallStats(db, projectId, requestIds = null) {
         return fresh;
     };
 
+    /*
+     * Executed DeepSeek model calls only. Transcript `tool_use` is necessary but not sufficient:
+     * FinESO turn :21 recorded two `ask_deepseek_pro` tool_uses with no route-trace postToolUse,
+     * no deepseek-frames line, and no usage ledger row — yet `pro_count` was 2.
+     */
     for (const row of db.all(
-        `SELECT c.request_id, c.tool_names FROM llm_call c
-         JOIN request r ON r.id = c.request_id
-         WHERE r.project_id = ? AND c.request_id IN (${ph})`,
+        `SELECT request_id, tool, model FROM mcp_call
+         WHERE project_id = ? AND request_id IN (${ph}) AND request_id IS NOT NULL`,
         [projectId, ...ids],
     )) {
         const acc = accFor(row.request_id);
-        const part = mcpCountsFromToolNames(row.tool_names);
+        const part = mcpCountsFromToolNames(mcpCallCountLabel(row));
         acc.flash_brain_count += part.flash_brain_count;
         acc.flash_executor_count += part.flash_executor_count;
         acc.pro_count += part.pro_count;
         acc.smart_route_count += part.smart_route_count;
-        acc.jev_count += part.jev_count;
     }
 
     /*

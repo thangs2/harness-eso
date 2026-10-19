@@ -1,0 +1,29 @@
+---
+description: Lean delivery workflow (mechanism) — Ready → factory → HIR; no ABP/domain copy
+layer: delivery
+globs: "sdlc/08.wbs/**/*,SDLC/08.wbs/**/*,scripts/jira-*.sh"
+alwaysApply: false
+version: "1.0.0-mechanism"
+canonical: profiles/templates/rules/delivery.workflow.mdc
+---
+
+# Delivery workflow (lean mechanism)
+
+**Law:** Mechanism only. **Forbidden:** copying `baplatform` `stack.abp.*`, SaaS domain manifests, or another consumer's Jira wave maps wholesale.
+
+## Lanes (when Jira/WBS adopted — T5)
+
+| Lane | When | Action |
+|---|---|---|
+| Enrich | Unenriched / partial ticket | Human/agent enrich → Agent Zone specs; then Ready |
+| Zero-SDLC-Crawl | Enriched + contract pinned | `scripts/jira-impl.sh` → Eng factory |
+
+## Handoff
+
+Ready Eng slice → rule `workflow.agentic-factory` + skill `brain-dispatch`.  
+Qualified DEV → `workflow.qc-runtime`.  
+**Done / Merge = human only.**
+
+## Optional consumer files
+
+- `delivery.tdd-dod` · `delivery.task-standard` · `delivery.qc-scenarios` · `delivery.jira*` — author per consumer; do not clone ABP.

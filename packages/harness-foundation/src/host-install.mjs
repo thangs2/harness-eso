@@ -220,11 +220,15 @@ export function ensureConsumerRules(root, treeKey) {
     const targetRulesDir = path.join(root, `.${treeKey}`, 'rules');
     fs.mkdirSync(targetRulesDir, { recursive: true });
 
+    // Eager core.* (token-diet) + scoped workflow/delivery (alwaysApply:false in templates).
     const ruleNames = [
         'core.law-gate.mdc',
         'core.conversation-hygiene.mdc',
         'core.pipeline-gate.mdc',
         'core.scope-fallback.mdc',
+        'workflow.agentic-factory.mdc',
+        'workflow.qc-runtime.mdc',
+        'delivery.workflow.mdc',
     ];
 
     for (const name of ruleNames) {

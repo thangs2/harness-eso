@@ -2,8 +2,9 @@
 /**
  * `harnessctl fix consumer` — semi-auto remediations from maturity diagnostic.
  *
- * AUTO-SAFE: sync WORKFLOW_GUIDE, mkdir session dirs, host-pack refresh, optional provision.
- * NEVER auto: context-contract, agent-manifests, eso-coverage body, jira, domain rules
+ * AUTO-SAFE: sync WORKFLOW_GUIDE, mkdir session dirs, host-pack refresh, optional provision,
+ *   append Agent Zone path line to docgraph.scope (T3.4) when manifests dir exists.
+ * NEVER auto: context-contract, agent-manifests *content*, eso-coverage body, jira, domain rules
  *   → written to .harness/diagnostics/OPEN_FIXES.md for consumer self-adjust.
  */
 import fs from 'node:fs';
@@ -87,6 +88,67 @@ function syncSessionDirs(root, dryRun) {
   return { ok: true, detail: `ensured session dirs` };
 }
 
+/** Mechanism-only: ensure docgraph.scope declares Agent Zone path (does not author specs). */
+function ensureDocgraphAgentZoneScope(root, dryRun) {
+  const scopeRel = 'docgraph.scope';
+  const scopePath = path.join(root, scopeRel);
+  if (!fs.existsSync(scopePath)) {
+    return { ok: false, detail: 'docgraph.scope missing — author T2.1 first (OPEN)' };
+  }
+  const text = fs.readFileSync(scopePath, 'utf8');
+  const lines = text.split(/\r?\n/);
+  const trimmed = lines.map((l) => l.trim());
+  const patterns = ['path:sdlc/00.agent-manifests', 'path:SDLC/00.agent-manifests'];
+  if (patterns.some((p) => trimmed.some((l) => l === p || l.startsWith(p)))) {
+    return { ok: true, detail: 'docgraph.scope already lists Agent Zone path' };
+  }
+
+  let pathLine = null;
+  if (fs.existsSync(path.join(root, 'SDLC', '00.agent-manifests'))) {
+    pathLine = 'path:SDLC/00.agent-manifests';
+  } else if (fs.existsSync(path.join(root, 'sdlc', '00.agent-manifests'))) {
+    pathLine = 'path:sdlc/00.agent-manifests';
+  } else {
+    return {
+      ok: false,
+      detail: 'no sdlc|SDLC/00.agent-manifests dir — create Agent Zone (T3.2) first (OPEN)',
+    };
+  }
+
+  const block = [
+    '',
+    '# --- Agent Zone (high-density normative specs for AI / ESO Preflight) --------',
+    pathLine,
+    '',
+  ].join('\n');
+
+  // Prefer insert before Human Zone path:sdlc / path:SDLC; else after last ext: line; else prepend.
+  let insertAt = -1;
+  for (let i = 0; i < trimmed.length; i += 1) {
+    if (trimmed[i] === 'path:sdlc' || trimmed[i] === 'path:SDLC') {
+      insertAt = i;
+      break;
+    }
+  }
+  if (insertAt < 0) {
+    for (let i = trimmed.length - 1; i >= 0; i -= 1) {
+      if (trimmed[i].startsWith('ext:')) {
+        insertAt = i + 1;
+        break;
+      }
+    }
+  }
+  if (insertAt < 0) insertAt = 0;
+
+  const next = [...lines.slice(0, insertAt), ...block.split('\n'), ...lines.slice(insertAt)];
+  const body = next.join('\n').replace(/\n{3,}/g, '\n\n');
+  if (dryRun) {
+    return { ok: true, detail: `dry-run: would insert ${pathLine} into ${scopeRel}` };
+  }
+  fs.writeFileSync(scopePath, body.endsWith('\n') ? body : `${body}\n`);
+  return { ok: true, detail: `appended ${pathLine} to ${scopeRel}` };
+}
+
 function runHostPackRefresh(root, dryRun) {
   const cli = path.join(ESO_ROOT, 'packages', 'harness-cli', 'src', 'cli.mjs');
   if (dryRun) return { ok: true, detail: `dry-run: would host-pack refresh ${root}` };
@@ -128,6 +190,7 @@ function applySafe(root, consumerId, fails, opts) {
   let needHostPack = false;
   let needWorkflow = false;
   let needSessions = false;
+  let needDocgraphAgentZone = false;
 
   for (const c of fails) {
     if (!isAutoSafe(c)) {
@@ -140,8 +203,10 @@ function applySafe(root, consumerId, fails, opts) {
     else if (action === 'sync') {
       if (c.id === 'T1.1') needWorkflow = true;
       else if (c.id === 'T1.2') needSessions = true;
+      else if (c.id === 'T3.4') needDocgraphAgentZone = true;
       else if ((c.remediation?.hint || '').includes('WORKFLOW')) needWorkflow = true;
       else if ((c.remediation?.hint || '').includes('session')) needSessions = true;
+      else if ((c.remediation?.hint || '').includes('Agent Zone')) needDocgraphAgentZone = true;
       else skipped.push({ ...c, note: 'unknown sync target — left for OPEN_FIXES' });
     } else skipped.push(c);
   }
@@ -166,6 +231,22 @@ function applySafe(root, consumerId, fails, opts) {
   if (needSessions) {
     const r = syncSessionDirs(root, opts.dryRun);
     applied.push({ action: 'sync-session-dirs', checks: ['T1.2'], ...r });
+  }
+  if (needDocgraphAgentZone) {
+    const r = ensureDocgraphAgentZoneScope(root, opts.dryRun);
+    applied.push({ action: 'sync-docgraph-agent-zone', checks: ['T3.4'], ...r });
+    if (!r.ok) {
+      skipped.push({
+        id: 'T3.4',
+        title: 'docgraph.scope lists Agent Zone path',
+        severity: 'WARN',
+        remediation: {
+          action: 'docs',
+          hint: r.detail,
+        },
+        note: r.detail,
+      });
+    }
   }
 
   return { applied, openDocs: skipped.filter((s) => !isAutoSafe(s) || s.note) };

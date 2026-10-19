@@ -136,6 +136,23 @@ function runProbe(root, probe) {
   if (type === 'glob_min') {
     return globMin(root, probe.glob, probe.min ?? 1);
   }
+  if (type === 'file_contains_any') {
+    const rel = probe.path || '';
+    const full = path.join(root, rel);
+    if (!fs.existsSync(full) || !fs.statSync(full).isFile()) {
+      return { ok: false, evidence: `missing file ${rel}` };
+    }
+    const text = fs.readFileSync(full, 'utf8');
+    const lines = text.split(/\r?\n/).map((l) => l.trim());
+    const patterns = probe.patterns || [];
+    const hit = patterns.find((pat) => lines.some((l) => l === pat || l.startsWith(`${pat}`)));
+    return {
+      ok: Boolean(hit),
+      evidence: hit
+        ? `${rel} contains ${hit}`
+        : `${rel} missing any of: ${patterns.join(' | ')}`,
+    };
+  }
   return { ok: false, evidence: `unknown probe type: ${type}` };
 }
 

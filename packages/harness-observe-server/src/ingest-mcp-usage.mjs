@@ -110,6 +110,23 @@ function numOrNull(v) {
 }
 
 /**
+ * Prefer the transcript-resolved label on `mcp_prompt`; otherwise map the ledger `role` so
+ * `refreshMcpCallStats` can classify the row without waiting for attribution.
+ *
+ * @param {object} record ledger line
+ * @param {string | null | undefined} ownerTool
+ */
+export function toolLabelForLedgerRecord(record, ownerTool) {
+    if (ownerTool) return ownerTool;
+    const role = String(record?.role || '');
+    if (role === 'pro') return 'mcp:ask_deepseek_pro';
+    if (role === 'brain_flash') return 'mcp:ask_deepseek_flash_brain';
+    if (role === 'brain_fallback') return 'mcp:ask_deepseek_flash_brain_fallback';
+    if (role === 'executor') return 'mcp:ask_deepseek_flash';
+    return `mcp:${record?.model ?? 'unknown'}`;
+}
+
+/**
  * Version of the history walk. Bump when the walk starts deriving something new, so conversations
  * processed by an older version are revisited instead of keeping stale derivations forever.
  *
@@ -287,7 +304,7 @@ export function ingestMcpUsage(db, cfg, opts = {}) {
                     [
                         owner.request_id,
                         owner.conversation_id ?? null,
-                        owner.tool ?? `mcp:${record.model ?? 'unknown'}`,
+                        toolLabelForLedgerRecord(record, owner.tool),
                         id,
                         cfg.project.id,
                     ],
@@ -314,7 +331,7 @@ export function ingestMcpUsage(db, cfg, opts = {}) {
                 cfg.project.id,
                 owner?.request_id ?? null,
                 owner?.conversation_id ?? null,
-                owner?.tool ?? `mcp:${record.model ?? 'unknown'}`,
+                toolLabelForLedgerRecord(record, owner?.tool),
                 record.model ?? null,
                 sha,
                 numOrNull(record.promptChars),

@@ -162,6 +162,20 @@ To give human project members rich documentation while keeping AI token consumpt
 - **`guard-write.py`:** Enforces both the **HMAC Sufficiency Receipt** (`.eso-bundle-stamp.json`) and the **Brain Stamp** (`.pipeline-brain-stamp.json`, supporting both DeepSeek MCP and `.direct-mode` sentinel).
 - **`guard-shell.py`:** Blocks destructive shell commands and prevents bypassing `guard-write.py` via shell redirection into protected paths.
 
+### D. Engineering factory templates (maturity v1.2.0)
+
+Provision seeds (if missing) from `profiles/templates/`:
+
+| Artifact | Role |
+|---|---|
+| skill `brain-dispatch` | Pro/Flash tier, Brain stamp, chunk, Hybrid Executor |
+| rule `workflow.agentic-factory` | Ready → build/verify/audit → **HIR** (never agent Done) |
+| rule `workflow.qc-runtime` | QC after qualified DEV |
+| rule `delivery.workflow` | Lean delivery lanes — **mechanism only**; do not copy ABP `delivery.jira.*` |
+| `scripts/ci/verify-dual-harness.mjs` | Dual-IDE isolation CI (or keep BAP parity scripts) |
+
+**Port law:** Observatory host ports (`8792`/`8793`/`8794`) ≠ consumer product API ports (e.g. FinESO Cockpit `:8900`).
+
 ---
 
 ## 4. Context Discipline & Token-Diet Standard (`STD-ESO-PERF-02`)

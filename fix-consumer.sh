@@ -2,8 +2,9 @@
 # Semi-auto fix for a consumer from maturity diagnostic remediations.
 # Parallel to provision.sh / verify-consumer.sh.
 #
-# AUTO-SAFE: sync WORKFLOW_GUIDE, mkdir session dirs, host-pack refresh, optional provision
-# NEVER auto: context-contract / agent-manifests / domain rules → OPEN_FIXES.md
+# AUTO-SAFE: sync WORKFLOW_GUIDE, mkdir session dirs, host-pack refresh, optional provision,
+#            append path:*/00.agent-manifests to docgraph.scope (T3.4) when zone dir exists
+# NEVER auto: context-contract / agent-manifests content / domain rules → OPEN_FIXES.md
 #
 # Usage:
 #   ./fix-consumer.sh <consumer | all> [--dry-run] [--from-latest] [--force-provision] [--no-provision] [--strict] [--json]

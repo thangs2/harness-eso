@@ -485,6 +485,41 @@ test('two projects reading one machine-wide ledger each keep their own row', asy
     }
 });
 
+test('transcript tool_use alone does not inflate Pro/Brain call counts', async () => {
+    /*
+     * Cursor can emit ask_deepseek_pro in the assistant transcript without ever reaching the MCP
+     * server (no postToolUse, no ledger line). Counting those from llm_call.tool_names showed
+     * "DeepSeek Pro" with brainUsageCalls=0. Counts must follow attributed mcp_call rows.
+     */
+    const { cfg, restoreEnv } = fixture();
+    try {
+        await runIngestOnce(cfg);
+        const { openDb } = await import('../packages/harness-observe-server/src/observe-db.mjs');
+        const { refreshMcpCallStats } = await import(
+            '../packages/harness-observe-server/src/mcp-call-stats.mjs'
+        );
+        const db = openDb(cfg.storage.target);
+        // Transcript path already recorded mcp:ask_deepseek_flash_brain on the llm_call.
+        const req = db.get('SELECT id FROM request LIMIT 1');
+        assert.ok(req);
+        assert.match(
+            db.get('SELECT tool_names FROM llm_call WHERE request_id = ?', [req.id]).tool_names,
+            /ask_deepseek_flash_brain/,
+        );
+        // No ledger → no mcp_call → stats must not claim a Brain call happened.
+        db.run('DELETE FROM mcp_call');
+        refreshMcpCallStats(db, cfg.project.id, [req.id]);
+        const stats = db.get('SELECT * FROM mcp_call_stats WHERE request_id = ?', [req.id]);
+        assert.equal(stats.flash_brain_count, 0);
+        assert.equal(stats.pro_count, 0);
+        assert.equal(stats.brain_usage_calls, 0);
+        db.close();
+    } finally {
+        restoreEnv();
+        closeIngestDb();
+    }
+});
+
 test('history backfills prompts that live ingest already passed by', async () => {
     /*
      * Live ingest only reads new bytes. A transcript fully ingested before this feature existed
