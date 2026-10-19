@@ -18,14 +18,90 @@ export const adapter = {
         if (!q) return { snippets: [], trace: 'docgraph:skip-empty' };
         const root = ctx.root || findRepoRoot();
         const max = ctx.maxChars ?? MAX_SNIPPET;
-        const snippet = fetchDocgraph(q, root, max);
-        if (!snippet) return { snippets: [], trace: `docgraph:miss:${q.slice(0, 40)}` };
+        const rawSnippet = fetchDocgraph(q, root, max);
+        if (!rawSnippet) return { snippets: [], trace: `docgraph:miss:${q.slice(0, 40)}` };
+
+        const { text, specDebt } = extractNormativeSpec(rawSnippet, max);
         return {
-            snippets: [{ kind: 'law', text: snippet, query: q, meta: { adapterId: 'docgraph-cli' } }],
-            trace: `docgraph:ok:${q.slice(0, 40)}`,
+            snippets: [{ kind: 'law', text, query: q, meta: { adapterId: 'docgraph-cli', specDebt } }],
+            trace: `docgraph:ok:${q.slice(0, 40)}${specDebt ? ':spec_debt' : ''}`,
         };
     },
 };
+
+/**
+ * Extracts normative blocks (Invariants, Rules, Constraints, Alerts, bullet points)
+ * and strips background prose and historical narratives.
+ *
+ * @param {string} rawMarkdown
+ * @param {number} maxChars
+ * @returns {{ text: string, specDebt: boolean }}
+ */
+export function extractNormativeSpec(rawMarkdown, maxChars = 1200) {
+    if (!rawMarkdown || typeof rawMarkdown !== 'string') {
+        return { text: '', specDebt: false };
+    }
+
+    const lines = rawMarkdown.split('\n');
+    const normativeLines = [];
+    let inNormativeSection = false;
+    let foundNormativeMarker = false;
+
+    for (const line of lines) {
+        // Section header indicating invariants, rules, constraints, acceptance criteria
+        if (/^#{1,4}\s+(invariants?|rules?|constraints?|acceptance criteria|security rules?)/i.test(line)) {
+            inNormativeSection = true;
+            foundNormativeMarker = true;
+            normativeLines.push(line);
+            continue;
+        }
+
+        // Another header breaks the normative section
+        if (/^#{1,4}\s+/.test(line) && inNormativeSection) {
+            inNormativeSection = false;
+        }
+
+        // GitHub alert blocks (> [!CRITICAL], > [!IMPORTANT], > [!WARNING])
+        if (/^>\s*\[!(CRITICAL|IMPORTANT|WARNING|CAUTION)\]/i.test(line)) {
+            foundNormativeMarker = true;
+            normativeLines.push(line);
+            continue;
+        }
+
+        // Lines inside an alert block (starts with >)
+        if (normativeLines.length > 0 && normativeLines[normativeLines.length - 1].startsWith('>') && line.startsWith('>')) {
+            normativeLines.push(line);
+            continue;
+        }
+
+        // Invariant bullet points: - **INV-..., - **RULE-..., - **LAW-...
+        if (/^\s*[-*]\s+\*\*(INV|LAW|RULE|SEC)-[A-Z0-9_-]+\*\*/i.test(line)) {
+            foundNormativeMarker = true;
+            normativeLines.push(line);
+            continue;
+        }
+
+        // Lines inside normative section: keep structured items (bullets, numbers, tables, indented continuations)
+        if (inNormativeSection) {
+            if (/^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line) || /^\s*\|/.test(line) || /^\s{2,}/.test(line)) {
+                normativeLines.push(line);
+            }
+        }
+    }
+
+    // If normative blocks were identified, return them
+    if (foundNormativeMarker && normativeLines.length > 0) {
+        const text = normativeLines.join('\n').trim().slice(0, maxChars);
+        return { text, specDebt: false };
+    }
+
+    // Fallback: No normative markers found (old/legacy document).
+    // Return original snippet truncated to maxChars, but flag specDebt: true!
+    return {
+        text: rawMarkdown.trim().slice(0, maxChars),
+        specDebt: true,
+    };
+}
 
 function cacheFile(root, query) {
     const hash = crypto.createHash('sha256').update(query).digest('hex').slice(0, 32);

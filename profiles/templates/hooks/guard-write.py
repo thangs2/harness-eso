@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -465,12 +467,67 @@ def eso_fail_closed_blocks() -> bool:
     if mode != "fail_closed" and enforce_writes != "fail_closed":
         return False
     if data.get("allowWrite") is True:
+        # P2: State Hardening — Verify HMAC and TTL on Product State Receipt
+        if data.get("mac"):
+            secret = get_attest_secret(project_id())
+            if not verify_receipt_mac(data, secret):
+                return True  # Tampered attestation: block!
+            at_str = data.get("at")
+            if at_str:
+                try:
+                    at_dt = datetime.fromisoformat(str(at_str).replace("Z", "+00:00"))
+                    age = (datetime.now(timezone.utc) - at_dt).total_seconds()
+                    ttl = int(data.get("ttlSec") or 600)
+                    if age > ttl:
+                        return True  # Expired receipt: block!
+                except Exception:
+                    return True
         return False
     closure = _read_json(ROOT / SESSION_REL / ".eso-gap-closure.json")
     if closure.get("allClosed") is True and (not data.get("preflightAt") or closure.get("preflightAt") == data.get("preflightAt")):
         return False
     level = data.get("level") or ""
     return level in ("insufficient", "partial")
+
+
+def get_attest_secret(pid: str) -> str:
+    env_sec = os.environ.get("HARNESS_ATTEST_SECRET", "").strip()
+    if env_sec:
+        return env_sec
+    secret_path = product_state_dir() / ".attest_secret"
+    try:
+        if secret_path.is_file():
+            sec = secret_path.read_text(encoding="utf-8").strip()
+            if sec:
+                return sec
+    except Exception:
+        pass
+    return hashlib.sha256(f"harness-eso:{pid or 'default'}".encode("utf-8")).hexdigest()
+
+
+def verify_receipt_mac(doc: dict, secret: str) -> bool:
+    mac = str(doc.get("mac") or "").strip()
+    if not mac:
+        return False
+    inv_ids = doc.get("invIds") or []
+    if isinstance(inv_ids, list):
+        inv_str = ",".join(str(x) for x in inv_ids)
+    else:
+        inv_str = ""
+    score = float(doc.get("score") if doc.get("score") is not None else 0.0)
+    ttl = int(doc.get("ttlSec") or 600)
+    data = "|".join([
+        str(doc.get("projectId") or ""),
+        str(doc.get("at") or ""),
+        str(doc.get("fingerprint") or ""),
+        inv_str,
+        str(bool(doc.get("allowWrite"))).lower(),
+        str(doc.get("level") or ""),
+        f"{score:.2f}",
+        str(ttl),
+    ])
+    expected = hmac.new(secret.encode("utf-8"), data.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(mac, expected)
 
 
 def direct_mode_on() -> bool:

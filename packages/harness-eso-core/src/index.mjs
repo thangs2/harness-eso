@@ -1,5 +1,5 @@
 export { orchestrateTurn, loadEsoPolicy } from './orchestrate-turn.mjs';
-export { buildPreflightProjection, skippedPreflightProjection } from './preflight-projection.mjs';
+export { buildPreflightProjection, skippedPreflightProjection, extractPinnedInvariants } from './preflight-projection.mjs';
 export {
     ENFORCE_WRITES_VALUES,
     resolveEnforceWrites,
@@ -12,3 +12,12 @@ export { buildTurnVerdict } from './gate.mjs';
 export { createSourceRegistry } from './adapter-registry.mjs';
 export { resolveSkillPack } from './skill-pack.mjs';
 export { insertEvidenceLedger } from './eso-ledger.mjs';
+export { extractNormativeSpec } from '../adapters/docgraph-law.mjs';
+export { filterMemoryHits } from '../adapters/agentmemory-memory.mjs';
+export {
+    loadContextContract,
+    resolveDomainContract,
+    compilePinnedInvariants,
+    DEFAULT_CONTRACT_REL_PATHS,
+} from './context-contract.mjs';
+

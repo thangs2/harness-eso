@@ -1,3 +1,5 @@
+import { loadContextContract, compilePinnedInvariants } from './context-contract.mjs';
+
 /**
  * Preflight projection — the `.eso-preflight.json` document every host hook reads.
  *
@@ -9,14 +11,30 @@
  *
  * @param {object} turn      the host event that triggered preflight
  * @param {object} result    `orchestrateTurn` return value
- * @param {{ latencyMs?: number }} [opts]
+ * @param {{ latencyMs?: number, root?: string, cfg?: object, contract?: object, policy?: object }} [opts]
  */
 export function buildPreflightProjection(turn, result, opts = {}) {
-    const verdict = result.verdict;
-    const level = verdict.sufficiency.level;
+    const verdict = result.verdict || {};
+    const sufficiency = verdict.sufficiency || {};
+    const level = sufficiency.level ?? verdict.level;
     const surface = result.facade?.route
         ? { bucket: result.facade.route.bucket }
         : { bucket: result.facade?.l0?.winner?.bucket ?? 'general' };
+
+    const root = opts.root || opts.cfg?.root || turn.root;
+    const contract = opts.contract || (root ? loadContextContract(root, opts.contractPath || opts.policy?.eso?.contextContractPath) : null);
+    const pinnedInvariants = extractPinnedInvariants(result, {
+        root,
+        contract,
+        stem: turn.userQueryStem,
+        paths: turn.touchedPaths || turn.paths,
+        domainHint: turn.domainHint || opts.domainHint,
+    });
+    const domain = contract && !contract.contractMissing
+        ? (compilePinnedInvariants(contract, { stem: turn.userQueryStem, paths: turn.touchedPaths || turn.paths, domainHint: turn.domainHint }).domain)
+        : null;
+
+    const cognitiveState = level === 'sufficient' ? 'WARM' : (turn.fingerprint ? 'STALE' : 'COLD');
 
     return {
         ok: level !== 'insufficient' || verdict.allowPromptSubmit,
@@ -25,17 +43,68 @@ export function buildPreflightProjection(turn, result, opts = {}) {
         generationId: turn.generationId ?? turn.turnId ?? null,
         conversationId: turn.conversationId ?? null,
         userQueryStem: String(turn.userQueryStem || ''),
+        fingerprint: turn.fingerprint ?? null,
+        cognitiveState,
+        pinnedInvariants,
+        domain: domain ?? surface.bucket ?? null,
+        contractMissing: contract ? Boolean(contract.contractMissing) : true,
         allowWrite: verdict.allowProtectedWrite,
         level,
-        score: verdict.sufficiency.score,
+        score: sufficiency.score ?? verdict.score ?? 0,
         mode: verdict.esoMode,
         enforceWrites: verdict.enforceWrites,
-        gaps: verdict.sufficiency.gaps,
+        gaps: sufficiency.gaps ?? verdict.gaps ?? [],
         brainTierHint: turn.brainTierHint || 'flash',
         surface,
         metrics: { latencyMsTotal: opts.latencyMs ?? 0 },
         verdict,
     };
+}
+
+/**
+ * Extracts recognized invariant / rule codes from verified retrieval snippets and pack requirements.
+ * When a Context Contract is present, compiles and scopes invariants to the active domain.
+ *
+ * @param {object} result
+ * @param {object} [opts]
+ * @returns {string[]}
+ */
+export function extractPinnedInvariants(result, opts = {}) {
+    const invSet = new Set();
+    const snippets = result?.retrieval?.snippets || result?.collected?.retrieval?.snippets || [];
+    for (const s of snippets) {
+        if (!s.text) continue;
+        const matches = s.text.match(/(?:INV|LAW|RULE|SEC)-[A-Z0-9_-]+/gi);
+        if (matches) {
+            for (const m of matches) {
+                invSet.add(m.toUpperCase());
+            }
+        }
+    }
+    for (const term of result?.pack?.requiredDocTerms || []) {
+        if (/(?:INV|LAW|RULE|SEC)-/i.test(term)) {
+            invSet.add(term.toUpperCase());
+        }
+    }
+    const detected = Array.from(invSet);
+
+    const root = opts.root || opts.cfg?.root;
+    if (root) {
+        const contract = opts.contract || loadContextContract(root, opts.contractPath || opts.policy?.eso?.contextContractPath);
+        if (!contract.contractMissing) {
+            const compiled = compilePinnedInvariants(contract, {
+                stem: opts.stem || opts.userQueryStem,
+                paths: opts.paths || opts.touchedPaths,
+                domainHint: opts.domainHint,
+                attestedInvariants: detected,
+            });
+            if (compiled.pinnedInvariants.length > 0) {
+                return compiled.pinnedInvariants.slice(0, 5);
+            }
+        }
+    }
+
+    return detected.slice(0, 5);
 }
 
 /** The projection written when ESO is disabled — still a valid document for the other hooks. */

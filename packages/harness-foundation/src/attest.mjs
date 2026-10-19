@@ -34,6 +34,7 @@
  * the observer, which matches `sha256(prompt)` between transcript and ledger; that is not available at
  * gate time. A cross-project false positive is therefore possible and is stated rather than hidden.
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { productStateDir } from './workspace-store.mjs';
@@ -98,15 +99,78 @@ export function readEsoAttestation(projectId) {
 }
 
 /**
- * Record the pack's evidence verdict. Called by the preflight hook — never by a tool call.
+ * Retrieve or generate machine/project secret for signing attestations.
+ *
+ * @param {string} [projectId]
+ * @returns {string}
+ */
+export function getAttestationSecret(projectId = '') {
+    if (process.env.HARNESS_ATTEST_SECRET) {
+        return process.env.HARNESS_ATTEST_SECRET;
+    }
+    const secretPath = path.join(productStateDir(), '.attest_secret');
+    try {
+        if (fs.existsSync(secretPath)) {
+            const sec = fs.readFileSync(secretPath, 'utf8').trim();
+            if (sec) return sec;
+        }
+    } catch {
+        /* best-effort read */
+    }
+    try {
+        fs.mkdirSync(productStateDir(), { recursive: true });
+        const generated = crypto.randomBytes(32).toString('hex');
+        fs.writeFileSync(secretPath, generated, { mode: 0o600 });
+        return generated;
+    } catch {
+        return crypto.createHash('sha256').update(`harness-eso:${projectId || 'default'}`).digest('hex');
+    }
+}
+
+/**
+ * Computes an HMAC-SHA256 signature for a Sufficiency Receipt doc.
+ *
+ * @param {object} doc
+ * @param {string} [secret]
+ * @returns {string}
+ */
+export function computeReceiptMac(doc, secret) {
+    if (!doc || typeof doc !== 'object') return '';
+    const sec = secret || getAttestationSecret(doc.projectId);
+    const invStr = Array.isArray(doc.invIds) ? doc.invIds.join(',') : '';
+    const scoreStr = typeof doc.score === 'number' ? Number(doc.score).toFixed(2) : '0.00';
+    const ttlStr = String(doc.ttlSec ?? 600);
+    const macData = [
+        String(doc.projectId || ''),
+        String(doc.at || ''),
+        String(doc.fingerprint || ''),
+        invStr,
+        String(doc.allowWrite === true),
+        String(doc.level || ''),
+        scoreStr,
+        ttlStr,
+    ].join('|');
+    return crypto.createHmac('sha256', sec).update(macData).digest('hex');
+}
+
+/**
+ * Record the pack's evidence verdict as a signed Sufficiency Receipt.
+ * Called by the preflight hook or gap closer — never by a tool call.
  *
  * @param {string} projectId
  * @param {object} input
+ * @param {string} [secret]
  */
-export function writeEsoAttestation(projectId, input) {
+export function writeEsoAttestation(projectId, input, secret = undefined) {
     if (!projectId) throw new Error('attestation needs a project id');
     const dir = attestDir();
     fs.mkdirSync(dir, { recursive: true });
+    const sec = secret || getAttestationSecret(projectId);
+    const ttlSec = Number.isFinite(input?.ttlSec) ? Number(input.ttlSec) : 600;
+    const invIds = Array.isArray(input?.invIds)
+        ? input.invIds
+        : (Array.isArray(input?.pinnedInvariants) ? input.pinnedInvariants : []);
+
     const doc = {
         ok: true,
         projectId,
@@ -119,12 +183,68 @@ export function writeEsoAttestation(projectId, input) {
         allowWrite: input?.allowWrite === true,
         enforceWrites: input?.enforceWrites ?? null,
         mode: input?.mode ?? null,
+        fingerprint: input?.fingerprint ? String(input.fingerprint) : null,
+        invIds,
+        ttlSec,
     };
+    doc.mac = computeReceiptMac(doc, sec);
+
     const file = esoAttestationFile(projectId);
     const tmp = `${file}.tmp`;
     fs.writeFileSync(tmp, `${JSON.stringify(doc, null, 4)}\n`, 'utf8');
     fs.renameSync(tmp, file);
     return doc;
+}
+
+/**
+ * Verify a Sufficiency Receipt on disk in Product State.
+ * Checks existence, allowWrite, TTL, fingerprint, and HMAC signature.
+ *
+ * @param {string} projectId
+ * @param {string|null} [currentFingerprint]
+ * @param {object} [opts]
+ * @returns {{ valid: boolean, reason?: string, receipt?: object, ageSec?: number, ttlSec?: number }}
+ */
+export function verifySufficiencyReceipt(projectId, currentFingerprint = null, opts = {}) {
+    if (!projectId) return { valid: false, reason: 'missing_project_id' };
+    const doc = readEsoAttestation(projectId);
+    if (!doc || typeof doc !== 'object') {
+        return { valid: false, reason: 'missing_receipt' };
+    }
+
+    if (doc.allowWrite !== true) {
+        return { valid: false, reason: 'allow_write_false', receipt: doc };
+    }
+
+    const nowMs = opts.now instanceof Date
+        ? opts.now.getTime()
+        : (typeof opts.now === 'number' ? opts.now : Date.now());
+    const atMs = Date.parse(doc.at);
+    const ttlSec = Number(doc.ttlSec ?? 600);
+    if (!Number.isFinite(atMs)) {
+        return { valid: false, reason: 'invalid_timestamp', receipt: doc };
+    }
+    const ageSec = (nowMs - atMs) / 1000;
+    if (ageSec < -120) {
+        return { valid: false, reason: 'clock_skew', ageSec, ttlSec, receipt: doc };
+    }
+    if (ageSec > ttlSec) {
+        return { valid: false, reason: 'expired', ageSec, ttlSec, receipt: doc };
+    }
+
+    if (currentFingerprint && doc.fingerprint) {
+        if (doc.fingerprint !== currentFingerprint) {
+            return { valid: false, reason: 'fingerprint_mismatch', receipt: doc };
+        }
+    }
+
+    const sec = opts.secret || getAttestationSecret(projectId);
+    const expectedMac = computeReceiptMac(doc, sec);
+    if (!doc.mac || doc.mac !== expectedMac) {
+        return { valid: false, reason: 'mac_mismatch', receipt: doc };
+    }
+
+    return { valid: true, receipt: doc };
 }
 
 /**

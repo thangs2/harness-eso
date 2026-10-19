@@ -258,6 +258,9 @@ export function writeBundleStampFromPreflight(preflight, policy, root = process.
                 allowWrite: payload.allowWrite,
                 enforceWrites: payload.enforceWrites,
                 mode: payload.mode,
+                fingerprint: preflight.fingerprint ?? null,
+                invIds: preflight.pinnedInvariants ?? preflight.invIds ?? [],
+                ttlSec: preflight.ttlSec ?? 600,
             });
         }
     } catch {

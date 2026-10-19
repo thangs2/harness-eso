@@ -46,6 +46,7 @@ export async function orchestrateTurn(event, options = {}) {
         surface,
         stem,
         root,
+        conversationId: event.conversationId ?? options.conversationId,
         reads: options.reads,
         injectSnippets: options.injectSnippets,
     });

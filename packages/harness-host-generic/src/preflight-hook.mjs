@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildPreflightProjection, orchestrateTurn } from '@mu/harness-eso-core';
-import { findRepoRoot } from '@mu/harness-foundation/pure';
+import { computeFastFingerprint, findRepoRoot } from '@mu/harness-foundation/pure';
 import { detectShape, emitHook, harnessTree, loadPolicyForCwd, readStdin, sessionDir } from './hook-io.mjs';
 import { readGapClosure, readPreflight, resetGapClosure, writeBundleStampFromPreflight } from './eso-gap-io.mjs';
 
@@ -75,16 +75,36 @@ export async function run() {
         data.conversation_id ?? data.session_id ?? data.conversationId ?? data.sessionId ?? '';
     const generationId = data.generation_id ?? data.generationId ?? '';
     const requestId = generationId || sessionId || `preflight-${Date.now()}`;
+    const currentStem = stemFromPrompt(data);
+    const currentFp = computeFastFingerprint({ stem: currentStem, root });
 
     // Antigravity fires PreInvocation before EVERY LLM call (invocationNum: 0, 1, 2...).
-    // For continuation steps (invocationNum > 0) in the same session, do not wipe gap closure!
-    if (shape === 'antigravity' && typeof data.invocationNum === 'number' && data.invocationNum > 0) {
+    // For continuation steps (invocationNum > 0) in the same session, do not wipe gap closure
+    // UNLESS the prompt changed (intent drift) or repository state changed (dirty index)!
+    const isContinuation =
+        (typeof data.invocationNum === 'number' && data.invocationNum > 0) ||
+        data.isContinuation === true;
+
+    if (isContinuation) {
         const existingPre = readPreflight(root, tree);
-        if (existingPre?.at && (existingPre.conversationId === sessionId || !sessionId)) {
+        const effectiveStem = currentStem || existingPre?.userQueryStem || '';
+        const effectiveFp = computeFastFingerprint({ stem: effectiveStem, root });
+        const isMeaningful = currentStem ? currentStem.length >= 6 : Boolean(effectiveStem);
+
+        const matchesFingerprint = existingPre?.fingerprint
+            ? Boolean(isMeaningful && existingPre.fingerprint === effectiveFp)
+            : (!currentStem && !existingPre?.fingerprint);
+
+        if (existingPre?.at && matchesFingerprint && (existingPre.conversationId === sessionId || !sessionId)) {
             emitHook(
                 {
                     permission: 'allow',
-                    esoPreflight: { level: existingPre.level, score: existingPre.score, continuation: true },
+                    esoPreflight: {
+                        level: existingPre.level,
+                        score: existingPre.score,
+                        continuation: true,
+                        cognitiveState: 'HOT',
+                    },
                 },
                 shape,
             );
@@ -101,7 +121,8 @@ export async function run() {
         event: 'turn_start',
         kernelEvent: 'prompt.submitted',
         turnId: requestId,
-        userQueryStem: stemFromPrompt(data),
+        userQueryStem: currentStem,
+        fingerprint: currentFp,
         conversationId: sessionId,
         generationId,
         harnessTree: tree,
@@ -122,7 +143,7 @@ export async function run() {
         if (result.skipped) {
             projection = { ok: true, skipped: true, reason: result.reason, at: new Date().toISOString() };
         } else {
-            projection = buildPreflightProjection(turn, result, { latencyMs: Date.now() - t0 });
+            projection = buildPreflightProjection(turn, result, { latencyMs: Date.now() - t0, root, policy });
         }
     } catch (err) {
         /*
@@ -141,7 +162,10 @@ export async function run() {
     }
 
     try {
-        if (projection) projection.conversationId = sessionId;
+        if (projection) {
+            projection.conversationId = sessionId;
+            if (!projection.fingerprint && currentFp) projection.fingerprint = currentFp;
+        }
         writePreflightFile(root, tree, projection);
         resetGapClosure(projection.at, root, tree);
         writeBundleStampFromPreflight(projection, policy, root, tree);
@@ -151,12 +175,28 @@ export async function run() {
 
     const out = {
         permission: 'allow',
-        esoPreflight: { level: projection.level, score: projection.score },
+        esoPreflight: {
+            level: projection.level,
+            score: projection.score,
+            cognitiveState: projection.cognitiveState || 'COLD',
+        },
     };
-    const block = buildEvidencePreflightBlock(projection);
-    if (block && projection.level !== 'sufficient') {
-        out.additional_context = `[ESO COGNITION] Evidence sufficiency notice: For code/implementation, close gaps before code generation. For docs/analysis/planning, Brain deep-thinking is permitted immediately; close gaps before protected writes.\n\n${block}`;
+
+    // Cognitive Plane Dispatch:
+    // WARM: Level is sufficient -> JIT-Pin verified Invariants (<= 30 tokens)
+    // COLD / STALE: Level is insufficient -> emit structured Gap Directives
+    if (projection.level === 'sufficient') {
+        if (Array.isArray(projection.pinnedInvariants) && projection.pinnedInvariants.length > 0) {
+            out.additional_context = `[ESO INVARIANTS PINNED] Active invariants for this turn:\n${projection.pinnedInvariants.map((id) => `• ${id}`).join('\n')}`;
+        } else {
+            out.additional_context = `[ESO SUFFICIENT] Evidence verified (score: ${Number(projection.score ?? 1).toFixed(2)}). All invariants satisfied.`;
+        }
+    } else {
+        const stateLabel = projection.cognitiveState === 'STALE' ? 'STALE' : 'COLD';
+        const block = buildEvidencePreflightBlock(projection);
+        out.additional_context = `[ESO EVIDENCE GAP - ${stateLabel}] Score: ${Number(projection.score ?? 0).toFixed(2)}. Required before write:\n${block}`;
     }
+
     if (projection.ok === false && projection.enforceWrites === 'fail_closed') {
         out.permission = 'deny';
         out.user_message =

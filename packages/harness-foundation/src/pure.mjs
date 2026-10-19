@@ -52,10 +52,20 @@ export {
     BRAIN_ROLES,
     attestDir,
     brainAttested,
+    computeReceiptMac,
     esoAttestationFile,
+    getAttestationSecret,
     projectIdFrom,
     readEsoAttestation,
     usageLedgerFile,
+    verifySufficiencyReceipt,
     writeEsoAttestation,
 } from './attest.mjs';
+
+export {
+    computeFastFingerprint,
+    normalizeStem,
+    readGitHead,
+    readIndexMtime,
+} from './fingerprint.mjs';
 
