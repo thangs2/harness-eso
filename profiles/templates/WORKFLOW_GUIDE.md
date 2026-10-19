@@ -73,7 +73,8 @@ flowchart TD
   │   - Route by Operational Lane:
   │
   ├── LANE A — `dev-runtime` on ENRICHED JIRA TICKET (Zero-SDLC-Crawl Fast Path):
-  │     ├── Run `scripts/jira-impl.sh [--start] <KEY>` (or `get_issue` via MCP)
+  │     ├── DEFAULT (~80–90%, not hard-forced): `scripts/jira-impl.sh [--start] <KEY>`
+  │     │     (Jira already holds Execution Pack → next step is implement; MCP `get_issue` = fallback only)
   │     ├── Treat Enriched Jira Ticket (15 sections, 8-col AC matrix, Code evidence, Verify cmd) as Compiled SoT
   │     └──► FORBIDDEN to crawl `sdlc/01..12` or `docs/releases/`! Read ONLY Jira ticket + target code files
   │
@@ -153,7 +154,7 @@ To give human project members rich documentation while keeping AI token consumpt
 | Script | Purpose | Token Impact |
 |---|---|---|
 | `scripts/jira-enrich-desc.sh [--lean] <KEY> <FILE>` | Updates Jira Description via REST API v2, auto-converts Markdown GFM tables to Jira Wiki, verifies `ac_id` table, and **preserves 100% of `subtasks` & `issuelinks`**. | Saves ~60% MCP payload tokens |
-| `scripts/jira-impl.sh [--start] <KEY>` | **Fast Path (`Zero-SDLC-Crawl`)** for Enriched tickets: prints self-contained Execution Pack (AC matrix, Code evidence, Verify cmd, Native links). Forbids crawling `sdlc/01..12`. | Saves 15,000–25,000 tokens/ticket |
+| `scripts/jira-impl.sh [--start] <KEY>` | **Default Fast Path (`Zero-SDLC-Crawl`)** for implement on Enriched tickets (~80–90% preferred, not hard-forced): prints Execution Pack. Prefer over habitual `get_issue`. Forbids crawling `sdlc/01..12`. | Saves 15,000–25,000 tokens/ticket |
 | `scripts/jira-impl-full.sh [--start] <KEY>` | **Targeted Fallback** for unenriched/partial tickets: fetches Ticket + Parent Story + `02.jira-waves/` + `01.domains/*.spec.md` + exact cited `sdlc/` paths. | Saves ~80% vs blind repo crawl |
 | `scripts/jira-sync-wave-map.sh [--apply] [W1..W4\|ALL]` | Batch-syncs live Jira statuses (`TD / IP / HIL / Done`) back into human `01.ticket-map.md` Mermaid diagrams at sprint/wave boundaries. | **0 AI Tokens** |
 
@@ -168,7 +169,7 @@ To give human project members rich documentation while keeping AI token consumpt
 ```text
 [1. Preflight State]    --> Leverage HOT (0 tok) & WARM (≤30 tok JIT-Pin) continuation states
           │
-[2. Zero-SDLC-Crawl]    --> If Jira ticket is Enriched, run `scripts/jira-impl.sh` & code directly
+[2. Zero-SDLC-Crawl]    --> Default: `scripts/jira-impl.sh [--start] <KEY>` then code (get_issue = fallback)
           │
 [3. Agent Zone First]   --> Query `sdlc/00.agent-manifests/` (`01.domains` & `02.jira-waves`) before `sdlc/01..12`
           │
