@@ -113,11 +113,11 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                 End-to-End Pipeline Data Flow & Decision Orchestration
                             </h3>
                             <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
-                                07.dataflow.md
+                                07.dataflow.md · V2.0
                             </span>
                         </div>
                         <p className="text-xs text-slate-400 m-0 mt-0.5">
-                            Complete turn lifecycle from Prompt Ingest → Decision Facade → Recon → ESO Gate → Brain → Distillation
+                            Turn lifecycle: Preflight (HOT/WARM/COLD) → Decision Facade &amp; Lanes → Recon → ESO Gate + HMAC Receipt → Brain → Execution → Distillation
                         </p>
                     </div>
                 </div>
@@ -178,10 +178,10 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                                            Step 1 · Prompt Ingest & Law Gate
+                                            Step 1 · Cognitive Preflight & Fingerprint Gates
                                         </span>
                                         <span className="text-[11px] text-slate-400">
-                                            (Law Gate & Context Load)
+                                            (Law Gate · Context Contract · HOT / WARM / COLD)
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
@@ -202,30 +202,30 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                     <div className="p-2.5 rounded-lg bg-surface-raised/60 border border-surface-border/50">
                                         <div className="font-semibold text-slate-200 mb-1 flex items-center gap-1.5">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                            Mandatory Law Gate
+                                            Context Contract &amp; Law Gate
                                         </div>
                                         <p className="text-[11px] text-slate-400 m-0">
-                                            Enforce workspace invariants, Sacred Execution Pipeline, and zero-scratch discipline.
+                                            Load <code>00.context-contract.json</code> → resolve <code>domain_slug</code> and pinned <code>INV-*</code>; enforce AGENTS.md law.
                                         </p>
                                     </div>
 
                                     <div className="p-2.5 rounded-lg bg-surface-raised/60 border border-surface-border/50">
                                         <div className="font-semibold text-slate-200 mb-1 flex items-center gap-1.5">
                                             <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                                            Intent Classification
+                                            Fingerprint Gates G1 / G2
                                         </div>
                                         <p className="text-[11px] text-slate-400 m-0">
-                                            Dispatches prompt type: Pure Q&A · Jira Read · Code Modification · Diagnostic.
+                                            G1: stem &lt; 6 chars never goes HOT. G2: missing or dirty git fingerprint fails closed to COLD.
                                         </p>
                                     </div>
 
                                     <div className="p-2.5 rounded-lg bg-surface-raised/60 border border-surface-border/50">
                                         <div className="font-semibold text-slate-200 mb-1 flex items-center gap-1.5">
                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                                            Protective Guardrails
+                                            HOT / WARM / COLD
                                         </div>
                                         <p className="text-[11px] text-slate-400 m-0">
-                                            No unrequested git commits, preserve existing comments, enforce bounded diffs.
+                                            HOT: 0ms, 0 tokens injected. WARM: ≤30-token JIT-pin of <code>INV-*</code>. COLD: full recon + gap directive.
                                         </p>
                                     </div>
                                 </div>
@@ -247,10 +247,10 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold uppercase tracking-wider text-purple-400">
-                                            Step 2 · Classification & Ambiguity Resolution
+                                            Step 2 · Decision Facade & Lane Routing
                                         </span>
                                         <span className="text-[11px] text-slate-400">
-                                            (Decision Facade: L0 vs Jev System One)
+                                            (L0 vs Jev · Lane A enriched Jira / B fallback / C intake)
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -356,7 +356,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                             Step 3 · Reconnaissance via Adapters
                                         </span>
                                         <span className="text-[11px] text-slate-400">
-                                            (Evidence Collection — Zero File Dump)
+                                            (COLD turns only — Delta-scoped, zero file dump)
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 text-xs">
@@ -385,7 +385,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-300 m-0 leading-relaxed">
-                                            Retrieves cross-session episodic memories, ticket facts, and previous architectural decisions via <code className="text-amber-200">memory_smart_search</code>.
+                                            Delta-scoped episodic recall via <code className="text-amber-200">memory_smart_search</code> with <code className="text-amber-200">excludeSessionId</code> (no same-session echo).
                                         </p>
                                     </div>
 
@@ -406,7 +406,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-300 m-0 leading-relaxed">
-                                            Extracts 30–50 line slices of authoritative law, invariants, DoR, and API specs directly via <code className="text-emerald-200">docgraph --q</code>.
+                                            Normative slicing on Agent Zone first: only <code className="text-emerald-200">## Invariants</code>, <code className="text-emerald-200">INV-*</code>, [!CRITICAL]; flags <code className="text-emerald-200">specDebt</code> on legacy prose.
                                         </p>
                                     </div>
 
@@ -449,10 +449,10 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                                            Step 4 · Evidence Sufficiency Gate (ESO)
+                                            Step 4 · Sufficiency Gate & HMAC Receipt
                                         </span>
                                         <span className="text-[11px] text-slate-400">
-                                            Formula: score = (lawRatio × 0.55) + (readRatio × 0.45)
+                                            score = (lawRatio × 0.55) + (readRatio × 0.45) · SUFFICIENT iff score ≥ T_high and 0 gaps
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -482,7 +482,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                             {trace.isSufficient && <Badge tone="ok">PASS</Badge>}
                                         </div>
                                         <p className="text-[11px] text-slate-300 m-0 leading-relaxed">
-                                            Score ≥ T_high and 0 open gaps. Unlocks write authorization (<code className="text-emerald-300">allowWrite = true</code>) to proceed to Step 5.
+                                            Score ≥ T_high and 0 open gaps (or promoted by <code className="text-emerald-300">recordGapToolUse</code> when all gaps close). Mints HMAC-SHA256 receipt in <code className="text-emerald-300">.eso-bundle-stamp.json</code>; <code>guard-write.py</code> verifies signature, TTL and Brain Stamp before unlocking writes.
                                         </p>
                                     </div>
 
@@ -544,10 +544,10 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
-                                            Step 5 · Cognitive Allocation (Brain Tiers)
+                                            Step 5 · Cognitive Allocation
                                         </span>
                                         <span className="text-[11px] text-slate-400">
-                                            (Token Diet & Reasoning Tier Enforcement)
+                                            (Direct IDE · Brain Flash · Brain Pro)
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -581,14 +581,14 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                     >
                                         <div className="flex items-center justify-between mb-1.5">
                                             <span className="text-xs font-bold text-emerald-300">
-                                                5.1 Zero Brain
+                                                5.1 Direct IDE
                                             </span>
                                             <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
-                                                0 Model Tokens
+                                                0 Brain Tokens
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-300 m-0 leading-relaxed">
-                                            Dispatcher operates exclusively via IDE tools: Jira lookups, running tests, slice reading, single-line edits.
+                                            IDE model reasons and patches directly (<code>.direct-mode</code> sentinel, Brain Stamp <code>via: direct_ide</code>).
                                         </p>
                                     </div>
 
@@ -609,7 +609,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-300 m-0 leading-relaxed">
-                                            Default workhorse: Test-Driven Development (TDD), implementing business logic with clear DoR, bugfixes with stack traces.
+                                            Default workhorse: implementation, bugfixes, TDD, WBS slices with AC, and Jira enrichment.
                                         </p>
                                     </div>
 
@@ -630,7 +630,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-300 m-0 leading-relaxed">
-                                            Deep architectural synthesis: Domain modeling, invariant violations, deadlock investigation, or multi-step reasoning.
+                                            Exception tier: greenfield bounded contexts, cross-module money/tenant redesign, or law conflicts.
                                         </p>
                                     </div>
                                 </div>
@@ -660,13 +660,13 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                     </div>
                                     <ul className="text-[11px] text-slate-300 space-y-1.5 m-0 pl-4 list-disc">
                                         <li>
-                                            <strong className="text-slate-200">Slice Reading Discipline:</strong> Never dump &gt;100 lines; use range-read with StartLine/EndLine.
+                                            <strong className="text-slate-200">Surgical Patches:</strong> Minimal <code className="text-teal-300">replace_file_content</code> edits, preserving comments.
                                         </li>
                                         <li>
-                                            <strong className="text-slate-200">Surgical Patches:</strong> Use <code className="text-teal-300">replace_file_content</code>, preserving existing comments.
+                                            <strong className="text-slate-200">Deterministic Verify:</strong> <code className="text-teal-300">dotnet test</code> / <code className="text-teal-300">node --test</code> / selfcheck.
                                         </li>
                                         <li>
-                                            <strong className="text-slate-200">Verification:</strong> Execute local tests (<code className="text-teal-300">bun test | tail -n 25</code>).
+                                            <strong className="text-slate-200">Jira Rollup:</strong> In Progress (21) → Human In Review (31) + Story rollup.
                                         </li>
                                     </ul>
                                 </div>
@@ -681,7 +681,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                                            Step 7 · Knowledge Distillation
+                                            Step 7-8 · Distillation & Handoff
                                         </span>
                                         {trace.memorySaved ? (
                                             <Badge tone="ok">Memory Saved</Badge>
@@ -690,7 +690,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                         )}
                                     </div>
                                     <p className="text-[11px] text-slate-300 m-0 leading-relaxed mb-2">
-                                        Persists finalized decisions, discovered defects, and modified symbols via <code className="text-emerald-300">memory_save</code> to feed Step 3.1 in subsequent turns.
+                                        Persists verified decisions, lessons, and touched symbols via <code className="text-emerald-300">memory_save</code>, then hands off with file links and <code className="text-emerald-300">READY_FOR_HUMAN_REVIEW</code>.
                                     </p>
                                     <div className="p-2 rounded bg-surface-raised/80 border border-surface-border text-[10px] font-mono text-slate-400 flex items-center justify-between">
                                         <span>Next turn inherits context automatically</span>
