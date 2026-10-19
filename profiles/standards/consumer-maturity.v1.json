@@ -1,0 +1,346 @@
+{
+  "version": "1.0.0",
+  "id": "consumer-maturity",
+  "title": "Harness ESO Consumer Maturity Standard",
+  "humanDoc": "documents/03.state-and-contracts/05.consumer-maturity-standard.md",
+  "opsChecklist": "documents/04.operations/08.consumer-maturity-checklist.md",
+  "law": {
+    "mechanismOnly": true,
+    "forbidden": [
+      "Copy domain rules from baplatform (ABP/Jira/SaaS manifests) into other consumers",
+      "Mutate consumer during verify \u2014 diagnostic is read-only"
+    ],
+    "fix": {
+      "autoSafeActions": [
+        "provision",
+        "sync",
+        "host-pack-refresh"
+      ],
+      "neverAuto": [
+        "docs"
+      ],
+      "note": "fix-consumer applies only autoSafe; docs \u2192 OPEN_FIXES.md"
+    }
+  },
+  "tiers": [
+    {
+      "id": "T0",
+      "name": "Host installed",
+      "checks": [
+        {
+          "id": "T0.1",
+          "title": "Host pack directory present",
+          "severity": "CRITICAL",
+          "probe": {
+            "type": "dir_exists",
+            "path": ".harness/host-pack"
+          },
+          "remediation": {
+            "action": "provision",
+            "hint": "./provision.sh <id> --host-mode dual-ide",
+            "autoSafe": true
+          }
+        },
+        {
+          "id": "T0.2",
+          "title": "harness.config.json with server.port",
+          "severity": "CRITICAL",
+          "probe": {
+            "type": "json_has_keys",
+            "path": "harness.config.json",
+            "keys": [
+              "server.port"
+            ]
+          },
+          "remediation": {
+            "action": "provision",
+            "hint": "Align port in harness.config.json (8792/8793/8794) then provision --force if needed",
+            "autoSafe": true
+          }
+        },
+        {
+          "id": "T0.3",
+          "title": "Dual-IDE trees exist (.cursor + .agents)",
+          "severity": "CRITICAL",
+          "probe": {
+            "type": "all_exist",
+            "paths": [
+              ".cursor",
+              ".agents"
+            ],
+            "as": "dir"
+          },
+          "remediation": {
+            "action": "provision",
+            "hint": "./provision.sh <id> --host-mode dual-ide",
+            "autoSafe": true
+          }
+        },
+        {
+          "id": "T0.4",
+          "title": "Write guards present (both trees)",
+          "severity": "CRITICAL",
+          "probe": {
+            "type": "all_exist",
+            "paths": [
+              ".cursor/hooks/guard-write.py",
+              ".agents/hooks/guard-write.py"
+            ],
+            "as": "file"
+          },
+          "remediation": {
+            "action": "host-pack-refresh",
+            "hint": "harnessctl host-pack refresh <consumer>",
+            "autoSafe": true
+          }
+        },
+        {
+          "id": "T0.5",
+          "title": "decision-policy.json has paths + eso + tokenDiet",
+          "severity": "CRITICAL",
+          "probe": {
+            "type": "json_has_keys",
+            "path": ".harness/decision-policy.json",
+            "keys": [
+              "paths",
+              "eso",
+              "tokenDiet"
+            ]
+          },
+          "remediation": {
+            "action": "provision",
+            "hint": "./provision.sh <id> (merges decision-policy)",
+            "autoSafe": true
+          }
+        },
+        {
+          "id": "T0.6",
+          "title": "host-install-state.json present",
+          "severity": "WARN",
+          "probe": {
+            "type": "file_exists",
+            "path": ".harness/host-install-state.json"
+          },
+          "remediation": {
+            "action": "provision",
+            "hint": "./provision.sh <id>",
+            "autoSafe": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "T1",
+      "name": "Workflow + token diet",
+      "checks": [
+        {
+          "id": "T1.1",
+          "title": "WORKFLOW_GUIDE.md under .harness",
+          "severity": "WARN",
+          "probe": {
+            "type": "file_exists",
+            "path": ".harness/WORKFLOW_GUIDE.md"
+          },
+          "remediation": {
+            "action": "sync",
+            "hint": "Copy profiles/templates/WORKFLOW_GUIDE.md \u2192 .harness/WORKFLOW_GUIDE.md",
+            "autoSafe": true
+          }
+        },
+        {
+          "id": "T1.2",
+          "title": "Session dirs for both IDE trees",
+          "severity": "WARN",
+          "probe": {
+            "type": "all_exist",
+            "paths": [
+              ".cursor/session",
+              ".agents/session"
+            ],
+            "as": "dir"
+          },
+          "remediation": {
+            "action": "sync",
+            "hint": "mkdir -p .cursor/session .agents/session",
+            "autoSafe": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "T2",
+      "name": "Recon Trinity",
+      "checks": [
+        {
+          "id": "T2.1",
+          "title": "docgraph.scope at repo root",
+          "severity": "WARN",
+          "probe": {
+            "type": "file_exists",
+            "path": "docgraph.scope"
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Add docgraph.scope covering sdlc/SDLC + AGENTS.md + rules",
+            "autoSafe": false
+          }
+        },
+        {
+          "id": "T2.2",
+          "title": "AGENTS.md supreme law present",
+          "severity": "WARN",
+          "probe": {
+            "type": "file_exists",
+            "path": "AGENTS.md"
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Author consumer AGENTS.md (mechanism pipeline + domain INV)",
+            "autoSafe": false
+          }
+        },
+        {
+          "id": "T2.3",
+          "title": "Codegraph index directory (.codegraph)",
+          "severity": "INFO",
+          "probe": {
+            "type": "dir_exists",
+            "path": ".codegraph"
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "codegraph init -i at consumer root",
+            "autoSafe": false
+          }
+        },
+        {
+          "id": "T2.4",
+          "title": "Docgraph index directory (.docgraph)",
+          "severity": "INFO",
+          "probe": {
+            "type": "dir_exists",
+            "path": ".docgraph"
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "docgraph init / build at consumer root",
+            "autoSafe": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "T3",
+      "name": "Dual-zone + context-contract",
+      "checks": [
+        {
+          "id": "T3.1",
+          "title": "00.context-contract.json present",
+          "severity": "WARN",
+          "probe": {
+            "type": "any_exists",
+            "paths": [
+              "sdlc/00.governance/00.context-contract.json",
+              "SDLC/00.governance/00.context-contract.json"
+            ]
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Create consumer-specific context-contract mapping domains \u2192 INV-* (do not copy baplatform domains)",
+            "autoSafe": false
+          }
+        },
+        {
+          "id": "T3.2",
+          "title": "Agent manifests zone present",
+          "severity": "WARN",
+          "probe": {
+            "type": "any_exists",
+            "paths": [
+              "sdlc/00.agent-manifests",
+              "SDLC/00.agent-manifests"
+            ],
+            "as": "dir"
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Add 00.agent-manifests/01.domains/*.spec.md for THIS consumer's INV",
+            "autoSafe": false
+          }
+        },
+        {
+          "id": "T3.3",
+          "title": "eso-coverage.json scorecard",
+          "severity": "INFO",
+          "probe": {
+            "type": "file_exists",
+            "path": ".harness/eso-coverage.json"
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Generate baseline .harness/eso-coverage.json after T3 docs land",
+            "autoSafe": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "T4",
+      "name": "Engineering SLP control plane",
+      "checks": [
+        {
+          "id": "T4.1",
+          "title": "Engineering *-runtime agents (Cursor)",
+          "severity": "INFO",
+          "probe": {
+            "type": "glob_min",
+            "glob": ".cursor/agents/*-runtime.md",
+            "min": 5
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Port 7 engineering workers (scout/plan/build/verify/audit/fixbug/qc) dual-harness",
+            "autoSafe": false
+          }
+        },
+        {
+          "id": "T4.2",
+          "title": "pipeline-gate rule present (Cursor)",
+          "severity": "INFO",
+          "probe": {
+            "type": "any_exists",
+            "paths": [
+              ".cursor/rules/core.pipeline-gate.mdc",
+              ".cursor/rules/core.pipeline-gate.md"
+            ]
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Add mechanism core.pipeline-gate (dual-harness .mdc/.md)",
+            "autoSafe": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "T5",
+      "name": "Jira delivery factory (optional)",
+      "checks": [
+        {
+          "id": "T5.1",
+          "title": "jira-impl.sh present (optional lane)",
+          "severity": "INFO",
+          "probe": {
+            "type": "file_exists",
+            "path": "scripts/jira-impl.sh"
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Only if consumer uses Jira Execution Pack \u2014 do not invent a fake Jira lane",
+            "autoSafe": false
+          }
+        }
+      ]
+    }
+  ]
+}

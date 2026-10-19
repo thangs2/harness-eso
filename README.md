@@ -61,6 +61,8 @@ A **consumer** is a repo the product is installed into. It must live **outside**
 harnessctl init profile /path/to/consumer --plan            # dry run — writes nothing
 harnessctl init profile /path/to/consumer --id <id> --host-mode dual-ide
 harnessctl host-pack status /path/to/consumer               # expect integrity ok, verification ok
+./verify-consumer.sh <id>                                      # maturity diagnostic → .harness/diagnostics/
+./fix-consumer.sh <id>                                         # semi-auto safe remediations + OPEN_FIXES.md
 # then reload the IDE window — required, the IDE caches hooks.json at window open
 ```
 

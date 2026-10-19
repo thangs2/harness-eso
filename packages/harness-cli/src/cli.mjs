@@ -8,6 +8,8 @@ import { runInitProfile } from './init-profile-cmd.mjs';
 import { runHostPack } from './host-pack-cmd.mjs';
 import { runStorageGc, storageStatus } from './storage-gc.mjs';
 import { runTokenDiet } from './token-diet-cmd.mjs';
+import { runVerifyConsumer } from './verify-consumer-cmd.mjs';
+import { runFixConsumer } from './fix-consumer-cmd.mjs';
 
 applyWorkspaceEnv();
 
@@ -19,6 +21,8 @@ function usage() {
 
   harnessctl init profile <consumer-path> [--plan] [--id <id>] [--name <name>] [--host-mode dual-ide|all-ide|claude|superset]
   harnessctl host-pack status|refresh|add-ide|remove-ide [consumer | --project <id>]
+  harnessctl verify consumer <path|--project <id>> [--json] [--strict] [--out <dir>]
+  harnessctl fix consumer <path|--project <id>> [--dry-run] [--from-latest] [--force-provision] [--no-provision] [--strict] [--json]
   harnessctl token-diet [consumer | --project <id>] [--json]
   harnessctl configure list | harnessctl configure use <id>
   harnessctl observatory up|down|restart|status|health|logs|build|smoke [--project <id>]
@@ -123,6 +127,16 @@ async function main() {
     if (cmd === 'token-diet' || (cmd === 'check' && argv[1] === 'token-diet')) {
         const sliceFrom = cmd === 'check' ? 2 : 1;
         runTokenDiet(argv.slice(sliceFrom));
+        return;
+    }
+
+    if (cmd === 'verify' && argv[1] === 'consumer') {
+        runVerifyConsumer(argv.slice(2));
+        return;
+    }
+
+    if (cmd === 'fix' && argv[1] === 'consumer') {
+        runFixConsumer(argv.slice(2));
         return;
     }
 
