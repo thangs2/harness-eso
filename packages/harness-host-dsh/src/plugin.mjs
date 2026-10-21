@@ -14,6 +14,7 @@ import {
     createHostRuntime,
     hardBlockersFromChecks,
     loadCheckInputs,
+    resolveEsoPolicy,
     withHardBlockers,
 } from '@mu/harness-eso-core';
 import { createDshSessionMemory } from './memory-provider.mjs';
@@ -46,6 +47,12 @@ export function createDshEsoPlugin(options = {}) {
         all.push(createDshSkillsLaw({ root, maxSnippets: options.lawSnippets }));
     }
     const runtime = createHostRuntime({ root, policy, providers: all });
+    /*
+     * Checks may also come from the consumer's policy (`eso.checks`), so a host shim does not have to
+     * be the place a project's paths are configured. An explicit option still wins: it is the more
+     * specific declaration.
+     */
+    const declaredChecks = checks ?? resolveEsoPolicy(policy).checks;
 
     /**
      * Checks are declared as inputs (paths, tables), so the same call works from a hook bundle and
@@ -56,7 +63,7 @@ export function createDshEsoPlugin(options = {}) {
      * consumer never asked for.
      */
     async function preflight(event, overrides = {}) {
-        const declared = overrides.checks ?? checks;
+        const declared = overrides.checks ?? declaredChecks;
         let loaded = null;
         let blockers = [];
         if (declared) {

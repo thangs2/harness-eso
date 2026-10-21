@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { resolveEsoPolicy } from '../packages/harness-eso-core/src/eso-policy.mjs';
 import { buildTurnVerdict } from '../packages/harness-eso-core/src/gate.mjs';
 import { createDshEsoPlugin } from '../packages/harness-host-dsh/src/plugin.mjs';
 import { policyWithNativeMemory } from './fixtures/host-runtime-fixture.mjs';
@@ -179,4 +180,59 @@ test('without a declared check the verdict keeps its old shape', async () => {
     });
     const result = await plugin.preflight({ event: 'turn_start', userQueryStem: 'ship it' });
     assert.deepEqual(result.verdict.hardBlockers, []);
+});
+
+test('a consumer can declare checks in policy, and invalid entries are dropped with the shape intact', () => {
+    const resolved = resolveEsoPolicy({
+        eso: {
+            checks: {
+                contract: { before: 'a.json', after: 'b.json' },
+                tenant: { files: ['q.sql'], tables: ['orders', ''] },
+                migration: { files: ['001.sql'] },
+            },
+        },
+    });
+    assert.deepEqual(resolved.checks, {
+        contract: { before: 'a.json', after: 'b.json', direction: 'response' },
+        tenant: { files: ['q.sql'], tables: ['orders'] },
+        migration: { files: ['001.sql'] },
+    });
+
+    // Invalid entries disappear instead of throwing on the preflight path.
+    const partial = resolveEsoPolicy({
+        eso: { checks: { tenant: { files: ['q.sql'] }, contract: { before: 'a.json' } } },
+    });
+    assert.equal(partial.checks, null);
+
+    assert.equal(resolveEsoPolicy({ eso: {} }).checks, null);
+});
+
+test('checks from eso.checks drive the DSH verdict without being passed to the plugin', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-blockers-policy-'));
+    write(root, '001.sql', 'drop table orders;');
+    const policy = policyWithNativeMemory();
+    policy.eso.checks = { migration: { files: ['001.sql'] } };
+    const plugin = createDshEsoPlugin({ root, policy, searchEvents: async () => [], law: false });
+
+    const result = await plugin.preflight({ event: 'turn_start', userQueryStem: 'ship it' });
+    assert.equal(result.verdict.allowProtectedWrite, false);
+    assert.equal(result.verdict.hardBlockers[0].ref, '001.sql');
+});
+
+test('an explicit checks option wins over the policy', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-blockers-wins-'));
+    write(root, 'from-policy.sql', 'drop table orders;');
+    write(root, 'from-option.sql', 'create table orders (id integer);');
+    const policy = policyWithNativeMemory();
+    policy.eso.checks = { migration: { files: ['from-policy.sql'] } };
+    const plugin = createDshEsoPlugin({
+        root,
+        policy,
+        checks: { migration: { files: ['from-option.sql'] } },
+        searchEvents: async () => [],
+        law: false,
+    });
+
+    const result = await plugin.preflight({ event: 'turn_start', userQueryStem: 'ship it' });
+    assert.deepEqual(result.verdict.hardBlockers, [], 'the specific declaration replaces the policy one');
 });

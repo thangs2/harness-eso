@@ -28,6 +28,73 @@ export const DEFAULT_ESO_POLICY = {
 
 /** Values already reported, so a hot path warns once instead of on every turn. */
 const warnedEnforceValues = new Set();
+const warnedCheckValues = new Set();
+
+function warnAboutCheck(key, message) {
+    if (warnedCheckValues.has(key)) return;
+    warnedCheckValues.add(key);
+    // stderr, for the same reason as enforceWrites: stdout is the hook verdict.
+    process.stderr.write(`harness: ${message}\n`);
+}
+
+const pathOrObject = (value) =>
+    (typeof value === 'string' && value.trim().length > 0) || (value !== null && typeof value === 'object');
+
+const stringList = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === 'string' && item.trim()) : []);
+
+/**
+ * Normalise `eso.checks` — the checks a consumer declares so it does not have to pass them to a host
+ * shim by hand.
+ *
+ * Invalid entries are **dropped with one warning each**, never thrown: this is read on the preflight
+ * path, and a typo in a config must not turn into an exception inside a hook. Dropping is the safe
+ * direction only because `checks` is opt-in — a declared check that is dropped means "no blocker",
+ * which is why the warning exists.
+ *
+ * @param {unknown} raw
+ * @returns {{ contract?: object, tenant?: object, migration?: object } | null}
+ */
+export function normaliseChecks(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const out = {};
+
+    if (raw.contract !== undefined) {
+        const before = raw.contract?.before;
+        const after = raw.contract?.after;
+        if (pathOrObject(before) && pathOrObject(after)) {
+            out.contract = {
+                before,
+                after,
+                direction: raw.contract?.direction === 'request' ? 'request' : 'response',
+            };
+        } else {
+            warnAboutCheck(
+                'contract',
+                'eso.checks.contract needs before and after (a path or a parsed object) — ignored',
+            );
+        }
+    }
+
+    if (raw.tenant !== undefined) {
+        const files = stringList(raw.tenant?.files);
+        const tables = stringList(raw.tenant?.tables);
+        if (files.length && tables.length) out.tenant = { files, tables };
+        else {
+            warnAboutCheck(
+                'tenant',
+                'eso.checks.tenant needs both files and tables (an isolation check without tables checks nothing) — ignored',
+            );
+        }
+    }
+
+    if (raw.migration !== undefined) {
+        const files = stringList(raw.migration?.files);
+        if (files.length) out.migration = { files };
+        else warnAboutCheck('migration', 'eso.checks.migration needs files — ignored');
+    }
+
+    return Object.keys(out).length ? out : null;
+}
 
 /**
  * Resolve `eso.enforceWrites` to a definite posture.
@@ -98,6 +165,7 @@ export function resolveEsoPolicy(policy) {
             jevOnPartial: preflightRaw.jevOnPartial === true,
         },
         memoryFetch: raw.memoryFetch !== false,
+        checks: normaliseChecks(raw.checks),
         cognition: {
             insufficientPromptGate:
                 raw.cognition?.insufficientPromptGate ??
