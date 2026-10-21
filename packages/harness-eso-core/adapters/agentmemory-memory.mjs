@@ -32,7 +32,8 @@ export function filterMemoryHits(hits, options = {}) {
 export const adapter = {
     id: 'agentmemory-mcp',
     kinds: ['memory'],
-    /** Policy permission only — the registry decides whether this provider is the one selected. */
+    /** Opt-in only in the implicit default path; a policy chain may still name it. */
+    requireExplicit: true,
     enabled(policy) {
         return policy?.eso?.sources?.memory?.enabled !== false;
     },

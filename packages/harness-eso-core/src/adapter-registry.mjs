@@ -102,7 +102,12 @@ export function createSourceRegistry(policy, extra = [], options = {}) {
 
             const chain = chainFor(kind);
             if (!chain.length) {
-                const first = providers.find((p) => enabled(p, kind));
+                /*
+                 * Implicit default: the first capable provider, EXCEPT one that requires an explicit
+                 * choice. Memory is the case that matters — a consumer that never configured memory
+                 * must not start probing agentmemory just because the registry learned about it.
+                 */
+                const first = providers.find((p) => !p.requireExplicit && enabled(p, kind));
                 return { adapter: first ?? null, reason: first ? 'default' : 'none' };
             }
 

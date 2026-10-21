@@ -54,3 +54,14 @@ test('a misspelled explicit id fails visibly instead of falling back', () => {
     assert.equal(picked.adapter, null, 'a typo must not silently select a different provider');
     assert.equal(picked.reason, 'exhausted');
 });
+
+test('memory is never switched on by the implicit default', () => {
+    /*
+     * Before the registry owned selection, every memory adapter self-gated on `adapter`, so an
+     * unconfigured consumer resolved to null. Moving selection into the registry must not quietly
+     * enable agentmemory just because the provider exists.
+     */
+    const registry = createSourceRegistry({ eso: { sources: { memory: { enabled: true } } } });
+    assert.equal(registry.resolve('memory'), null);
+    assert.equal(registry.resolveWithReason('memory').reason, 'none');
+});
