@@ -116,7 +116,13 @@ function main() {
         for (const rel of ['.cursor/hooks.json', '.agents/hooks.json', '.claude/settings.json']) {
             const abs = path.join(out, rel);
             if (!fs.existsSync(abs)) continue;
-            fs.writeFileSync(abs, rel.endsWith('settings.json') ? '{}\n' : '{"version":1,"hooks":{}}\n');
+            /*
+             * Each host has its own empty shape. Cursor reads `{version, hooks}`; Antigravity reads a
+             * bare map of named hook blocks, so writing Cursor's shape there invents blocks named
+             * `version` and `hooks`. Claude's settings file is JSON with a `hooks` key.
+             */
+            const empty = rel === '.cursor/hooks.json' ? '{"version":1,"hooks":{}}\n' : '{}\n';
+            fs.writeFileSync(abs, empty);
             stripped.push(`${rel} (emptied)`);
         }
         if (stripped.length) {
