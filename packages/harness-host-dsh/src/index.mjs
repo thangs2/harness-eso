@@ -6,6 +6,7 @@
  * without a running Harness.
  */
 export { createDshSessionMemory } from './memory-provider.mjs';
+export { createDshEsoPlugin } from './plugin.mjs';
 export {
     buildDshBridgePatch,
     buildDshBundleManifest,

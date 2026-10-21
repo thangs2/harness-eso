@@ -8,7 +8,7 @@ import { loadHarnessProfile } from './profile-load.mjs';
 /**
  * DPEF v2 — Collect → Gate (Act is host-side).
  * @param {object} event
- * @param {{ phase?: 'preflight' | 'full', cfg?: object, policy?: object, profileId?: string, decideFn?: typeof decide, waiver?: object, injectSnippets?: object[], reads?: object }} [options]
+ * @param {{ phase?: 'preflight' | 'full', cfg?: object, policy?: object, profileId?: string, decideFn?: typeof decide, waiver?: object, injectSnippets?: object[], reads?: object, registry?: object }} [options]
  */
 export async function orchestrateTurn(event, options = {}) {
     const phase = options.phase ?? 'preflight';
@@ -49,6 +49,7 @@ export async function orchestrateTurn(event, options = {}) {
         conversationId: event.conversationId ?? options.conversationId,
         reads: options.reads,
         injectSnippets: options.injectSnippets,
+        registry: options.registry,
     });
 
     const verdict = buildTurnVerdict({

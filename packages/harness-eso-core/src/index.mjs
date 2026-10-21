@@ -13,6 +13,7 @@ export { createSourceRegistry } from './adapter-registry.mjs';
 export { probeCapabilities, PROBE_KINDS } from './capability-probe.mjs';
 export { applyRecipe, loadRecipe, listRecipes, mergePolicy, validateRecipe, RECIPE_VERSION } from './recipe.mjs';
 export { runHostConformance, CONFORMANCE_TIERS } from './conformance.mjs';
+export { createHostRuntime } from './host-runtime.mjs';
 export { resolveSkillPack } from './skill-pack.mjs';
 export { insertEvidenceLedger } from './eso-ledger.mjs';
 export { extractNormativeSpec } from '../adapters/docgraph-law.mjs';
