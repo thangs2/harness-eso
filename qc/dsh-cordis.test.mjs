@@ -10,6 +10,7 @@ import {
     createEsoCordisPlugin,
     INSTRUCTIONS_SOURCE,
 } from '../packages/harness-host-dsh/src/cordis.mjs';
+import { readBlockerRecords } from '../packages/harness-eso-core/src/blocker-log.mjs';
 import { policyWithNativeMemory } from './fixtures/host-runtime-fixture.mjs';
 
 function fakeCtx() {
@@ -127,20 +128,31 @@ test('a sufficient verdict with nothing to act on adds no context', () => {
     );
 });
 
-test('a declared migration check rejects the step before a model request', async () => {
+test('a declared migration check rejects the step and leaves a reason in the trail', async () => {
     const { root, handler } = setup();
     fs.writeFileSync(path.join(root, '001-drop.sql'), 'drop table orders;');
+    const log = path.join(root, 'eso-blockers.jsonl');
     const ctx = fakeCtx();
     createEsoCordisPlugin({
         root,
         policy: policyWithNativeMemory(),
         checks: { migration: { files: ['001-drop.sql'] } },
+        blockerLogFile: log,
     }).apply(ctx);
-    const out = await ctx.listeners.get(CORDIS_PRE_STEP)({ messages: [], signal: {} }, async () => ({
-        kind: 'continue',
-        messages: [],
-    }));
+    const out = await ctx.listeners.get(CORDIS_PRE_STEP)(
+        { messages: [{ role: 'user', content: [{ type: 'text', text: 'ship it' }] }], step: 4, signal: {} },
+        async () => ({ kind: 'continue', messages: [] }),
+    );
     assert.deepEqual(out, { kind: 'reject' });
+
+    // The host's reject carries no reason, so this file is the only account of why the step stopped.
+    const [record] = readBlockerRecords(log);
+    assert.equal(record.kind, 'hard-blocker');
+    assert.equal(record.step, 4);
+    assert.equal(record.stem, 'ship it');
+    assert.equal(record.blockers[0].source, 'migration');
+    assert.equal(record.blockers[0].kind, 'drop-table');
+    assert.equal(record.blockers[0].ref, '001-drop.sql');
     assert.equal(typeof handler, 'function');
 });
 

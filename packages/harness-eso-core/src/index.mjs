@@ -32,6 +32,13 @@ export {
     rejectOnHardBlockers,
     hasHardBlockers,
 } from './hard-blockers.mjs';
+export {
+    appendBlockerRecord,
+    blockerLogFile,
+    createBlockerRecorder,
+    readBlockerRecords,
+    BLOCKER_LOG_ENV,
+} from './blocker-log.mjs';
 export { createJevVerifier, resolveVerifierMode, verifyClaim, VERIFIER_CLAIMS, VERIFIER_MODES } from './verifier.mjs';
 export { createExternalReasoner, createHostReasoner, delegateReasoning } from './reasoner.mjs';
 export { resolveSkillPack } from './skill-pack.mjs';

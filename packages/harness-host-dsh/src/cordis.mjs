@@ -20,8 +20,11 @@
  * the pack's guards, one enforcement path rather than two that can disagree. This plugin adds
  * evidence, and rejects on a hard blocker: a named finding from a declared `contract`, `tenant` or
  * `migration` check. A score is never consulted — the checks exclude their own marked exceptions.
+ *
+ * A reject carries no reason in the host's contract, so every rejection is appended to the product
+ * state trail (`eso-blockers.jsonl`) first. A log failure does not weaken the reject.
  */
-import { rejectOnHardBlockers } from '@mu/harness-eso-core';
+import { createBlockerRecorder, rejectOnHardBlockers } from '@mu/harness-eso-core';
 import { createDshEsoPlugin } from './plugin.mjs';
 
 /** The one hook this plugin registers. */
@@ -80,6 +83,9 @@ function userQueryStem(payload) {
  *   Host message factory. DSH's is `createUserMessage` from `@deepseek-ai/dsh-agent-instructions`.
  *   Without one the plugin still runs preflight, but adds nothing: a fabricated message shape would
  *   be rejected by the session store, and a plugin that throws ends the step.
+ * @param {((payload: object) => { ok: boolean, error?: string })|null} [options.recordBlocker]
+ *   Where a rejection is recorded. Default: append to `~/.harness/eso-blockers.jsonl` (or
+ *   `HARNESS_ESO_BLOCKER_LOG`). `null` disables recording; the reject still happens.
  * @param {((result: object) => boolean)|null} [options.rejectOn]
  *   Predicate over the preflight result. `true` returns `{ kind: 'reject' }`, ending the step as
  *   blocked before a model request. Default `rejectOnHardBlockers` (blockers only; pass
@@ -88,6 +94,10 @@ function userQueryStem(payload) {
  */
 export function createEsoCordisPlugin(options = {}) {
     const { createMessage = null, rejectOn = rejectOnHardBlockers } = options;
+    const recordBlocker =
+        options.recordBlocker === undefined
+            ? createBlockerRecorder({ root: options.root, file: options.blockerLogFile, host: 'dsh' })
+            : options.recordBlocker;
     return {
         name: 'harness-eso',
         inject: ['sessions'],
@@ -103,15 +113,29 @@ export function createEsoCordisPlugin(options = {}) {
                     if (!decision || decision.kind === 'reject') return decision;
                     if (payload?.signal?.aborted) return decision;
 
+                    const stem = userQueryStem(payload);
                     let result;
                     try {
-                        result = await plugin.preflight({ event: 'turn_start', userQueryStem: userQueryStem(payload) });
+                        result = await plugin.preflight({ event: 'turn_start', userQueryStem: stem });
                     } catch {
                         /* A failing plugin must not end the turn (DSH ends the step on a throw). */
                         return decision;
                     }
 
-                    if (typeof rejectOn === 'function' && rejectOn(result)) return { kind: 'reject' };
+                    if (typeof rejectOn === 'function' && rejectOn(result)) {
+                        if (typeof recordBlocker === 'function') {
+                            recordBlocker({
+                                event: CORDIS_PRE_STEP,
+                                kind: result?.hardBlockers?.length ? 'hard-blocker' : 'policy',
+                                step: payload?.step ?? null,
+                                agent: payload?.agent?.id ?? null,
+                                stem: stem || null,
+                                blockers: result?.hardBlockers ?? [],
+                                errors: result?.checkErrors ?? [],
+                            });
+                        }
+                        return { kind: 'reject' };
+                    }
 
                     const block = buildContextBlock(result);
                     if (!block || typeof createMessage !== 'function') return decision;
