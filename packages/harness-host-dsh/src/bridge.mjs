@@ -17,6 +17,14 @@ export const BRIDGE_ROW_ID = 'harness-eso-hooks';
 export const BRIDGE_PACKAGE = '@deepseek-ai/dsh-hooks-claude-code';
 
 /**
+ * The bridge package is not part of a DSH profile by default (checked on 0.2.1-rc.2: no
+ * `@deepseek-ai/dsh-hooks-*` in `~/.dsh/profiles/node_modules`). A bundle that inserts the row but
+ * does not declare the dependency produces a row the loader cannot resolve, so the manifest declares
+ * it and the installer is what fetches it.
+ */
+export const BRIDGE_PACKAGE_RANGE = '^0.2.1';
+
+/**
  * @param {{ configPath?: string, projectDir?: string, defaultTimeoutMs?: number }} [options]
  */
 export function buildDshBridgePatch(options = {}) {
@@ -72,6 +80,7 @@ export function buildDshBundleManifest(name = 'harness-eso-dsh-bundle') {
         version: '1.0.0',
         private: true,
         type: 'module',
+        dependencies: { [BRIDGE_PACKAGE]: BRIDGE_PACKAGE_RANGE },
         dsh: { bundle: { patch: './cordis.patch.yml' } },
     };
 }
@@ -84,11 +93,19 @@ commands it points at are the ones harness-eso already provisioned in the consum
 
 ## Prerequisite
 
-The consumer must have the Claude host tree, because the bridge reads a Claude Code hook config:
+The consumer must have the Claude host tree, because the bridge reads a Claude Code hook config. A
+consumer provisioned earlier only needs the tree added — do not re-run the whole profile flow:
 
 \`\`\`bash
-./harness init profile <consumer> --host-mode claude   # writes .claude/settings.json
+# already provisioned (has .harness/host-pack + another IDE tree)
+harnessctl host-pack add-ide --profile claude-superset <consumer>
+
+# fresh consumer
+harnessctl init profile <consumer> --host-mode claude
 \`\`\`
+
+The bundle declares \`@deepseek-ai/dsh-hooks-claude-code\` as a dependency because a DSH profile does
+not ship it; install it through DSH so the package is fetched into the profile.
 
 ## Install
 

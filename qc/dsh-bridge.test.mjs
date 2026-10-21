@@ -40,7 +40,11 @@ test('the generated bundle is a valid package with the three files', () => {
 
     const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
     assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml');
-    assert.match(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), /init profile/);
+    // Without this the inserted row names a package the profile does not have.
+    assert.equal(manifest.dependencies['@deepseek-ai/dsh-hooks-claude-code'], '^0.2.1');
+    const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
+    assert.match(readme, /init profile/);
+    assert.match(readme, /host-pack add-ide --profile claude-superset/, 'an existing consumer gets one tree, not a re-provision');
 
     assert.throws(() => writeDshBundle(dir), /not empty/, 'a non-empty target needs --force');
     writeDshBundle(dir, { force: true });

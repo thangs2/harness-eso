@@ -57,6 +57,8 @@ export function runDshBridge(argv = []) {
     console.log(`\nbundle written: ${result.dir}`);
     for (const file of result.files) console.log(`  ${file}`);
     console.log('\nInstall it in DSH: Plugins -> install a bundle, target = this directory.');
-    console.log('Prerequisite: the consumer has .claude/settings.json (harness init profile --host-mode claude).\n');
+    console.log('Prerequisite: the consumer has .claude/settings.json —');
+    console.log('  already provisioned: harnessctl host-pack add-ide --profile claude-superset <consumer>');
+    console.log('  fresh consumer:      harnessctl init profile <consumer> --host-mode claude\n');
     return result;
 }
