@@ -102,6 +102,7 @@ export async function runEsoForRequest(db, cfg, requestId, policy) {
             policy,
             db,
             jevCallsThisTurn,
+            reads: event.reads,
         },
     );
     if (result.skipped) return { ok: false, reason: result.reason || 'skipped' };

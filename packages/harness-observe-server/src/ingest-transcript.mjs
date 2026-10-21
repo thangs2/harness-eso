@@ -1139,8 +1139,15 @@ export function buildRequestDecisionContext(db, cfg, requestId) {
     );
     if (!req) return null;
 
-    const files = db.all('SELECT path FROM request_file WHERE request_id = ?', [requestId]);
+    const files = db.all('SELECT path, reads FROM request_file WHERE request_id = ?', [requestId]);
     const touchedPaths = [...new Set(files.map((f) => relPath(cfg, f.path)).filter(Boolean))];
+    /*
+     * The replay must see the work the turn actually did. Without `reads`, COLLECT scored every
+     * replayed request as if the agent had opened nothing: `scoreSufficiency` falls back to
+     * `readCount ?? 0`, so the dashboard reported `insufficient / score 0` for turns that had read
+     * dozens of files, and only the law term could ever contribute.
+     */
+    const readCount = files.reduce((n, f) => n + Number(f.reads || 0), 0);
 
     const rules = db.all('SELECT rule_id FROM request_rule WHERE request_id = ?', [requestId]);
     const stem = String(req.user_query || '')
@@ -1155,6 +1162,7 @@ export function buildRequestDecisionContext(db, cfg, requestId) {
         turnId: req.id,
         userQueryStem: stem,
         touchedPaths,
+        reads: { readCount },
         hookMeta: {
             attachedRules: rules.map((r) => r.rule_id),
             generationId: req.generation_id,

@@ -14,6 +14,7 @@
  * link generation_id -> request, then attribute the raw events to that request.
  */
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isoNow } from './observe-config.mjs';
@@ -33,23 +34,56 @@ function harnessOf(filePath) {
     return 'cursor';
 }
 
+/**
+ * Bytes immediately before the cursor, used to prove it still points where we left it.
+ *
+ * The cursor is a byte offset, and it is only meaningful if the bytes before it are still the ones
+ * already consumed. `size < last_offset` catches a truncation, but NOT a rewrite that is at least as
+ * long: the pass then reads the tail from a stale offset, so every line before it is lost permanently.
+ * Observed on a real consumer: 35 tool events carrying one request's `generation_id` were present in
+ * `route-trace.jsonl` but had never reached the DB, because the trace was rewritten in place and the
+ * cursor kept advancing past them. The transcript ingest already guards against exactly this; hooks
+ * did not.
+ */
+const SEAM_BYTES = 64;
+
+function readRange(filePath, start, length) {
+    const fd = fs.openSync(filePath, 'r');
+    try {
+        const buf = Buffer.alloc(length);
+        const n = fs.readSync(fd, buf, 0, length, start);
+        return buf.subarray(0, n);
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
+function seamHashOf(filePath, offset) {
+    if (offset <= 0) return null;
+    const start = Math.max(0, offset - SEAM_BYTES);
+    const seam = readRange(filePath, start, offset - start);
+    if (!seam.length) return null;
+    return crypto.createHash('sha256').update(seam).digest('hex');
+}
+
 function getState(db, projectId, sourcePath) {
     return (
         db.get(
             'SELECT * FROM ingest_state WHERE project_id = ? AND source_kind = ? AND source_path = ?',
             [projectId, 'hooks', sourcePath],
-        ) || { last_size: 0, last_offset: 0, last_line_no: 0 }
+        ) || { last_size: 0, last_offset: 0, last_line_no: 0, seam_hash: null }
     );
 }
 
-function putState(db, projectId, sourcePath, size, offset, lineNo, error) {
+function putState(db, projectId, sourcePath, size, offset, lineNo, error, seamHash = null) {
     db.run(
-        `INSERT INTO ingest_state (project_id, source_kind, source_path, last_size, last_offset, last_line_no, last_error, updated_at)
-         VALUES (?, 'hooks', ?, ?, ?, ?, ?, ?)
+        `INSERT INTO ingest_state (project_id, source_kind, source_path, last_size, last_offset, last_line_no, last_error, seam_hash, updated_at)
+         VALUES (?, 'hooks', ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(project_id, source_kind, source_path) DO UPDATE SET
              last_size = excluded.last_size, last_offset = excluded.last_offset,
-             last_line_no = excluded.last_line_no, last_error = excluded.last_error, updated_at = excluded.updated_at`,
-        [projectId, sourcePath, size, offset, lineNo, error || null, isoNow()],
+             last_line_no = excluded.last_line_no, last_error = excluded.last_error,
+             seam_hash = excluded.seam_hash, updated_at = excluded.updated_at`,
+        [projectId, sourcePath, size, offset, lineNo, error || null, seamHash, isoNow()],
     );
 }
 
@@ -84,9 +118,27 @@ export function ingestHookFile(db, cfg, hookPath) {
     const buf = fs.readFileSync(hookPath);
     const size = buf.length;
     let rebuilt = false;
-    if (size < state.last_offset) {
+    let staleCursor = size < state.last_offset;
+    if (!staleCursor && state.last_offset > 0 && !state.seam_hash) {
+        /*
+         * One-time repair for cursors written before this column existed. They cannot prove where
+         * they point, and a stale one silently skips everything before it — the exact defect that
+         * lost 35 events on a real consumer. Re-reading once is cheap; keeping the doubt is not.
+         */
+        staleCursor = true;
+    }
+    if (!staleCursor && state.last_offset > 0) {
+        const start = Math.max(0, state.last_offset - SEAM_BYTES);
+        const seam = readRange(hookPath, start, state.last_offset - start);
+        const endsOnNewline = seam.length > 0 && seam[seam.length - 1] === 0x0a;
+        const seamMatches = state.seam_hash
+            ? crypto.createHash('sha256').update(seam).digest('hex') === state.seam_hash
+            : null;
+        if (!endsOnNewline || seamMatches === false) staleCursor = true;
+    }
+    if (staleCursor) {
         db.run('DELETE FROM event WHERE project_id = ? AND harness = ? AND source_path = ?', [projectId, harness, hookPath]);
-        state = { last_size: 0, last_offset: 0, last_line_no: 0 };
+        state = { last_size: 0, last_offset: 0, last_line_no: 0, seam_hash: null };
         rebuilt = true;
     }
 
@@ -222,7 +274,7 @@ export function ingestHookFile(db, cfg, hookPath) {
                 }
             }
         }
-        putState(db, projectId, hookPath, size, offset, lineNo, null);
+        putState(db, projectId, hookPath, size, offset, lineNo, null, seamHashOf(hookPath, offset));
     });
 
     report.touchedGenerations = [...touched];

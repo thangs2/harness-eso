@@ -10,6 +10,8 @@
  * hook JSON (from which shell commands can be read).
  */
 
+import path from 'node:path';
+
 import { isoNow } from './observe-config.mjs';
 import {
     loadDecisionPolicy,
@@ -54,6 +56,24 @@ function shellCommand(rawJson) {
     }
     const c = j?.payload?.tool_input?.command ?? j?.tool_input?.command ?? j?.command;
     return typeof c === 'string' ? c : '';
+}
+
+/**
+ * Resolve an event path to a repository-relative one, or `null` when it is outside the checkout.
+ *
+ * `afterFileEdit` also fires for scratch files written outside the repo (an analysis script under
+ * /tmp, for instance). Counting those as "the last edit" made a real turn report "no verify after
+ * the final edit": the agent wrote `/tmp/analyze*.mjs` after `tsc` had already passed, so the verify
+ * window was extended by files the repository build can never cover. `route-watch.mjs` already
+ * normalises through the same rule; this file did not, and that drift is the defect.
+ */
+function repoRel(root, p) {
+    const s = String(p || '');
+    if (!s || !root) return null;
+    const abs = path.isAbsolute(s) ? s : path.resolve(root, s);
+    const rel = path.relative(root, abs);
+    if (!rel || rel.startsWith('..')) return null;
+    return rel.split(path.sep).join('/');
 }
 
 function baseName(p) {
@@ -216,7 +236,8 @@ export function computeChecks(db, cfg, scope) {
         //     Paths are taken from the EVENT stream alone so both sides of the
         //     comparison are in the same string space (event.path mixes absolute
         //     and relative forms, and request_file.path need not agree with it).
-        const editEventPaths = [...new Set(events.filter((e) => e.event_type === 'afterFileEdit').map((e) => e.path).filter(Boolean))];
+        const isRepoEdit = (e) => e.event_type === 'afterFileEdit' && repoRel(cfg.root, e.path) !== null;
+        const editEventPaths = [...new Set(events.filter(isRepoEdit).map((e) => e.path).filter(Boolean))];
         const announcedRead = new Set();
         const readToolPaths = new Set();
         const firstEventOf = new Map();
@@ -257,7 +278,7 @@ export function computeChecks(db, cfg, scope) {
         //     after the LAST edit. Only a Shell command counts. The check cannot
         //     see across the request boundary, so a verify that lands in the NEXT
         //     request still reads as a miss — hence `warn`, never a verdict.
-        const lastEditIdx = events.map((e) => e.event_type).lastIndexOf('afterFileEdit');
+        const lastEditIdx = events.reduce((acc, e, i) => (isRepoEdit(e) ? i : acc), -1);
         const verifyHit = events.findIndex(
             (e, i) => i > lastEditIdx && e.tool === 'Shell' && isVerifyCommand(shellCommand(e.raw_json)),
         );
@@ -268,7 +289,7 @@ export function computeChecks(db, cfg, scope) {
              * asserts something we have not established. Edits recorded in `request_file` prove the
              * latter.
              */
-            const editsRecorded = editedPaths.length > 0;
+            const editsRecorded = editedPaths.some((f) => repoRel(cfg.root, f.path) !== null);
             results['verify-after-edit'] = editsRecorded
                 ? verdict('skip', 1, 'edits recorded but no edit event captured — cannot judge')
                 : verdict('skip', 1, 'no edits in this request');

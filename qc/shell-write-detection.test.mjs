@@ -328,3 +328,46 @@ test('verify-after-edit distinguishes "no edits" from "cannot see edits"', () =>
         db.close();
     }
 });
+
+test('verify-after-edit ignores edits outside the repository', () => {
+    /*
+     * A real turn (BAP-38) wrote `/tmp/analyze*.mjs` after `tsc` had passed and was reported as
+     * "no verify after the final edit": scratch files outside the checkout extended the edit window,
+     * although no repository build can ever verify them. `route-watch.mjs` already normalised paths
+     * through `toRel`; `checks.mjs` did not.
+     */
+    const { db, cfg } = fixture();
+    try {
+        addEvent(db, { eventType: 'afterFileEdit', tool: 'Write', path: `${cfg.root}/src/feature.ts` });
+        addEvent(db, shellEvent('./node_modules/.bin/tsc --noEmit 2>&1; echo tsc-exit=$?', 'src/feature.ts'));
+        addEvent(db, { eventType: 'afterFileEdit', tool: 'Write', path: '/tmp/analyze-session.mjs' });
+        overlayEvidence(db, cfg, null);
+        computeChecks(db, cfg, null);
+
+        const row = db.get('SELECT status, detail FROM check_result WHERE request_id = ? AND check_id = ?', [
+            REQ,
+            'verify-after-edit',
+        ]);
+        assert.equal(row.status, 'pass', `scratch write must not invalidate the verify: ${row.detail}`);
+    } finally {
+        db.close();
+    }
+});
+
+test('verify-after-edit treats a scratch-only edit as no source edit', () => {
+    const { db, cfg } = fixture();
+    try {
+        addEvent(db, { eventType: 'afterFileEdit', tool: 'Write', path: '/tmp/analyze-session.mjs' });
+        overlayEvidence(db, cfg, null);
+        computeChecks(db, cfg, null);
+
+        const row = db.get('SELECT status, detail FROM check_result WHERE request_id = ? AND check_id = ?', [
+            REQ,
+            'verify-after-edit',
+        ]);
+        assert.equal(row.status, 'skip', 'a scratch file is not a repository edit');
+        assert.match(row.detail, /no edits in this request/);
+    } finally {
+        db.close();
+    }
+});
