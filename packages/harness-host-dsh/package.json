@@ -1,0 +1,11 @@
+{
+    "name": "@mu/harness-host-dsh",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "DeepSeek Harness host shim — native providers for the ESO capability fabric",
+    "exports": {
+        ".": "./src/index.mjs",
+        "./memory": "./src/memory-provider.mjs"
+    }
+}
