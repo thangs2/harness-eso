@@ -17,6 +17,7 @@ export { createHostRuntime } from './host-runtime.mjs';
 export { diffContracts } from './contract-diff.mjs';
 export { checkTenantFiles, checkTenantIsolation, TENANT_MARKER } from './tenant-check.mjs';
 export { checkMigrationFiles, checkMigrationSafety, APPROVED_MARKER } from './migration-check.mjs';
+export { createJevVerifier, resolveVerifierMode, verifyClaim, VERIFIER_CLAIMS, VERIFIER_MODES } from './verifier.mjs';
 export { resolveSkillPack } from './skill-pack.mjs';
 export { insertEvidenceLedger } from './eso-ledger.mjs';
 export { extractNormativeSpec } from '../adapters/docgraph-law.mjs';
