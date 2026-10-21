@@ -7,6 +7,7 @@
  */
 export { createDshSessionMemory } from './memory-provider.mjs';
 export { createDshEsoPlugin } from './plugin.mjs';
+export { createDshSkillsLaw, SKILL_ROOTS, INSTRUCTION_FILES } from './law-provider.mjs';
 export {
     buildDshBridgePatch,
     buildDshBundleManifest,

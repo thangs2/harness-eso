@@ -7,6 +7,9 @@ Host shim for DeepSeek Harness (DSH).
 | File | Role |
 |---|---|
 | `src/memory-provider.mjs` | `createDshSessionMemory()` — wraps a host session-search function as a **native** ESO provider (`memory`), with provenance (`sessionId`, `seq`) and a deliberate `ceiling` (0.65) |
+| `src/law-provider.mjs` | `createDshSkillsLaw()` — searches `AGENTS.md` and `.agents/skills/**` locally as a **native** `law` provider, with `file:line` provenance and `ceiling` 0.5 |
+| `src/plugin.mjs` | `createDshEsoPlugin()` — registers both native providers and exposes `preflight()` / `probe()` |
+| `src/bridge.mjs` | DSH bundle generator (package manifest + `cordis.patch.yml` + README) |
 
 The package is intentionally dependency-free: the Cordis plugin owns the DSH context and injects
 `searchEvents`. That keeps the adapter testable without a running Harness and avoids pinning this

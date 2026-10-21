@@ -31,3 +31,25 @@ test('without a host search function the plugin does not invent memory', async (
     assert.equal(memory.selected, null);
     assert.equal(memory.reason, 'none');
 });
+
+test('the plugin registers the host skills as a native law provider', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-dsh-plugin-law-'));
+    fs.writeFileSync(path.join(root, 'AGENTS.md'), '# Rules\n\nTenant isolation is mandatory for every query.\n');
+    const policy = policyWithNativeMemory();
+    policy.eso.sources.law = { enabled: true, prefer: ['native'], fallback: ['none'] };
+    policy.eso.sources.memory = { enabled: false };
+
+    const plugin = createDshEsoPlugin({ root, policy });
+    const law = plugin.probe().find((row) => row.kind === 'law');
+    assert.equal(law.selected.id, 'native:dsh-skills');
+    assert.equal(law.reason, 'native');
+
+    /*
+     * Law queries come from the prompt-class pack, not from the user's stem, so this test asserts the
+     * binding rather than a particular snippet: the provider is selected and exposed to COLLECT.
+     */
+    assert.equal(plugin.runtime.registry.resolve('law').id, 'native:dsh-skills');
+    const out = await plugin.preflight({ event: 'turn_start', userQueryStem: 'tenant isolation', turnId: 't1' });
+    assert.equal(out.skipped, false);
+    assert.ok(Array.isArray(out.retrieval.trace));
+});
