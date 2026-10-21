@@ -19,8 +19,21 @@ test('the patch points the bridge at the consumer hook config', () => {
     assert.equal(patch.rows[0].config.projectDir, '.');
 });
 
-test('an absolute configPath is rejected — DSH resolves it from the launch directory', () => {
-    assert.throws(() => buildDshBridgePatch({ configPath: '/abs/settings.json' }), /must be relative/);
+test('the hook config path is pinned, because the bridge reads it against the process cwd', () => {
+    // The bridge reads config.path verbatim when the plugin loads; a relative path would resolve
+    // against the DSH app directory, not the workspace.
+    const pinned = buildDshBridgePatch({ projectDir: '/work/consumer' });
+    assert.equal(pinned.rows[0].config.configPath, '/work/consumer/.claude/settings.json');
+
+    const alreadyAbsolute = buildDshBridgePatch({
+        configPath: '/work/consumer/.claude/hooks.json',
+        projectDir: '/work/consumer',
+    });
+    assert.equal(alreadyAbsolute.rows[0].config.configPath, '/work/consumer/.claude/hooks.json');
+
+    // Nothing to resolve against: keep the default so a hand-written patch still reads correctly.
+    assert.equal(buildDshBridgePatch().rows[0].config.configPath, './.claude/settings.json');
+
     assert.throws(() => buildDshBridgePatch({ configPath: '' }), /non-empty/);
     assert.throws(() => buildDshBridgePatch({ defaultTimeoutMs: 0 }), /positive integer/);
 });

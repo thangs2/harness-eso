@@ -13,6 +13,8 @@
  * lets a test assert the exact bytes.
  */
 
+import path from 'node:path';
+
 export const BRIDGE_ROW_ID = 'harness-eso-hooks';
 export const BRIDGE_PACKAGE = '@deepseek-ai/dsh-hooks-claude-code';
 
@@ -33,10 +35,19 @@ export function buildDshBridgePatch(options = {}) {
     const defaultTimeoutMs = options.defaultTimeoutMs ?? 120_000;
 
     if (typeof configPath !== 'string' || !configPath.trim()) throw new Error('configPath must be a non-empty string');
-    if (configPath.startsWith('/')) {
-        throw new Error('configPath must be relative — DSH resolves it from the directory that launched the process');
-    }
     if (typeof projectDir !== 'string' || !projectDir.trim()) throw new Error('projectDir must be a non-empty string');
+
+    /*
+     * The bridge reads `config.configPath` verbatim with `readFileSync` when the plugin loads, so a
+     * relative path is resolved against the **DSH process cwd** (the app), not the workspace and not
+     * `projectDir`. A generated bundle therefore pins the path: resolve it against `projectDir` when
+     * that is absolute, and leave an absolute path untouched. A relative path is kept only when there
+     * is nothing to resolve against — every other case would be a hook config the bridge never finds.
+     */
+    const configPathOut =
+        !path.isAbsolute(configPath) && projectDir !== '.' && path.isAbsolute(projectDir)
+            ? path.join(projectDir, configPath)
+            : configPath;
     if (!Number.isInteger(defaultTimeoutMs) || defaultTimeoutMs <= 0) throw new Error('defaultTimeoutMs must be a positive integer');
 
     return {
@@ -44,7 +55,7 @@ export function buildDshBridgePatch(options = {}) {
             {
                 id: BRIDGE_ROW_ID,
                 name: BRIDGE_PACKAGE,
-                config: { configPath, projectDir, defaultTimeoutMs },
+                config: { configPath: configPathOut, projectDir, defaultTimeoutMs },
             },
         ],
     };
