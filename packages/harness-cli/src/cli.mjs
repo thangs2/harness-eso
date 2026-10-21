@@ -14,6 +14,7 @@ import { runCapabilityProbe } from './capability-probe-cmd.mjs';
 import { runVerifyHost } from './verify-host-cmd.mjs';
 import { runDshBridge } from './dsh-bridge-cmd.mjs';
 import { runCheckContract } from './check-contract-cmd.mjs';
+import { runCheckTenant } from './check-tenant-cmd.mjs';
 
 applyWorkspaceEnv();
 
@@ -32,6 +33,7 @@ function usage() {
   harnessctl capability probe [consumer | --project <id>] [--recipe <id>] [--provider <module.mjs>] [--json]
   harnessctl dsh bridge --out <dir> [--config-path <path>] [--project-dir <dir>] [--force]
   harnessctl check contract <before.json> <after.json> [--direction response|request] [--json]
+  harnessctl check tenant <file...> --tables <table,table> [--json]
   harnessctl configure list | harnessctl configure use <id>
   harnessctl observatory up|down|restart|status|health|logs|build|smoke [--project <id>]
   harnessctl console up|down|restart|status|health|logs|build
@@ -68,6 +70,11 @@ async function main() {
     if (cmd === 'project' && argv[1] === 'init') {
         console.error('use: harnessctl init profile <consumer-path>');
         process.exit(2);
+    }
+
+    if (cmd === 'check' && argv[1] === 'tenant') {
+        runCheckTenant(argv.slice(2));
+        return;
     }
 
     if (cmd === 'check' && argv[1] === 'contract') {
