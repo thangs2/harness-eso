@@ -32,11 +32,9 @@ export function filterMemoryHits(hits, options = {}) {
 export const adapter = {
     id: 'agentmemory-mcp',
     kinds: ['memory'],
+    /** Policy permission only — the registry decides whether this provider is the one selected. */
     enabled(policy) {
-        const mem = policy?.eso?.sources?.memory;
-        if (mem?.enabled === false) return false;
-        const id = mem?.adapter ?? 'noop-memory';
-        return id === 'agentmemory-mcp' || id === 'agentmemory-http';
+        return policy?.eso?.sources?.memory?.enabled !== false;
     },
     async fetch(query, ctx) {
         const q = String(query?.text || query?.query || query || '').trim();

@@ -112,7 +112,7 @@ export async function runCollect(input, ctx) {
     }
     const memoryAdapter = registry.resolve('memory');
     if (memoryAdapter && ctx.eso?.memoryFetch !== false) {
-        const memQ = stem || pack.lawQueries?.[0] || 'harness context';
+        const memQ = ctx.stem || pack.lawQueries?.[0] || 'harness context';
         const r = await memoryAdapter.fetch(memQ, {
             root: ctx.root,
             policy: ctx.policy,
