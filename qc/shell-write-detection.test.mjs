@@ -371,3 +371,45 @@ test('verify-after-edit treats a scratch-only edit as no source edit', () => {
         db.close();
     }
 });
+
+test('verify-after-edit counts host-absolute paths when the consumer is mounted elsewhere', () => {
+    /*
+     * Inside Docker the consumer lives at /data/repo while hook payloads carry the host path
+     * (/Users/.../baplatform). A `path.relative(cfg.root, …)` test classified every real edit as
+     * "outside the repository" and turned the check off for the whole deployment.
+     */
+    const { db, cfg } = fixture();
+    try {
+        const hostPath = '/Users/someone/baplatform/src/feature.ts';
+        addEvent(db, { eventType: 'afterFileEdit', tool: 'StrReplace', path: hostPath });
+        addEvent(db, shellEvent('./node_modules/.bin/tsc --noEmit 2>&1; echo tsc-exit=$?', hostPath));
+        overlayEvidence(db, cfg, null);
+        computeChecks(db, cfg, null);
+
+        const row = db.get('SELECT status FROM check_result WHERE request_id = ? AND check_id = ?', [
+            REQ,
+            'verify-after-edit',
+        ]);
+        assert.equal(row.status, 'pass', 'a host-absolute source edit must still count as an edit');
+    } finally {
+        db.close();
+    }
+});
+
+test('verify-after-edit ignores product state inside the repository', () => {
+    const { db, cfg } = fixture();
+    try {
+        addEvent(db, { eventType: 'afterFileEdit', tool: 'StrReplace', path: `${cfg.root}/.cursor/session/.pipeline-brain-stamp.json` });
+        overlayEvidence(db, cfg, null);
+        computeChecks(db, cfg, null);
+
+        const row = db.get('SELECT status, detail FROM check_result WHERE request_id = ? AND check_id = ?', [
+            REQ,
+            'verify-after-edit',
+        ]);
+        assert.equal(row.status, 'skip');
+        assert.match(row.detail, /no edits in this request/);
+    } finally {
+        db.close();
+    }
+});

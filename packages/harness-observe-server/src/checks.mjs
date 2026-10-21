@@ -10,8 +10,6 @@
  * hook JSON (from which shell commands can be read).
  */
 
-import path from 'node:path';
-
 import { isoNow } from './observe-config.mjs';
 import {
     loadDecisionPolicy,
@@ -59,21 +57,26 @@ function shellCommand(rawJson) {
 }
 
 /**
- * Resolve an event path to a repository-relative one, or `null` when it is outside the checkout.
+ * True when an event path names a file in the checkout that a build can verify.
  *
- * `afterFileEdit` also fires for scratch files written outside the repo (an analysis script under
- * /tmp, for instance). Counting those as "the last edit" made a real turn report "no verify after
- * the final edit": the agent wrote `/tmp/analyze*.mjs` after `tsc` had already passed, so the verify
- * window was extended by files the repository build can never cover. `route-watch.mjs` already
- * normalises through the same rule; this file did not, and that drift is the defect.
+ * Two exclusions matter, and neither can be expressed as `path.relative(cfg.root, p)`:
+ *   1. Scratch files outside the repo (`/tmp/analyze*.mjs`) — writing one after `tsc` passed made a
+ *      real turn report "no verify after the final edit".
+ *   2. Product/agent state inside the repo (`.harness/`, `.cursor/session/`) — the brain stamp is
+ *      written on every turn and is not source.
+ *
+ * A root-relative test would also be wrong inside Docker: the consumer is mounted at `/data/repo`
+ * while hook payloads carry the host path (`/Users/.../baplatform`), so comparing against `cfg.root`
+ * classified every real edit as "outside the repository" and disabled the check entirely.
  */
-function repoRel(root, p) {
-    const s = String(p || '');
-    if (!s || !root) return null;
-    const abs = path.isAbsolute(s) ? s : path.resolve(root, s);
-    const rel = path.relative(root, abs);
-    if (!rel || rel.startsWith('..')) return null;
-    return rel.split(path.sep).join('/');
+const NON_REPO_SEGMENT = /(^|\/)(node_modules|\.git|\.harness|\.cursor\/session|\.agents\/session|\.claude\/session)(\/|$)/;
+const SCRATCH_PREFIX = /^(\/tmp\/|\/private\/tmp\/|\/dev\/)/;
+
+function isRepoPath(p) {
+    const s = String(p || '').replace(/\\/g, '/');
+    if (!s) return false;
+    if (SCRATCH_PREFIX.test(s)) return false;
+    return !NON_REPO_SEGMENT.test(s);
 }
 
 function baseName(p) {
@@ -236,7 +239,7 @@ export function computeChecks(db, cfg, scope) {
         //     Paths are taken from the EVENT stream alone so both sides of the
         //     comparison are in the same string space (event.path mixes absolute
         //     and relative forms, and request_file.path need not agree with it).
-        const isRepoEdit = (e) => e.event_type === 'afterFileEdit' && repoRel(cfg.root, e.path) !== null;
+        const isRepoEdit = (e) => e.event_type === 'afterFileEdit' && isRepoPath(e.path);
         const editEventPaths = [...new Set(events.filter(isRepoEdit).map((e) => e.path).filter(Boolean))];
         const announcedRead = new Set();
         const readToolPaths = new Set();
@@ -289,7 +292,7 @@ export function computeChecks(db, cfg, scope) {
              * asserts something we have not established. Edits recorded in `request_file` prove the
              * latter.
              */
-            const editsRecorded = editedPaths.some((f) => repoRel(cfg.root, f.path) !== null);
+            const editsRecorded = editedPaths.some((f) => isRepoPath(f.path));
             results['verify-after-edit'] = editsRecorded
                 ? verdict('skip', 1, 'edits recorded but no edit event captured — cannot judge')
                 : verdict('skip', 1, 'no edits in this request');
