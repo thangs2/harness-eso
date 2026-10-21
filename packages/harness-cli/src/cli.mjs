@@ -12,6 +12,7 @@ import { runVerifyConsumer } from './verify-consumer-cmd.mjs';
 import { runFixConsumer } from './fix-consumer-cmd.mjs';
 import { runCapabilityProbe } from './capability-probe-cmd.mjs';
 import { runVerifyHost } from './verify-host-cmd.mjs';
+import { runDshBridge } from './dsh-bridge-cmd.mjs';
 
 applyWorkspaceEnv();
 
@@ -28,6 +29,7 @@ function usage() {
   harnessctl fix consumer <path|--project <id>> [--dry-run] [--from-latest] [--force-provision] [--no-provision] [--strict] [--json]
   harnessctl token-diet [consumer | --project <id>] [--json]
   harnessctl capability probe [consumer | --project <id>] [--recipe <id>] [--provider <module.mjs>] [--json]
+  harnessctl dsh bridge --out <dir> [--config-path <path>] [--project-dir <dir>] [--force]
   harnessctl configure list | harnessctl configure use <id>
   harnessctl observatory up|down|restart|status|health|logs|build|smoke [--project <id>]
   harnessctl console up|down|restart|status|health|logs|build
@@ -64,6 +66,11 @@ async function main() {
     if (cmd === 'project' && argv[1] === 'init') {
         console.error('use: harnessctl init profile <consumer-path>');
         process.exit(2);
+    }
+
+    if (cmd === 'dsh' && argv[1] === 'bridge') {
+        runDshBridge(argv.slice(2));
+        return;
     }
 
     if (cmd === 'capability') {

@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+
+import {
+    buildDshBridgePatch,
+    renderBundleReadme,
+    renderCordisPatchYaml,
+} from '../packages/harness-host-dsh/src/index.mjs';
+import { writeDshBundle } from '../packages/harness-cli/src/dsh-bridge-cmd.mjs';
+
+test('the patch points the bridge at the consumer hook config', () => {
+    const patch = buildDshBridgePatch();
+    assert.equal(patch.rows.length, 1);
+    assert.equal(patch.rows[0].name, '@deepseek-ai/dsh-hooks-claude-code');
+    assert.equal(patch.rows[0].config.configPath, './.claude/settings.json');
+    assert.equal(patch.rows[0].config.projectDir, '.');
+});
+
+test('an absolute configPath is rejected — DSH resolves it from the launch directory', () => {
+    assert.throws(() => buildDshBridgePatch({ configPath: '/abs/settings.json' }), /must be relative/);
+    assert.throws(() => buildDshBridgePatch({ configPath: '' }), /non-empty/);
+    assert.throws(() => buildDshBridgePatch({ defaultTimeoutMs: 0 }), /positive integer/);
+});
+
+test('the rendered YAML quotes the scoped package name', () => {
+    const yaml = renderCordisPatchYaml();
+    assert.match(yaml, /^- insert:/m);
+    assert.match(yaml, /name: '@deepseek-ai\/dsh-hooks-claude-code'/);
+    assert.match(yaml, /configPath: \.\/\.claude\/settings\.json/);
+    assert.match(yaml, /defaultTimeoutMs: 120000/);
+});
+
+test('the generated bundle is a valid package with the three files', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-dsh-bundle-'));
+    const result = writeDshBundle(dir);
+    assert.deepEqual(result.files.sort(), ['README.md', 'cordis.patch.yml', 'package.json']);
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml');
+    assert.match(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), /init profile/);
+
+    assert.throws(() => writeDshBundle(dir), /not empty/, 'a non-empty target needs --force');
+    writeDshBundle(dir, { force: true });
+});
+
+test('the readme names the config path the patch uses', () => {
+    assert.match(renderBundleReadme({ configPath: './custom/hooks.json' }), /\.\/custom\/hooks\.json/);
+});
