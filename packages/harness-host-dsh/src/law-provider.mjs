@@ -1,9 +1,14 @@
 /**
  * DSH skills/instructions as a **native law provider** (RFC 18 M2).
  *
- * The host already has the organisational rules on disk — `AGENTS.md` plus `.agents/skills/**`. For a
- * question that a skill answers verbatim, going out to docgraph is slower and can miss the file
- * entirely. This provider searches them locally and returns evidence with a real file/line provenance.
+ * The host already has the organisational rules on disk — `AGENTS.md`, `.agents/skills/**` and
+ * `sub_agents/**`. For a question that a skill answers verbatim, going out to docgraph is slower and
+ * can miss the file entirely. This provider searches them locally and returns evidence with a real
+ * file/line provenance.
+ *
+ * That shape is not DSH-specific: it is exactly what the Codex substrate materialises (and what
+ * Harness² optimises), so a harness tree produced elsewhere is readable here without a second
+ * provider.
  *
  * Its ceiling is deliberately low (0.5): skills are curated instructions, not a normative corpus with
  * coverage guarantees. A caller that needs contract-level sufficiency must still bind docgraph, which
@@ -14,6 +19,13 @@ import path from 'node:path';
 
 export const SKILL_ROOTS = ['.agents/skills', '.cursor/skills', '.claude/skills'];
 export const INSTRUCTION_FILES = ['AGENTS.md', 'CLAUDE.md', '.agents/instructions.md', '.cursor/instructions.md'];
+
+/*
+ * Delegated agent roles. They are instructions a model reads before acting, so they are law for the
+ * same reason a skill is — and a harness that was optimized elsewhere (Harness² writes
+ * `sub_agents/<name>/AGENT.md`) carries its delegation rules here, not in `AGENTS.md`.
+ */
+export const SUBAGENT_ROOTS = ['sub_agents', '.agents/agents'];
 
 function walk(dir, acc = []) {
     let entries;
@@ -37,6 +49,7 @@ function candidateFiles(root) {
         if (fs.existsSync(full)) files.push(full);
     }
     for (const dir of SKILL_ROOTS) walk(path.join(root, dir), files);
+    for (const dir of SUBAGENT_ROOTS) walk(path.join(root, dir), files);
     return files;
 }
 
