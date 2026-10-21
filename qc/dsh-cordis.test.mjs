@@ -41,7 +41,7 @@ function setup(extra = {}) {
         ...extra,
     });
     plugin.apply(ctx);
-    return { ctx, handler: ctx.listeners.get(CORDIS_PRE_STEP) };
+    return { ctx, root, handler: ctx.listeners.get(CORDIS_PRE_STEP) };
 }
 
 test('the plugin registers exactly agent/pre-step and unwinds', () => {
@@ -125,4 +125,36 @@ test('a sufficient verdict with nothing to act on adds no context', () => {
         buildContextBlock({ verdict: { sufficiency: { level: 'insufficient', score: 0 } }, gaps: [{ kind: 'law' }] }),
         /insufficient/,
     );
+});
+
+test('a declared migration check rejects the step before a model request', async () => {
+    const { root, handler } = setup();
+    fs.writeFileSync(path.join(root, '001-drop.sql'), 'drop table orders;');
+    const ctx = fakeCtx();
+    createEsoCordisPlugin({
+        root,
+        policy: policyWithNativeMemory(),
+        checks: { migration: { files: ['001-drop.sql'] } },
+    }).apply(ctx);
+    const out = await ctx.listeners.get(CORDIS_PRE_STEP)({ messages: [], signal: {} }, async () => ({
+        kind: 'continue',
+        messages: [],
+    }));
+    assert.deepEqual(out, { kind: 'reject' });
+    assert.equal(typeof handler, 'function');
+});
+
+test('a declared check that finds nothing leaves the decision alone', async () => {
+    const { root, handler } = setup();
+    fs.writeFileSync(path.join(root, '001-add.sql'), 'create table orders (id integer);');
+    const ctx = fakeCtx();
+    createEsoCordisPlugin({
+        root,
+        policy: policyWithNativeMemory(),
+        checks: { migration: { files: ['001-add.sql'] } },
+    }).apply(ctx);
+    const decision = { kind: 'continue', messages: [] };
+    const out = await ctx.listeners.get(CORDIS_PRE_STEP)({ messages: [], signal: {} }, async () => decision);
+    assert.equal(out, decision);
+    assert.equal(typeof handler, 'function');
 });

@@ -18,8 +18,10 @@
  * Enforcement is deliberately NOT re-implemented here. DSH ships `@deepseek-ai/dsh-hooks-claude-code`
  * (0.2.1-rc.2), which runs the consumer's `.claude/settings.json` on its interception seams — that is
  * the pack's guards, one enforcement path rather than two that can disagree. This plugin adds
- * evidence, and can reject through `rejectOn` once a caller supplies a predicate (hard blockers).
+ * evidence, and rejects on a hard blocker: a named finding from a declared `contract`, `tenant` or
+ * `migration` check. A score is never consulted — the checks exclude their own marked exceptions.
  */
+import { rejectOnHardBlockers } from '@mu/harness-eso-core';
 import { createDshEsoPlugin } from './plugin.mjs';
 
 /** The one hook this plugin registers. */
@@ -80,10 +82,12 @@ function userQueryStem(payload) {
  *   be rejected by the session store, and a plugin that throws ends the step.
  * @param {((result: object) => boolean)|null} [options.rejectOn]
  *   Predicate over the preflight result. `true` returns `{ kind: 'reject' }`, ending the step as
- *   blocked before a model request. Default `null`: advisory only.
+ *   blocked before a model request. Default `rejectOnHardBlockers` (blockers only; pass
+ *   `(r) => rejectOnHardBlockers(r, { strict: true })` to also deny when a declared check was
+ *   unreadable). `null` disables rejection entirely.
  */
 export function createEsoCordisPlugin(options = {}) {
-    const { createMessage = null, rejectOn = null } = options;
+    const { createMessage = null, rejectOn = rejectOnHardBlockers } = options;
     return {
         name: 'harness-eso',
         inject: ['sessions'],
