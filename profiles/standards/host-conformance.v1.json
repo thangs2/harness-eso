@@ -1,0 +1,12 @@
+{
+    "standardId": "host-conformance",
+    "version": 1,
+    "description": "Read-only tiers for a host integration. Tiers are consecutive; tierReached stops at the first failure.",
+    "tiers": [
+        { "id": "H0", "title": "host hooks call the harness pack", "evidence": "a hook config names harness-hook.mjs" },
+        { "id": "H1", "title": "host pack present and a guard is wired", "evidence": ".harness/host-pack/harness-hook.mjs + a guard command" },
+        { "id": "H2", "title": "preflight produced a verdict", "evidence": ".eso-preflight.json with level and at" },
+        { "id": "H3", "title": "route trace contains evidence", "evidence": "route-trace.jsonl with >=1 event" },
+        { "id": "H4", "title": "a native provider is bound", "evidence": "capability probe reports selected.capability == native" }
+    ]
+}
