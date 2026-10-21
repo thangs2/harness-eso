@@ -19,6 +19,7 @@ export function buildTurnVerdict(params) {
         eso,
         waiver = null,
         stem = '',
+        blockers = [],
     } = params;
     /*
      * One resolver, shared with `eso-policy.mjs`.
@@ -60,6 +61,17 @@ export function buildTurnVerdict(params) {
         allowPromptSubmit = false;
     }
 
+    /*
+     * A hard blocker closes the write channel, not the conversation.
+     *
+     * Sufficiency says "we may not know enough to write safely"; a blocker says "this write is
+     * demonstrably wrong" (a dropped column, a query with no tenant filter, a removed route). Both
+     * stop writes. Ending the whole step is a host decision — DSH has an explicit reject for that —
+     * and a host that cannot express it must not be forced into one by the engine.
+     */
+    const hardBlockers = Array.isArray(blockers) ? blockers.slice(0, 20) : [];
+    if (hardBlockers.length) allowProtectedWrite = false;
+
     return {
         contractVersion: CONTRACT_VERSION,
         at: isoNow(),
@@ -72,6 +84,7 @@ export function buildTurnVerdict(params) {
         },
         allowPromptSubmit,
         allowProtectedWrite,
+        hardBlockers,
         consent: { required: consentRequired, state: consentState },
         enforceWrites,
         esoMode: eso.mode,

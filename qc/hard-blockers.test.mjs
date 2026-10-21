@@ -4,6 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { buildTurnVerdict } from '../packages/harness-eso-core/src/gate.mjs';
+import { createDshEsoPlugin } from '../packages/harness-host-dsh/src/plugin.mjs';
+import { policyWithNativeMemory } from './fixtures/host-runtime-fixture.mjs';
+
 import {
     hardBlockersFromChecks,
     hasHardBlockers,
@@ -125,4 +129,54 @@ test('strict rejection also denies when a declared check could not be read (B1)'
     assert.equal(rejectOnHardBlockers(unreadable, { strict: true }), true);
     assert.equal(rejectOnHardBlockers({ hardBlockers: [{}] }), true);
     assert.equal(rejectOnHardBlockers(null), false);
+});
+
+test('a blocker closes the write channel even when sufficiency says sufficient', () => {
+    const blocker = { source: 'migration', kind: 'drop-table', ref: '001.sql', detail: 'x' };
+    const base = {
+        requestId: 'r1',
+        phase: 'preflight',
+        measure: { level: 'sufficient', score: 1 },
+        gaps: [],
+        eso: { mode: 'hint', enforceWrites: 'off', cognition: {} },
+        stem: 'ship it',
+    };
+    const clean = buildTurnVerdict(base);
+    assert.equal(clean.allowProtectedWrite, true);
+    assert.deepEqual(clean.hardBlockers, []);
+
+    const blocked = buildTurnVerdict({ ...base, blockers: [blocker] });
+    assert.equal(blocked.allowProtectedWrite, false);
+    assert.equal(blocked.allowPromptSubmit, true, 'stopping the whole step is the host decision, not the engine\'s');
+    assert.deepEqual(blocked.hardBlockers, [blocker]);
+});
+
+test('the DSH preflight carries the blocker into the verdict before the guard reads it', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-blockers-dsh-'));
+    write(root, '001.sql', 'drop table orders;');
+    const plugin = createDshEsoPlugin({
+        root,
+        policy: policyWithNativeMemory(),
+        checks: { migration: { files: ['001.sql'] } },
+        searchEvents: async () => [],
+        law: false,
+    });
+    const result = await plugin.preflight({ event: 'turn_start', userQueryStem: 'ship it' });
+    assert.equal(result.skipped, false);
+    assert.equal(result.verdict.allowProtectedWrite, false);
+    assert.equal(result.verdict.hardBlockers.length, 1);
+    assert.equal(result.verdict.hardBlockers[0].kind, 'drop-table');
+    assert.equal(result.hardBlockers.length, 1, 'the preflight result carries the same list');
+});
+
+test('without a declared check the verdict keeps its old shape', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-blockers-plain-'));
+    const plugin = createDshEsoPlugin({
+        root,
+        policy: policyWithNativeMemory(),
+        searchEvents: async () => [],
+        law: false,
+    });
+    const result = await plugin.preflight({ event: 'turn_start', userQueryStem: 'ship it' });
+    assert.deepEqual(result.verdict.hardBlockers, []);
 });

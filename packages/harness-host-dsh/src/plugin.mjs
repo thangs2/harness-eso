@@ -49,15 +49,25 @@ export function createDshEsoPlugin(options = {}) {
 
     /**
      * Checks are declared as inputs (paths, tables), so the same call works from a hook bundle and
-     * from a test. A skipped preflight stays skipped: blockers on a disabled engine would be a
-     * decision the consumer never asked for.
+     * from a test. They run **before** the engine verdict, because the verdict has to carry the
+     * blockers: a write guard that decides after the verdict was built decides too late.
+     *
+     * A skipped preflight stays skipped: blockers on a disabled engine would be a decision the
+     * consumer never asked for.
      */
     async function preflight(event, overrides = {}) {
-        const result = await runtime.preflight(event, overrides);
         const declared = overrides.checks ?? checks;
+        let loaded = null;
+        let blockers = [];
+        if (declared) {
+            loaded = loadCheckInputs(root ?? process.cwd(), declared);
+            ({ blockers } = hardBlockersFromChecks(loaded));
+        }
+        const result = await runtime.preflight(event, {
+            ...overrides,
+            ...(declared ? { blockers } : {}),
+        });
         if (!declared || !result || result.skipped) return result;
-        const loaded = loadCheckInputs(root ?? process.cwd(), declared);
-        const { blockers } = hardBlockersFromChecks(loaded);
         return withHardBlockers(result, blockers, loaded.errors);
     }
 
