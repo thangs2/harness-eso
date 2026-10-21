@@ -55,12 +55,31 @@ function isoNow() {
     return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
+/**
+ * Antigravity has no `PreCompact` event, so this hook is wired to `PreInvocation` and fires before
+ * EVERY LLM call. A checkpoint per invocation is noise: the payload carries no context usage, and
+ * the trace grew by one `preCompact` row for every step (20 in a two-minute run).
+ *
+ * `invocationNum` is the host's own counter. Invocation 0 is the turn's first call, which is the one
+ * checkpoint worth writing; later invocations are continuations of the same turn. Cursor and Claude
+ * send no counter and keep their real `preCompact` event, so they are unaffected.
+ */
+export function shouldRunForPayload(payload) {
+    const inv = payload?.invocationNum ?? payload?.invocation_num;
+    return !(typeof inv === 'number' && inv > 0);
+}
+
 export async function run() {
     let payload = {};
     try {
         const raw = await readStdin();
         payload = raw.trim() ? JSON.parse(raw) : {};
     } catch {
+        emit();
+        return;
+    }
+
+    if (!shouldRunForPayload(payload)) {
         emit();
         return;
     }
