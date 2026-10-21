@@ -52,3 +52,12 @@ test('legacy law configuration still reports docgraph', () => {
     // The foundation default names no adapter, so the first capable builtin wins and the probe says so.
     assert.equal(law.reason, 'default');
 });
+
+test('a recipe re-binds the providers the probe reports', () => {
+    const root = consumerWithMemoryPolicy();
+    const report = buildCapabilityReport(root, { recipe: 'dsh-native' });
+
+    assert.equal(report.recipe.id, 'dsh-native');
+    const memory = report.kinds.find((k) => k.kind === 'memory');
+    assert.equal(memory.reason, 'id:agentmemory-mcp', 'no shim registered, so the chain lands on the fallback');
+});

@@ -8,7 +8,8 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadDecisionPolicy, loadWorkspace } from '@mu/harness-foundation';
-import { createSourceRegistry, probeCapabilities } from '@mu/harness-eso-core';
+import { applyRecipe, createSourceRegistry, loadRecipe, probeCapabilities } from '@mu/harness-eso-core';
+import { ESO_ROOT } from './workspace-env.mjs';
 
 function resolveConsumer(opts, positional) {
     if (positional) return path.resolve(positional);
@@ -29,11 +30,14 @@ function resolveConsumer(opts, positional) {
  */
 export function buildCapabilityReport(root, options = {}) {
     const loaded = loadDecisionPolicy({ root });
-    const registry = createSourceRegistry(loaded.policy, options.extraProviders ?? []);
+    const recipe = options.recipe ? loadRecipe(path.join(ESO_ROOT, 'profiles', 'recipes'), options.recipe) : null;
+    const policy = recipe ? applyRecipe(loaded.policy, recipe) : loaded.policy;
+    const registry = createSourceRegistry(policy, options.extraProviders ?? []);
     return {
         root,
         policyPath: loaded.path,
         policyFromFile: loaded.fromFile,
+        recipe: recipe ? { id: recipe.id, description: recipe.description } : null,
         kinds: probeCapabilities(registry),
     };
 }
@@ -52,20 +56,24 @@ async function loadProviders(specs) {
 }
 
 export async function runCapabilityProbe(argv = []) {
-    const opts = { project: null, json: false, providers: [] };
+    const opts = { project: null, json: false, providers: [], recipe: null };
     let positional = null;
 
     for (let i = 0; i < argv.length; i += 1) {
         const a = argv[i];
         if (a === '--project') opts.project = argv[++i];
         else if (a === '--provider') opts.providers.push(argv[++i]);
+        else if (a === '--recipe') opts.recipe = argv[++i];
         else if (a === '--json') opts.json = true;
         else if (!a.startsWith('-') && !positional) positional = a;
         else throw new Error(`unknown flag: ${a}`);
     }
 
     const root = resolveConsumer(opts, positional);
-    const report = buildCapabilityReport(root, { extraProviders: await loadProviders(opts.providers) });
+    const report = buildCapabilityReport(root, {
+        extraProviders: await loadProviders(opts.providers),
+        recipe: opts.recipe,
+    });
 
     if (opts.json) {
         console.log(JSON.stringify(report, null, 2));
@@ -77,7 +85,9 @@ export async function runCapabilityProbe(argv = []) {
     const reset = '\x1b[0m';
     console.log(`\n${bold}Harness capability probe${reset}`);
     console.log(`${dim}Consumer:${reset} ${report.root}`);
-    console.log(`${dim}Policy:${reset}   ${report.policyPath || '(defaults)'}${report.policyFromFile ? '' : ' [not found — defaults]'}\n`);
+    console.log(`${dim}Policy:${reset}   ${report.policyPath || '(defaults)'}${report.policyFromFile ? '' : ' [not found — defaults]'}`);
+    if (report.recipe) console.log(`${dim}Recipe:${reset}   ${report.recipe.id} — ${report.recipe.description}`);
+    console.log('');
 
     for (const row of report.kinds) {
         const selected = row.selected ? `${row.selected.id} (${row.selected.capability}${row.selected.ceiling !== null ? `, ceiling ${row.selected.ceiling}` : ''})` : '—';

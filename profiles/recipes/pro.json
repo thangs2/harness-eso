@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "id": "pro",
+    "description": "Full external evidence: docgraph for law, codegraph for code, agentmemory for prior decisions.",
+    "policyPatch": {
+        "eso": {
+            "sources": {
+                "law": { "enabled": true, "adapter": "docgraph-cli" },
+                "code": { "enabled": true, "adapter": "codegraph-cli" },
+                "memory": { "enabled": true, "adapter": "agentmemory-mcp" }
+            }
+        }
+    }
+}

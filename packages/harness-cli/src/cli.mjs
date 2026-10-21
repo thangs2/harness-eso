@@ -25,7 +25,7 @@ function usage() {
   harnessctl verify consumer <path|--project <id>> [--json] [--strict] [--out <dir>]
   harnessctl fix consumer <path|--project <id>> [--dry-run] [--from-latest] [--force-provision] [--no-provision] [--strict] [--json]
   harnessctl token-diet [consumer | --project <id>] [--json]
-  harnessctl capability probe [consumer | --project <id>] [--provider <module.mjs>] [--json]
+  harnessctl capability probe [consumer | --project <id>] [--recipe <id>] [--provider <module.mjs>] [--json]
   harnessctl configure list | harnessctl configure use <id>
   harnessctl observatory up|down|restart|status|health|logs|build|smoke [--project <id>]
   harnessctl console up|down|restart|status|health|logs|build
@@ -66,7 +66,7 @@ async function main() {
 
     if (cmd === 'capability') {
         if (argv[1] !== 'probe') {
-            console.error('usage: harnessctl capability probe [consumer | --project <id>] [--provider <module.mjs>] [--json]');
+            console.error('usage: harnessctl capability probe [consumer | --project <id>] [--recipe <id>] [--provider <module.mjs>] [--json]');
             process.exit(2);
         }
         await runCapabilityProbe(argv.slice(2));

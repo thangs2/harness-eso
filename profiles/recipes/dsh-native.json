@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "id": "dsh-native",
+    "description": "DeepSeek Harness: prefer the host's own session memory, fall back to agentmemory, then to none. docgraph/codegraph stay external because DSH has no code graph.",
+    "policyPatch": {
+        "eso": {
+            "sources": {
+                "law": { "enabled": true, "adapter": "docgraph-cli" },
+                "code": { "enabled": true, "adapter": "codegraph-cli" },
+                "memory": {
+                    "enabled": true,
+                    "prefer": ["native"],
+                    "fallback": ["agentmemory-mcp", "none"]
+                }
+            }
+        }
+    }
+}

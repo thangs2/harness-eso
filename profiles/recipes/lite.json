@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "id": "lite",
+    "description": "Host-only: no external law/code/memory providers. Use where a laptop has no graph services or the repository policy forbids leaving the machine.",
+    "policyPatch": {
+        "eso": {
+            "sources": {
+                "law": { "enabled": false },
+                "code": { "enabled": false },
+                "memory": { "enabled": false }
+            }
+        }
+    }
+}
