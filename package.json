@@ -14,6 +14,7 @@
         "test:all": "bun run test && bun run test:observatory",
         "build:host-pack": "node scripts/build-host-pack.mjs",
         "bench:ingest": "node scripts/bench-ingest.mjs",
+        "diag:session": "node scripts/session-whatif.mjs",
         "sync:diagrams": "node scripts/sync-diagrams.mjs",
         "build:console": "bun run --filter @mu/harness-console build",
         "build:observatory": "bun run --filter @mu/harness-observatory build",
