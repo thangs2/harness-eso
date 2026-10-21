@@ -34,6 +34,7 @@ function parseArgs(argv) {
         else if (a === '--forbid') out.forbid = v();
         else if (a === '--depth') out.depth = Number(v());
         else if (a === '--force') out.force = true;
+        else if (a === '--strip-eso') out.stripEso = true;
         else if (a === '--quiet') out.quiet = true;
         else if (a === '--help' || a === '-h') out.help = true;
         else throw new Error(`unknown argument: ${a}`);
@@ -52,7 +53,7 @@ function git(args, cwd, { allowFail = false } = {}) {
 function main() {
     const opts = parseArgs(process.argv);
     if (opts.help || !opts.repo || !opts.out) {
-        console.log('usage: node scripts/pilot-snapshot.mjs --repo <path> [--commit <sha>] --out <dir> [--forbid <sha>] [--depth N] [--force]');
+        console.log('usage: node scripts/pilot-snapshot.mjs --repo <path> [--commit <sha>] --out <dir> [--forbid <sha>] [--depth N] [--strip-eso] [--force]');
         process.exit(opts.help ? 0 : 2);
     }
     const repo = path.resolve(opts.repo);
@@ -91,9 +92,43 @@ function main() {
     git(['reflog', 'expire', '--expire=now', '--all'], out, { allowFail: true });
     git(['gc', '--prune=now', '--quiet'], out, { allowFail: true });
 
+    // 3b. Optional: remove ESO wiring so the copy is a genuine native baseline. Several consumers
+    // TRACK `.cursor/hooks.json` and the guard scripts, so a plain clone still calls the host pack.
+    let stripped = [];
+    if (opts.stripEso) {
+        const remove = [
+            'harness.config.json',
+            '.harness/host-pack',
+            '.harness/decision-policy.json',
+            '.harness/host-install-state.json',
+            '.harness/host-bootstrap.json',
+            '.harness/integrations.json',
+            '.cursor/hooks',
+            '.agents/hooks',
+            '.claude/hooks',
+        ];
+        for (const rel of remove) {
+            const abs = path.join(out, rel);
+            if (!fs.existsSync(abs)) continue;
+            fs.rmSync(abs, { recursive: true, force: true });
+            stripped.push(rel);
+        }
+        for (const rel of ['.cursor/hooks.json', '.agents/hooks.json', '.claude/settings.json']) {
+            const abs = path.join(out, rel);
+            if (!fs.existsSync(abs)) continue;
+            fs.writeFileSync(abs, rel.endsWith('settings.json') ? '{}\n' : '{"version":1,"hooks":{}}\n');
+            stripped.push(`${rel} (emptied)`);
+        }
+        if (stripped.length) {
+            git(['add', '-A'], out);
+            git(['-c', 'user.name=pilot', '-c', 'user.email=pilot@local', 'commit', '--quiet', '-m', 'pilot: native baseline (ESO wiring removed)'], out);
+        }
+    }
+
     // 4. Prove the state instead of assuming it.
     const head = git(['rev-parse', 'HEAD'], out).stdout.trim();
-    if (head !== sha) throw new Error(`HEAD is ${head}, expected ${sha}`);
+    // `--strip-eso` commits the removal, so HEAD intentionally moves one commit past the target.
+    if (head !== sha && !opts.stripEso) throw new Error(`HEAD is ${head}, expected ${sha}`);
     const dirty = git(['status', '--porcelain'], out).stdout.trim();
     if (dirty) throw new Error(`snapshot is not clean:\n${dirty}`);
 
@@ -118,6 +153,7 @@ function main() {
         console.log(`  refs    ${refs.length} removed (history before the commit is kept)`);
         console.log(`  git     ${size}`);
         console.log(`  forbid  ${opts.forbid ? (leak ? 'LEAK' : 'unreachable') : 'not checked'}`);
+        console.log(`  strip   ${opts.stripEso ? `${stripped.length} ESO path(s) removed` : 'no'}`);
     }
     if (leak) {
         console.error(`pilot-snapshot: LEAK — ${leak}`);
