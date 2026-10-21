@@ -24,7 +24,11 @@ export const BRIDGE_PACKAGE = '@deepseek-ai/dsh-hooks-claude-code';
  * does not declare the dependency produces a row the loader cannot resolve, so the manifest declares
  * it and the installer is what fetches it.
  */
-export const BRIDGE_PACKAGE_RANGE = '^0.2.1';
+/*
+ * Exact, not `^0.2.1`: semver excludes prereleases from a caret range, so `^0.2.1` does not match
+ * `0.2.1-rc.2` and pnpm installs nothing while the row still needs the package.
+ */
+export const BRIDGE_PACKAGE_RANGE = '0.2.1-rc.2';
 
 /**
  * @param {{ configPath?: string, projectDir?: string, defaultTimeoutMs?: number }} [options]
