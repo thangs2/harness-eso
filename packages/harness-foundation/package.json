@@ -12,7 +12,8 @@
         "./host-install": "./src/host-install.mjs",
         "./init-profile": "./src/init-profile.mjs",
         "./consent": "./src/consent.mjs",
-        "./token-diet": "./src/token-diet.mjs"
+        "./token-diet": "./src/token-diet.mjs",
+        "./token-estimate": "./src/token-estimate.mjs"
     },
     "files": [
         "src"

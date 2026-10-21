@@ -13,6 +13,14 @@ export { createSourceRegistry } from './adapter-registry.mjs';
 export { probeCapabilities, PROBE_KINDS } from './capability-probe.mjs';
 export { applyRecipe, loadRecipe, listRecipes, mergePolicy, validateRecipe, RECIPE_VERSION } from './recipe.mjs';
 export { runHostConformance, CONFORMANCE_TIERS } from './conformance.mjs';
+export {
+    checkHarnessSurface,
+    readHarnessSurface,
+    globToRegExp,
+    normalizeSurfaceRel,
+    SURFACE_PRESETS,
+    DEFAULT_ALWAYS_ON_CAP,
+} from './surface-check.mjs';
 export { createHostRuntime } from './host-runtime.mjs';
 export { diffContracts } from './contract-diff.mjs';
 export { checkTenantFiles, checkTenantIsolation, TENANT_MARKER } from './tenant-check.mjs';

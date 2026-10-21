@@ -2,16 +2,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadDecisionPolicyForCwd } from './policy-load.mjs';
 
-/**
- * Estimate token count for markdown / code.
- * Uses ~3.8 characters per token heuristic (cl100k-compatible approximation).
- * @param {string} text
- * @returns {number}
+import { estimateTokens } from './token-estimate.mjs';
+
+/*
+ * The estimator lives in `token-estimate.mjs` so a module that only needs the division (the host
+ * pack's surface check) does not bundle this scanner. Imported for local use and re-exported, so
+ * `token-diet` stays the obvious import and there is still exactly one definition (A1).
+ *
+ * Not `export { estimateTokens } from './token-estimate.mjs'`: that re-exports without creating a
+ * local binding, so every call inside this module would be `undefined` — and the scan swallows the
+ * TypeError, which reports zero rules instead of failing.
  */
-export function estimateTokens(text) {
-    if (!text) return 0;
-    return Math.ceil(text.length / 3.8);
-}
+export { estimateTokens };
 
 /**
  * Parse simple YAML frontmatter between --- and ---.

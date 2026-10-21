@@ -58,6 +58,12 @@ export function runVerifyHost(argv = []) {
         const tag = tier.status === 'pass' ? green : tier.status === 'skip' ? '\x1b[33mSKIP\x1b[0m' : red;
         console.log(`  [${tag}] ${tier.id}  ${tier.title}`);
         console.log(`         ${dim}${tier.detail}${reset}`);
+        // A surface usually has more than one problem; the tier detail carries only the first.
+        if (tier.id === 'H5' && Array.isArray(report.surface?.violations) && report.surface.violations.length > 1) {
+            for (const violation of report.surface.violations.slice(1)) {
+                console.log(`         ${dim}- ${violation.surface}: ${violation.detail}${reset}`);
+            }
+        }
     }
     console.log(`\n  tier reached: ${bold}${report.tierReached}${reset}\n`);
     if (!report.ok) process.exitCode = 1;

@@ -7,6 +7,7 @@
         { "id": "H1", "title": "host pack present and a guard is wired", "evidence": ".harness/host-pack/harness-hook.mjs + a guard command" },
         { "id": "H2", "title": "preflight produced a verdict", "evidence": ".eso-preflight.json with level and at" },
         { "id": "H3", "title": "route trace contains evidence", "evidence": "route-trace.jsonl with >=1 event" },
-        { "id": "H4", "title": "a native provider is bound", "evidence": "capability probe reports selected.capability == native" }
+        { "id": "H4", "title": "a native provider is bound", "evidence": "capability probe reports selected.capability == native" },
+        { "id": "H5", "title": "the gate is outside the editable surface", "evidence": "harness.config.json#harnessSurface declares editable globs that do not match the hooks file, and always-on files stay within alwaysOnMaxTokens (default 8000); skipped when nothing is declared" }
     ]
 }

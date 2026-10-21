@@ -10,6 +10,7 @@
  *   H2  a preflight verdict exists (level + timestamp)
  *   H3  the route trace has evidence (≥1 event)
  *   H4  a native provider is bound (only when the caller supplies a capability probe)
+ *   H5  the gate is outside the declared editable surface and always-on stays in budget (B2)
  *
  * Tiers are consecutive: `tierReached` stops at the first failure, because H3 evidence from a run
  * whose hooks never fired is not the same claim.
@@ -17,18 +18,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { checkHarnessSurface, readHarnessSurface } from './surface-check.mjs';
+
 export const CONFORMANCE_TIERS = [
     { id: 'H0', title: 'host hooks call the harness pack' },
     { id: 'H1', title: 'host pack present and a guard is wired' },
     { id: 'H2', title: 'preflight produced a verdict' },
     { id: 'H3', title: 'route trace contains evidence' },
     { id: 'H4', title: 'a native provider is bound' },
+    { id: 'H5', title: 'the gate is outside the editable surface' },
 ];
 
 const TREES = [
     { id: 'cursor', hooks: '.cursor/hooks.json', session: '.cursor/session' },
     { id: 'agents', hooks: '.agents/hooks.json', session: '.agents/session' },
     { id: 'claude', hooks: '.claude/settings.json', session: '.claude/session' },
+    { id: 'codex', hooks: '.codex/hooks.json', session: '.codex/session' },
 ];
 
 function readJson(file) {
@@ -75,7 +80,11 @@ function result(id, status, detail) {
 
 /**
  * @param {string} root consumer root
- * @param {{ probe?: ReturnType<import('./capability-probe.mjs').probeCapabilities> }} [options]
+ * @param {{
+ *   probe?: ReturnType<import('./capability-probe.mjs').probeCapabilities>,
+ *   requireNative?: boolean,
+ *   surface?: object|null,
+ * }} [options] `surface` overrides `harness.config.json#harnessSurface` (tests, probes)
  */
 export function runHostConformance(root, options = {}) {
     const trees = wiredTrees(root);
@@ -134,7 +143,15 @@ export function runHostConformance(root, options = {}) {
         else h4 = result('H4', 'skip', 'no native provider — H4 requires a host shim (pass --require-native to enforce)');
     }
 
-    const tiers = [h0, h1, h2, h3, h4];
+    /*
+     * H5 is a different axis from H0–H4: those say the host is wired, this says the wiring cannot be
+     * edited away. It is opt-in by declaration — a consumer with no `harnessSurface` in
+     * `harness.config.json` reports `skip`, so no existing consumer changes its answer.
+     */
+    const surface = checkHarnessSurface(root, options.surface ?? readHarnessSurface(root));
+    const h5 = result('H5', surface.status, surface.detail);
+
+    const tiers = [h0, h1, h2, h3, h4, h5];
     let tierReached = '-';
     for (const tier of tiers) {
         if (tier.status !== 'pass') break;
@@ -147,6 +164,13 @@ export function runHostConformance(root, options = {}) {
         root,
         tiers,
         tierReached,
-        ok: h0.status === 'pass' && h1.status === 'pass' && h2.status === 'pass' && h3.status === 'pass',
+        surface,
+        // A declared surface whose gate is editable is not a working host, whatever H0–H3 say.
+        ok:
+            h0.status === 'pass' &&
+            h1.status === 'pass' &&
+            h2.status === 'pass' &&
+            h3.status === 'pass' &&
+            surface.status !== 'fail',
     };
 }
