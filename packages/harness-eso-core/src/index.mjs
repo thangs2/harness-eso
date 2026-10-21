@@ -16,6 +16,7 @@ export { runHostConformance, CONFORMANCE_TIERS } from './conformance.mjs';
 export { createHostRuntime } from './host-runtime.mjs';
 export { diffContracts } from './contract-diff.mjs';
 export { checkTenantFiles, checkTenantIsolation, TENANT_MARKER } from './tenant-check.mjs';
+export { checkMigrationFiles, checkMigrationSafety, APPROVED_MARKER } from './migration-check.mjs';
 export { resolveSkillPack } from './skill-pack.mjs';
 export { insertEvidenceLedger } from './eso-ledger.mjs';
 export { extractNormativeSpec } from '../adapters/docgraph-law.mjs';
