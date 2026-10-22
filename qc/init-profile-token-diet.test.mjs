@@ -55,7 +55,7 @@ test('initProfile seeds micro-rules and returns tokenDiet audit report', () => {
         );
         assert.equal(policy.tokenDiet?.enabled, true);
         assert.equal(policy.tokenDiet?.maxEagerRules, 7);
-        assert.equal(policy.tokenDiet?.maxEagerTokens, 5000);
+        assert.equal(policy.tokenDiet?.maxEagerTokens, 10000);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
     }

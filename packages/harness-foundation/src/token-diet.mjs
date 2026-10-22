@@ -230,12 +230,12 @@ export function scanTokenDiet(root = process.cwd(), opts = {}) {
     const tokenDietCfg = policyResult?.policy?.tokenDiet || {
         enabled: true,
         maxEagerRules: 7,
-        maxEagerTokens: 5000,
+        maxEagerTokens: 10000,
     };
 
     const budget = {
         maxEagerRules: Number(tokenDietCfg.maxEagerRules ?? 7),
-        maxEagerTokens: Number(tokenDietCfg.maxEagerTokens ?? 5000),
+        maxEagerTokens: Number(tokenDietCfg.maxEagerTokens ?? 10000),
     };
 
     const targetTree = opts.tree || 'all';

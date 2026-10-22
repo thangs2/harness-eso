@@ -445,7 +445,7 @@ EOF
 
 Harness-ESO enforces a Token-Diet budget:
 - **`maxEagerRules`**: `7`
-- **`maxEagerTokens`**: `5000`
+- **`maxEagerTokens`**: `10000`
 
 If your project has 15 rules with `alwaysApply: true`, it inflates prompt turns by **>23,000 tokens**.
 

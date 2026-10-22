@@ -16,7 +16,7 @@ export const DEFAULT_POLICY = {
     tokenDiet: {
         enabled: true,
         maxEagerRules: 7,
-        maxEagerTokens: 5000,
+        maxEagerTokens: 10000,
     },
 };
 
