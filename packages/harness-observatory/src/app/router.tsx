@@ -4,6 +4,7 @@ import { RequestDetailPage } from '@/pages/RequestDetailPage';
 import { RequestsListPage } from '@/pages/RequestsListPage';
 import { CallsPage } from '@/pages/CallsPage';
 import { DecisionsPage } from '@/pages/DecisionsPage';
+import { GatePage } from '@/pages/GatePage';
 import { ProjectsPage } from '@/pages/ProjectsPage';
 import { StatusPage } from '@/pages/StatusPage';
 import { RouteGraphPage } from '@/pages/RouteGraphPage';
@@ -27,6 +28,7 @@ export const appRouter = createBrowserRouter([
             { path: 'findings', element: <StubPage title="Findings" hint="L1 conformance overlay." /> },
             { path: 'targets', element: <StubPage title="Targets" hint="Hot files/rules in session." /> },
             { path: 'decisions', element: <DecisionsPage /> },
+            { path: 'gate', element: <GatePage /> },
             { path: 'charts', element: <StubPage title="Charts" hint="Token/time buckets." /> },
             { path: 'status', element: <StatusPage /> },
         ],

@@ -150,6 +150,71 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
         }
     }
 
+    /**
+     * Gate decisions recorded by the runtime plugin (prompt rejections and denied tool calls).
+     * Parameterised by `kind`, `tool` and `limit`; newest first.
+     */
+    function getGateEvents(url) {
+        const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '100', 10) || 100, 500);
+        const kind = url.searchParams.get('kind');
+        const tool = url.searchParams.get('tool');
+        const where = ['project_id = ?'];
+        const params = [cfg.project.id];
+        if (kind) {
+            where.push('kind = ?');
+            params.push(kind);
+        }
+        if (tool) {
+            where.push('tool = ?');
+            params.push(tool);
+        }
+        return withDb((db) => {
+            const total = db.get(`SELECT COUNT(*) AS n FROM gate_event WHERE ${where.join(' AND ')}`, params);
+            const rows = db.all(
+                `SELECT id, at, kind, host, event, tool, ref, detail, blockers_json, source_path, source_line_no
+                 FROM gate_event WHERE ${where.join(' AND ')}
+                 ORDER BY at DESC, id DESC LIMIT ?`,
+                [...params, limit],
+            );
+            return {
+                items: rows.map((row) => ({
+                    ...row,
+                    blockers: (() => {
+                        try {
+                            return JSON.parse(row.blockers_json || '[]');
+                        } catch {
+                            return [];
+                        }
+                    })(),
+                })),
+                total: total?.n ?? 0,
+                limit,
+            };
+        });
+    }
+
+    /** Counts for the Gate panel: by kind, by host, by tool, plus the newest timestamp. */
+    function getGateSummary() {
+        return withDb((db) => {
+            const byKind = db.all(
+                'SELECT kind, COUNT(*) AS n FROM gate_event WHERE project_id = ? GROUP BY kind ORDER BY n DESC',
+                [cfg.project.id],
+            );
+            const byTool = db.all(
+                `SELECT tool, COUNT(*) AS n FROM gate_event
+                 WHERE project_id = ? AND tool IS NOT NULL GROUP BY tool ORDER BY n DESC LIMIT 10`,
+                [cfg.project.id],
+            );
+            const byRef = db.all(
+                `SELECT ref, COUNT(*) AS n FROM gate_event
+                 WHERE project_id = ? AND ref IS NOT NULL GROUP BY ref ORDER BY n DESC LIMIT 10`,
+                [cfg.project.id],
+            );
+            const latest = db.get('SELECT MAX(at) AS at FROM gate_event WHERE project_id = ?', [cfg.project.id]);
+            return { byKind, byTool, byRef, latestAt: latest?.at ?? null, trailPath: cfg.gateTrailPath ?? null };
+        });
+    }
+
     return {
         withDb,
         tenantInfo,
@@ -159,6 +224,8 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
         getDecisions,
         getAggregates,
         getDecisionFlow,
+        getGateEvents,
+        getGateSummary,
         tenants,
     };
 }

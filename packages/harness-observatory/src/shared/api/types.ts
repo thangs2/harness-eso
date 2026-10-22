@@ -363,3 +363,32 @@ export interface ApiVersion {
     openapi: string;
     startedAt: string;
 }
+
+/** One decision the runtime gate recorded (prompt rejection or denied tool call). */
+export interface GateEvent {
+    id: number;
+    at: string | null;
+    kind: string;
+    host: string | null;
+    event: string | null;
+    tool: string | null;
+    ref: string | null;
+    detail: string | null;
+    blockers: Array<{ source?: string | null; kind?: string | null; ref?: string | null; detail?: string | null }>;
+    source_path: string;
+    source_line_no: number;
+}
+
+export interface GateEventListResponse {
+    items: GateEvent[];
+    total: number;
+    limit: number;
+}
+
+export interface GateSummaryResponse {
+    byKind: Array<{ kind: string; n: number }>;
+    byTool: Array<{ tool: string | null; n: number }>;
+    byRef: Array<{ ref: string | null; n: number }>;
+    latestAt: string | null;
+    trailPath: string | null;
+}

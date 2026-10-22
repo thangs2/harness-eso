@@ -20,6 +20,8 @@ import { ingestHookFile, linkRequests, overlayEvidence } from './ingest-hooks.mj
 import { computeChecks } from './checks.mjs';
 import { refreshRequestListCache } from './request-list-cache.mjs';
 import { invalidateObserveCaches } from './observe-spine-cache.mjs';
+import { ingestDshSessions } from './ingest-dsh.mjs';
+import { ingestGateTrail } from './ingest-gate.mjs';
 
 /**
  * Pooled ingest connection.
@@ -102,6 +104,38 @@ export async function runIngestOnce(cfg, opts = {}) {
             }
         }
 
+        /*
+         * Two spines that are not transcripts of an IDE: DSH session files (the host that runs the
+         * plugin) and the gate trail (the decisions that host makes). Both are read from product
+         * state / the host home, never from the consumer repo.
+         */
+        const beforeSpines = db.get(
+            `SELECT (SELECT COUNT(*) FROM conversation) AS c,
+                    (SELECT COUNT(*) FROM request) AS r,
+                    (SELECT COUNT(*) FROM llm_call) AS l,
+                    (SELECT COUNT(*) FROM event) AS e,
+                    (SELECT COUNT(*) FROM gate_event) AS g`,
+        );
+        const dsh = [];
+        for (const report of ingestDshSessions(db, cfg)) dsh.push(report);
+        const gate = (() => {
+            try {
+                return ingestGateTrail(db, cfg);
+            } catch (err) {
+                return { ok: false, path: cfg.gateTrailPath ?? null, reason: err.message };
+            }
+        })();
+
+        const afterSpines = db.get(
+            `SELECT (SELECT COUNT(*) FROM conversation) AS c,
+                    (SELECT COUNT(*) FROM request) AS r,
+                    (SELECT COUNT(*) FROM llm_call) AS l,
+                    (SELECT COUNT(*) FROM event) AS e,
+                    (SELECT COUNT(*) FROM gate_event) AS g`,
+        );
+        const grew =
+            ['c', 'r', 'l', 'e', 'g'].some((key) => Number(afterSpines?.[key] ?? 0) > Number(beforeSpines?.[key] ?? 0));
+
         const link = linkRequests(db, cfg);
         const linked = link.linked;
 
@@ -123,7 +157,8 @@ export async function runIngestOnce(cfg, opts = {}) {
             link.repaired > 0 ||
             link.linked > 0 ||
             transcripts.some((t) => t.rebuilt || t.newLines > 0 || t.newRequests > 0 || t.newCalls > 0) ||
-            hooks.some((h) => h.rebuilt || h.newEvents > 0);
+            hooks.some((h) => h.rebuilt || h.newEvents > 0) ||
+            grew;
         cycleCount += 1;
         const runBackfill = changed || cycleCount % BACKFILL_EVERY() === 0;
 
@@ -274,6 +309,8 @@ export async function runIngestOnce(cfg, opts = {}) {
             migrations,
             transcripts,
             hooks,
+            dsh,
+            gate,
             linked,
             repaired: link.repaired,
             corrected: link.corrected,

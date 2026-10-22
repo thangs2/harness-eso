@@ -4,6 +4,8 @@ import type {
     ConfigureAddResult,
     DecisionFlowVm,
     DecisionListResponse,
+    GateEventListResponse,
+    GateSummaryResponse,
     HealthResponse,
     IngestRunReport,
     IngestStatus,
@@ -148,4 +150,17 @@ export function fetchDecisions(params?: { limit?: number; offset?: number }) {
     if (params?.offset != null) q.set('offset', String(params.offset));
     const suffix = q.toString() ? `?${q}` : '';
     return getJson<DecisionListResponse>(`/api/decisions${suffix}`);
+}
+
+export function fetchGateEvents(params?: { limit?: number; kind?: string; tool?: string }) {
+    const q = new URLSearchParams();
+    if (params?.limit != null) q.set('limit', String(params.limit));
+    if (params?.kind) q.set('kind', params.kind);
+    if (params?.tool) q.set('tool', params.tool);
+    const suffix = q.toString() ? `?${q}` : '';
+    return getJson<GateEventListResponse>(`/api/gate/events${suffix}`);
+}
+
+export function fetchGateSummary() {
+    return getJson<GateSummaryResponse>('/api/gate/summary');
 }

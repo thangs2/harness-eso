@@ -70,6 +70,10 @@ function summarize(report, id) {
         idle: report.idle ?? null,
         ms: report.ms ?? null,
         scope: report.scope ?? null,
+        dsh: Array.isArray(report.dsh) ? report.dsh.length : 0,
+        gate: report.gate
+            ? { inserted: report.gate.inserted ?? 0, skipped: report.gate.skipped ?? 0, stored: report.gate.stored ?? 0 }
+            : null,
     };
 }
 

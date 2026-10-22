@@ -152,6 +152,8 @@ export function createObserveApp(cfg, opts = {}) {
             }
             return json(result.flow);
         }
+        if (p === '/api/gate/events') return json(api.getGateEvents(url));
+        if (p === '/api/gate/summary') return json(api.getGateSummary());
         if (p === '/api/aggregates') return json(api.getAggregates(url));
         if (p === '/api/route/graph.json') {
             const candidates = [

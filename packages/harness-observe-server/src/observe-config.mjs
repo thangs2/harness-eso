@@ -7,6 +7,7 @@ import {
     expandHome,
     findConfigPath,
     isoNow,
+    productStateDir,
 } from '@mu/harness-foundation';
 
 export { isoNow };
@@ -89,6 +90,28 @@ export function antigravityBrainDirs() {
         candidates.push(path.join(b, 'antigravity', 'brain'));
     }
     return [...new Set(candidates.filter((d) => fs.existsSync(d)))];
+}
+
+/**
+ * DSH sessions live outside the consumer, one directory per workspace slug:
+ * `~/.dsh/sessions/--Users-…-repo--/<session>/session.v4.jsonl.zstd`. In Docker the host home is
+ * mounted read-only at /host-dsh.
+ */
+export function dshSessionDirs() {
+    const explicit = process.env.HARNESS_DSH_SESSIONS;
+    if (explicit) return [expandHome(explicit)];
+    const mount = process.env.HARNESS_DSH_MOUNT || '/host-dsh';
+    const mounted = path.join(mount, 'sessions');
+    if (fs.existsSync(mounted)) return [mounted];
+    const host = path.join(os.homedir(), '.dsh', 'sessions');
+    return fs.existsSync(host) ? [host] : [];
+}
+
+/** The gate trail: product state, next to the workspace registry (never inside the consumer). */
+export function gateTrailPath() {
+    const explicit = process.env.HARNESS_ESO_BLOCKER_LOG;
+    if (explicit) return expandHome(explicit);
+    return path.join(productStateDir(), 'eso-blockers.jsonl');
 }
 
 export function claudeProjectsDirs() {
@@ -175,6 +198,8 @@ export function loadConfig(startDir = process.cwd()) {
     const { dataDir, storageTarget } = resolveObserveStoragePaths(root, project.id, storage);
     const sentinel = (config.tracking && config.tracking.sentinelPath) || '.harness/DISABLED';
     const transcriptDir = resolveIngestTranscriptDir(root, config.ingest);
+    /* DSH names its session directory after the workspace path; use the host path, not /data/repo. */
+    const dshProjectSlug = `--${cursorProjectSlug(consumerRootForCursorSlug(root))}--`;
 
     return {
         ok: true,
@@ -206,6 +231,8 @@ export function loadConfig(startDir = process.cwd()) {
             transcriptDir,
             brainDirs: antigravityBrainDirs(),
             claudeProjectsDirs: claudeProjectsDirs(),
+            dshSessionDirs: dshSessionDirs(),
+            dshProjectSlug,
             hookFiles: ((config.ingest && config.ingest.hookFiles) || [
                 '.cursor/session/route-trace.jsonl',
                 '.agents/session/route-trace.jsonl',
@@ -216,6 +243,7 @@ export function loadConfig(startDir = process.cwd()) {
             mode: (config.tenancy && config.tenancy.mode) || 'isolated',
             registry: expandHome((config.tenancy && config.tenancy.registry) || '~/.harness/tenants.json'),
         },
+        gateTrailPath: gateTrailPath(),
         decisionPolicyPath: decisionPolicyFile(root),
     };
 }

@@ -97,6 +97,8 @@ Mounts for the Docker plane:
 | Compose volume `observe-data` → `/data/observe` | rw | `harness.db` at `/data/observe/<projectId>/harness.db` |
 | `HARNESS_PRODUCT_STATE_HOST` (default `~/.harness`) → `/data/product-state` | rw | `workspace.json`, `tenants.json`, **MCP usage ledger** |
 | `~/.cursor` → `/host-cursor` | ro | Agent transcript JSONL (REQUEST spine) |
+| `~/.dsh` → `/host-dsh` | ro | DSH sessions (`session.v4.jsonl.zstd`); filter theo workspace slug |
+| `~/.harness` → `/data/product-state` | rw | product state, gồm `eso-blockers.jsonl` (gate trail) |
 
 ### MCP model usage ledger
 
