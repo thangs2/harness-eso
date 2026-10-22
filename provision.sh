@@ -146,6 +146,21 @@ if (res.dryRun) {
   console.log(`   Files:        ${created} created, ${merged} merged, ${updated} updated, ${skipped} skipped`);
 }
 ' "$out"
+
+    # Conformance is evidence, not decoration: H0–H3 prove the hooks are wired and have fired, H5 proves
+    # an optimizer cannot edit the gate. Print the tier so a broken provision is visible immediately.
+    echo ""
+    echo "🔎 verify host:"
+    node "$CLI" verify host "$root" 2>&1 | tail -n 12 || true
+
+    # The guide is copied only when missing, so a newer template never reaches an existing consumer.
+    local guide="$root/.harness/WORKFLOW_GUIDE.md"
+    local template="$ROOT/profiles/templates/WORKFLOW_GUIDE.md"
+    if [[ -f "$guide" && -f "$template" ]] && ! cmp -s "$guide" "$template"; then
+        echo ""
+        echo "⚠️  WORKFLOW_GUIDE.md đã cũ so với template — đồng bộ bằng:"
+        echo "    node $CLI fix consumer $root --no-provision"
+    fi
 }
 
 if [[ "$target_consumer" == "all" ]]; then

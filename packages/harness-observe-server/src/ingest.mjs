@@ -20,7 +20,7 @@ import { ingestHookFile, linkRequests, overlayEvidence } from './ingest-hooks.mj
 import { computeChecks } from './checks.mjs';
 import { refreshRequestListCache } from './request-list-cache.mjs';
 import { invalidateObserveCaches } from './observe-spine-cache.mjs';
-import { ingestDshSessions } from './ingest-dsh.mjs';
+import { discoverDshSessions, ingestDshSessions } from './ingest-dsh.mjs';
 import { ingestGateTrail } from './ingest-gate.mjs';
 
 /**
@@ -420,6 +420,37 @@ export function transcriptSpineDiagnostics(cfg) {
     };
 }
 
+/**
+ * Are the two extra spines visible from inside this process?
+ *
+ * `deploy.sh` asserts this: a container that mounts `~/.cursor` but not `~/.dsh` looks healthy while
+ * every DSH session is missing, which is exactly the failure it exists to catch.
+ */
+function extraSpineDiagnostics(cfg) {
+    const dshDirs = cfg.ingest?.dshSessionDirs ?? [];
+    const dshDirsExist = dshDirs.some((dir) => fs.existsSync(dir));
+    let dshSessions = 0;
+    try {
+        dshSessions = discoverDshSessions(dshDirs, { projectSlug: cfg.ingest?.dshProjectSlug }).length;
+    } catch {
+        dshSessions = 0;
+    }
+    const gatePath = cfg.gateTrailPath ?? null;
+    const gateExists = Boolean(gatePath && fs.existsSync(gatePath));
+    let gateLines = 0;
+    try {
+        gateLines = gateExists
+            ? fs.readFileSync(gatePath, 'utf8').split('\n').filter((line) => line.trim()).length
+            : 0;
+    } catch {
+        gateLines = 0;
+    }
+    return {
+        dsh: { dirs: dshDirs, dirsExist: dshDirsExist, sessions: dshSessions, projectSlug: cfg.ingest?.dshProjectSlug ?? null },
+        gate: { trailPath: gatePath, exists: gateExists, lines: gateLines },
+    };
+}
+
 export function ingestStatus(cfg) {
     const spine = transcriptSpineDiagnostics(cfg);
     if (!fs.existsSync(cfg.storage.target)) {
@@ -428,6 +459,7 @@ export function ingestStatus(cfg) {
             db: cfg.storage.target,
             enabled: !isTrackingDisabled(cfg),
             ...spine,
+            ...extraSpineDiagnostics(cfg),
             spineOk: spine.ok,
         };
     }
@@ -453,6 +485,7 @@ export function ingestStatus(cfg) {
             cursorMount: spine.cursorMount,
             spineOk: spine.ok,
             warnings: spine.warnings,
+            ...extraSpineDiagnostics(cfg),
             sources,
             pendingLinks: db.get(
                 'SELECT COUNT(*) AS n FROM request WHERE project_id = ? AND generation_id IS NULL',

@@ -20,6 +20,7 @@
         "harnessctl": "./src/cli.mjs",
       },
       "dependencies": {
+        "@mu/harness-eso-core": "0.1.0",
         "@mu/harness-foundation": "0.1.0",
         "@mu/harness-observe-server": "0.1.0",
       },
@@ -70,9 +71,20 @@
         "@mu/harness-foundation": "0.1.0",
       },
     },
+    "packages/harness-eso-dsh": {
+      "name": "@mu/harness-eso-dsh",
+      "version": "0.2.3",
+    },
     "packages/harness-foundation": {
       "name": "@mu/harness-foundation",
       "version": "0.1.0",
+    },
+    "packages/harness-host-dsh": {
+      "name": "@mu/harness-host-dsh",
+      "version": "0.1.0",
+      "dependencies": {
+        "@mu/harness-eso-core": "0.1.0",
+      },
     },
     "packages/harness-host-generic": {
       "name": "@mu/harness-host-generic",
@@ -300,7 +312,11 @@
 
     "@mu/harness-eso-core": ["@mu/harness-eso-core@workspace:packages/harness-eso-core"],
 
+    "@mu/harness-eso-dsh": ["@mu/harness-eso-dsh@workspace:packages/harness-eso-dsh"],
+
     "@mu/harness-foundation": ["@mu/harness-foundation@workspace:packages/harness-foundation"],
+
+    "@mu/harness-host-dsh": ["@mu/harness-host-dsh@workspace:packages/harness-host-dsh"],
 
     "@mu/harness-host-generic": ["@mu/harness-host-generic@workspace:packages/harness-host-generic"],
 
