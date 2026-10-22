@@ -47,7 +47,15 @@
         }
     },
     "paths": {
-        "locked": [],
+        "locked": [
+            ".cursor/mcp.json",
+            ".vscode/mcp.json",
+            ".agents/mcp_config.json",
+            ".env",
+            ".env.local",
+            ".env.production",
+            "credentials.json"
+        ],
         "gated": [
             "AGENTS.md",
             ".cursorrules",
@@ -59,9 +67,6 @@
             ".agents/skills/",
             ".cursor/agents/",
             ".agents/agents/",
-            ".cursor/mcp.json",
-            ".vscode/mcp.json",
-            ".agents/mcp_config.json",
             ".cursor/hooks/guard-write.py",
             ".cursor/hooks/guard-shell.py",
             ".cursor/hooks/locked-paths.txt",

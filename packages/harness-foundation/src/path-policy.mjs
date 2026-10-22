@@ -43,7 +43,19 @@
  * is what `locked-paths.txt` held — a path no gate can open.
  */
 export const DEFAULT_PATH_POLICY = {
-    locked: ['document/mu/be/00.law/'],
+    /*
+     * `mcp.json` files hold the credentials the MCP servers run with, and the root `.mcp.json` is a
+     * copy of one of them. They are `locked` rather than `gated`: a stamp is evidence that an agent
+     * read enough context, not that a human agreed to edit a secret, and a gated entry could be
+     * opened by a turn that happened to collect enough evidence (H7).
+     */
+    locked: [
+        'document/mu/be/00.law/',
+        '.cursor/mcp.json',
+        '.vscode/mcp.json',
+        '.agents/mcp_config.json',
+        '.mcp.json',
+    ],
     gated: [
         'frontend/',
         'backend/mu-*',
@@ -61,9 +73,6 @@ export const DEFAULT_PATH_POLICY = {
         'scripts/ci/',
         'installation/docgraph/',
         'docgraph.scope',
-        '.cursor/mcp.json',
-        '.vscode/mcp.json',
-        '.agents/mcp_config.json',
         '.cursor/hooks/guard-write.py',
         '.cursor/hooks/guard-shell.py',
         '.agents/hooks/guard-write.py',

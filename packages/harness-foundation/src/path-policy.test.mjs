@@ -77,6 +77,18 @@ test('the most restrictive tier wins when a path is listed twice', () => {
     assert.equal(pathMode('document/mu/x.md', resolved), 'locked');
 });
 
+test('MCP config files are locked by default, not merely gated (H7)', () => {
+    /*
+     * `mcp.json` carries the credentials the MCP servers run with, and the root `.mcp.json` is a copy
+     * of one of them. `gated` would open them to any turn that collected enough evidence — reading
+     * enough files is not a decision about a secret — so the default has to be `locked`.
+     */
+    const resolved = resolvePathPolicy({});
+    for (const rel of ['.cursor/mcp.json', '.vscode/mcp.json', '.agents/mcp_config.json', '.mcp.json']) {
+        assert.equal(pathMode(rel, resolved), 'locked', `${rel} must be locked`);
+    }
+});
+
 test('entries match a directory subtree, and exact files only when written exactly', () => {
     const resolved = resolvePathPolicy({
         paths: { gated: ['frontend/', 'AGENTS.md', '.cursor/rules/'] },
