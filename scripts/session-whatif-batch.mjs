@@ -13,7 +13,7 @@
  * Usage
  *   node scripts/session-whatif-batch.mjs
  *   node scripts/session-whatif-batch.mjs --dir ~/.dsh/sessions --min-steps 20
- *   node scripts/session-whatif-batch.mjs --md documents/05.development/21.session-whatif-batch.md
+ *   node scripts/session-whatif-batch.mjs --md documents/08.archive/21.session-whatif-batch.md
  *
  * The per-session analysis is delegated to `session-whatif.mjs` so both share exactly one cost model.
  */

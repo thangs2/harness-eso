@@ -38,4 +38,4 @@ policy falls through to `agentmemory-mcp`, then to no memory at all.
 
 The Cordis plugin (hook wiring: preflight, guards, route) and the DSH host-pack bridge are the next
 milestone — see `documents/05.development/19.plan-dsh-integration.md` and
-`documents/05.development/26.advanced-program.md`.
+`documents/08.archive/26.advanced-program.md`.
