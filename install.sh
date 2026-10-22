@@ -19,7 +19,7 @@ HARNESS_REPO_ROOT="$ROOT" node "$ROOT/packages/harness-cli/src/cli.mjs" observat
 # Consumers receive the built host pack, never the checkout — so it must exist before any
 # `init profile`. Without this the provision fails loudly (`host pack not built at …`).
 node "$ROOT/scripts/build-host-pack.mjs"
-chmod +x "$ROOT/harness" "$ROOT/docker/"*.sh 2>/dev/null || true
+chmod +x "$ROOT/harness" "$ROOT/deploy.sh" "$ROOT/provision.sh" "$ROOT/console.sh" 2>/dev/null || true
 
 echo ""
 echo "Cài xong (monorepo @mu/harness-*)."

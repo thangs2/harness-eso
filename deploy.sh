@@ -46,7 +46,7 @@ import("@mu/harness-foundation/workspace").then(({ loadWorkspace }) => {
   const ws = loadWorkspace();
   for (const p of ws.projects || []) {
     const isDef = p.id === ws.defaultProjectId ? " (mặc định)" : "";
-    console.log(`  - \x1b[36m${p.id}\x1b[0m\t(port :${p.port || 8792})${isDef} \t→ ${p.rootHost || p.root}`);
+    console.log(`  - \x1b[36m${p.id}\x1b[0m\t(port :${p.port})${isDef} \t→ ${p.rootHost || p.root}`);
   }
   console.log(`  - \x1b[33mall\x1b[0m\t(re-deploy tất cả các consumer trên)`);
 }).catch(() => {});'
@@ -151,7 +151,7 @@ deploy_single_consumer() {
 import("@mu/harness-foundation/workspace").then(({ loadWorkspace, resolveProject }) => {
   const ws = loadWorkspace();
   const p = resolveProject(ws, process.argv[1]);
-  console.log(`${p.id} ${p.port || 8792} ${p.rootHost || p.root}`);
+  console.log(`${p.id} ${p.port} ${p.rootHost || p.root}`);
 }).catch(err => {
   console.error("NOT_FOUND");
   process.exit(1);
@@ -166,12 +166,14 @@ import("@mu/harness-foundation/workspace").then(({ loadWorkspace, resolveProject
     local id port root
     read -r id port root <<< "$info"
 
-    echo ""
     echo "=================================================="
     echo "🚀 Triển khai cho consumer: $id (Port :$port)"
+    echo "   Compose stack:  harness-observatory-$id"
     echo "   Repo root: $root"
     echo "=================================================="
 
+    # The stack is keyed by project id, never by port: a port is an entrance and the id is the
+    # identity. Keying by port is what let `restart` of one project take down another's stack.
     node "$CLI" observatory restart --project "$id"
 
     echo ""
@@ -186,6 +188,16 @@ import("@mu/harness-foundation/workspace").then(({ loadWorkspace, resolveProject
     done
 
     if [[ "$ok" == "true" ]]; then
+        # A healthy container is not proof that it serves *this* consumer: the port may be held by a
+        # stack belonging to another project, and `/health` answers 200 either way. Ask the tenant
+        # endpoint which project the stack is actually configured for.
+        local served
+        served=$(curl -fsS "http://127.0.0.1:${port}/api/tenant" 2>/dev/null || true)
+        if [[ -n "$served" ]] && ! printf '%s' "$served" | grep -q "\"$id\""; then
+            echo "❌ Stack trên :$port KHÔNG phải '$id' — port đang bị consumer khác chiếm."
+            echo "   /api/tenant trả: $served"
+            die "port overlap on :$port (project '$id')"
+        fi
         echo "✅ Consumer '$id' đã sẵn sàng tại: http://127.0.0.1:${port}/"
         echo ""
         echo "🔎 Kiểm tra ingest spine (Cursor / DSH / gate trail):"

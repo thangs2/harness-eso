@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { summarizeHostPack } from './host-pack-summary.mjs';
@@ -22,6 +23,13 @@ import {
     syncTenantsFromWorkspace,
     tenantsFile,
 } from '@mu/harness-foundation/workspace';
+import {
+    assertPortAvailable,
+    assignObservePort,
+    claimObservePort,
+    normalizePort,
+    observeUrlFor,
+} from '@mu/harness-foundation/observe-port';
 // Consent records — the `ask` tier's human half. Imported by subpath rather than from the package root
 // so the console server does not pull the SQLite port into its cold start for one JSON file.
 import {
@@ -49,7 +57,8 @@ const ESO_ROOT = process.env.HARNESS_ESO_ROOT || path.resolve(PKG_ROOT, '../..')
  * product repo writes host hooks into the repo that ships them.
  */
 function defaultAgentRoot() {
-    return process.env.HARNESS_AGENT_ROOT_HOST || '~';
+    const raw = process.env.HARNESS_AGENT_ROOT_HOST || process.env.HARNESS_AGENT_ROOT || '~';
+    return raw.startsWith('~') ? path.join(os.homedir(), raw.slice(1)) : raw;
 }
 
 function profilesDir() {
@@ -59,6 +68,21 @@ function profilesDir() {
 function stateDir() {
     ensureProductState();
     return productStateDir();
+}
+
+/**
+ * The base URL of a project's Observatory, resolved through the one port registry.
+ *
+ * `HARNESS_OBSERVE_PUBLIC_HOST` exists for the containerised Console, which reaches the host as
+ * `host.docker.internal`. It names a transport, never a port — the Console used to take a whole
+ * `HARNESS_OBSERVE_HEALTH_BASE` URL with a hard-coded `:8792`, so every project in a container probed
+ * the first project's stack and saw it healthy.
+ *
+ * @param {string} projectId
+ */
+function observeBaseFor(projectId) {
+    const host = (process.env.HARNESS_OBSERVE_PUBLIC_HOST || '127.0.0.1').trim();
+    return observeUrlFor(loadWorkspace(), projectId, { publicHost: host });
 }
 
 function json(res, status, data) {
@@ -107,18 +131,30 @@ function serveStatic(req, res) {
 
 function provisionProject(project) {
     const dir = stateDir();
-    const applied = initProfile(project, profilesDir(), tenantsFile(), {
-        dryRun: false,
-    });
-
     const workspace = loadWorkspace();
+    /*
+     * Claim before provisioning, not after. `initProfile` writes the port into
+     * `harness.config.json`, `sidecar.env` and `host-bootstrap.json`, so a project that had no port
+     * yet must have one recorded before those files are generated — otherwise the consumer is
+     * provisioned against a number the registry never agreed to.
+     */
+    const port = assignObservePort(workspace, project.id, { preferred: project.observe?.port });
+    const applied = initProfile(
+        { ...project, observe: { ...(project.observe || {}), port } },
+        profilesDir(),
+        tenantsFile(),
+        {
+            dryRun: false,
+        },
+    );
+
     const idx = workspace.projects.findIndex((p) => p.id === project.id);
     const row = {
         id: project.id,
         displayName: project.displayName,
         root: applied.root,
         rootHost: applied.root,
-        port: project.observe?.port || 8792,
+        port,
         profile: 'generic-eso',
         consoleProject: true,
     };
@@ -130,6 +166,7 @@ function provisionProject(project) {
 
     project.status = 'provisioned';
     project.provisionedAt = new Date().toISOString();
+    project.observe = { ...(project.observe || {}), port };
     saveProject(dir, project);
 
     return { ok: true, files: applied.files, observeUrl: applied.observeUrl };
@@ -234,7 +271,12 @@ async function route(req, res) {
          * appears as "provisioned", so the operator only learns about it from an IDE that silently
          * stopped guarding. One cheap `readFile`+`hash` per project makes it visible where projects
          * are already listed.
+         *
+         * The port is also reconciled here: every project claims one from the workspace, and a
+         * document that disagrees is reported (`portConflict`) rather than silently repaired — two
+         * registries disagreeing is the defect, and hiding it in a read route would keep it invisible.
          */
+        const workspace = loadWorkspace();
         const items = listProjects(stateDir()).map((project) => {
             const root = project.agentRepo?.root;
             let hostPack = null;
@@ -245,8 +287,45 @@ async function route(req, res) {
                     hostPack = { state: 'error', detail: String(err?.message || err) };
                 }
             }
-            return { ...project, hostPack };
+            const recorded = claimObservePort(workspace, project.id);
+            const docPort = normalizePort(project.observe?.port);
+            const owners = (workspace.projects ?? []).filter((p) => normalizePort(p.port) === recorded);
+            const rival = owners.find((p) => p.id !== project.id);
+            return {
+                ...project,
+                hostPack,
+                observe: { ...(project.observe || {}), port: recorded, recorded },
+                portConflict:
+                    docPort !== null && docPort !== recorded
+                        ? {
+                              document: docPort,
+                              workspace: recorded,
+                              detail: `project document says ${docPort}, workspace records ${recorded}`,
+                          }
+                        : rival
+                          ? { owner: rival.id, detail: `port ${recorded} is also owned by "${rival.id}"` }
+                          : null,
+            };
         });
+        json(res, 200, { ok: true, items });
+        return;
+    }
+
+    if (p === '/api/observe-ports' && req.method === 'GET') {
+        /*
+         * The registry as the Console renders it: every project, its port, and the compose identity
+         * that stack uses. One Console serves every project's Observatory (each on its own port), so
+         * this route is what lets the UI open the right one instead of assuming :8792.
+         */
+        const workspace = loadWorkspace();
+        const items = workspace.projects.map((project) => ({
+            id: project.id,
+            displayName: project.displayName,
+            root: project.rootHost || project.root,
+            port: claimObservePort(workspace, project.id),
+            observeUrl: observeBaseFor(project.id),
+            defaultProject: project.id === workspace.defaultProjectId,
+        }));
         json(res, 200, { ok: true, items });
         return;
     }
@@ -257,8 +336,43 @@ async function route(req, res) {
             json(res, 400, { ok: false, error: 'displayName required' });
             return;
         }
-        const doc = createProject(stateDir(), { displayName: body.displayName });
-        json(res, 201, { ok: true, project: doc });
+        /*
+         * The port is claimed here, through the one resolver, and written into both registries by
+         * `createProject`/`saveWorkspace` callers. A draft used to get `8792` from
+         * `defaultProjectDraft`, which is how a second project started life pointing at the first
+         * project's stack.
+         */
+        const workspace = loadWorkspace();
+        let port;
+        try {
+            // Reserve the id first so the port is claimed for the id that will actually be used.
+            const doc = createProject(stateDir(), {
+                displayName: body.displayName,
+                root: String(body.root || '').trim(),
+            });
+            port = assignObservePort(workspace, doc.id, { preferred: body.port });
+            doc.observe = { ...(doc.observe || {}), port, source: 'workspace' };
+            saveProject(stateDir(), doc);
+
+            const row = {
+                id: doc.id,
+                displayName: doc.displayName,
+                root: String(body.root || '').trim(),
+                rootHost: String(body.root || '').trim(),
+                port,
+                profile: 'generic-eso',
+                consoleProject: true,
+            };
+            const idx = workspace.projects.findIndex((x) => x.id === doc.id);
+            if (idx >= 0) workspace.projects[idx] = { ...workspace.projects[idx], ...row };
+            else workspace.projects.push(row);
+            workspace.defaultProjectId = workspace.defaultProjectId || doc.id;
+            saveWorkspace(workspace);
+            syncTenantsFromWorkspace(workspace);
+            json(res, 201, { ok: true, project: doc });
+        } catch (err) {
+            json(res, 400, { ok: false, error: String(err?.message || err) });
+        }
         return;
     }
 
@@ -336,20 +450,53 @@ async function route(req, res) {
             delete body.id;
             project = { ...project, ...body, id: project.id, version: project.version };
             if (body.agentRepo) project.agentRepo = { ...project.agentRepo, ...body.agentRepo };
-            if (body.observe) project.observe = { ...project.observe, ...body.observe };
             if (body.plugins) project.plugins = { ...project.plugins, ...body.plugins };
             if (body.hostMode) project.hostMode = body.hostMode;
             if (body.hostProfile) project.hostProfile = body.hostProfile;
+            /*
+             * A port edited in the Console is written to **both** registries, and it is refused when
+             * another project already owns it. Accepting it for the document only is what produced the
+             * divergence this fix removes: the document said one number, the workspace another, and
+             * whichever process read the document first served the wrong consumer.
+             */
+            if (body.observe) {
+                const workspace = loadWorkspace();
+                const wanted = normalizePort(body.observe.port);
+                const recorded = claimObservePort(workspace, project.id);
+                if (wanted !== null && wanted !== recorded) {
+                    try {
+                        assertPortAvailable(workspace, project.id, wanted);
+                    } catch (err) {
+                        json(res, 409, { ok: false, error: 'port_conflict', message: err.message });
+                        return;
+                    }
+                    assignObservePort(workspace, project.id, { preferred: wanted });
+                    const row = workspace.projects.find((x) => x.id === project.id);
+                    if (row) row.port = wanted;
+                    saveWorkspace(workspace);
+                    syncTenantsFromWorkspace(workspace);
+                }
+                project.observe = { ...project.observe, ...body.observe, port: wanted ?? recorded };
+            }
             saveProject(stateDir(), project);
             json(res, 200, { ok: true, project });
             return;
         }
 
         if (action === '/observe-health' && req.method === 'GET') {
-            const port = project.observe?.port || 8792;
-            const observeBase =
-                process.env.HARNESS_OBSERVE_HEALTH_BASE?.replace(/\/$/, '') ||
-                `http://127.0.0.1:${port}`;
+            /*
+             * Per-project, always. This used to prefer one `HARNESS_OBSERVE_HEALTH_BASE` URL and only
+             * fall back to the project's port, so a Console in Docker probed `:8792` for every
+             * project — every row reported "healthy" because one stack answered, whichever project it
+             * belonged to. The project id decides the port; the host is only a transport choice.
+             */
+            let observeBase;
+            try {
+                observeBase = observeBaseFor(id);
+            } catch (err) {
+                json(res, 400, { ok: false, error: 'port_unresolved', message: String(err?.message || err) });
+                return;
+            }
             try {
                 const upstream = await fetch(`${observeBase}/health`, {
                     headers: { Accept: 'application/json' },
@@ -367,7 +514,7 @@ async function route(req, res) {
                     error: 'observe_unreachable',
                     message: err.message,
                     observeUrl: observeBase,
-                    hint: 'Start Docker, then in harness-eso: ./harness up',
+                    hint: `Start this project's stack: harnessctl observatory up --project ${id}`,
                 });
             }
             return;

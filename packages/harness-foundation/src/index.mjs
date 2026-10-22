@@ -34,6 +34,17 @@ export {
     workspaceFile,
 } from './workspace-store.mjs';
 export {
+    OBSERVE_PORT_BASE,
+    assertPortAvailable,
+    assignObservePort,
+    claimObservePort,
+    composeProjectName,
+    normalizePort,
+    observeUrlFor,
+    portsInUse,
+    projectIdByRoot,
+} from './observe-port.mjs';
+export {
     CONSENT_DIR_NAME,
     consentCovers,
     consentDir,

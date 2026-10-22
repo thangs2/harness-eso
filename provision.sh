@@ -29,7 +29,7 @@ import("@mu/harness-foundation/workspace").then(({ loadWorkspace }) => {
   const ws = loadWorkspace();
   for (const p of ws.projects || []) {
     const isDef = p.id === ws.defaultProjectId ? " (mặc định)" : "";
-    console.log(`  - \x1b[36m${p.id}\x1b[0m\t(port :${p.port || 8792})${isDef} \t→ ${p.rootHost || p.root}`);
+    console.log(`  - \x1b[36m${p.id}\x1b[0m\t(port :${p.port})${isDef} \t→ ${p.rootHost || p.root}`);
   }
   console.log(`  - \x1b[33mall\x1b[0m\t(re-provision tất cả các consumer trên)`);
 }).catch(() => {});'
@@ -88,7 +88,7 @@ provision_single_consumer() {
 import("@mu/harness-foundation/workspace").then(({ loadWorkspace, resolveProject }) => {
   const ws = loadWorkspace();
   const p = resolveProject(ws, process.argv[1]);
-  console.log(`${p.id} ${p.port || 8792} ${p.rootHost || p.root}`);
+  console.log(`${p.id} ${p.port} ${p.rootHost || p.root}`);
 }).catch(() => {
   console.error("NOT_FOUND");
   process.exit(1);
@@ -102,6 +102,18 @@ import("@mu/harness-foundation/workspace").then(({ loadWorkspace, resolveProject
 
     local id port root
     read -r id port root <<< "$info"
+
+    if [[ -z "$port" ]]; then
+        echo "❌ Consumer '$id' chưa có observe port trong ~/.harness/workspace.json."
+        echo "   Cấp port: node \"$CLI\" observatory up --project $id"
+        return 1
+    fi
+
+    if [[ -z "$port" ]]; then
+        echo "❌ Consumer '$id' chưa có observe port trong ~/.harness/workspace.json."
+        echo "   Cấp port: node \"$CLI\" observatory up --project $id"
+        return 1
+    fi
 
     echo ""
     echo "=================================================="

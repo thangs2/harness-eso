@@ -10,7 +10,7 @@ const STEPS = [
     {
         n: 1,
         title: 'Observatory Docker (harness-eso)',
-        body: 'Bật Docker Desktop → trong repo harness-eso: ./docker/observatory.sh build && ./harness up',
+        body: 'Bật Docker Desktop → trong repo harness-eso: ./deploy.sh <consumer> (hoặc ./harness up)',
     },
     {
         n: 2,

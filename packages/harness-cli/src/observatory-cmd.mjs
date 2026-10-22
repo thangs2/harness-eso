@@ -4,9 +4,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { applyWorkspaceEnv, ESO_ROOT } from './workspace-env.mjs';
 import { findProject, findProjectByRoot, loadWorkspace, resolveProject } from '@mu/harness-foundation/workspace';
+import {
+    OBSERVE_PORT_BASE,
+    assertPortAvailable,
+    claimObservePort,
+    composeProjectName,
+    normalizePort,
+} from '@mu/harness-foundation/observe-port';
 
 const COMPOSE_FILE = path.join(ESO_ROOT, 'compose.harness.yml');
-const DEFAULT_PORT = 8792;
 
 function die(msg) {
     console.error(`observatory: ${msg}`);
@@ -35,48 +41,46 @@ function tryResolveConsumerFromCwd() {
     return null;
 }
 
-function tryDefaultProjectRoot() {
-    try {
-        const ws = loadWorkspace();
-        const p = resolveProject(ws, null);
-        return p.rootHost || p.root;
-    } catch {
-        return null;
-    }
-}
-
 /**
- * @param {{ repoOptional?: boolean, consumerPath?: string }} opts
+ * Everything a compose invocation needs, resolved once.
+ *
+ * Two facts used to be the same variable — `COMPOSE_PROJECT_NAME = harness-observatory-${port}` — and
+ * that is what made `deploy.sh baplatform` bring up x79's stack: baplatform's document said 8792, so
+ * it addressed the project x79 was already running, and the `down` half of `restart` removed it. A
+ * port is an entrance; the stack's identity is the project id and nothing else.
+ *
+ * @param {{ repoOptional?: boolean, projectId?: string|null, consumerPath?: string|null, port?: number|null }} opts
  */
 function composeEnv(opts = {}) {
-    const port = String(process.env.HARNESS_OBSERVE_PORT || DEFAULT_PORT);
     const env = { ...process.env };
     env.HOME = env.HOME || os.homedir();
-    env.HARNESS_OBSERVE_PORT = port;
-    // No HARNESS_ESO_ROOT: the stack mounts `~/.harness` for product state, so it does not need to
-    // know where the checkout is.
     env.HARNESS_AGENT_ROOT = env.HARNESS_AGENT_ROOT || path.join(env.HOME, 'Workspaces');
     env.HARNESS_CURSOR_HOME = env.HARNESS_CURSOR_HOME || path.join(env.HOME, '.cursor');
     env.HARNESS_GEMINI_HOME = env.HARNESS_GEMINI_HOME || path.join(env.HOME, '.gemini');
-    env.COMPOSE_PROJECT_NAME = env.COMPOSE_PROJECT_NAME || `harness-observatory-${port}`;
 
-    if (!env.HARNESS_REPO_ROOT && opts.consumerPath) {
-        env.HARNESS_REPO_ROOT = path.resolve(opts.consumerPath);
+    const workspace = loadWorkspace();
+    const projectId = opts.projectId ?? null;
+
+    env.HARNESS_OBSERVE_PORT = String(
+        opts.port ?? (projectId ? claimObservePort(workspace, projectId) : OBSERVE_PORT_BASE),
+    );
+    env.COMPOSE_PROJECT_NAME = projectId
+        ? composeProjectName(projectId)
+        : env.COMPOSE_PROJECT_NAME || composeProjectName('shared');
+
+    let consumerPath = opts.consumerPath || env.HARNESS_REPO_ROOT;
+    if (!consumerPath && projectId) {
+        const project = findProject(workspace, projectId);
+        consumerPath = project?.rootHost || project?.root || null;
     }
+    if (!consumerPath) consumerPath = tryResolveConsumerFromCwd();
+    if (consumerPath) env.HARNESS_REPO_ROOT = path.resolve(consumerPath);
+    if (!env.HARNESS_REPO_ROOT && opts.repoOptional) env.HARNESS_REPO_ROOT = ESO_ROOT;
+
     if (!env.HARNESS_REPO_ROOT) {
-        const fromWs = tryDefaultProjectRoot();
-        if (fromWs) env.HARNESS_REPO_ROOT = path.resolve(fromWs);
+        die(`chưa có dự án — thêm trong http://127.0.0.1:${OBSERVE_PORT_BASE}/projects hoặc harnessctl observatory up --project <id>`);
     }
-    if (!env.HARNESS_REPO_ROOT) {
-        const fromCwd = tryResolveConsumerFromCwd();
-        if (fromCwd) env.HARNESS_REPO_ROOT = fromCwd;
-    }
-    if (!env.HARNESS_REPO_ROOT && opts.repoOptional) {
-        env.HARNESS_REPO_ROOT = ESO_ROOT;
-    }
-    if (!env.HARNESS_REPO_ROOT) {
-        die('chưa có dự án — thêm trong http://127.0.0.1:8792/projects hoặc harnessctl observatory up --project <id>');
-    }
+
     return env;
 }
 
@@ -121,18 +125,20 @@ function cmdUp(rest, opts) {
     console.log(`Consumer mount: ${env.HARNESS_REPO_ROOT} → /data/repo (read-only)`);
     console.log(`Observe SQLite: Docker volume observe-data → /data/observe/<projectId>/harness.db`);
     console.log(`Transcripts: Cursor (${env.HARNESS_CURSOR_HOME}) / Antigravity (${env.HARNESS_GEMINI_HOME}) → container (REQUEST spine)`);
-    console.log(`Stop only this stack: HARNESS_OBSERVE_PORT=${port} harnessctl observatory down`);
+    console.log(
+        opts.projectId
+            ? `Restart only this stack: harnessctl observatory restart --project ${opts.projectId}`
+            : `Stop this stack: docker compose -p ${env.COMPOSE_PROJECT_NAME} down`,
+    );
 }
 
-function cmdHealth() {
-    const port = process.env.HARNESS_OBSERVE_PORT || DEFAULT_PORT;
+function cmdHealth(port) {
     const out = curlJson(`http://127.0.0.1:${port}/health`);
     process.stdout.write(out);
     if (!out.endsWith('\n')) console.log('');
 }
 
-function cmdSmoke() {
-    const port = process.env.HARNESS_OBSERVE_PORT || DEFAULT_PORT;
+function cmdSmoke(port) {
     const base = `http://127.0.0.1:${port}`;
     console.log(`==> GET ${base}/health`);
     console.log(curlJson(`${base}/health`));
@@ -151,6 +157,60 @@ function cmdSmoke() {
 }
 
 /**
+ * Resolve which project this invocation is about, or none.
+ *
+ * Precedence is the operator's, not the environment's: `--project` (or a consumer path that maps to
+ * one) wins outright. The old code let an inherited `HARNESS_OBSERVE_PORT` beat the project's own
+ * record, which is how a shell variable turned one deploy into another project's deploy.
+ */
+function resolveTarget(opts) {
+    const ws = loadWorkspace();
+    const consumerPath = opts.consumerPath || process.env.HARNESS_REPO_ROOT || null;
+    if (opts.projectId) {
+        const project = findProject(ws, opts.projectId);
+        if (!project) {
+            die(`không tìm thấy dự án "${opts.projectId}" — harnessctl configure list`);
+        }
+        return { workspace: ws, project };
+    }
+    if (consumerPath) {
+        const project = findProjectByRoot(ws, consumerPath);
+        if (project) return { workspace: ws, project };
+        return { workspace: ws, project: null, consumerPath };
+    }
+    const fromCwd = tryResolveConsumerFromCwd();
+    if (fromCwd) {
+        const project = findProjectByRoot(ws, fromCwd);
+        if (project) return { workspace: ws, project, consumerPath: fromCwd };
+        return { workspace: ws, project: null, consumerPath: fromCwd };
+    }
+    try {
+        return { workspace: ws, project: resolveProject(ws, null) };
+    } catch {
+        return { workspace: ws, project: null };
+    }
+}
+
+/**
+ * The host port this invocation should talk to.
+ *
+ * A named project's recorded port is authoritative; `--port` is an explicit override; an inherited
+ * `HARNESS_OBSERVE_PORT` only decides when nothing else does. Previously the environment outranked the
+ * project, so a stale shell variable silently retargeted the command.
+ *
+ * @param {string|null} projectId
+ * @param {{ projects?: Array<object> }} workspace
+ * @param {{ port?: number }} opts
+ */
+function resolvePort(projectId, workspace, opts) {
+    const explicit = normalizePort(opts.port);
+    if (explicit !== null) return explicit;
+    if (projectId) return claimObservePort(workspace, projectId);
+    const fromEnv = normalizePort(process.env.HARNESS_OBSERVE_PORT);
+    return fromEnv ?? OBSERVE_PORT_BASE;
+}
+
+/**
  * @param {string} subcommand
  * @param {string[]} restArgs
  * @param {{ projectId?: string, consumerPath?: string, port?: number }} [opts]
@@ -159,75 +219,60 @@ export function runObservatory(subcommand, restArgs = [], opts = {}) {
     applyWorkspaceEnv();
     requireDocker();
 
-    let consumerPath = opts.consumerPath || process.env.HARNESS_REPO_ROOT;
-    let port = opts.port || (process.env.HARNESS_OBSERVE_PORT ? Number.parseInt(process.env.HARNESS_OBSERVE_PORT, 10) : undefined);
+    const target = resolveTarget(opts);
+    const project = target.project;
+    const projectId = project?.id ?? null;
 
-    const ws = loadWorkspace();
-    let project = null;
-
-    if (opts.projectId) {
-        project = findProject(ws, opts.projectId);
-    } else if (consumerPath) {
-        project = findProjectByRoot(ws, consumerPath);
-    } else {
-        const fromCwd = tryResolveConsumerFromCwd();
-        if (fromCwd) {
-            project = findProjectByRoot(ws, fromCwd);
-            if (project) consumerPath = fromCwd;
-        }
-    }
-
-    if (!project && !consumerPath && !opts.projectId) {
+    /*
+     * Warning, then refusal. Two projects recorded on one port is a corrupted registry, and acting on
+     * it would start a stack that answers for a different consumer — the failure a healthy `/health`
+     * cannot detect. `down`/`status`/`logs` only need the stack's identity, so they are still allowed
+     * to run: an operator must be able to stop the stack that is already wrong.
+     */
+    const port = resolvePort(projectId, target.workspace, opts);
+    if ((subcommand === 'up' || subcommand === 'restart') && projectId) {
         try {
-            project = resolveProject(ws, null);
-        } catch (e) {
-            const hasRepo = Boolean(process.env.HARNESS_REPO_ROOT);
-            if ((subcommand === 'up' || subcommand === 'restart') && !hasRepo) {
-                die(e instanceof Error ? e.message : String(e));
-            }
+            assertPortAvailable(target.workspace, projectId, port);
+        } catch (err) {
+            die(err.message);
         }
-    }
-
-    if (project) {
-        consumerPath = consumerPath || project.rootHost || project.root;
-        port = port ?? project.port;
-    }
-
-    if (port) {
-        process.env.HARNESS_OBSERVE_PORT = String(port);
-        process.env.COMPOSE_PROJECT_NAME = `harness-observatory-${port}`;
-    }
-    if (consumerPath) {
-        process.env.HARNESS_REPO_ROOT = path.resolve(consumerPath);
     }
 
     const composeOpts = {
-        consumerPath,
-        repoOptional: subcommand === 'build' || subcommand === 'down' || subcommand === 'status' || subcommand === 'ps' || subcommand === 'logs',
+        projectId,
+        consumerPath: target.consumerPath ?? project?.rootHost ?? project?.root ?? null,
+        port,
+        repoOptional:
+            subcommand === 'build' || subcommand === 'down' || subcommand === 'status' || subcommand === 'ps' || subcommand === 'logs',
     };
 
     switch (subcommand) {
         case 'up':
-            cmdUp(restArgs, { consumerPath });
+            cmdUp(restArgs, composeOpts);
             return;
         case 'down':
             process.exit(compose(['down', ...restArgs], composeOpts));
         case 'restart':
+            /*
+             * `down` is addressed by the same project id as `up`. When it was addressed by port, a
+             * project whose document disagreed with the registry tore down the other project's stack
+             * here and then started its own — visible only as a log line from the wrong consumer.
+             */
             compose(['down'], composeOpts);
-            cmdUp(restArgs, { consumerPath });
+            cmdUp(restArgs, composeOpts);
             return;
         case 'status':
         case 'ps':
             process.exit(compose(['ps', ...restArgs], composeOpts));
         case 'health':
-            cmdHealth();
+            cmdHealth(port);
             return;
         case 'logs':
             process.exit(compose(['logs', '-f', '--tail=200', ...restArgs], composeOpts));
         case 'build':
             process.exit(compose(['build', ...restArgs], composeOpts));
         case 'smoke':
-            cmdSmoke();
+            cmdSmoke(port);
             return;
         default:
             die(`unknown command: ${subcommand} (try: up down restart status health logs build smoke)`);

@@ -12,7 +12,7 @@ fi
 case "$cmd" in
     console)
         shift || true
-        exec ./docker/console.sh "${1:-up}" "${@:2}"
+        exec ./console.sh "${1:-up}" "${@:2}"
         ;;
     init)
         shift

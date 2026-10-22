@@ -9,6 +9,7 @@ import {
     loadWorkspace,
     saveWorkspace,
 } from '@mu/harness-foundation/workspace';
+import { assignObservePort, normalizePort } from '@mu/harness-foundation/observe-port';
 import { applyWorkspaceEnv, ESO_ROOT } from './workspace-env.mjs';
 
 function profilesDir() {
@@ -24,7 +25,9 @@ export function runInitProfile(argv) {
 
     const positional = [];
     const opts = {
-        port: 8792,
+        // No default port. A missing `--port` means "claim one from the workspace"; writing 8792 here
+        // is what made every fresh consumer point at the first project's stack.
+        port: null,
         hostMode: 'dual-ide',
         dryRun: false,
         force: false,
@@ -54,6 +57,7 @@ export function runInitProfile(argv) {
     }
 
     const consumerPath = path.resolve(positional[0]);
+    const workspace = loadWorkspace();
     let project;
     if (opts.fromConsoleProject) {
         project = loadProject(productStateDir(), opts.fromConsoleProject);
@@ -63,19 +67,30 @@ export function runInitProfile(argv) {
         project = projectDraftForConsumer(consumerPath, opts);
     }
 
+    /*
+     * The port is claimed before provisioning and written to **both** registries. The document used to
+     * keep its own `observe.port` while the workspace kept another, and `initProfile` read whichever
+     * one it was handed — so `harness.config.json`, `sidecar.env` and `host-bootstrap.json` could name
+     * a number the registry never agreed to.
+     */
+    const port = assignObservePort(workspace, project.id, {
+        preferred: normalizePort(opts.port),
+    });
+    project.observe = { ...(project.observe || {}), port };
+
     const result = initProfile(project, profilesDir(), tenantsFile(), {
         dryRun: opts.dryRun,
         force: opts.force,
+        observePort: port,
     });
 
     if (!opts.dryRun) {
-        const workspace = loadWorkspace();
         const row = {
             id: project.id,
             displayName: project.displayName,
             root: result.root,
             rootHost: result.root,
-            port: project.observe?.port || 8792,
+            port,
             profile: 'generic-eso',
             initProfile: true,
         };
@@ -86,11 +101,9 @@ export function runInitProfile(argv) {
         saveWorkspace(workspace);
         syncTenantsFromWorkspace(workspace);
 
-        if (opts.fromConsoleProject) {
-            project.status = 'provisioned';
-            project.provisionedAt = new Date().toISOString();
-            saveProject(productStateDir(), project);
-        }
+        project.status = 'provisioned';
+        project.provisionedAt = new Date().toISOString();
+        saveProject(productStateDir(), project);
     }
 
     return result;

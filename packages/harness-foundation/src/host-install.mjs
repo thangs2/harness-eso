@@ -609,13 +609,32 @@ export function installHostPack(root) {
 }
 
 /**
+ * A host install always names the port of the project it installs for. Refusing a missing one is
+ * deliberate: the old `opts.observePort || 8792` is how a consumer silently received the first
+ * project's port, and the resulting `sidecar.env`/`host-bootstrap.json` pointed at another stack.
+ *
+ * @param {unknown} observePort
+ * @returns {number}
+ */
+function requireObservePort(observePort) {
+    const port = Number.parseInt(String(observePort ?? ''), 10);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error(
+            `observePort is required for a host install (got ${String(observePort)}) — ` +
+                'resolve it with claimObservePort() instead of defaulting to 8792',
+        );
+    }
+    return port;
+}
+
+/**
  * @param {string} consumerRoot
  * @param {object} profile host profile JSON (e.g. cursor-superset)
  * @param {{ observePort: number, writeSidecar?: boolean, profileIds?: string[] }} opts
  */
 export function applyHostProfile(consumerRoot, profile, opts = {}) {
     const root = path.resolve(consumerRoot);
-    const port = opts.observePort || 8792;
+    const port = requireObservePort(opts.observePort);
     const sidecarUrl = `http://127.0.0.1:${port}`;
     const actions = [];
 
@@ -660,7 +679,7 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
         throw new Error('provision requires at least one host profile (full pack — no minimal tier)');
     }
     const root = path.resolve(consumerRoot);
-    const port = opts.observePort || 8792;
+    const port = requireObservePort(opts.observePort);
     const profileIds = profiles.map((p) => p.id);
     const actions = [
         ...installHostPack(root).actions,

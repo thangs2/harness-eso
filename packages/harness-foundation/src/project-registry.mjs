@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG_NAME } from './repo-root.mjs';
-import { portableStatePath, resolveAgentRepoPath, writeJsonAtomic } from './workspace-store.mjs';
+import { claimObservePort, normalizePort } from './observe-port.mjs';
+import { loadWorkspace, portableStatePath, resolveAgentRepoPath, writeJsonAtomic } from './workspace-store.mjs';
 import {
     HOST_PACK_REL,
     addHostProfile,
@@ -74,7 +75,13 @@ export function defaultProjectDraft({ displayName, id }) {
         displayName: displayName || projectId,
         status: 'draft',
         agentRepo: { root: '' },
-        observe: { port: 8792 },
+        /*
+         * `null`, not `8792`. A draft has not claimed a port yet — the project id only becomes the
+         * owner of one when it is registered in the workspace, and `claimObservePort` is the only
+         * place that decides which. Writing a default here created a second, disagreeing copy of the
+         * port (`projects/baplatform.json` said 8792 while `workspace.json` said 8793).
+         */
+        observe: { port: null },
         hostMode: 'dual-ide',
         hostProfile: 'cursor-superset',
         plugins: defaultPlugins(),
@@ -115,7 +122,7 @@ export function saveProject(stateDir, doc) {
 }
 
 /** Id = slug từ tên, cố định sau khi tạo (không đổi). */
-export function createProject(stateDir, { displayName }) {
+export function createProject(stateDir, { displayName, port = null, root = '', portSource = null }) {
     const name = String(displayName || '').trim();
     if (!name) throw new Error('displayName required');
     const baseId = slugify(name);
@@ -126,6 +133,16 @@ export function createProject(stateDir, { displayName }) {
         projectId = `${baseId}-${n}`;
     }
     const doc = defaultProjectDraft({ displayName: name, id: projectId });
+    /*
+     * A port is not invented here (that used to be `observe: { port: 8792 }`). The Console passes the
+     * port it claimed in the workspace, so the document records the same number the CLI and the
+     * compose stack use. `portSource` names where it came from, because a mismatch between two
+     * registries is exactly what made baplatform serve on x79's stack — an unexplained number should
+     * be visible in the record rather than inferred later.
+     */
+    doc.observe = { port: normalizePort(port) };
+    doc.agentRepo = { root: String(root || '') };
+    if (portSource) doc.observe.source = portSource;
     return saveProject(stateDir, doc);
 }
 
@@ -372,7 +389,8 @@ function hostPreviewFiles(root, hostProfile, hostProfileId, observePort) {
  * @param {object} project
  * @param {string} profilesDir
  * @param {string} tenantsRegistryPath
- * @param {{ force?: boolean }} [opts] `force` rewrites a stale `harness.config.json`
+ * @param {{ force?: boolean, observePort?: number }} [opts] `force` rewrites a stale `harness.config.json`;
+ *   `observePort` pins the port instead of claiming one from the workspace
  */
 export function buildProvisionPlan(project, profilesDir, tenantsRegistryPath, opts = {}) {
     const force = opts.force === true;
@@ -409,12 +427,21 @@ export function buildProvisionPlan(project, profilesDir, tenantsRegistryPath, op
         policy = mergePolicyPatch(policy, hp);
     }
 
+    /*
+     * The port comes from the workspace record, which is the only registry that owns it. This used to
+     * be `project.observe?.port || 8792` — so a project document that had never been reconciled with
+     * the workspace wrote the wrong number into `harness.config.json`, `sidecar.env` and
+     * `host-bootstrap.json`, and the consumer's own tools then called the wrong Observatory.
+     */
+    const observePort = normalizePort(opts.observePort) ?? claimObservePort(loadWorkspace(), project.id, {
+        preferred: project.observe?.port,
+    });
     const harnessConfig = {
         version: 1,
         project: { id: project.id, displayName: project.displayName },
         tracking: { enabled: true, sentinelPath: '.harness/DISABLED' },
         storage: { driver: 'sqlite', sqlite: { path: '.harness/harness.db' } },
-        server: { host: '127.0.0.1', port: project.observe?.port || 8792 },
+        server: { host: '127.0.0.1', port: observePort },
         ingest: {
             pollMs: 2000,
             harnesses: [
@@ -457,12 +484,11 @@ export function buildProvisionPlan(project, profilesDir, tenantsRegistryPath, op
         },
     ];
 
-    const observePort = project.observe?.port || 8792;
     const combinedHost = {
         cursor: hostProfiles.find((p) => p.cursor)?.cursor,
         agents: hostProfiles.find((p) => p.agents)?.agents,
     };
     files.push(...hostPreviewFiles(root, combinedHost, hostProfileIds.join('+'), observePort));
 
-    return { root, files, project, hostProfileIds, hostProfiles };
+    return { root, files, project, hostProfileIds, hostProfiles, observePort };
 }

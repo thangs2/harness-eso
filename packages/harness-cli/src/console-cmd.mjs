@@ -26,9 +26,13 @@ function composeEnv() {
     env.HOME = env.HOME || os.homedir();
     env.HARNESS_CONSOLE_PORT = port;
     env.HARNESS_AGENT_ROOT = env.HARNESS_AGENT_ROOT || path.join(env.HOME, 'Workspaces');
-    const observePort = env.HARNESS_OBSERVE_PORT || '8792';
-    env.HARNESS_OBSERVE_HEALTH_BASE =
-        env.HARNESS_OBSERVE_HEALTH_BASE || `http://host.docker.internal:${observePort}`;
+    /*
+     * No observe port here. The Console resolves each project's Observatory from the registry in
+     * `workspace.json`, so all this container needs is how to reach the host — it used to also receive
+     * one port (`HARNESS_OBSERVE_HEALTH_BASE` built from `HARNESS_OBSERVE_PORT || 8792`), which made
+     * every project in the container probe the same stack.
+     */
+    env.HARNESS_OBSERVE_PUBLIC_HOST = env.HARNESS_OBSERVE_PUBLIC_HOST || 'host.docker.internal';
     env.COMPOSE_PROJECT_NAME = env.COMPOSE_PROJECT_NAME || `harness-console-${port}`;
     return env;
 }
@@ -74,7 +78,7 @@ function cmdUp(rest) {
         `Product state: ${env.HARNESS_PRODUCT_STATE_HOST || path.join(env.HOME, '.harness')} → /data/product-state`,
     );
     console.log(`Agent repos: ${env.HARNESS_AGENT_ROOT} → /agent-repos`);
-    console.log(`Observe health probe: ${env.HARNESS_OBSERVE_HEALTH_BASE}/health`);
+    console.log(`Observe probes: one per project, port from ~/.harness/workspace.json (host ${env.HARNESS_OBSERVE_PUBLIC_HOST})`);
     console.log(`Stop: HARNESS_CONSOLE_PORT=${port} harnessctl console down`);
 }
 

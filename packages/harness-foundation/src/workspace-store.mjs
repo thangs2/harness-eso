@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CONFIG_NAME } from './repo-root.mjs';
+import { claimObservePort, normalizePort } from './observe-port.mjs';
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -114,11 +115,13 @@ export function resolveProject(workspace, idOrNull) {
 }
 
 export function syncTenantsFromWorkspace(workspace) {
+    // The tenant anchor is what a consumer's own tools read, so the port here is the same one
+    // `observeUrlFor` hands out — not a second `|| 8792` that can disagree with the registry.
     const tenants = workspace.projects.map((p) => ({
         id: p.id,
         root: p.root,
         configPath: path.join(p.root, 'harness.config.json'),
-        serverUrl: `http://127.0.0.1:${p.port || 8792}`,
+        serverUrl: `http://127.0.0.1:${normalizePort(p.port) ?? claimObservePort(workspace, p.id)}`,
     }));
     writeJsonAtomic(tenantsFile(), { tenants });
 }
@@ -196,7 +199,10 @@ export function configureAdd(opts) {
 
     const projectId = opts.projectId || path.basename(consumerPath);
     const displayName = opts.displayName || projectId;
-    const port = Number(opts.port) || 8792;
+    // Allocated through the one resolver: an explicit `opts.port` is a preference, a conflict is an
+    // error, and the recorded port wins over both. There is no `|| 8792` here any more.
+    const workspace = loadWorkspace();
+    const port = claimObservePort(workspace, projectId, { preferred: opts.port });
     const profile = opts.profile || 'generic-eso';
 
     const runtimeDir = path.join(consumerPath, '.harness');
@@ -225,7 +231,6 @@ export function configureAdd(opts) {
         createdPolicy = true;
     }
 
-    const workspace = loadWorkspace();
     const hostPath = path.resolve(String(opts.consumerPath).trim());
     const row = {
         id: projectId,
@@ -234,8 +239,7 @@ export function configureAdd(opts) {
         rootHost: hostPath,
         port,
         profile,
-    };
-    const idx = workspace.projects.findIndex((p) => p.id === projectId);
+    };    const idx = workspace.projects.findIndex((p) => p.id === projectId);
     if (idx >= 0) workspace.projects[idx] = { ...workspace.projects[idx], ...row };
     else workspace.projects.push(row);
     if (!workspace.defaultProjectId || workspace.projects.length === 1) {
@@ -252,8 +256,7 @@ export function configureAdd(opts) {
         policyPath,
         workspaceFile: workspaceFile(),
         tenantsFile: registryPath,
-        serverUrl: `http://127.0.0.1:${port}`,
-        created: { config: createdConfig, policy: createdPolicy },
+        serverUrl: `http://127.0.0.1:${port}`,        created: { config: createdConfig, policy: createdPolicy },
     };
 }
 

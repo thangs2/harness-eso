@@ -10,7 +10,8 @@
  * inside it.
  *
  * This is a Node script rather than a shell one-liner because the repo runs on Windows too
- * (`docker/observatory.ps1`), where `for … do … done` is not a thing.
+ * (`deploy.sh` is bash, so Windows goes through `bun run test` instead), where `for … do … done` is not
+ * a thing.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

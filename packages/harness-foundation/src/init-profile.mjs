@@ -8,6 +8,7 @@ import {
     defaultProjectDraft,
 } from './project-registry.mjs';
 import { scanTokenDiet } from './token-diet.mjs';
+import { normalizePort } from './observe-port.mjs';
 import { writeJsonAtomic } from './workspace-store.mjs';
 
 const POLICY_RELATIVE = '.harness/decision-policy.json';
@@ -75,11 +76,13 @@ function writePlanFiles(plan) {
  * @param {string} profilesDir ship unit profiles/
  * @param {string} tenantsRegistryPath
  * @param {{ dryRun?: boolean, force?: boolean, verify?: boolean }} opts
- *   `force` rewrites an existing `harness.config.json` (see `tenantProvisionAction`).
+     *      * `force` rewrites an existing `harness.config.json` (see `tenantProvisionAction`).
+ *   `observePort` pins the port instead of claiming one from the workspace.
  */
 export function initProfile(project, profilesDir, tenantsRegistryPath, opts = {}) {
     const plan = buildProvisionPlan(project, profilesDir, tenantsRegistryPath, {
         force: opts.force === true,
+        observePort: opts.observePort ?? project.observe?.port,
     });
     if (!plan.root) {
         throw new Error('consumer root is required (agentRepo.root)');
@@ -106,8 +109,10 @@ export function initProfile(project, profilesDir, tenantsRegistryPath, opts = {}
 
     const results = writePlanFiles(plan);
 
+    // `plan.observePort` is the port `buildProvisionPlan` claimed from the workspace. Reading
+    // `project.observe?.port || 8792` here would re-open the second registry this change removes.
     const host = applyHostProfiles(plan.root, plan.hostProfiles, {
-        observePort: project.observe?.port || 8792,
+        observePort: plan.observePort,
         verify: opts.verify,
     });
     for (const a of host.actions) {
@@ -121,7 +126,8 @@ export function initProfile(project, profilesDir, tenantsRegistryPath, opts = {}
         root: plan.root,
         hostProfileIds: plan.hostProfileIds,
         files: results,
-        observeUrl: `http://127.0.0.1:${project.observe?.port || 8792}`,
+        observePort: plan.observePort,
+        observeUrl: `http://127.0.0.1:${plan.observePort}`,
         tokenDiet: {
             status: diet.status,
             eagerRulesCount: diet.summary.eagerRulesCount,
@@ -140,7 +146,9 @@ export function projectDraftForConsumer(consumerPath, opts = {}) {
     const displayName = opts.displayName || id;
     const doc = defaultProjectDraft({ displayName, id });
     doc.agentRepo = { root };
-    doc.observe = { port: opts.port ?? 8792 };
+    // `null` when the operator named no port: `buildProvisionPlan` claims one from the workspace, so
+    // a draft never carries a number that could disagree with the registry.
+    doc.observe = { port: normalizePort(opts.port) };
     doc.hostMode = opts.hostMode ?? 'dual-ide';
     if (opts.hostProfile) doc.hostProfile = opts.hostProfile;
     if (opts.plugins) doc.plugins = { ...defaultPlugins(), ...opts.plugins };
@@ -167,10 +175,11 @@ export function reloadHostConfig(project, profilesDir, opts = {}) {
     const forceTenant = opts.forceTenant === true;
     const plan = buildProvisionPlan(project, profilesDir, opts.tenantsRegistryPath || '', {
         force: forceTenant,
+        observePort: opts.observePort ?? project.observe?.port,
     });
     const files = forceTenant ? writePlanFiles(plan) : [];
     const host = applyHostProfiles(plan.root, plan.hostProfiles, {
-        observePort: project.observe?.port || 8792,
+        observePort: plan.observePort,
         verify: opts.verify,
     });
     return {
@@ -178,7 +187,8 @@ export function reloadHostConfig(project, profilesDir, opts = {}) {
         root: plan.root,
         hostProfileIds: plan.hostProfileIds,
         tenantRefreshed: forceTenant,
-        observeUrl: `http://127.0.0.1:${project.observe?.port || 8792}`,
+        observePort: plan.observePort,
+        observeUrl: `http://127.0.0.1:${plan.observePort}`,
         bootstrap: host.bootstrap,
         files: [...files, ...host.actions.map((a) => ({ relative: a.relative, action: a.action }))],
     };

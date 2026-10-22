@@ -15,7 +15,14 @@ export interface HarnessProject {
     status: 'draft' | 'provisioned';
     hostPack?: HostPackSummary | null;
     agentRepo: { root: string };
-    observe: { port: number };
+    /** Port as recorded in `workspace.json` (`recorded` mirrors it), plus why if it disagrees. */
+    observe: { port: number; recorded?: number; source?: string };
+    /**
+     * Non-null when a project document and the workspace disagree, or two projects own one port. The
+     * server reports the workspace's value in `observe.port` either way; this field says the two
+     * registries are not yet reconciled.
+     */
+    portConflict?: { document?: number; workspace?: number; owner?: string; detail: string } | null;
     hostMode?: 'dual-ide' | 'superset';
     hostProfile?: string;
     plugins: Record<string, unknown>;
@@ -104,6 +111,24 @@ export async function fetchPluginCatalog(): Promise<{ catalog: PluginCatalog; so
 
 export function listProjects() {
     return getJson<{ ok: boolean; items: HarnessProject[] }>('/api/projects');
+}
+
+/**
+ * The observe plane as the server resolves it: one Observatory per project, each on the port recorded
+ * in `workspace.json`. The UI must read ports from here rather than assume `:8792` — a Console that
+ * assumes one port can only manage one project, which is the bug this route exists to end.
+ */
+export interface ObservePortRow {
+    id: string;
+    displayName: string;
+    root: string;
+    port: number;
+    observeUrl: string;
+    defaultProject: boolean;
+}
+
+export function listObservePorts() {
+    return getJson<{ ok: boolean; items: ObservePortRow[] }>('/api/observe-ports');
 }
 
 export function createProject(displayName: string) {

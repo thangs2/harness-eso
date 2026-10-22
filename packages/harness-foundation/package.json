@@ -8,6 +8,7 @@
         ".": "./src/index.mjs",
         "./pure": "./src/pure.mjs",
         "./workspace": "./src/workspace-store.mjs",
+        "./observe-port": "./src/observe-port.mjs",
         "./project-registry": "./src/project-registry.mjs",
         "./host-install": "./src/host-install.mjs",
         "./init-profile": "./src/init-profile.mjs",
