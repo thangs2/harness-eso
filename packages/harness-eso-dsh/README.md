@@ -36,13 +36,17 @@ harnessctl doctor dsh --profile desktop     # must say healthy
 |---|---|---|
 | Write (`write`/`edit`/`multiedit`/…) | `tools/pre-execute` | `deny` for a `locked` path, `ask` for `ask` tier or a `gated` path with no live consent |
 | Shell (`bash`/`pwsh`/…) | `tools/pre-execute` | same rules, targets resolved from the command with the shared `shell-writes` matcher |
-| Prompt | `agent/pre-step` | pass-through today; hard blockers land in P2 |
+| Prompt | `agent/pre-step` | `reject` when a declared `eso.checks` check reports a hard blocker; the reason goes to `~/.harness/eso-blockers.jsonl` first |
 
 The rules are the consumer's own `.harness/decision-policy.json`, read per call. A directory that is not
 an ESO consumer gets **no opinion** — the plugin never blocks a repo it was not installed for.
 
 ## Known limits
 
-- Approval (`ask`) depends on DSH surfacing it; the plugin returns the decision and does not implement UI.
-- No prompt gating yet (P2), no context injection (P3), no evidence ledger yet.
-- `<unknown>` shell targets are denied rather than allowed: a write with no resolvable target is a write.
+- **`ask` is not a gate on DSH**: a gated write went through under an `ask` decision, so the plugin denies
+  by default. `config.askMode: "host"` delegates to the host's approval UI for consumers that trust it.
+- The prompt gate only refuses a **named** finding from `eso.checks`; it never refuses because evidence
+  is thin. Preflight/evidence collection stays in the hook pack and the observe plane.
+- The shell channel is gated only when the target is readable (absolute, or a relative literal inside a
+  heredoc). `> $VAR` cannot be resolved without the session workspace, which the plugin does not inject.
+- No context injection yet (P3).

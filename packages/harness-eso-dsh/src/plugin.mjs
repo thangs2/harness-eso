@@ -15,7 +15,33 @@
  * must not be allowed to break the user's turn; the deny path is the only place that intentionally
  * stops something, and only when the consumer's policy says so.
  */
-import { decideToolCall } from './guards.mjs';
+import { loadDecisionPolicy } from '@mu/harness-foundation/pure';
+
+/*
+ * Imported by path, not through the core barrel: the barrel re-exports the ledger and the decision
+ * facade, and those reach SQLite. The bundle must stay `node:*`-only, so this pulls exactly the three
+ * modules the prompt gate needs.
+ */
+import { appendBlockerRecord } from '../../harness-eso-core/src/blocker-log.mjs';
+import { loadCheckInputs, hardBlockersFromChecks } from '../../harness-eso-core/src/hard-blockers.mjs';
+import { resolveEsoPolicy } from '../../harness-eso-core/src/eso-policy.mjs';
+import { decideToolCall, findConsumerRoot } from './guards.mjs';
+
+/** Last user-authored text in the step, bounded — what the trail records as the trigger. */
+function userStem(payload) {
+    const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index];
+        if (message?.role !== 'user') continue;
+        const text = Array.isArray(message.content)
+            ? message.content.filter((part) => part?.type === 'text').map((part) => part.text).join(' ')
+            : typeof message.content === 'string'
+              ? message.content
+              : '';
+        if (text) return text.slice(0, 240);
+    }
+    return null;
+}
 
 /** One line per event so a user can see the plugin is alive and what it decided. */
 function makeLogger(ctx) {
@@ -45,6 +71,8 @@ export function createEsoDshPlugin(defaults = {}) {
             /* `host` delegates a not-yet-approved path to the host's approval UI; the default denies,
              * because a host `ask` was measured to let the write through. */
             const askMode = config.askMode === 'host' ? 'host' : 'deny';
+            /* Row config is data; the plugin factory is the test/programmatic seam. Config wins. */
+            const declaredChecks = config.checks ?? defaults.checks ?? null;
             const onDecision = typeof defaults.onDecision === 'function' ? defaults.onDecision : null;
 
             const report = (decision, event) => {
@@ -93,14 +121,57 @@ export function createEsoDshPlugin(defaults = {}) {
             if (typeof offTool === 'function') disposers.push(offTool);
 
             /*
-             * P0/P1: no prompt gate yet. Registered so the row proves the event name is accepted; it
-             * decides nothing and always delegates. P2 replaces this with preflight + hard blockers.
+             * The prompt gate. It refuses a step only for a **named** finding from the checks the
+             * consumer declared in `eso.checks` — never for a score, and never because evidence is thin.
+             * The rejection is written to the product-state trail first, because the host's `reject`
+             * carries no reason and a blocked step must still be explainable afterwards.
              */
             const offStep = ctx.on('agent/pre-step', async (payload, next) => {
                 const decision = await next();
+                // Only an entering step is ours; rejecting an already-decided step would overwrite it.
                 if (decision?.kind !== 'enter') return decision;
-                log(`pre-step: turn ${payload?.turn ?? '?'} allowed`);
-                return decision;
+                try {
+                    const root = findConsumerRoot(configRoot || process.cwd());
+                    if (!root) return decision;
+
+                    const policy = loadDecisionPolicy({ root }).policy ?? {};
+                    const checks = declaredChecks ?? resolveEsoPolicy(policy).checks;
+                    if (!checks) return decision;
+
+                    const loaded = loadCheckInputs(root, checks);
+                    const { blockers } = hardBlockersFromChecks(loaded);
+                    if (!blockers.length) {
+                        if (loaded.errors.length) log(`pre-step: ${loaded.errors.length} unreadable check input(s), no blocker`);
+                        return decision;
+                    }
+
+                    /*
+                     * Record first, then reject — but a failed write must not weaken the reject. "Cannot
+                     * log" is not evidence that the step was safe, so the trail failure is reported and
+                     * the step is still refused.
+                     */
+                    let trail = null;
+                    try {
+                        trail = appendBlockerRecord({
+                            root,
+                            host: 'dsh',
+                            event: 'agent/pre-step',
+                            kind: 'hard-blocker',
+                            step: payload?.turn ?? null,
+                            stem: userStem(payload),
+                            blockers,
+                            errors: loaded.errors,
+                        });
+                    } catch (err) {
+                        log(`pre-step: trail write failed (${err?.message ?? err}) — rejecting anyway`);
+                    }
+                    log(`pre-step: reject — ${blockers.length} blocker(s)${trail ? ` via ${trail.file}` : ''}`);
+                    return { kind: 'reject' };
+                } catch (err) {
+                    /* A prompt gate that throws would end the step anyway; let it be the host's decision. */
+                    log(`pre-step error: ${err?.message ?? err}`);
+                    return decision;
+                }
             });
             if (typeof offStep === 'function') disposers.push(offStep);
 

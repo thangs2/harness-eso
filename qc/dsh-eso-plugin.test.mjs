@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { decideToolCall, findConsumerRoot, resolveRoot } from '../packages/harness-eso-dsh/src/guards.mjs';
 import { createEsoDshPlugin } from '../packages/harness-eso-dsh/src/plugin.mjs';
+import { readBlockerRecords } from '../packages/harness-eso-core/src/blocker-log.mjs';
 import pluginDefault from '../packages/harness-eso-dsh/src/plugin.mjs';
 
 function consumer({ paths, projectId = 'opt' } = {}) {
@@ -237,4 +238,85 @@ test('the pre-step seam never changes an upstream decision', async () => {
     assert.equal(await handler({ turn: 1 }, async () => rejected), rejected);
     const entered = { kind: 'enter', messages: [] };
     assert.equal(await handler({ turn: 2 }, async () => entered), entered);
+});
+
+async function withBlockerLog(file, fn) {
+    const previous = process.env.HARNESS_ESO_BLOCKER_LOG;
+    process.env.HARNESS_ESO_BLOCKER_LOG = file;
+    try {
+        return await fn();
+    } finally {
+        if (previous === undefined) delete process.env.HARNESS_ESO_BLOCKER_LOG;
+        else process.env.HARNESS_ESO_BLOCKER_LOG = previous;
+    }
+}
+
+function consumerWithChecks(checks, body = 'drop table orders;') {
+    const root = consumer({ paths: { locked: [], gated: [], ask: [], sot: [] } });
+    fs.writeFileSync(path.join(root, '001.sql'), body);
+    const policyFile = path.join(root, '.harness', 'decision-policy.json');
+    const policy = JSON.parse(fs.readFileSync(policyFile, 'utf8'));
+    policy.eso = { ...(policy.eso ?? {}), checks };
+    fs.writeFileSync(policyFile, JSON.stringify(policy));
+    return root;
+}
+
+async function runPreStep(options, payload = { turn: 1, messages: [{ role: 'user', content: [{ type: 'text', text: 'ship it' }] }] }) {
+    const ctx = fakeCtx();
+    createEsoDshPlugin(options).apply(ctx);
+    return ctx.listeners.get('agent/pre-step')(payload, async () => ({ kind: 'enter', messages: [] }));
+}
+
+test('a declared check with a hard blocker rejects the step and leaves a reason', async () => {
+    const root = consumerWithChecks({ migration: { files: ['001.sql'] } });
+    const log = path.join(root, 'eso-blockers.jsonl');
+    const out = await withBlockerLog(log, () => runPreStep({ root }));
+    assert.deepEqual(out, { kind: 'reject' });
+
+    const [record] = readBlockerRecords(log);
+    assert.equal(record.kind, 'hard-blocker');
+    assert.equal(record.host, 'dsh');
+    assert.equal(record.step, 1);
+    assert.equal(record.stem, 'ship it');
+    assert.equal(record.blockers[0].kind, 'drop-table');
+    assert.equal(record.blockers[0].ref, '001.sql');
+});
+
+test('checks that find nothing leave the step entering', async () => {
+    const root = consumerWithChecks({ migration: { files: ['001.sql'] } }, 'create table orders (id integer);');
+    const log = path.join(root, 'eso-blockers.jsonl');
+    const out = await withBlockerLog(log, () => runPreStep({ root }));
+    assert.equal(out.kind, 'enter');
+    assert.deepEqual(readBlockerRecords(log), [], 'a clean check writes no trail');
+});
+
+test('no declared checks means no prompt gate at all', async () => {
+    const root = consumer({ paths: { locked: [], gated: [], ask: [], sot: [] } });
+    const out = await runPreStep({ root });
+    assert.equal(out.kind, 'enter');
+});
+
+test('a step the host already rejected is returned untouched', async () => {
+    const root = consumerWithChecks({ migration: { files: ['001.sql'] } });
+    const ctx = fakeCtx();
+    createEsoDshPlugin({ root }).apply(ctx);
+    const rejected = { kind: 'reject' };
+    const out = await ctx.listeners.get('agent/pre-step')({ turn: 2 }, async () => rejected);
+    assert.equal(out, rejected);
+});
+
+test('an unreadable check input does not reject the step', async () => {
+    const root = consumerWithChecks({ migration: { files: ['missing.sql'] } });
+    const out = await runPreStep({ root });
+    assert.equal(out.kind, 'enter', 'a config typo must not block the conversation');
+});
+
+test('checks from the plugin config win over the policy', async () => {
+    const root = consumerWithChecks({ migration: { files: ['missing.sql'] } }, 'drop table orders;');
+    const log = path.join(root, 'eso-blockers.jsonl');
+    const out = await withBlockerLog(log, () =>
+        runPreStep({ root, checks: { migration: { files: ['001.sql'] } } }),
+    );
+    assert.deepEqual(out, { kind: 'reject' });
+    assert.equal(readBlockerRecords(log)[0].blockers[0].ref, '001.sql');
 });
