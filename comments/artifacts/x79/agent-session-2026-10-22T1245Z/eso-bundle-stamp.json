@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "at": "2026-10-22T12:57:33Z",
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0.3666666666666667,
+  "mode": "hint",
+  "enforceWrites": "off",
+  "preflightAt": "2026-10-22T12:57:33Z"
+}

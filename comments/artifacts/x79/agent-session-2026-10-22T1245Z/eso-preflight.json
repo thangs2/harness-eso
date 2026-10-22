@@ -1,0 +1,71 @@
+{
+  "ok": true,
+  "at": "2026-10-22T12:57:33Z",
+  "harnessTree": "cursor",
+  "generationId": "0c286b5a-a3a9-49d9-9291-88f7e4eb046b",
+  "conversationId": "e32047d0-66c5-448d-ace8-47848220c7fa",
+  "userQueryStem": "tao muốn mày ghi thành file log, tao cần upstream đọc và hiểu hành vi của mày",
+  "fingerprint": "e402044d24885cdb",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "root",
+  "contractMissing": true,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0.3666666666666667,
+  "mode": "hint",
+  "enforceWrites": "off",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "harness-tooling",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "root"
+  },
+  "metrics": {
+    "latencyMsTotal": 511
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-22T12:57:33Z",
+    "requestId": "0c286b5a-a3a9-49d9-9291-88f7e4eb046b",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0.3666666666666667,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "harness-tooling",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "off",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}

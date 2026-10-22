@@ -1,0 +1,63 @@
+{
+  "ok": true,
+  "at": "2026-10-22T13:24:37Z",
+  "preflightAt": "2026-10-22T13:24:06Z",
+  "requiredGapIds": [
+    "law:harness-tooling",
+    "law:decision-facade",
+    "law:harness-eso",
+    "code:need at least 1 file read(s); have 0"
+  ],
+  "closedGapIds": [
+    "law:harness-eso",
+    "code:need at least 1 file read(s); have 0"
+  ],
+  "toolUses": [
+    {
+      "at": "2026-10-22T13:24:11Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T13:24:14Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T13:24:17Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/harness-eso/comments/artifacts/README.md"
+    },
+    {
+      "at": "2026-10-22T13:24:18Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T13:24:21Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/harness-eso/comments/artifacts/x79/agent-session-log-2026-10-22-x79-smoke.md"
+    },
+    {
+      "at": "2026-10-22T13:24:22Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T13:24:25Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/harness-eso/comments/artifacts/x79/agent-session-log-2026-10-22-x79-smoke.md"
+    },
+    {
+      "at": "2026-10-22T13:24:31Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T13:24:37Z",
+      "tool": "Shell",
+      "path": ""
+    }
+  ],
+  "allClosed": false
+}

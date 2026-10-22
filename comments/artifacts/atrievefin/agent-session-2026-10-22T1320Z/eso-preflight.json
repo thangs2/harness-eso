@@ -1,0 +1,91 @@
+{
+  "ok": true,
+  "at": "2026-10-22T13:24:06Z",
+  "harnessTree": "cursor",
+  "generationId": "1b8add8b-c360-40e6-8035-6f9e6e783238",
+  "conversationId": "dc4602aa-f2ab-44db-8c2c-265e9a7330e3",
+  "userQueryStem": "hãy ghi log này vào repo harness-eso/comments/artifacts/atrievefin",
+  "fingerprint": "c8385577e873d51f",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "tools",
+  "contractMissing": true,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0,
+  "mode": "hint",
+  "enforceWrites": "fail_closed",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "harness-tooling",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "decision-facade",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "harness-eso",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "tools"
+  },
+  "metrics": {
+    "latencyMsTotal": 927
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-22T13:24:06Z",
+    "requestId": "1b8add8b-c360-40e6-8035-6f9e6e783238",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "harness-tooling",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "decision-facade",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "harness-eso",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "fail_closed",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}

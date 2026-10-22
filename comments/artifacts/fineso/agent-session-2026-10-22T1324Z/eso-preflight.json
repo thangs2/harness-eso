@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "at": "2026-10-22T13:24:25Z",
+  "harnessTree": "cursor",
+  "generationId": "26c1faf8-b714-4415-b5d3-b1605f873f16",
+  "conversationId": "595973e2-ab40-408b-8e22-576ccf6b0d00",
+  "userQueryStem": "tao muốn kiểm tra môi trường harness-eso đang được áp dụng sửa dụng cho fineso chỉ kiểm tra, không sửa code",
+  "fingerprint": "886e654fed5f844e",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "harness",
+  "contractMissing": false,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0.18333333333333335,
+  "mode": "hint",
+  "enforceWrites": "fail_closed",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "harness-tooling",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "decision-facade",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "tools"
+  },
+  "metrics": {
+    "latencyMsTotal": 917
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-22T13:24:25Z",
+    "requestId": "26c1faf8-b714-4415-b5d3-b1605f873f16",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0.18333333333333335,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "harness-tooling",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "decision-facade",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "fail_closed",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}
