@@ -143,6 +143,19 @@ test('the handler returns deny straight from the gate without calling next()', a
     assert.equal(decisions[0].event, 'tools/pre-execute');
 });
 
+test('arrow functions and 2>&1 are not redirects', () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const arrow = ["python3 - <<'PY'", "open('src/x.js','w').write('y')", 'PY', 'node -e "const f = (a) => a" && echo done'].join('\n');
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: arrow } }), null);
+
+    const stderr = ["python3 - <<'PY'", "open('src/x.js','w').write('y')", 'PY', 'node x.mjs 2>&1 | tail -n 2'].join('\n');
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: stderr } }), null);
+
+    // A real redirect still counts.
+    const writing = ["python3 - <<'PY' > $OUT", "open('x','w').write('y')", 'PY'].join('\n');
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: writing } })?.kind, 'deny');
+});
+
 test('the word "tee" in prose is not a redirect', () => {
     const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
     const message = ["git commit -F - <<'EOF'", 'a redirect or `tee` with an unresolvable target keeps the deny', 'EOF'].join('\n');

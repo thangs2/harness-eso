@@ -56,12 +56,15 @@ export function findConsumerRoot(start) {
 /**
  * A shell redirect, or `tee` used as a command.
  *
- * `tee` must be a command, not the word: a commit message that says "a redirect or `tee`" is prose, and
- * treating prose as a redirect denied a harmless `git commit -F - <<'EOF'`.
+ * Two false positives this rule already paid for: the word `tee` inside a commit message was read as a
+ * command, and `=>` inside a `node -e` snippet was read as `>`. A redirect operator is `>`/`>>` that is
+ * not part of `=>`, `->`, `<>` or `2>&1`.
  */
 function hasShellRedirect(command) {
     const text = String(command || '');
-    return /[^<]>>?\s*[^\s&]/.test(text) || /\|\s*tee\b/.test(text) || /(?:^|[;&]\s*)tee\b/.test(text);
+    const redirect = /(?<![=<>-])>>?\s*[^\s&|]/.test(text);
+    const tee = /\|\s*tee\b/.test(text) || /(?:^|[;&]\s*)tee\b/.test(text);
+    return redirect || tee;
 }
 
 /** Repo-relative path literals a script names, e.g. `open('AGENTS.md','w')`. */
