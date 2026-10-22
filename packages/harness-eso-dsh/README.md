@@ -47,6 +47,8 @@ an ESO consumer gets **no opinion** — the plugin never blocks a repo it was no
   by default. `config.askMode: "host"` delegates to the host's approval UI for consumers that trust it.
 - The prompt gate only refuses a **named** finding from `eso.checks`; it never refuses because evidence
   is thin. Preflight/evidence collection stays in the hook pack and the observe plane.
-- The shell channel is gated only when the target is readable (absolute, or a relative literal inside a
-  heredoc). `> $VAR` cannot be resolved without the session workspace, which the plugin does not inject.
+- The shell channel is gated from absolute targets, relative literals inside a heredoc, and — since the
+  plugin injects DSH's `workingDirectory` service — the session's own directory for relative paths. A
+  `> $VAR` redirect still cannot be resolved to a concrete path; that case is denied when it has write
+  intent and no readable target.
 - No context injection yet (P3).

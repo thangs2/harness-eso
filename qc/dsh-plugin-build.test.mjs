@@ -42,6 +42,6 @@ test('the bundle exports the plugin shape DSH loads', async () => {
     const mod = await import(path.join(PKG, 'dist/eso-plugin.mjs'));
     const plugin = mod.default ?? mod;
     assert.equal(plugin.name, 'harness-eso');
-    assert.deepEqual(plugin.inject, []);
+    assert.deepEqual(plugin.inject, ['workingDirectory'], 'the session directory is the only host service used');
     assert.equal(typeof plugin.apply, 'function');
 });

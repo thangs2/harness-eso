@@ -63,8 +63,12 @@ function makeLogger(ctx) {
 export function createEsoDshPlugin(defaults = {}) {
     return {
         name: 'harness-eso',
-        /* No service injection: the gate reads the consumer's files, not DSH state. */
-        inject: [],
+        /*
+         * `workingDirectory` is the only DSH service this needs: `get(session)` is the real cwd of the
+         * tool call, which a shell command's pre-expansion text cannot tell us. No import — the service
+         * is injected, so nothing from `@deepseek-ai/*` enters the bundle.
+         */
+        inject: ['workingDirectory'],
         apply(ctx, config = {}) {
             const log = makeLogger(ctx);
             const configRoot = config.root || defaults.root || null;
@@ -74,6 +78,18 @@ export function createEsoDshPlugin(defaults = {}) {
             /* Row config is data; the plugin factory is the test/programmatic seam. Config wins. */
             const declaredChecks = config.checks ?? defaults.checks ?? null;
             const onDecision = typeof defaults.onDecision === 'function' ? defaults.onDecision : null;
+
+            /** The session's effective directory, or null when the service or session is absent. */
+            const sessionDirOf = (agent) => {
+                try {
+                    const session = agent?.session;
+                    if (!session || typeof ctx?.workingDirectory?.get !== 'function') return null;
+                    const dir = ctx.workingDirectory.get(session);
+                    return typeof dir === 'string' && dir.startsWith('/') ? dir : null;
+                } catch {
+                    return null;
+                }
+            };
 
             const report = (decision, event) => {
                 log(`${event}: ${decision.kind} ${decision.path ?? ''}`.trim());
@@ -103,6 +119,7 @@ export function createEsoDshPlugin(defaults = {}) {
                     // here would miss every shell command, whose cwd is the app directory.
                     const decision = decideToolCall({
                         configRoot,
+                        sessionRoot: sessionDirOf(exec?.agent),
                         name: exec?.name,
                         args: exec?.arguments ?? {},
                         askMode,
@@ -131,7 +148,7 @@ export function createEsoDshPlugin(defaults = {}) {
                 // Only an entering step is ours; rejecting an already-decided step would overwrite it.
                 if (decision?.kind !== 'enter') return decision;
                 try {
-                    const root = findConsumerRoot(configRoot || process.cwd());
+                    const root = findConsumerRoot(configRoot || sessionDirOf(payload?.agent) || process.cwd());
                     if (!root) return decision;
 
                     const policy = loadDecisionPolicy({ root }).policy ?? {};

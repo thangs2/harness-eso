@@ -28,11 +28,18 @@ function consumer({ paths, projectId = 'opt' } = {}) {
     return root;
 }
 
-function fakeCtx() {
+function fakeCtx({ sessionDirs = [] } = {}) {
     const listeners = new Map();
     return {
         listeners,
         logger: { info: () => {} },
+        /* Stand-in for the injected DSH service: `get(session)` returns that session's directory. */
+        workingDirectory: {
+            get: (session) => {
+                const index = session?.dirIndex ?? 0;
+                return sessionDirs[index] ?? null;
+            },
+        },
         on(event, fn) {
             listeners.set(event, fn);
             return () => listeners.delete(event);
@@ -42,9 +49,10 @@ function fakeCtx() {
 
 const dispatch = (handler, ...args) => handler(...args);
 
-test('the plugin object is the shape DSH loads, with no injected services', () => {
+test('the plugin object is the shape DSH loads, and injects only the directory service', () => {
     assert.equal(pluginDefault.name, 'harness-eso');
-    assert.deepEqual(pluginDefault.inject, []);
+    // The session directory is the one host fact a shell command cannot tell us; nothing else is needed.
+    assert.deepEqual(pluginDefault.inject, ['workingDirectory']);
     assert.equal(typeof pluginDefault.apply, 'function');
 });
 
@@ -319,4 +327,40 @@ test('checks from the plugin config win over the policy', async () => {
     );
     assert.deepEqual(out, { kind: 'reject' });
     assert.equal(readBlockerRecords(log)[0].blockers[0].ref, '001.sql');
+});
+
+test('a relative shell write is gated from the session directory', async () => {
+    // The gap this closes: `> secrets/x` names no absolute path, and the plugin cannot use the app's
+    // cwd — but DSH knows the session's directory.
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const ctx = fakeCtx({ sessionDirs: [root] });
+    createEsoDshPlugin().apply(ctx);
+    const out = await ctx.listeners.get('tools/pre-execute')(
+        { name: 'bash', arguments: { command: 'echo x > secrets/a.txt' }, agent: { session: { dirIndex: 0 } } },
+        async () => ({ kind: 'allow' }),
+    );
+    assert.equal(out.kind, 'deny');
+    assert.match(out.reason, /secrets\/a\.txt/);
+});
+
+test('a relative write tool call is gated from the session directory too', async () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const ctx = fakeCtx({ sessionDirs: [root] });
+    createEsoDshPlugin().apply(ctx);
+    const out = await ctx.listeners.get('tools/pre-execute')(
+        { name: 'write', arguments: { path: 'secrets/x.txt' }, agent: { session: { dirIndex: 0 } } },
+        async () => ({ kind: 'allow' }),
+    );
+    assert.equal(out.kind, 'deny');
+});
+
+test('a session outside any consumer still gets no opinion', async () => {
+    const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-dsh-plain-'));
+    const ctx = fakeCtx({ sessionDirs: [plain] });
+    createEsoDshPlugin().apply(ctx);
+    const out = await ctx.listeners.get('tools/pre-execute')(
+        { name: 'bash', arguments: { command: 'echo x > secrets/a.txt' }, agent: { session: { dirIndex: 0 } } },
+        async () => ({ kind: 'allow' }),
+    );
+    assert.equal(out.kind, 'allow');
 });

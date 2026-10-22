@@ -144,7 +144,7 @@ export function resolveRoot({ configRoot = null, args = null } = {}) {
  * @param {{ root: string, name: string, args: object }} input
  * @returns {{ kind: 'deny'|'ask', reason: string, path?: string } | null} null means "no opinion"
  */
-export function decideToolCall({ root = null, configRoot = null, name, args, askMode = 'deny' }) {
+export function decideToolCall({ root = null, configRoot = null, sessionRoot = null, name, args, askMode = 'deny' }) {
     const tool = String(name || '').toLowerCase();
 
     let command = null;
@@ -171,6 +171,8 @@ export function decideToolCall({ root = null, configRoot = null, name, args, ask
     const candidates = [];
     if (root) candidates.push(root);
     if (configRoot) candidates.push(configRoot);
+    /* The session's directory is the real cwd of the tool call — DSH's `workingDirectory` service. */
+    if (sessionRoot) candidates.push(sessionRoot);
     for (const target of raw) {
         if (path.isAbsolute(target)) candidates.push(path.dirname(target));
     }
