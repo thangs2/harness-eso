@@ -1,11 +1,108 @@
 name: harness-eso-ci
+
+# The OS matrix is the point of this file, not an extra. Issue #12 in
+# `documents/05.development/03.open-issues.md` records three cross-platform breakages that survived a
+# fully green suite because the suite only ever ran on macOS: hook commands that called `bash -lc`,
+# operator scripts that re-exec'd `/bin/bash`, and a route helper that spawned `python3`. Each was
+# invisible on one OS and fatal on another.
+#
+# The matrix job runs the unit suites on all three target platforms. Two more jobs gate the things a
+# matrix cannot see: the static portability lints run on **every** OS (cheap, and a lint that only runs
+# on Linux does not prove the profiles are portable), and the operator smoke proves the entrypoints
+# still answer on each platform.
+
 on:
     push:
         branches: [main, master]
     pull_request:
+    workflow_dispatch:
+
 jobs:
+    # Fast, and runs everywhere the product claims to work. These are static checks over
+    # `profiles/host/*.json` and the `.sh` entrypoints, so if they disagree between OSes the lint
+    # itself is wrong.
+    portability:
+        name: portability lint (${{ matrix.os }})
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1.3.14"
+            - run: bun install
+            # The pack is a build output; the hook smoke runs the real bundle with a PATH that has no
+            # bash, which is how Windows looks. Without the build that test skips itself — and a test
+            # that skips on the platform it was written for proves nothing.
+            - run: bun run build:host-pack
+            - name: profiles and entrypoints are shell-free
+              shell: bash
+              run: bun test qc/hook-portability.test.mjs qc/entrypoint-scripts.test.mjs qc/output-wrapper.test.mjs
+
+    # The operator surface, exercised the way an operator starts it: `sh` for the POSIX path (that is
+    # what P2 broke) and `harness.ps1` for Windows. `--plan` only: nothing is provisioned, no container
+    # is started, and an empty registry is a legitimate answer (exit 2, "unknown consumer"), not a fail.
+    entrypoint-smoke:
+        name: entrypoint smoke (${{ matrix.os }})
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1.3.14"
+            - run: bun install
+            - name: sh re-exec still finds bash
+              if: runner.os != 'Windows'
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  for script in deploy.sh provision.sh verify-consumer.sh console.sh; do
+                      sh "./$script" --help > /dev/null
+                  done
+            - name: operators answer --plan on an empty registry
+              if: runner.os != 'Windows'
+              shell: bash
+              env:
+                  HARNESS_PRODUCT_STATE_DIR: ${{ runner.temp }}/state
+              run: |
+                  set -uo pipefail
+                  mkdir -p "$HARNESS_PRODUCT_STATE_DIR"
+                  # 0 = planned, 2 = unknown consumer on an empty registry. Anything else is a crash,
+                  # and exit 1 here would mean the script broke, not that the consumer was missing.
+                  for script in deploy.sh provision.sh verify-consumer.sh; do
+                      set +e
+                      sh "./$script" ci-fixture --plan > /dev/null 2>&1
+                      code=$?
+                      set -e
+                      if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+                          echo "::error file=$script::$script --plan exited $code on an empty registry"
+                          exit 1
+                      fi
+                  done
+            - name: harness.ps1 resolves bash and forwards argv
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  # `harness.ps1` is a thin wrapper: if it cannot find a bash it must say so with exit
+                  # 2 and a sentence, not crash. Finding one (Git Bash ships with the runner) it must
+                  # forward `--help` and exit 0.
+                  ./harness.ps1 verify --help
+                  if ($LASTEXITCODE -ne 0) { throw "harness.ps1 verify --help exited $LASTEXITCODE" }
+
     test:
-        runs-on: ubuntu-latest
+        name: unit suites (${{ matrix.os }})
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+        runs-on: ${{ matrix.os }}
         steps:
             - uses: actions/checkout@v4
             - uses: oven-sh/setup-bun@v2
@@ -16,7 +113,23 @@ jobs:
             # can assert on it (the test builds it too, but a CI failure should point at the
             # build step when the bundle is broken).
             - run: bun run build:host-pack
-            - run: bun test
+            # `bun run test` walks every suite with a Node script rather than the shell, because the
+            # Windows runner has no POSIX `for … do … done`; `bun test` alone would only reach `qc`
+            # (the root is pinned in bunfig.toml).
+            - run: bun run test
+
+    ui:
+        # Not in the matrix: both SPAs are TypeScript and Vite, and the platform-specific risk is in
+        # the hooks and shell entrypoints, which the jobs above cover. Splitting this out keeps the
+        # matrix's failure signal about portability.
+        name: observatory + console build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1.3.14"
+            - run: bun install
             # Both SPAs are typechecked here, not just built: `build` runs `tsc --noEmit` first, so
             # a type error in either UI fails CI. Without the console step, a change to its pages or
             # API types could be broken and CI would stay green.

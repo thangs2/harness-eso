@@ -6,7 +6,8 @@
     "description": "Host hook pack \u2014 bundled standalone dispatcher for consumer IDE hooks",
     "exports": {
         "./dispatch": "./src/dispatch.mjs",
-        "./hooks": "./src/dispatch.mjs"
+        "./hooks": "./src/dispatch.mjs",
+        "./launcher": "./src/hook-launcher.mjs"
     },
     "dependencies": {
         "@mu/harness-decision": "0.1.0",

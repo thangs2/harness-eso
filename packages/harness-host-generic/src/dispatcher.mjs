@@ -14,7 +14,9 @@
  * `--tree` selects the session directory and the response shape; the hook code itself is
  * IDE-agnostic, so adding an IDE is a config change rather than a new copy of the pack.
  */
+import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { HOOKS, HOOK_NAMES, errorPosture, runHook } from './dispatch.mjs';
 import { deny, emitHook } from './hook-io.mjs';
 import { loadPolicyForCwd } from './hook-io.mjs';
@@ -134,7 +136,45 @@ function guardPolicy() {
     }
 }
 
-main().catch((err) => {
-    // Last-resort: no shape is known here, so emit the cursor dialect rather than nothing.
-    deny('cursor', `harness hook pack crashed: ${String(err?.message || err)}`, { hookCrash: true });
-});
+/**
+ * The dispatcher's normal entry point. Exported so the cross-platform launcher can run a hook
+ * in-process instead of spawning another `node` for every tool call (issue #12, P1).
+ *
+ * @returns {Promise<void>} resolves after a response has been written to stdout
+ */
+export async function run() {
+    try {
+        await main();
+    } catch (err) {
+        // Not rethrown: an unhandled rejection would print a stack and exit non-zero *after* the deny
+        // has already been written, which reads to the host as a crash on top of a decision.
+        deny('cursor', `harness hook pack crashed: ${String(err?.message || err)}`, { hookCrash: true });
+    }
+}
+
+/*
+ * Only run when executed as a program: `node …/harness-hook.mjs --hook X`.
+ *
+ * Both sides go through `realpathSync` because comparing the unresolved forms is wrong on macOS:
+ * `os.tmpdir()` is `/var/folders/…`, which is a symlink to `/private/var/folders/…`, so the hook
+ * loaded normally and produced **no output at all** — no deny, no allow, just silence that a host
+ * reads as a crash. Failing to resolve must not silently disable the pack, so an unresolvable argv
+ * falls back to running (a stray dispatch is louder than none).
+ */
+function isDirectInvocation() {
+    const argv1 = process.argv[1];
+    if (!argv1) return false;
+    try {
+        return pathToFileURL(fs.realpathSync(argv1)).href === pathToFileURL(fs.realpathSync(new URL(import.meta.url))).href;
+    } catch {
+        return true;
+    }
+}
+
+if (isDirectInvocation()) {
+    // `run()` already catches; the `.catch` here only covers a failure to *reach* `main()`.
+    run().catch((err) => {
+        // Last-resort: no shape is known here, so emit the cursor dialect rather than nothing.
+        deny('cursor', `harness hook pack crashed: ${String(err?.message || err)}`, { hookCrash: true });
+    });
+}

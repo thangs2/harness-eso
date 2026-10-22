@@ -24,7 +24,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook preflight --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook preflight --tree claude"
                         }
                     ]
                 },
@@ -33,7 +33,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook route --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree claude"
                         }
                     ]
                 }
@@ -45,7 +45,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree claude"
                         }
                     ]
                 },
@@ -65,7 +65,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree claude"
                         }
                     ]
                 },
@@ -75,7 +75,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook route --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree claude"
                         }
                     ]
                 }
@@ -87,7 +87,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree claude"
                         }
                     ]
                 },
@@ -97,7 +97,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree claude"
                         }
                     ]
                 },
@@ -107,7 +107,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook route --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree claude"
                         }
                     ]
                 }
@@ -118,7 +118,7 @@
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "bash -lc 'export HARNESS_TREE=claude; exec node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree claude'"
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree claude"
                         }
                     ]
                 }

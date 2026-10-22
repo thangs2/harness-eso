@@ -34,7 +34,20 @@ set -euo pipefail
 # (`sh console.sh` is common and works on macOS, but `sh` is dash elsewhere). Re-exec under bash
 # once, keeping the same argv, so the operator does not have to know.
 if [ -z "${BASH_VERSION:-}" ]; then
-    exec /bin/bash "$0" "$@"
+    # Do not hardcode /bin/bash: Git Bash on Windows has no such path. Prefer bash from PATH, then
+    # /bin/bash for the platforms that do have it, and fail with a sentence rather than exec 127.
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    fi
+    # Last resort: the conventional absolute paths, tried one at a time. Never `exec /bin/bash`
+    # directly — on Windows that line *is* the bug this block exists to fix.
+    for _harness_bash in /bin/bash /usr/local/bin/bash /opt/homebrew/bin/bash; do
+        if [ -x "$_harness_bash" ]; then
+            exec "$_harness_bash" "$0" "$@"
+        fi
+    done
+    echo "${0}: bash is required (this script uses bash-only syntax) and none was found on PATH" >&2
+    exit 2
 fi
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"

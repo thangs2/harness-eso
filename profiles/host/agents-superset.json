@@ -20,11 +20,11 @@
                 "PreInvocation": [
                     {
                         "type": "command",
-                        "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook preflight --tree agents --event PreInvocation'"
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook preflight --tree agents --event PreInvocation"
                     },
                     {
                         "type": "command",
-                        "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree agents --event PreInvocation'"
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree agents --event PreInvocation"
                     }
                 ]
             },
@@ -35,7 +35,7 @@
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree agents --event PreToolUse'"
+                                "command": "node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree agents --event PreToolUse"
                             }
                         ]
                     }
@@ -48,7 +48,7 @@
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree agents --event PreToolUse'"
+                                "command": "node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree agents --event PreToolUse"
                             }
                         ]
                     }
@@ -61,11 +61,11 @@
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree agents --event PostToolUse'"
+                                "command": "node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree agents --event PostToolUse"
                             },
                             {
                                 "type": "command",
-                                "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree agents --event PostToolUse'"
+                                "command": "node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree agents --event PostToolUse"
                             }
                         ]
                     }
@@ -75,7 +75,7 @@
                 "PreInvocation": [
                     {
                         "type": "command",
-                        "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreInvocation'"
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreInvocation"
                     }
                 ],
                 "PreToolUse": [
@@ -84,7 +84,7 @@
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreToolUse'"
+                                "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreToolUse"
                             }
                         ]
                     }
@@ -95,7 +95,7 @@
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PostToolUse'"
+                                "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PostToolUse"
                             }
                         ]
                     }
@@ -103,7 +103,7 @@
                 "Stop": [
                     {
                         "type": "command",
-                        "command": "bash -lc 'export HARNESS_TREE=agents; [ -f harness.config.json ] || cd ..; exec node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event Stop'"
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event Stop"
                     }
                 ]
             }

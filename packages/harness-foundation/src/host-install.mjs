@@ -451,7 +451,14 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
             });
         }
     } else if (treeKey === 'agents') {
-        const tracerCmd = "bash -lc '[ -f harness.config.json ] || cd ..; exec python3 .agents/hooks/pre-tool-use.py'";
+        /*
+         * Portable form: no `bash`, so Windows can run it, and no `cd ..` guard because the Antigravity
+         * tree is spawned with the consumer root as cwd. `python3` stays — `pre-tool-use.py` is a Python
+         * file by design (it runs guard-write and guard-shell from one stdin read), and a command
+         * literal cannot resolve a different interpreter name. Windows needs `python` on PATH or a
+         * `python3` shim; that is a documented prerequisite, not something this string can fix.
+         */
+        const tracerCmd = 'python3 .agents/hooks/pre-tool-use.py';
         if (!hooksDoc['harness-tracer'] && !hooksDoc['consumer-guards']) {
             hooksDoc['harness-tracer'] = {
                 PreToolUse: [
@@ -467,9 +474,19 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
                 ],
             };
         } else if (hooksDoc['harness-tracer']?.PreToolUse) {
+            /*
+             * Re-point a command **we** previously wrote, in any of its historical spellings. Matching
+             * only the current one meant a consumer provisioned with the old `bash -lc '…'` form kept it
+             * forever: the entry was found, the command did not match, and nothing was rewritten — the
+             * exact drift `applyHostProfiles` exists to prevent.
+             */
+            const legacyTracers = new Set([
+                'python3 .agents/hooks/pre-tool-use.py',
+                "bash -lc '[ -f harness.config.json ] || cd ..; exec python3 .agents/hooks/pre-tool-use.py'",
+            ]);
             for (const item of hooksDoc['harness-tracer'].PreToolUse) {
                 for (const hook of item.hooks || []) {
-                    if (hook.command === 'python3 .agents/hooks/pre-tool-use.py') {
+                    if (legacyTracers.has(hook.command)) {
                         hook.command = tracerCmd;
                     }
                 }
