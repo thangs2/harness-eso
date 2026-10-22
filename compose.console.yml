@@ -3,7 +3,7 @@ services:
     console-server:
         build:
             context: .
-            dockerfile: docker/console.Dockerfile
+            dockerfile: console.Dockerfile
         image: mu/harness-console:local
         ports:
             - "${HARNESS_CONSOLE_PORT:-8791}:8791"
@@ -18,7 +18,11 @@ services:
             HARNESS_PROFILES_DIR: /app/profiles
             HARNESS_AGENT_ROOT_HOST: ${HARNESS_AGENT_ROOT:?Set HARNESS_AGENT_ROOT (e.g. $HOME/Workspaces)}
             HARNESS_AGENT_MOUNT: /agent-repos
-            HARNESS_OBSERVE_HEALTH_BASE: ${HARNESS_OBSERVE_HEALTH_BASE:-http://host.docker.internal:8792}
+            # Transport only — the port of each project's Observatory comes from the registry in
+            # `workspace.json`, resolved per project id. This used to be a whole
+            # `HARNESS_OBSERVE_HEALTH_BASE=http://host.docker.internal:8792`, which made every project
+            # in the container probe the first project's stack and report it healthy.
+            HARNESS_OBSERVE_PUBLIC_HOST: ${HARNESS_OBSERVE_PUBLIC_HOST:-host.docker.internal}
         volumes:
             # Operator state, so the console sees the same projects as the host CLI.
             - ${HARNESS_PRODUCT_STATE_HOST:-${HOME}/.harness}:/data/product-state

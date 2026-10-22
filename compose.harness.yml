@@ -1,9 +1,12 @@
-# Observe plane — một cổng :8792 (API + Observatory + cấu hình Projects).
+# Observe plane — một container mỗi project, host port = port trong `~/.harness/workspace.json`
+# (x79 :8792, baplatform :8793, fineso :8794, …). Container luôn bind :8792 bên trong.
+# Stack identity là project id (`-p harness-observatory-<id>`), KHÔNG phải port — xem
+# `packages/harness-foundation/src/observe-port.mjs`.
 services:
     observe-server:
         build:
             context: .
-            dockerfile: docker/observatory.Dockerfile
+            dockerfile: observatory.Dockerfile
         image: mu/harness-observe:local
         ports:
             - "${HARNESS_OBSERVE_PORT:-8792}:8792"
@@ -36,7 +39,7 @@ services:
             # container-only filesystem the host server cannot see.
             - ${HARNESS_PRODUCT_STATE_HOST:-${HOME}/.harness}:/data/product-state
             - ${HARNESS_AGENT_ROOT}:/agent-repos
-            # Agent transcripts (REQUEST spine) — read-only; see docker/README.md
+            # Agent transcripts (REQUEST spine) — read-only; see documents/04.operations/02.docker-deploy.md
             - ${HARNESS_CURSOR_HOME:-${HOME}/.cursor}:/host-cursor:ro
             - ${HARNESS_GEMINI_HOME:-${HOME}/.gemini}:/host-gemini:ro
             - ${HARNESS_CLAUDE_HOME:-${HOME}/.claude/projects}:/host-claude-projects:ro

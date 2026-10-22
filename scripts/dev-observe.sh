@@ -72,7 +72,7 @@ if curl -sf "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
   HEALTH_JSON="$(curl -sf "http://127.0.0.1:${PORT}/health" 2>/dev/null || true)"
   if [[ "$HEALTH_JSON" == *"/data/observe"* ]]; then
     echo "dev-observe.sh: Docker Observatory is on :${PORT} (DB on volume /data/observe)." >&2
-    echo "  Stop it first: ./docker/observatory.sh down  — or use another HARNESS_OBSERVE_PORT." >&2
+    echo "  Stop it first: ./deploy.sh down  — or use another HARNESS_OBSERVE_PORT." >&2
     exit 1
   fi
   echo "==> observe API already up on :${PORT} (reusing — must match consumer $CONSUMER or stop it first)"
