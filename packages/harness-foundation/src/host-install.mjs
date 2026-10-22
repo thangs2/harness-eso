@@ -36,6 +36,9 @@ export const HOST_PACK_REL = '.harness/host-pack';
  * So provisioning makes sure the rules exist. It is additive and idempotent: operator rules are
  * never removed or reordered, missing re-admissions are appended under a marker, and the runtime
  * exclusions (`harness.db`, its WAL siblings, `cache/`) stay in effect.
+ *
+ * Two lists, not one, because they answer different questions: what a clone must contain, and what a
+ * clone must never contain. Anything not on either list is ignored by the blanket `*`.
  */
 const GITIGNORE_MARKER = '# harness-eso: files this tool writes that must be committed';
 const GITIGNORE_ADMIT = [
@@ -51,7 +54,12 @@ const GITIGNORE_ADMIT = [
     '!WORKFLOW_GUIDE.md',
     '!ONBOARDING.md',
     '!diagnostics.sh',
-    '!sidecar.env',
+    /*
+     * The example, never the real file. `sidecar.env` carries `HARNESS_TOKEN` — the token a machine
+     * uses to talk to its own sidecar — so admitting it put one developer's secret in the repository
+     * the first time anybody committed. The prose above used to claim the opposite of what the code
+     * did, which is how it survived.
+     */
     '!sidecar.env.example',
     '!eso-coverage.json',
     '!host-bootstrap.json',
@@ -59,16 +67,38 @@ const GITIGNORE_ADMIT = [
     '!host-pack/',
     '!host-pack/**',
 ];
+
 /*
- * Lines removed rather than written. Nothing to deny today — the historical entry was a typo'd
- * `!WORKFLOW_GUIDE.md` under prose that claimed it was admitted, which is precisely the drift the
- * single admit list now prevents.
+ * Everything a session writes. Two mechanisms used to disagree about this: the consumer's root
+ * `.gitignore` carried a hand-maintained subset, and `session/` had no ignore of its own, so each new
+ * artifact (`*.json`) stayed tracked until somebody noticed. The failure is social, not technical — a
+ * tracked session file makes `git status` dirty after every turn, and the cheapest way to get a clean
+ * tree is to commit another developer's preflight verdict.
+ *
+ * `session/README.md` stays committed: the one file in that directory that describes rather than
+ * records, and a directory whose purpose is undocumented is one people delete. It is spelled with a
+ * `**\/session/` prefix rather than the sibling pattern plus an exception, because two adjacent
+ * slash-star sequences in a parameter expansion terminate a block comment — which is how a correct
+ * ignore list once managed to break the module it lived in.
  */
-const GITIGNORE_DENY = new Set([]);
+const GITIGNORE_RUNTIME = [
+    'sidecar.env',
+    '*/session/*',
+];
+const GITIGNORE_RUNTIME_ADMIT = ['!**/session/README.md'];
+const GITIGNORE_RUNTIME_MARKER = '# harness-eso: per-user session state, never commit';
 
 /**
- * Ensure `.harness/.gitignore` ignores all runtime and provisioned files.
- * Only `.gitignore` and `README.md` are admitted.
+ * Ensure `.harness/.gitignore` says which files a team shares and which belong to one machine.
+ *
+ * The directory mixes three kinds of file, and this is the only place that says which is which:
+ * install artifacts a clone must carry (the host pack, the policy, the operator docs), per-machine
+ * state (the sidecar token, the database, caches), and — through the session rules — the per-turn
+ * verdicts each developer's own agent writes.
+ *
+ * Additive and idempotent: operator rules are never removed or reordered. Our runtime block is
+ * re-emitted when one of its rules is missing, because a runtime rule that silently disagrees with the
+ * product is how a tracked session file gets committed by hand.
  *
  * @param {string} root consumer root
  * @returns {{ relative: string, action: 'write' | 'skip' }}
@@ -83,17 +113,33 @@ export function ensureHarnessGitignore(root) {
         existing = fs.readFileSync(file, 'utf8');
     } catch {
         isNew = true;
-        existing = `*\n!.gitignore\n!README.md\n`;
+        existing = '*\n!.gitignore\n!README.md\n';
     }
 
-    // Strip any lines that un-ignore provisioned/runtime files or the legacy marker
-    const lines = existing.split('\n');
-    const filteredLines = lines.filter((l) => {
+    const runtimeSet = new Set(GITIGNORE_RUNTIME);
+    /*
+     * `README.md` is admitted by pattern, not by name: the blanket plus the session block would
+     * otherwise swallow the session README even though an un-ignore appears above it — gitignore
+     * evaluates the *last* matching rule, and the session block comes later. Emitting the exception
+     * after the block is what makes it hold.
+     */
+    const unIgnorable = new Set([...GITIGNORE_ADMIT, ...GITIGNORE_RUNTIME_ADMIT]);
+    const filteredLines = [];
+    let inRuntimeBlock = false;
+    for (const l of existing.split('\n')) {
         const trimmed = l.trim();
-        if (trimmed === GITIGNORE_MARKER) return false;
-        return !GITIGNORE_DENY.has(trimmed);
-    });
-    const stripped = filteredLines.length !== lines.length;
+        if (trimmed === GITIGNORE_RUNTIME_MARKER) {
+            inRuntimeBlock = true;
+            continue;
+        }
+        if (inRuntimeBlock) {
+            if (runtimeSet.has(trimmed)) continue;
+            inRuntimeBlock = false;
+        }
+        if (trimmed === GITIGNORE_MARKER) continue;
+        if (unIgnorable.has(trimmed)) continue;
+        filteredLines.push(l);
+    }
 
     const present = new Set(
         filteredLines
@@ -101,15 +147,29 @@ export function ensureHarnessGitignore(root) {
             .filter(Boolean),
     );
     const missing = GITIGNORE_ADMIT.filter((rule) => !present.has(rule));
-    if (!isNew && !missing.length && !stripped) return { relative, action: 'skip' };
+    const runtimeMissing = GITIGNORE_RUNTIME.filter((rule) => !present.has(rule));
+    const runtimeAdmitMissing = GITIGNORE_RUNTIME_ADMIT.filter((rule) => !present.has(rule));
+
+    if (!isNew && !missing.length && !runtimeMissing.length && !runtimeAdmitMissing.length) {
+        return { relative, action: 'skip' };
+    }
 
     let body = filteredLines.join('\n');
-    if (!body.endsWith('\n')) body += '\n';
+    body = body.endsWith('\n') ? body : body + '\n';
     if (!present.has('*')) {
-        body = `*\n${body}`;
+        body = '*' + '\n' + body;
     }
     for (const rule of missing) {
-        body += `${rule}\n`;
+        body += rule + '\n';
+    }
+    if (runtimeMissing.length || runtimeAdmitMissing.length) {
+        body += GITIGNORE_RUNTIME_MARKER + '\n';
+        for (const rule of runtimeMissing) {
+            body += rule + '\n';
+        }
+        for (const rule of runtimeAdmitMissing) {
+            body += rule + '\n';
+        }
     }
 
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -313,14 +373,20 @@ export function ensureSessionGitignore(root, treeKey) {
     const rootGitignore = path.join(root, '.gitignore');
     if (!fs.existsSync(rootGitignore)) return [];
 
-    const entry = `.${treeKey}/session/`;
+    /*
+     * Contents, not the directory. A `.gitignore` line ending in `/` matches the directory and nothing
+     * inside it, and git never evaluates rules for the contents of an excluded directory — so the
+     * README exception that follows would be unreachable. `.cursor/session/*` keeps the directory
+     * traversable, which is what lets the exception admit one file.
+     */
+    const lines = [`.${treeKey}/session/*`, `!.${treeKey}/session/README.md`];
     try {
-        let content = fs.readFileSync(rootGitignore, 'utf8');
-        if (!content.includes(entry)) {
-            content = `${content.trimEnd()}\n${entry}\n`;
-            fs.writeFileSync(rootGitignore, content, 'utf8');
-            return [{ relative: '.gitignore', action: 'updated' }];
-        }
+        const content = fs.readFileSync(rootGitignore, 'utf8');
+        const present = new Set(content.split('\n').map((l) => l.trim()));
+        const missing = lines.filter((l) => !present.has(l));
+        if (!missing.length) return [];
+        fs.writeFileSync(rootGitignore, `${content.trimEnd()}\n${missing.join('\n')}\n`, 'utf8');
+        return [{ relative: '.gitignore', action: 'updated' }];
     } catch {
         /* best-effort gitignore update */
     }

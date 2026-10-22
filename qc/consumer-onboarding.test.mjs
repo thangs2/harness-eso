@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { ensureConsumerOnboarding, ensureHarnessGitignore } from '../packages/harness-foundation/src/host-install.mjs';
+import { ensureSessionGitignore, ensureHarnessGitignore, ensureConsumerOnboarding } from '../packages/harness-foundation/src/host-install.mjs';
 import { syncConsumerDocs } from '../packages/harness-cli/src/fix-consumer-cmd.mjs';
 import { runCapabilityProbe } from '../packages/harness-cli/src/capability-probe-cmd.mjs';
 
@@ -291,4 +291,57 @@ test('the seeded checklist and diagnostic are committed, not trapped by .harness
     for (const f of ['ONBOARDING.md', 'diagnostics.sh']) {
         assert.match(body, new RegExp(`^!${f.replace('.', '\\.')}$`, 'm'), `${f} must be admitted`);
     }
+});
+
+/*
+ * `.harness/.gitignore` splits the directory three ways, and the split is the whole product of this
+ * function: install artifacts a clone must carry, per-machine state it must not, and session verdicts.
+ * Asserting the text is not enough — gitignore semantics are order-sensitive and "ignored directory"
+ * differs from "ignored contents" — so the assertions below go through `git check-ignore` on a real
+ * repository. A rule nobody proved is a claim.
+ */
+function gitIgnored(root, relPath) {
+    fs.mkdirSync(path.dirname(path.join(root, relPath)), { recursive: true });
+    fs.writeFileSync(path.join(root, relPath), 'x');
+    if (!fs.existsSync(path.join(root, '.git'))) spawnSync('git', ['init', '-q'], { cwd: root });
+    const r = spawnSync('git', ['check-ignore', '-q', relPath], { cwd: root });
+    return r.status === 0;
+}
+
+test('sidecar.env is per-machine state: ignored, while the example is committed', () => {
+    const root = tempRoot();
+    ensureHarnessGitignore(root);
+    assert.equal(gitIgnored(root, '.harness/sidecar.env'), true, 'the token file must never be committed');
+    assert.equal(gitIgnored(root, '.harness/sidecar.env.example'), false, 'the example is documentation');
+});
+
+test('session state is ignored and the session README is not', () => {
+    const root = tempRoot();
+    ensureHarnessGitignore(root);
+    ensureSessionGitignore(root, 'cursor');
+    // The root `.gitignore` only matters if it exists; a consumer with none gets no session rules and
+    // the `.harness` block is the backstop — assert the backstop too.
+    fs.writeFileSync(path.join(root, '.gitignore'), '/node_modules\n');
+    ensureSessionGitignore(root, 'cursor');
+
+    assert.equal(gitIgnored(root, '.cursor/session/.eso-preflight.json'), true);
+    assert.equal(gitIgnored(root, '.cursor/session/route-trace.jsonl'), true);
+    assert.equal(gitIgnored(root, '.cursor/session/README.md'), false, 'a directory nobody documents gets deleted');
+});
+
+test('ensureSessionGitignore ignores contents, not the directory, and is idempotent', () => {
+    const root = tempRoot();
+    fs.writeFileSync(path.join(root, '.gitignore'), '');
+    ensureSessionGitignore(root, 'cursor');
+    const first = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
+    /*
+     * A line ending in `/` excludes the directory and git then never evaluates rules for what is
+     * inside, which silently defeats the exception on the next line. The contents form is the only
+     * shape in which `.cursor/session/README.md` can be committed at all.
+     */
+    assert.doesNotMatch(first, /^\.cursor\/session\/$/m, 'excluding the directory makes its README unreachable');
+    assert.match(first, /^\.cursor\/session\/\*$/m);
+
+    ensureSessionGitignore(root, 'cursor');
+    assert.equal(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), first, 'repeat runs must not grow the file');
 });
