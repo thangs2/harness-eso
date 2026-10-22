@@ -507,3 +507,42 @@ test('claude-superset provisions .claude/settings.json, guards and CLAUDE.md', (
     assert.ok(fs.existsSync(path.join(root, '.claude', 'hooks', 'guard-write.py')));
 });
 
+
+test('remove-ide unwires the claude tree too, leaving the consumer settings intact', () => {
+    const root = tempConsumer();
+    writeConsumerConfig(root);
+    applyHostProfiles(root, [loadHostProfile(PROFILES_DIR, 'claude-superset')], { observePort: 8792, verify: false });
+
+    const settingsPath = path.join(root, '.claude/settings.json');
+    const doc = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    // A hook the consumer owns, next to ours, must survive the removal.
+    doc.hooks.PreToolUse = [
+        { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo consumer-own' }] },
+        ...(doc.hooks.PreToolUse || []),
+    ];
+    fs.writeFileSync(settingsPath, `${JSON.stringify(doc, null, 4)}\n`);
+
+    const res = removeHostTree(root, 'claude');
+    assert.ok(res.removed.length > 0, 'our entries must be reported as removed');
+
+    const after = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const serialized = JSON.stringify(after);
+    assert.equal(serialized.includes('harness-hook.mjs'), false, 'no product hook may remain wired');
+    assert.match(serialized, /consumer-own/, 'the consumer hook survives');
+
+    // The bootstrap must agree with the state file, or the next provision reinstates the tree.
+    const bootstrap = JSON.parse(fs.readFileSync(path.join(root, '.harness/host-bootstrap.json'), 'utf8'));
+    assert.equal(bootstrap.profileIds.includes('claude-superset'), false);
+    assert.equal(res.profileId, 'claude-superset');
+
+    // Running it again is a no-op on hooks, but still reconciles a stale profile id.
+    fs.writeFileSync(
+        path.join(root, '.harness/host-bootstrap.json'),
+        JSON.stringify({ version: 1, profileIds: ['cursor-superset', 'claude-superset'], sidecarUrl: '' }),
+    );
+    const again = removeHostTree(root, 'claude');
+    assert.deepEqual(again.removed, []);
+    assert.equal(again.profileId, 'claude-superset');
+    const repaired = JSON.parse(fs.readFileSync(path.join(root, '.harness/host-bootstrap.json'), 'utf8'));
+    assert.deepEqual(repaired.profileIds, ['cursor-superset']);
+});

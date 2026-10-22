@@ -191,7 +191,12 @@ function cmdAddIde({ opts, positional }) {
 function cmdRemoveIde({ opts, positional }) {
     const root = resolveConsumer(opts, positional[0]);
     const tree = opts.ide;
-    if (!tree || !['cursor', 'agents'].includes(tree)) die('needs --ide cursor|agents');
+    /*
+     * Any tree that can be provisioned can be unwired: the state file knows the hook shape, and the
+     * tree spec is data. Restricting this to two names made `claude` un-removable, which is how a
+     * consumer keeps a hook config nobody asked for after an experiment.
+     */
+    if (!tree || !/^[a-z][a-z0-9-]*$/.test(tree)) die('needs --ide <tree>, e.g. cursor|agents|claude');
 
     const res = removeHostTree(root, tree);
     console.log(`host-pack remove-ide  ${root}`);

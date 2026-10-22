@@ -827,12 +827,29 @@ export function hostPackStatus(root, opts = {}) {
 export function removeHostTree(root, treeKey) {
     const state = readHostState(root);
     const treeState = state.hooks[treeKey];
-    if (!treeState) return { removed: [], hooksPath: null };
+    if (!treeState) {
+        /*
+         * Nothing wired — but the *profile id* may still be recorded (an earlier removal that predates
+         * the bookkeeping). Clean that up too, so the command is idempotent and the bootstrap stops
+         * claiming a tree that is not there.
+         */
+        const stale = findProfileIdForTree(treeKey);
+        const dropped = stale ? dropProfileFromBootstrap(root, stale) : false;
+        return { removed: [], hooksPath: null, profileId: dropped ? stale : null };
+    }
 
     const profile = treeState.hooksJsonPath
         ? { hooksJsonPath: treeState.hooksJsonPath }
         : findTreeSpec(root, treeKey);
-    const hooksPath = path.join(root, profile?.hooksJsonPath || `.${treeKey}/hooks.json`);
+    /*
+     * A tree may carry its hooks in a settings file rather than a `hooks.json` (claude does), so the
+     * settings path is the second place to look — without it removal resolved `.claude/hooks.json`,
+     * a file that does not exist, and reported "nothing to remove" while our entries stayed wired.
+     */
+    const hooksPath = path.join(
+        root,
+        treeState.hooksJsonPath || profile?.settingsJsonPath || profile?.hooksJsonPath || `.${treeKey}/hooks.json`,
+    );
     if (!fs.existsSync(hooksPath)) return { removed: [], hooksPath };
 
     let hooksDoc = JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
@@ -852,13 +869,61 @@ export function removeHostTree(root, treeKey) {
     writeJsonAtomic(hooksPath, hooksDoc);
     delete state.hooks[treeKey];
     writeHostState(root, state);
-    return { removed: report.pruned, hooksPath };
+
+    /*
+     * The bootstrap file is what an operator reads to answer "which profiles are wired here". Leaving a
+     * profile id behind after its tree was unwired makes it disagree with the state file, and the next
+     * provision then reinstates a tree nobody asked for.
+     */
+    const profileId = findProfileIdForTree(treeKey);
+    const dropped = profileId ? dropProfileFromBootstrap(root, profileId) : false;
+    return { removed: report.pruned, hooksPath, profileId: dropped ? profileId : null };
 }
 
-/** Find the tree spec for a tree key by scanning the shipped host profiles. */
+/** Which shipped profile provides this tree, so bookkeeping can name it. */
+function findProfileIdForTree(treeKey) {
+    const profilesDir = path.resolve(GENERIC_PKG, '../../../profiles');
+    for (const profileId of listHostProfileIds(profilesDir)) {
+        const hp = loadHostProfile(profilesDir, profileId);
+        if (hp?.[treeKey]) return profileId;
+    }
+    return null;
+}
+
+/** Remove one profile id from `.harness/host-bootstrap.json`; true when it was there. */
+function dropProfileFromBootstrap(root, profileId) {
+    const file = path.join(root, '.harness', 'host-bootstrap.json');
+    let bootstrap;
+    try {
+        bootstrap = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+        return false;
+    }
+    const ids = Array.isArray(bootstrap.profileIds)
+        ? bootstrap.profileIds
+        : bootstrap.profileId
+          ? [bootstrap.profileId]
+          : [];
+    if (!ids.includes(profileId)) return false;
+    const next = ids.filter((id) => id !== profileId);
+    bootstrap.profileIds = next;
+    if (bootstrap.profileId && !next.includes(bootstrap.profileId)) delete bootstrap.profileId;
+    writeJsonAtomic(file, bootstrap);
+    return true;
+}
+
+/**
+ * Find the tree spec for a tree key by scanning the shipped host profiles.
+ *
+ * The path is the repo's `profiles/`, three levels up from the host-generic source directory. It used
+ * to be two (`packages/harness-host-generic/profiles`), which does not exist — so this always returned
+ * null and removal fell back to `.<tree>/hooks.json` for every tree that stores its hooks in a settings
+ * file. Removing the claude tree therefore reported "nothing to remove" while its entries stayed wired.
+ */
 function findTreeSpec(root, treeKey) {
-    for (const profileId of listHostProfileIds(path.join(GENERIC_PKG, '../../profiles'))) {
-        const hp = loadHostProfile(path.join(GENERIC_PKG, '../../profiles'), profileId);
+    const profilesDir = path.resolve(GENERIC_PKG, '../../../profiles');
+    for (const profileId of listHostProfileIds(profilesDir)) {
+        const hp = loadHostProfile(profilesDir, profileId);
         if (hp?.[treeKey]) return hp[treeKey];
     }
     void root;
