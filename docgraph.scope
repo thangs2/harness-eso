@@ -11,7 +11,7 @@ ext:.json
 # --- Documentation pack & operator runbooks ---------------------------------
 path:documents
 path:docs
-path:docker/README.md
+path:README.md
 
 # --- Agent law & skills -----------------------------------------------------
 path:AGENTS.md

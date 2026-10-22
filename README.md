@@ -13,7 +13,7 @@ writes on evidence, attributes every action to a turn, and serves a read-only mo
 | **Documentation Index (read first)** | [`documents/00.README.md`](./documents/00.README.md) — what the system is and how it works |
 | **Invariants** | [`documents/05.development/02.invariants.md`](./documents/05.development/02.invariants.md) — **read before changing how data flows** |
 | **Defect log** | [`docs/04.standalone-revamp-wbs.md`](./docs/04.standalone-revamp-wbs.md) — measured history, every `F<n>` |
-| **Operator runbooks** | `docs/00`–`docs/07` · Docker: [`docker/README.md`](./docker/README.md) |
+| **Operator runbooks** | `docs/00`–`docs/07` · Docker: [`documents/04.operations/02.docker-deploy.md`](./documents/04.operations/02.docker-deploy.md) |
 | **Operator config** | `~/.harness/workspace.json` (machine-wide product state) |
 
 > **Picking this project up cold?** Read `documents/00.README.md`, then the invariants. Each invariant
@@ -46,7 +46,7 @@ Before installing, ensure your host environment meets the following requirements
 ```bash
 git clone https://github.com/thangs2/harness-eso.git
 cd harness-eso
-./install.sh          # bun install + make ./harness and docker/*.sh executable
+./install.sh          # bun install + make ./harness, ./console.sh executable
 ./harness up          # build image + compose up
 ```
 
@@ -86,7 +86,11 @@ packages/
 profiles/
   generic-eso.json          consumer policy seed (mechanism-generic)
   host/*.json               per-IDE hook wiring (cursor-superset, agents-superset)
-docker/                     operator scripts (observatory.sh/.ps1, console.sh/.ps1) + Dockerfiles
+observatory.Dockerfile      observe image (Bun + SPA + observe-server)
+console.Dockerfile          console image (wizard API + SPA, :8791)
+compose.harness.yml         observe stack — one container per project id
+compose.console.yml         console stack (:8791)
+console.sh                  console deploy / lifecycle (symmetry with deploy.sh)
 qc/                         integration tests
 documents/                  what the system is (this pack)
 docs/                       defect log + operator runbooks
