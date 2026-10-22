@@ -81,6 +81,30 @@ test('closesGap keeps law gap open when tool path does not match query', () => {
     assert.equal(closed, false);
 });
 
+test('the code gap counts source code, not any file', () => {
+    /*
+     * A `tools` turn on x79 closed its "read at least 1 file" gap by reading `scripts/ci/*.sh` — a
+     * path that is not a rule directory and therefore passed the old check. The gap is about the
+     * source the change is about to touch; a document, a config or a CI helper is recon, not that.
+     */
+    const gap = { kind: 'code', query: 'need at least 1 file read(s); have 0' };
+    const closes = (p) => closesGap(gap, gapKindsForTool('Read', { path: p }), { path: p }, 'Read');
+
+    assert.equal(closes('packages/harness-eso-core/src/collect.mjs'), true);
+    assert.equal(closes('scripts/ci/metadata-kind-parity.sh'), true, 'a shell script is source');
+    assert.equal(closes('README.md'), false, 'prose is not the code the gap is about');
+    assert.equal(closes('package.json'), false, 'config is not source');
+    assert.equal(closes('.cursor/rules/core.law-gate.mdc'), false, 'rules are excluded as before');
+    assert.equal(closes('document/mu/be/00.law/spec.md'), false);
+});
+
+test('a codegraph query still closes the read gap even with no path', () => {
+    const gap = { kind: 'code', query: 'need at least 1 file read(s); have 0' };
+    const toolInput = { name: 'codegraph_explore', query: 'detectGaps' };
+    const closed = closesGap(gap, gapKindsForTool('CallDynamicTool', toolInput), toolInput, 'CallDynamicTool');
+    assert.equal(closed, true, 'codegraph is the stronger evidence, not the weaker one');
+});
+
 test('recordGapToolUse integration with fixture .eso-preflight.json', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-gap-test-'));
     const sessionDir = path.join(tmp, '.cursor', 'session');

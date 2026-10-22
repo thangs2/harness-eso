@@ -144,23 +144,81 @@ test('H2: a closure score is re-measured, never raised to a constant', () => {
             { kind: 'law', query: 'decision-facade' },
             { kind: 'code', query: 'need at least 1 file read(s); have 0' },
         ]);
-        recordGapToolUse('Read', { path: 'AGENTS.md' }, { root, tree: 'cursor' });
+        const res = recordGapToolUse('Read', { path: 'AGENTS.md' }, { root, tree: 'cursor' });
 
         const stamp = readBundleStamp(root, 'cursor');
         assert.ok(
             Number(stamp.score) < 0.85,
             `one of three gaps closed must not report 0.85 (got ${stamp.score}); the score has to agree with the gaps it is derived from`,
         );
-        assert.equal(stamp.level, 'partial');
+        /*
+         * `AGENTS.md` closes neither gap: the laws in this fixture are `harness-tooling` and
+         * `decision-facade`, and the root document carries no source extension, so the code gap
+         * stays open too. The measured score is therefore the preflight floor, not a constant — the
+         * point of H2 — and it is the *level* that this test used to over-claim: `partial` was only
+         * reachable while a `.md` copy counted as a source read (H5).
+         */
+        assert.ok(!res.closedGapIds.length, 'no gap in this fixture is answerable by AGENTS.md');
+        assert.equal(stamp.level, 'insufficient');
         assert.equal(stamp.allowWrite, false);
-        assert.deepEqual(stamp.closure, { closed: 1, required: 3, allClosed: false });
+        assert.deepEqual(stamp.closure, { closed: 0, required: 3, allClosed: false });
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
 
-test('H3: partial progress is written to the stamp, not only the closure file', () => {
+/* ── F-05 · the stamp (and the attest derived from it) describes the configured mode ─────────── */
+
+test('F-05: a closure rewrite records the consumer mode, not the default', () => {
     const root = tempRoot();
+    try {
+        seedPreflight(root, [{ kind: 'code', query: 'need at least 1 file read(s); have 0' }], {
+            mode: 'hint',
+            enforceWrites: 'off',
+        });
+        /*
+         * `recordGapToolUse` used to be called from `gap-tracker-hook.mjs` with no options at all, so
+         * `writeBundleStampFromPreflight` got `{}` and fell back to `mode: 'observe'` — while the
+         * preflight path, which passes the policy, wrote `hint`. The attestation `guard-write.py`
+         * prefers was therefore the copy that did not describe the consumer.
+         *
+         * Two independent ways to get this wrong, so both are pinned: the verdict's own mode, and the
+         * policy for a caller whose preflight carries none.
+         */
+        const policy = { eso: { mode: 'hint', enforceWrites: 'fail_closed' } };
+        const res = recordGapToolUse('Read', { path: 'src/app.mjs' }, { root, tree: 'cursor', policy });
+        assert.ok(res);
+
+        const stamp = readBundleStamp(root, 'cursor');
+        assert.equal(stamp.mode, 'hint');
+        assert.equal(stamp.enforceWrites, 'off', 'the verdict wins over the policy, as before');
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('F-05: with no policy the stamp still describes the verdict, not a default', () => {
+    const root = tempRoot();
+    try {
+        seedPreflight(root, [{ kind: 'code', query: 'need at least 1 file read(s); have 0' }], {
+            mode: 'hint',
+            enforceWrites: 'off',
+        });
+        recordGapToolUse('Read', { path: 'src/app.mjs' }, { root, tree: 'cursor' });
+        /*
+         * The preflight document carries the verdict's own mode. Reading the policy instead meant a
+         * caller with no policy (`gap-tracker-hook.mjs` until this fix) wrote `observe` over a
+         * consumer configured `hint` — the default masquerading as a measurement.
+         */
+        const stamp = readBundleStamp(root, 'cursor');
+        assert.equal(stamp.mode, 'hint');
+        assert.equal(stamp.enforceWrites, 'off');
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('H3: partial progress is written to the stamp, not only the closure file', () => {    const root = tempRoot();
     try {
         seedPreflight(root, [
             { kind: 'law', query: 'never-appears-anywhere' },

@@ -6,6 +6,7 @@
  * consumer it runs in" and "does the checklist still name a command that exists".
  */
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,6 +23,10 @@ const TEMPLATES = path.join(ESO_ROOT, 'profiles', 'templates');
 
 function tempRoot() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'eso-onboarding-'));
+}
+
+function sha256(text) {
+    return crypto.createHash('sha256').update(text).digest('hex');
 }
 
 function runScript(root, args = [], env = {}) {
@@ -44,14 +49,72 @@ test('provision seeds the checklist and an executable diagnostic', () => {
     assert.ok(mode !== 0, 'diagnostics.sh must be executable — a chmod the operator forgets is "permission denied"');
 });
 
-test('a consumer that already has these files keeps its own copy', () => {
+test('re-provisioning refreshes an untouched copy and keeps the bookkeeping', () => {
+    const root = tempRoot();
+    const docs = {};
+    ensureConsumerOnboarding(root, docs);
+    assert.ok(docs['.harness/ONBOARDING.md'].sha256, 'the hash we wrote is what makes the next run decidable');
+
+    // Same template, same bytes: nothing to do, and no action to report.
+    assert.deepEqual(ensureConsumerOnboarding(root, docs), []);
+
+    // The template moved on while the consumer's copy was still ours: the recorded hash proves the
+    // consumer never edited it, so the stale bytes in the file are refreshed rather than reported.
+    const template = fs.readFileSync(path.join(TEMPLATES, 'ONBOARDING.md'), 'utf8');
+    const before = docs['.harness/ONBOARDING.md'].sha256;
+    const stale = ensureConsumerOnboarding(root, docs);
+    assert.equal(stale.length, 0, 'same template twice is a no-op');
+    assert.equal(fs.readFileSync(path.join(root, '.harness/ONBOARDING.md'), 'utf8'), template);
+    assert.equal(docs['.harness/ONBOARDING.md'].sha256, before);
+
+    const mode = fs.statSync(path.join(root, '.harness/diagnostics.sh')).mode & 0o111;
+    assert.ok(mode !== 0, 'a refreshed diagnostic is still executable');
+});
+
+test('a template change reaches a copy nobody edited', () => {
+    const root = tempRoot();
+    const docs = {};
+    ensureConsumerOnboarding(root, docs);
+    // Simulate the old release's bytes: the file is ours according to the state, but its content is
+    // not the template's — which is exactly the state a consumer is in after an upgrade.
+    fs.writeFileSync(path.join(root, '.harness/ONBOARDING.md'), 'older release\n');
+    docs['.harness/ONBOARDING.md'] = { sha256: sha256('older release\n') };
+
+    const actions = ensureConsumerOnboarding(root, docs);
+    assert.equal(actions.length, 1);
+    assert.equal(actions[0].action, 'updated');
+    assert.equal(
+        fs.readFileSync(path.join(root, '.harness/ONBOARDING.md'), 'utf8'),
+        fs.readFileSync(path.join(TEMPLATES, 'ONBOARDING.md'), 'utf8'),
+    );
+});
+
+test('an edited copy is reported, not overwritten', () => {
+    const root = tempRoot();
+    const docs = {};
+    ensureConsumerOnboarding(root, docs);
+    const edited = '# ours, tuned for this repo\n';
+    fs.writeFileSync(path.join(root, '.harness/ONBOARDING.md'), edited);
+
+    const actions = ensureConsumerOnboarding(root, docs);
+    const onboarding = actions.find((a) => a.relative === '.harness/ONBOARDING.md');
+    assert.equal(onboarding.action, 'kept-edited');
+    assert.equal(fs.readFileSync(path.join(root, '.harness/ONBOARDING.md'), 'utf8'), edited);
+});
+
+test('a copy we did not write is adopted, not clobbered', () => {
     const root = tempRoot();
     fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
     fs.writeFileSync(path.join(root, '.harness/ONBOARDING.md'), '# edited by the operator\n');
 
-    const actions = ensureConsumerOnboarding(root);
-    assert.deepEqual(actions.map((a) => a.relative), ['.harness/diagnostics.sh']);
-    assert.match(fs.readFileSync(path.join(root, '.harness/ONBOARDING.md'), 'utf8'), /edited by the operator/);
+    const docs = {};
+    const actions = ensureConsumerOnboarding(root, docs);
+    assert.deepEqual(actions.map((a) => a.relative), ['.harness/ONBOARDING.md', '.harness/diagnostics.sh']);
+    assert.equal(fs.readFileSync(path.join(root, '.harness/ONBOARDING.md'), 'utf8'), '# edited by the operator\n');
+    assert.ok(
+        docs['.harness/ONBOARDING.md'].adopted,
+        'a pre-bookkeeping copy becomes the baseline, so it is not re-examined as an edit every run',
+    );
 });
 
 test('fix docs refreshes all three operator documents, not only the guide', () => {

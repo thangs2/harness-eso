@@ -11,6 +11,11 @@ dist/
 .docgraph/
 .agents/session/
 .cursor/session/
+# The session rules above are anchored to the repo root. Tests create the same directories inside a
+# fixture tree (`qc/.cursor/session/…` when a test runs from `qc/`), and those are neither intended
+# nor safe to commit — they are the output of a run, not a fixture.
+**/.cursor/session/
+**/.agents/session/
 __pycache__/
 *.pyc
 

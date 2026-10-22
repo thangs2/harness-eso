@@ -1,10 +1,12 @@
 /**
  * Gap tracker — `postToolUse`. Attests recon tool use into `.eso-gap-closure.json`.
  */
-import { allow, detectShape, extractToolMeta, loadPolicyForCwd, popAgyToolCache, readStdin } from './hook-io.mjs';
+import { allow, detectShape, extractToolMeta, harnessTree, loadPolicyForCwd, popAgyToolCache, readStdin } from './hook-io.mjs';
 import { readPreflight, recordGapToolUse, resetGapClosure } from './eso-gap-io.mjs';
 
 export async function run() {
+    const root = process.cwd();
+    const tree = harnessTree();
     let data = {};
     let shape = 'cursor';
     try {
@@ -23,7 +25,7 @@ export async function run() {
         return;
     }
 
-    const pre = readPreflight();
+    const pre = readPreflight(root, tree);
     if (!pre?.at) {
         allow(shape);
         return;
@@ -50,7 +52,14 @@ export async function run() {
             toolInput = hasInput ? toolInput : { ...(cached.toolInput || {}), ...(toolInput || {}) };
         }
     }
-    const closure = recordGapToolUse(toolName, toolInput) || resetGapClosure(pre.at);
+    /*
+     * The policy, root and tree are passed **in**. They default to `{}` and `process.cwd()` inside
+     * `recordGapToolUse`, and one of its callees falls back to `mode: 'observe'` when the policy is
+     * absent — so calling this with a bare `(toolName, toolInput)` wrote an attestation whose mode
+     * disagreed with `.harness/decision-policy.json` on every post-tool rewrite. `policy` was already
+     * loaded three lines up for `gapAttestation`; not hand it down was the whole defect.
+     */
+    const closure = recordGapToolUse(toolName, toolInput, { policy, root, tree }) || resetGapClosure(pre.at, root, tree);
     allow(shape, {
         esoGapClosure: {
             preflightAt: closure.preflightAt,

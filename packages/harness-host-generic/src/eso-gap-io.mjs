@@ -69,16 +69,43 @@ const NON_SOURCE_SEGMENTS = [
     '.round-cost',
 ];
 
+/**
+ * Extensions a "file read" may count as project source.
+ *
+ * The gap comes from a pack whose `codeQueries` name directories, and the honest reading of "read at
+ * least one source file" is *code*: a `.sh` CI helper, a `.md` document or a `.json` config is real
+ * recon but is not the source the gap is about. Before this list the check was "any path that is not
+ * a rule directory", so reading `scripts/ci/*.sh` closed the code gap while the agent had inspected
+ * none of the code it was about to change.
+ *
+ * Deliberately a allow-list rather than a deny-list: a new non-code extension (`.lock`, `.snap`,
+ * `.sql`) should not need an entry to stay out, and a new *code* extension is a visible edit here.
+ */
+const SOURCE_EXTENSIONS = [
+    '.ts', '.tsx', '.mts', '.cts',
+    '.js', '.jsx', '.mjs', '.cjs',
+    '.py', '.go', '.rs', '.java', '.kt', '.kts', '.swift',
+    '.rb', '.php', '.cs', '.scala', '.c', '.h', '.cc', '.cpp', '.hpp',
+    '.vue', '.svelte', '.astro',
+    '.sh', '.bash', '.zsh',
+    '.sql',
+];
+
 function isNonSourcePath(rel) {
     return rel.split('/').some((seg) => NON_SOURCE_SEGMENTS.includes(seg.toLowerCase()));
+}
+
+function hasSourceExtension(rel) {
+    const lower = rel.toLowerCase();
+    return SOURCE_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
 /**
  * Whether a read path proves project source was inspected (H5).
  *
- * Three layers, and the third is deliberate: a path must be inside the preflight root, must not be
- * harness/skill/dependency material, and — unlike the naive fix — is **not** required to match
- * `codeQueries`. The `tools` pack lists `tools/harness`, so requiring it would reject
+ * Four layers: a path must be inside the preflight root, must not be harness/skill/dependency
+ * material, must carry a source-code extension, and — unlike the naive fix — is **not** required to
+ * match `codeQueries`. The `tools` pack lists `tools/harness`, so requiring it would reject
  * `packages/harness-host-generic/src/…`, which is exactly the source a `tools` turn is about.
  *
  * @param {string|null} filePath
@@ -101,6 +128,7 @@ export function isProjectSourcePath(filePath, opts = {}) {
     const normalised = rel.split(path.sep).join('/').replace(/^\.\//, '');
     if (!normalised || normalised === '' || normalised === '.') return false;
     if (isNonSourcePath(normalised)) return false;
+    if (!hasSourceExtension(normalised)) return false;
 
     return true;
 }
@@ -432,8 +460,16 @@ export function shouldBlockBrain(preflight, closure, policy) {
 
 export function writeBundleStampFromPreflight(preflight, policy, root = process.cwd(), tree = harnessTree()) {
     if (!preflight) return null;
+    /*
+     * The preflight document wins over the policy argument, because it is the verdict this stamp
+     * describes. It used to read `preflight.enforceWrites` and then ignore `preflight.mode`
+     * entirely, falling to `policy?.eso?.mode ?? 'observe'` — so the caller without a policy wrote
+     * the *default* mode over a document that carried the real one. `x79`'s attestation said
+     * `observe` while the consumer configured `hint`, and `observe` is the copy `guard-write.py`
+     * prefers.
+     */
     const enforceWrites = preflight.enforceWrites ?? policy?.eso?.enforceWrites ?? 'off';
-    const esoMode = policy?.eso?.mode ?? 'observe';
+    const esoMode = preflight.mode ?? policy?.eso?.mode ?? 'observe';
     const gateMode =
         enforceWrites === 'fail_closed' || esoMode === 'fail_closed' ? 'fail_closed' : esoMode;
     const payload = {

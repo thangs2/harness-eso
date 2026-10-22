@@ -1,0 +1,110 @@
+{
+  "ok": true,
+  "at": "2026-10-22T16:40:06Z",
+  "preflightAt": "2026-10-22T16:37:21Z",
+  "requiredGapIds": [
+    "law:harness-tooling",
+    "code:need at least 1 file read(s); have 0"
+  ],
+  "closedGapIds": [
+    "code:need at least 1 file read(s); have 0"
+  ],
+  "toolUses": [
+    {
+      "at": "2026-10-22T16:39:04Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/x79/scripts/ci/metadata-kind-parity.sh"
+    },
+    {
+      "at": "2026-10-22T16:39:04Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:05Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:05Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:10Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/x79/.harness/host-pack/harness-hook.mjs"
+    },
+    {
+      "at": "2026-10-22T16:39:10Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:16Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:19Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:24Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:25Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:34Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:35Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:42Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:46Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:52Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:53Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:39:59Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:40:00Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T16:40:06Z",
+      "tool": "Shell",
+      "path": ""
+    }
+  ],
+  "allClosed": false
+}

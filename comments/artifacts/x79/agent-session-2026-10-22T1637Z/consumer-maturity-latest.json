@@ -1,0 +1,356 @@
+{
+  "ok": true,
+  "standardId": "consumer-maturity",
+  "standardVersion": "1.3.0",
+  "standardPath": "/Users/thangs2net/Workspaces/harness-eso/profiles/standards/consumer-maturity.v1.json",
+  "consumerRoot": "/Users/thangs2net/Workspaces/x79",
+  "consumerId": "x79",
+  "at": "2026-10-22T16:38:11.597Z",
+  "summary": {
+    "pass": 21,
+    "fail": 5,
+    "skip": 0,
+    "criticalFail": 0,
+    "tierReached": "T2"
+  },
+  "checks": [
+    {
+      "id": "T0.1",
+      "tier": "T0",
+      "title": "Host pack directory present",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "evidence": "dir .harness/host-pack",
+      "remediation": {
+        "action": "provision",
+        "hint": "./provision.sh <id> --host-mode dual-ide",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T0.2",
+      "tier": "T0",
+      "title": "harness.config.json with server.port",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "evidence": "harness.config.json keys ok",
+      "remediation": {
+        "action": "provision",
+        "hint": "Align port in harness.config.json (8792/8793/8794) then provision --force if needed",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T0.3",
+      "tier": "T0",
+      "title": "Dual-IDE trees exist (.cursor + .agents)",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "evidence": "all present (2)",
+      "remediation": {
+        "action": "provision",
+        "hint": "./provision.sh <id> --host-mode dual-ide",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T0.4",
+      "tier": "T0",
+      "title": "Write guards present (both trees)",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "evidence": "all present (2)",
+      "remediation": {
+        "action": "host-pack-refresh",
+        "hint": "harnessctl host-pack refresh <consumer>",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T0.5",
+      "tier": "T0",
+      "title": "decision-policy.json has paths + eso + tokenDiet",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "evidence": ".harness/decision-policy.json keys ok",
+      "remediation": {
+        "action": "provision",
+        "hint": "./provision.sh <id> (merges decision-policy)",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T0.6",
+      "tier": "T0",
+      "title": "host-install-state.json present",
+      "severity": "WARN",
+      "status": "PASS",
+      "evidence": "file .harness/host-install-state.json",
+      "remediation": {
+        "action": "provision",
+        "hint": "./provision.sh <id>",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T1.1",
+      "tier": "T1",
+      "title": "WORKFLOW_GUIDE.md under .harness",
+      "severity": "WARN",
+      "status": "PASS",
+      "evidence": "file .harness/WORKFLOW_GUIDE.md",
+      "remediation": {
+        "action": "sync",
+        "hint": "Copy profiles/templates/WORKFLOW_GUIDE.md → .harness/WORKFLOW_GUIDE.md",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T1.2",
+      "tier": "T1",
+      "title": "Session dirs for both IDE trees",
+      "severity": "WARN",
+      "status": "PASS",
+      "evidence": "all present (2)",
+      "remediation": {
+        "action": "sync",
+        "hint": "mkdir -p .cursor/session .agents/session",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T1.3",
+      "tier": "T1",
+      "title": "tokenDiet enabled in decision-policy.json",
+      "severity": "WARN",
+      "status": "PASS",
+      "evidence": ".harness/decision-policy.json tokenDiet.enabled = true",
+      "remediation": {
+        "action": "provision",
+        "hint": "Set tokenDiet.enabled = true in .harness/decision-policy.json (token diet keeps injected context small); then restart the observe worker.",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T2.1",
+      "tier": "T2",
+      "title": "docgraph.scope at repo root",
+      "severity": "WARN",
+      "status": "PASS",
+      "evidence": "file docgraph.scope",
+      "remediation": {
+        "action": "docs",
+        "hint": "Add docgraph.scope covering sdlc/SDLC + AGENTS.md + rules",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T2.2",
+      "tier": "T2",
+      "title": "AGENTS.md supreme law present",
+      "severity": "WARN",
+      "status": "PASS",
+      "evidence": "file AGENTS.md",
+      "remediation": {
+        "action": "docs",
+        "hint": "Author consumer AGENTS.md (mechanism pipeline + domain INV)",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T2.3",
+      "tier": "T2",
+      "title": "Codegraph index directory (.codegraph)",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "dir .codegraph",
+      "remediation": {
+        "action": "docs",
+        "hint": "codegraph init -i at consumer root",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T2.4",
+      "tier": "T2",
+      "title": "Docgraph index directory (.docgraph)",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "dir .docgraph",
+      "remediation": {
+        "action": "docs",
+        "hint": "docgraph init / build at consumer root",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T3.1",
+      "tier": "T3",
+      "title": "00.context-contract.json present",
+      "severity": "WARN",
+      "status": "FAIL",
+      "evidence": "none of: sdlc/00.governance/00.context-contract.json | SDLC/00.governance/00.context-contract.json",
+      "remediation": {
+        "action": "docs",
+        "hint": "Create consumer-specific context-contract mapping domains → INV-* (do not copy baplatform domains)",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T3.2",
+      "tier": "T3",
+      "title": "Agent manifests zone present",
+      "severity": "WARN",
+      "status": "FAIL",
+      "evidence": "none of: sdlc/00.agent-manifests | SDLC/00.agent-manifests",
+      "remediation": {
+        "action": "docs",
+        "hint": "Add 00.agent-manifests/01.domains/*.spec.md for THIS consumer's INV",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T3.3",
+      "tier": "T3",
+      "title": "eso-coverage.json scorecard",
+      "severity": "INFO",
+      "status": "FAIL",
+      "evidence": "missing file .harness/eso-coverage.json",
+      "remediation": {
+        "action": "docs",
+        "hint": "Generate baseline .harness/eso-coverage.json after T3 docs land",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T3.4",
+      "tier": "T3",
+      "title": "docgraph.scope lists Agent Zone path, and that path exists",
+      "severity": "WARN",
+      "status": "PASS",
+      "evidence": "docgraph.scope declares existing paths: sdlc, document/mu, document/harness, .cursor/rules, .cursor/skills, .cursor/agents, .cursor/instructions.md, .agents/rules, .agents/skills, .agents/agents, .agents/instructions.md, .agents/workflows, backend, frontend, installation, build, AGENTS.md, README.md, agent-native-delivery-model/md, agent-native-delivery-model/learn",
+      "remediation": {
+        "action": "sync",
+        "hint": "Add explicit Agent Zone line to docgraph.scope (path:sdlc/00.agent-manifests or path:SDLC/00.agent-manifests) before Human Zone path:sdlc|SDLC; the directory it names must exist, not just the line. Then docgraph build.",
+        "autoSafe": true
+      }
+    },
+    {
+      "id": "T4.1",
+      "tier": "T4",
+      "title": "Engineering *-runtime agents (Cursor)",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "7 match(es) under .cursor/agents (need ≥5)",
+      "remediation": {
+        "action": "docs",
+        "hint": "Port 7 engineering workers (scout/plan/build/verify/audit/fixbug/qc) dual-harness",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T4.2",
+      "tier": "T4",
+      "title": "pipeline-gate rule present (Cursor)",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "found .cursor/rules/core.pipeline-gate.mdc",
+      "remediation": {
+        "action": "docs",
+        "hint": "Add mechanism core.pipeline-gate (dual-harness .mdc/.md)",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T4.3",
+      "tier": "T4",
+      "title": "Engineering skill (*engineering*) present (Cursor)",
+      "severity": "INFO",
+      "status": "FAIL",
+      "evidence": "0 match(es) under .cursor/skills (need ≥1)",
+      "remediation": {
+        "action": "docs",
+        "hint": "Add consumer *-engineering-team skill (dual-harness); do not copy ABP domain skills",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T4.4",
+      "tier": "T4",
+      "title": "brain-dispatch skill present (Cursor)",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "found .cursor/skills/brain-dispatch/SKILL.md",
+      "remediation": {
+        "action": "sync",
+        "hint": "Copy profiles/templates/skills/brain-dispatch → .cursor/skills + .agents/skills (or re-provision)",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T4.5",
+      "tier": "T4",
+      "title": "Dual-harness verify script (or BAP parity equivalent)",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "found scripts/ci/metadata-kind-parity.sh",
+      "remediation": {
+        "action": "sync",
+        "hint": "Copy profiles/templates/scripts/ci/verify-dual-harness.mjs → scripts/ci/ (or keep consumer parity script)",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T5.1",
+      "tier": "T5",
+      "title": "jira-impl.sh present (optional lane)",
+      "severity": "INFO",
+      "status": "FAIL",
+      "evidence": "missing file scripts/jira-impl.sh",
+      "remediation": {
+        "action": "docs",
+        "hint": "Only if consumer uses Jira Execution Pack — do not invent a fake Jira lane",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T5.2",
+      "tier": "T5",
+      "title": "workflow.agentic-factory rule present (Cursor)",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "found .cursor/rules/workflow.agentic-factory.mdc",
+      "remediation": {
+        "action": "sync",
+        "hint": "Copy profiles/templates/rules/workflow.agentic-factory.mdc (dual-harness .md for .agents)",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T5.3",
+      "tier": "T5",
+      "title": "workflow.qc-runtime rule or qc-runtime agent present",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "found .cursor/rules/workflow.qc-runtime.mdc",
+      "remediation": {
+        "action": "sync",
+        "hint": "Copy profiles/templates/rules/workflow.qc-runtime.mdc + ensure qc-runtime agent",
+        "autoSafe": false
+      }
+    },
+    {
+      "id": "T5.4",
+      "tier": "T5",
+      "title": "delivery.workflow lean rule present (optional lane)",
+      "severity": "INFO",
+      "status": "PASS",
+      "evidence": "found .cursor/rules/delivery.workflow.mdc",
+      "remediation": {
+        "action": "sync",
+        "hint": "Copy profiles/templates/rules/delivery.workflow.mdc — mechanism stub only; do not copy ABP delivery.jira",
+        "autoSafe": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "ok": true,
+  "at": "2026-10-22T16:37:21Z",
+  "harnessTree": "cursor",
+  "generationId": "9284452f-10e2-4c3d-a915-3504e3d2d2ed",
+  "conversationId": "017bf544-06e3-4d08-9352-582f9dfc135a",
+  "userQueryStem": "tao muốn mày làm audit-diagnostic thêm 1 lần nữa, chi tiết hơn nữa, và ghi trực tiếp vào repo harness-eso/comments/artifacts/x79/",
+  "fingerprint": "92b884aa918ecb37",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "tools",
+  "contractMissing": true,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0.3666666666666667,
+  "mode": "hint",
+  "enforceWrites": "off",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "harness-tooling",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "tools"
+  },
+  "metrics": {
+    "latencyMsTotal": 207
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-22T16:37:21Z",
+    "requestId": "9284452f-10e2-4c3d-a915-3504e3d2d2ed",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0.3666666666666667,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "harness-tooling",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "off",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}

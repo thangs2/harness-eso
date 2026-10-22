@@ -186,24 +186,94 @@ export function ensureHarnessGitignore(root) {
  */
 export const HOST_STATE_REL = '.harness/host-install-state.json';
 
-function readHostState(root) {
+export function readHostState(root) {
     const fp = path.join(root, HOST_STATE_REL);
-    if (!fs.existsSync(fp)) return { version: 1, hooks: {} };
+    if (!fs.existsSync(fp)) return { version: 1, hooks: {}, docs: {} };
     try {
         const raw = JSON.parse(fs.readFileSync(fp, 'utf8'));
-        return { version: 1, hooks: raw?.hooks || {} };
+        return { version: 1, hooks: raw?.hooks || {}, docs: raw?.docs || {} };
     } catch {
         // A corrupt state file must not abort a provision; the worst case is one duplicate that
         // the next run compacts away.
-        return { version: 1, hooks: {} };
+        return { version: 1, hooks: {}, docs: {} };
     }
 }
 
+/**
+ * Write our record. The document holds more than hooks — `docs` is the other bookkeeping that has to
+ * survive a provision (the hashes in `syncConsumerDoc`), so it is carried through rather than dropped.
+ */
 function writeHostState(root, state) {
     const fp = path.join(root, HOST_STATE_REL);
     fs.mkdirSync(path.dirname(fp), { recursive: true });
-    writeJsonAtomic(fp, { version: 1, hooks: state.hooks || {} });
+    writeJsonAtomic(fp, { version: 1, hooks: state.hooks || {}, docs: state.docs || {} });
     return { relative: HOST_STATE_REL, action: 'write' };
+}
+
+function sha256File(fp) {
+    return crypto.createHash('sha256').update(fs.readFileSync(fp)).digest('hex');
+}
+
+/**
+ * Copy one provisioned document into a consumer, keeping whatever the developer changed.
+ *
+ * Copy-only-when-missing was safe but left every consumer pinned to the documents of the release that
+ * first created them: a checklist describing a `diagnostics.sh` from an older release sends the
+ * operator to commands that no longer exist, and the only way out was `harnessctl fix docs`, which
+ * overwrites unconditionally. Neither answer is right, so this is the three-way one.
+ *
+ * The state file remembers the hash of the bytes **we** wrote, and those hashes compare against two
+ * other versions: the template now, and the file now. That is enough to tell "nobody touched it,
+ * refresh it" from "somebody edited it, leave it alone" — no markers to remember, no flag to pass.
+ *
+ * @param {string} root consumer root
+ * @param {{ src: string[], rel: string, exec?: boolean }} doc consumer-relative destination
+ * @param {object} docs the `docs` section of the host state, updated in place
+ * @returns {{relative: string, action: 'created'|'updated'|'kept'|'kept-edited'|'kept-foreign'}|null}
+ */
+export function syncConsumerDoc(root, doc, docs = {}) {
+    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
+    const src = path.join(baseProfiles, ...doc.src);
+    if (!fs.existsSync(src)) return null;
+    const dest = path.join(root, doc.rel);
+    const record = docs[doc.rel] || {};
+    const tplHash = sha256File(src);
+
+    let action;
+    if (!fs.existsSync(dest)) {
+        action = 'created';
+    } else {
+        const curHash = sha256File(dest);
+        if (record.sha256 && record.sha256 === curHash) {
+            // Untouched since we wrote it: the only version that can be stale is the template's.
+            if (curHash === tplHash) return null;
+            action = 'updated';
+        } else if (record.sha256) {
+            action = 'kept-edited';
+        } else {
+            // Present with no record — a copy from a release that predates this bookkeeping. It may be
+            // stock, but an edit made to it is indistinguishable from stock, so it is the operator's.
+            action = 'kept-foreign';
+        }
+    }
+
+    if (action === 'created' || action === 'updated') {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, fs.readFileSync(src));
+        if (doc.exec) {
+            try {
+                fs.chmodSync(dest, 0o755);
+            } catch {
+                /* Windows: the mode is meaningless and bash is not the entrypoint there */
+            }
+        }
+        docs[doc.rel] = { sha256: tplHash, syncedAt: new Date().toISOString() };
+    } else if (!record.sha256) {
+        // Adopt the current bytes as the baseline so a future template change is not reported as an
+        // edit forever; the file itself stays exactly as it is now.
+        docs[doc.rel] = { sha256: sha256File(dest), syncedAt: record.syncedAt || null, adopted: true };
+    }
+    return { relative: doc.rel, action };
 }
 
 function writeSidecarEnv(root, profileIds, port) {
@@ -395,20 +465,13 @@ export function ensureSessionGitignore(root, treeKey) {
 
 /**
  * Ensure comprehensive consumer workflow guide exists in .harness/WORKFLOW_GUIDE.md.
+ *
+ * Refreshed when it is still the copy we wrote and the template moved on; a consumer that edited its
+ * own copy keeps it. See `syncConsumerDoc` for how the three versions are told apart.
  */
-export function ensureConsumerWorkflowGuide(root) {
-    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
-    const guideSrc = path.join(baseProfiles, 'templates', 'WORKFLOW_GUIDE.md');
-    if (!fs.existsSync(guideSrc)) return [];
-
-    const harnessDir = path.join(root, '.harness');
-    fs.mkdirSync(harnessDir, { recursive: true });
-    const guideDest = path.join(harnessDir, 'WORKFLOW_GUIDE.md');
-    if (!fs.existsSync(guideDest)) {
-        fs.copyFileSync(guideSrc, guideDest);
-        return [{ relative: '.harness/WORKFLOW_GUIDE.md', action: 'created' }];
-    }
-    return [];
+export function ensureConsumerWorkflowGuide(root, docs = {}) {
+    const result = syncConsumerDoc(root, { src: ['templates', 'WORKFLOW_GUIDE.md'], rel: '.harness/WORKFLOW_GUIDE.md' }, docs);
+    return result ? [result] : [];
 }
 
 /**
@@ -424,31 +487,19 @@ export function ensureConsumerWorkflowGuide(root) {
  * reports "permission denied" on the one run that mattered.
  *
  * @param {string} root consumer root
+ * @param {object} [docs] the `docs` section of the host state, updated in place
  * @returns {{relative: string, action: string}[]}
  */
-export function ensureConsumerOnboarding(root) {
-    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
-    const harnessDir = path.join(root, '.harness');
+export function ensureConsumerOnboarding(root, docs = {}) {
     const files = [
         { src: ['templates', 'ONBOARDING.md'], rel: '.harness/ONBOARDING.md', exec: false },
         { src: ['templates', 'diagnostics.sh'], rel: '.harness/diagnostics.sh', exec: true },
     ];
+    fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
     const actions = [];
-    fs.mkdirSync(harnessDir, { recursive: true });
     for (const file of files) {
-        const src = path.join(baseProfiles, ...file.src);
-        if (!fs.existsSync(src)) continue;
-        const dest = path.join(root, file.rel);
-        if (fs.existsSync(dest)) continue;
-        fs.copyFileSync(src, dest);
-        if (file.exec) {
-            try {
-                fs.chmodSync(dest, 0o755);
-            } catch {
-                /* Windows: the mode is meaningless and bash is not the entrypoint there */
-            }
-        }
-        actions.push({ relative: file.rel, action: 'created' });
+        const result = syncConsumerDoc(root, file, docs);
+        if (result) actions.push(result);
     }
     return actions;
 }
@@ -817,12 +868,21 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
     const root = path.resolve(consumerRoot);
     const port = requireObservePort(opts.observePort);
     const profileIds = profiles.map((p) => p.id);
+    /*
+     * The document bookkeeping lives in the host state next to the hook bookkeeping, and it survives
+     * the hook merges below: they read the state before this section is filled in and write it back
+     * through `writeHostState`, which carries `docs` through.
+     */
+    const state = readHostState(root);
+    const docs = state.docs;
     const actions = [
         ...installHostPack(root).actions,
         writeSidecarEnv(root, profileIds, port),
-        ...ensureConsumerWorkflowGuide(root),
-        ...ensureConsumerOnboarding(root),
+        ...ensureConsumerWorkflowGuide(root, docs),
+        ...ensureConsumerOnboarding(root, docs),
     ];
+    state.docs = docs;
+    actions.push(writeHostState(root, state));
 
     const sidecarUrl = `http://127.0.0.1:${port}`;
     const bootstrap = {
@@ -1113,6 +1173,16 @@ export function addHostProfile(root, profileId, profilesDir, opts = {}) {
      * `installHostPack` is idempotent, so this costs nothing when the pack is already there.
      */
     const actions = [...installHostPack(root).actions];
+
+    /*
+     * The operator docs go with it: `add-ide` on a repo nobody provisioned is exactly the case that
+     * has no checklist yet, and the three documents are the same for every host tree.
+     */
+    const state = readHostState(root);
+    const docs = state.docs;
+    actions.push(...ensureConsumerWorkflowGuide(root, docs), ...ensureConsumerOnboarding(root, docs));
+    state.docs = docs;
+    actions.push(writeHostState(root, state));
 
     const bootstrapPath = path.join(root, '.harness', 'host-bootstrap.json');
     let bootstrap = {};
