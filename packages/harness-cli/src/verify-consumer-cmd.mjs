@@ -46,9 +46,13 @@ function parse(argv) {
 }
 
 function loadStandard() {
-  const p = path.join(ESO_ROOT, STANDARD_REL);
-  if (!fs.existsSync(p)) die(`standard missing: ${p}`);
-  return { path: p, data: JSON.parse(fs.readFileSync(p, 'utf8')) };
+    // `HARNESS_STANDARD_PATH` lets a checkout verify against a throwaway standard instead of the
+    // packaged one. Without it the only way to exercise a failing check is to break a real consumer's
+    // files — which is exactly how a "test" ends up editing the thing it is testing.
+    const override = process.env.HARNESS_STANDARD_PATH;
+    const p = override ? path.resolve(override) : path.join(ESO_ROOT, STANDARD_REL);
+    if (!fs.existsSync(p)) die(`standard missing: ${p}`);
+    return { path: p, data: JSON.parse(fs.readFileSync(p, 'utf8')) };
 }
 
 function exists(root, rel, as = 'any') {
@@ -302,8 +306,14 @@ export function runVerifyConsumer(argv) {
     );
     console.log(`  diagnostics   ${dir}/latest.md`);
     for (const c of report.checks.filter((x) => x.status === 'FAIL')) {
-      console.log(`  FAIL ${c.severity.padEnd(8)} ${c.id}  ${c.title}`);
-      console.log(`       → [${c.remediation?.action}] ${c.remediation?.hint}`);
+        console.log(`  FAIL ${c.severity.padEnd(8)} ${c.id}  ${c.title}`);
+      // `[undefined] undefined` is worse than no line: it looks like output, so the operator reads it
+      // as "the report says nothing" instead of "this check has no remediation". Say which.
+      if (c.remediation?.action || c.remediation?.hint) {
+        console.log(`       → [${c.remediation.action || 'docs'}] ${c.remediation.hint || 'n/a'}`);
+      } else {
+        console.log(`       → ${c.evidence ? `no remediation recorded — evidence: ${c.evidence}` : 'no remediation recorded'}`);
+      }
     }
   }
 

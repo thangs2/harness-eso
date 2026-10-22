@@ -1,0 +1,59 @@
+# Entrypoint discipline — the operator surface is four scripts
+
+**Prerequisite:** `core.law-gate.mdc` (`AGENTS.md` Read this session). This rule narrows *how* an
+agent may act on a consumer; it does not replace the layout, tooling or verification rules.
+
+## The rule
+
+An agent may drive a consumer **only** through the repository's operator scripts:
+
+| Allowed | Forbidden |
+|---|----|
+| `./deploy.sh`, `./provision.sh`, `./verify-consumer.sh`, `./console.sh` | `node …`, `bun …`, `npm …` as the entrypoint of a consumer operation |
+| `./fix-consumer.sh`, `./install.sh`, `./harness` (wrapper over the same CLI) | `packages/harness-cli/src/*.mjs`, `init-profile.mjs`, `reconcile-observe-ports.mjs` invoked directly |
+| `harness.ps1 <command>` on Windows (thin wrapper → the same `.sh`) | raw `docker`, `docker compose`, `curl` used to *perform* a step the scripts already perform |
+
+Reading is not restricted: `git`, `sed`, `rg`, `gh`, `ls` and `Read` are always fine. The rule is
+about **actions**.
+
+## Why
+
+The scripts exist so that a behaviour has one definition. `provision.sh` resolves the consumer and
+forwards to `harness-cli init profile`; `deploy.sh` resolves it and forwards to `observatory restart`.
+When an agent bypasses them, it re-creates the resolution by hand — and hand-written resolution is how
+the port moved from `p.port` to `p.observe.port` while `provision.sh`, `deploy.sh` and
+`verify-consumer.sh` kept reading the old field with a `|| 8792` fallback. Module tests passed; every
+consumer silently reported 8792.
+
+## If a script cannot do what the step needs
+
+Extend the script and add a case to `qc/entrypoint-scripts.test.mjs`. Do **not** route around it for
+"just this once": the next session reads the transcript as precedent, and the bypass becomes the
+workflow.
+
+## Case-by-case consumer run
+
+Each step is a script, and each step's output is the input to the next one's judgement:
+
+1. `./provision.sh <consumer> --plan` — file plan + host tier. Read-only.
+2. `./verify-consumer.sh <consumer>` — baseline T-tier. Read-only apart from `.harness/diagnostics`.
+3. `./provision.sh <consumer>` — apply. Expect `✅ Provisioned`.
+4. `./verify-consumer.sh <consumer> --json` — diff against the step-2 baseline.
+5. `./deploy.sh <consumer>` — builds SPA + image, restarts `harness-observatory-<id>`.
+6. `./deploy.sh <consumer> --plan` after any failure — confirms what *would* run before re-running.
+7. `./console.sh up` then `./console.sh verify` — all five checkpoints against real data.
+
+Exit codes carry the meaning, so never pipe a script through `| head` when the exit code matters and
+never flatten 0/1/2 in a wrapper:
+
+| Code | Meaning |
+|---|---|
+| 0 | done (or dry run printed) |
+| 1 | the operation failed |
+| 2 | usage error, or unknown consumer |
+
+## Windows
+
+`harness.ps1` is a thin wrapper: it finds Git Bash (or WSL with `HARNESS_WSL=1`), translates the
+repo path, and execs the matching `.sh` with the same argv. Keeping it thin is the point — a native
+PowerShell re-implementation would be a second definition of consumer resolution.
