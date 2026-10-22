@@ -73,7 +73,51 @@ path hoặc finding có tên**.
 
 ---
 
-## 3. Cái gì có thể bị chặn, và vì sao
+## 3. Pipeline vận hành — 7 bước (Cursor / Antigravity / Claude)
+
+Đây là pipeline **đang chạy** trên host IDE. Mỗi bước có một chỗ implement và một hook tương ứng; nếu
+một hook không fire, bước đó không có bằng chứng.
+
+| # | Bước | Làm gì | Hook / lệnh | Code |
+|---|---|---|---|---|
+| 1 | Cognitive preflight | contract domain + pinned invariants + fingerprint; quyết định `HOT` (continuation cùng stem, fingerprint khớp) / `WARM` (sufficient → JIT-pin ≤30 token) / `STALE` / `COLD` | `beforeSubmitPrompt` · `PreInvocation` | `preflight-hook.mjs`, `preflight-projection.mjs`, `context-contract.mjs` |
+| 2 | Decision facade | route bucket bằng L0 (0 ms) hoặc JEV; chọn surface/skill pack | trong preflight | `orchestrate-turn.mjs`, `harness-decision` |
+| 3 | Recon | thu bằng chứng theo `sources`: law = **docgraph**, code = **codegraph**, memory = **agentmemory** (opt-in) | trong preflight | `adapter-registry.mjs`, `collect.mjs` |
+| 4 | Sufficiency + gate | chấm level/score/gaps → `TurnVerdict`; **cổng quyết định là tier của path và hard blocker**, score chỉ mô tả | preflight | `gate.mjs`, `attest.mjs`, `hard-blockers.mjs` |
+| 5 | Brain allocation | guard buộc chọn tier `pro` / `flash` / direct trước khi gọi model | `preToolUse` (brain) | `guard-brain-hook.mjs`, `reasoner.mjs` |
+| 6 | Exec + verify | guard shell/write; check deterministic trước khi merge | `beforeShellExecution`, `check *` | `guard-shell-hook.mjs`, `contract-diff`, `tenant-check`, `migration-check` |
+| 7 | Distill + handoff | gap closure, hint sau tool, chi phí trước compact, lưu bài học | `postToolUse`, `preCompact` | `gap-tracker`, `post-tool-hint`, `pre-compact` |
+
+### 3.1 Vì sao vẫn cần docgraph + codegraph + agentmemory
+
+Bước 3 không có nguồn thay thế trên host IDE: không có "native provider" nào ở Cursor/Antigravity, nên
+chain resolve ra external. Kiểm tra bằng:
+
+```bash
+harnessctl capability probe .        # law: docgraph-cli · code: codegraph-cli · memory: agentmemory-mcp | none
+```
+
+Memory là **opt-in**: consumer chưa khai thì resolve `none`, không tự gọi.
+
+### 3.2 Điều đã đổi, và điều không đổi
+
+- **Không đổi**: 7 bước, thứ tự, hook nào làm bước nào.
+- **Đã đổi ở bước 4**: quyết định không còn dựa trên ngưỡng score (đo được: 2/2 tín hiệu quality gate là
+  false positive). Cổng bây giờ là **tier path** (`locked`/`ask`/`gated` + consent) và **hard blocker**
+  (`contract`/`tenant`/`migration`). Score vẫn được tính để mô tả, không dùng để cho qua.
+- **Đã đổi ở bước 3**: nguồn bằng chứng chọn bằng dữ liệu (`sources`, recipe), không hard-code ba công cụ.
+
+### 3.3 Host khác thì khác ở đâu
+
+| Host | Evidence spine (bước 1–4) | Gate (bước 4 write + 6) | Brain guard (5) | Trail |
+|---|---|---|---|---|
+| Cursor / Antigravity / Claude | có, qua hook + 3 MCP | có | có | session artifacts |
+| DSH (plugin `@mu/harness-eso-dsh`) | **chưa có** — plugin không chạy preflight | có | chưa | `~/.harness/eso-blockers.jsonl`, tab **Gate** |
+
+DSH là host **bổ sung**, không thay thế host IDE: nó thêm đường cưỡng chế in-process + audit trail, còn
+bằng chứng (law/recon/brain) vẫn chỉ có khi chạy qua host pack.
+
+## 4. Cái gì có thể bị chặn, và vì sao
 
 ### 3.1 Ba tier của path (`.harness/decision-policy.json` → `paths`)
 
@@ -117,7 +161,7 @@ Consent của ESO nằm ở product state (`~/.harness`), không phải ở UI h
 
 ---
 
-## 4. Bằng chứng và dấu vết
+## 5. Bằng chứng và dấu vết
 
 ### 4.1 Session (agent ghi được — chỉ để đọc lại)
 
@@ -147,7 +191,7 @@ tail -n 20 ~/.harness/eso-blockers.jsonl
 
 ---
 
-## 5. Lệnh thường dùng
+## 6. Lệnh thường dùng
 
 Tất cả chạy từ checkout harness-eso (hoặc `harnessctl` nếu đã cài toàn cục):
 
@@ -180,7 +224,7 @@ H4/H5 mặc định `skip` khi không áp dụng; `skip` không phải `pass`.
 
 ---
 
-## 6. Việc cần làm theo nhịp
+## 7. Việc cần làm theo nhịp
 
 **Trước khi merge thay đổi có schema/API:**
 
@@ -210,7 +254,7 @@ package dir** → `harnessctl doctor dsh`. Sửa code plugin phải `remove_bund
 
 ---
 
-## 7. Khi có sự cố
+## 8. Khi có sự cố
 
 | Triệu chứng | Nguyên nhân thường gặp | Kiểm bằng |
 |---|---|---|
@@ -226,7 +270,7 @@ lệnh đó (gỡ dependency trùng / cách ly `node_modules`) rồi mới chạ
 
 ---
 
-## 8. Ranh giới và bảo đảm
+## 9. Ranh giới và bảo đảm
 
 - **Không sửa host.** Với DSH, ESO chỉ là một plugin dùng API công khai (`ctx.on`,
   `workingDirectory`); không patch `app.asar`, không sửa profile bằng tay.
@@ -238,7 +282,7 @@ lệnh đó (gỡ dependency trùng / cách ly `node_modules`) rồi mới chạ
 
 ---
 
-## 9. Đồng bộ tài liệu này
+## 10. Đồng bộ tài liệu này
 
 File này được copy từ `profiles/templates/WORKFLOW_GUIDE.md` của harness-eso **khi provision**; nó
 không tự cập nhật. Sau khi nâng cấp harness-eso:
