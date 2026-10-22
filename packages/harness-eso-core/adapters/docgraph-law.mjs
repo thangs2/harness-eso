@@ -14,20 +14,60 @@ export const adapter = {
         return policy?.eso?.sources?.law?.enabled !== false;
     },
     async fetch(query, ctx) {
-        const q = String(query?.text || query?.query || query || '').trim();
+        const spec = query && typeof query === 'object' ? query : { query };
+        const q = String(spec.text || spec.query || query || '').trim();
         if (!q) return { snippets: [], trace: 'docgraph:skip-empty' };
         const root = ctx.root || findRepoRoot();
         const max = ctx.maxChars ?? MAX_SNIPPET;
-        const rawSnippet = fetchDocgraph(q, root, max);
-        if (!rawSnippet) return { snippets: [], trace: `docgraph:miss:${q.slice(0, 40)}` };
+        const raw = fetchDocgraph(q, root, max);
+        if (!raw) return { snippets: [], trace: `docgraph:miss:${q.slice(0, 40)}` };
 
-        const { text, specDebt } = extractNormativeSpec(rawSnippet, max);
+        /*
+         * A `requiredDocTerms` entry names a **document**, not a phrase, so the snippets have to say
+         * which documents docgraph answered with. Without an id the only signal was the term
+         * appearing in the body, which is why a required term could stay open forever while the law
+         * answering it sat in the same result (H4).
+         */
+        const docIds = extractDocIds(raw);
+        const { text, specDebt } = extractNormativeSpec(raw, max);
         return {
-            snippets: [{ kind: 'law', text, query: q, meta: { adapterId: 'docgraph-cli', specDebt } }],
+            snippets: [
+                {
+                    kind: 'law',
+                    text,
+                    query: q,
+                    id: docIds[0] ?? null,
+                    meta: { adapterId: 'docgraph-cli', specDebt, ...(specDebt ? {} : { docIds }) },
+                },
+            ],
             trace: `docgraph:ok:${q.slice(0, 40)}${specDebt ? ':spec_debt' : ''}`,
         };
     },
 };
+
+const DOC_PATH_RE = /(?:^|[\s(])((?:\.{0,2}\/)?[\w./-]+\.(?:md|mdc|json))\b/gi;
+
+/**
+ * Document paths docgraph named in its answer, most specific first.
+ *
+ * Docgraph's text output names the file each hit came from; the basename is the document id the
+ * packs use when they say `harness-tooling` or `stack.fe.angular`.
+ *
+ * @param {string} raw
+ * @returns {string[]}
+ */
+export function extractDocIds(raw) {
+    if (!raw || typeof raw !== 'string') return [];
+    const out = [];
+    const seen = new Set();
+    for (const match of raw.matchAll(DOC_PATH_RE)) {
+        const p = match[1].replace(/^\.{0,2}\//, '');
+        if (!p || seen.has(p)) continue;
+        seen.add(p);
+        out.push(p);
+    }
+    return out;
+}
 
 /**
  * Extracts normative blocks (Invariants, Rules, Constraints, Alerts, bullet points)

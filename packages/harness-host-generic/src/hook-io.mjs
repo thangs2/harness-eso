@@ -357,8 +357,21 @@ export function popAgyToolCache(data, opts = {}) {
     if (callId) {
         matchIdx = freshQueue.findIndex((e) => e.callId === callId);
     }
+    /*
+     * Falling back to the first entry of the same tool name is how a replay hands the wrong path to
+     * the gap tracker: `view_file /path/to/AGENTS.md` and `view_file AGENTS.md` share a name, and the
+     * caller only knows the name. That fallback used to be harmless because a law gap matched on a
+     * *substring of any path* (H1), so either entry closed it. It is no longer harmless: the two paths
+     * now decide differently, and guessing made a deliberate negative assertion fail while looking
+     * like a bug in the matching. When there is no `callId`, only a **unique** name is unambiguous;
+     * with more than one candidate the answer is "unknown" and the caller keeps its own input.
+     */
     if (matchIdx === -1 && requestedName && requestedName !== '*') {
-        matchIdx = freshQueue.findIndex((e) => e.toolName.toLowerCase() === requestedName.toLowerCase());
+        const sameName = [];
+        for (let i = 0; i < freshQueue.length; i += 1) {
+            if (freshQueue[i].toolName.toLowerCase() === requestedName.toLowerCase()) sameName.push(i);
+        }
+        if (sameName.length === 1) matchIdx = sameName[0];
     }
     if (matchIdx === -1 && (!requestedName || requestedName === '*')) {
         matchIdx = 0; // FIFO pop

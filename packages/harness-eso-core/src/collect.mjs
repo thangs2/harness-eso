@@ -2,21 +2,74 @@ import { createSourceRegistry } from './adapter-registry.mjs';
 import { resolveSkillPack } from './skill-pack.mjs';
 
 /**
+ * Fold the separators the packs use in document names, so a term matches the document it names.
+ *
+ * A `requiredDocTerms` entry is a **document name** — `harness-tooling`, `stack.fe.angular` — and the
+ * ids docgraph returns for those documents are written the same way, so the comparison is a
+ * slug-versus-slug one. Folding is also what stops `stack.fe` from matching `stack.fe.angular`.
+ */
+function foldSlug(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+/** Document ids / paths a snippet came from, as folded slugs. */
+function snippetSlugs(snippet) {
+    const ids = [
+        snippet?.id,
+        snippet?.docId,
+        snippet?.path,
+        snippet?.source,
+        ...(Array.isArray(snippet?.meta?.docIds) ? snippet.meta.docIds : []),
+        ...(Array.isArray(snippet?.meta?.paths) ? snippet.meta.paths : []),
+    ];
+    const out = new Set();
+    for (const raw of ids) {
+        if (typeof raw !== 'string' || !raw.trim()) continue;
+        for (const part of [raw, String(raw).split(/[\\/]/).pop()]) {
+            const slug = foldSlug(part).replace(/\.[a-z0-9]+$/, '');
+            if (slug) out.add(slug);
+        }
+    }
+    return out;
+}
+
+/**
  * @param {object} pack
  * @param {object} retrieval
  * @param {string} stem
  */
 export function detectGaps(pack, retrieval, stem) {
     const gaps = [];
-    const lawText = (retrieval.snippets || [])
-        .filter((s) => s.kind === 'law')
+    const lawSnippets = (retrieval.snippets || []).filter((s) => s.kind === 'law');
+    const lawText = lawSnippets
         .map((s) => s.text)
         .join('\n')
         .toLowerCase();
+    const resolvedDocs = new Set();
+    for (const snippet of lawSnippets) {
+        for (const slug of snippetSlugs(snippet)) resolvedDocs.add(slug);
+    }
+    const bodyHas = new Set();
+    for (const snippet of lawSnippets) {
+        const body = String(snippet?.text || '').toLowerCase();
+        if (body) bodyHas.add(body);
+    }
 
     for (const term of pack.requiredDocTerms || []) {
-        const t = term.toLowerCase();
-        if (!lawText.includes(t)) {
+        /*
+         * A term is satisfied either by a fetched snippet that **is** that document, or — for a
+         * snippet whose metadata carries no id — by the term appearing in its body. The second
+         * branch is what the scored path always relied on (`scoreSufficiency` counts `lawHit` the
+         * same way), so gaps and score keep agreeing about what a pack requires (A1, F44).
+         */
+        const slug = foldSlug(term);
+        const byDoc = resolvedDocs.has(slug);
+        const t = String(term).toLowerCase();
+        const byBody = !byDoc && lawText.includes(t) && [...bodyHas].some((b) => b.includes(t));
+        if (!byDoc && !byBody) {
             gaps.push({ kind: 'law', query: term, priority: 1 });
         }
     }
@@ -84,6 +137,28 @@ export function scoreSufficiency(pack, retrieval, gaps, stem, thresholds) {
 }
 
 /**
+ * Every term a pack needs law text for: the queries it names, plus every required term.
+ *
+ * `detectGaps` compares `requiredDocTerms` against the fetched law text, so a term that is only in
+ * `requiredDocTerms` must still be fetched or its gap is unclosable (H4). Order is preserved and
+ * duplicates are removed, so `trace` reads in the order the pack declared them.
+ *
+ * @param {object} pack
+ * @returns {string[]}
+ */
+export function lawTermsFor(pack) {
+    const seen = new Set();
+    const terms = [];
+    for (const term of [...(pack?.lawQueries || []), ...(pack?.requiredDocTerms || [])]) {
+        const t = String(term || '').trim();
+        if (!t || seen.has(t)) continue;
+        seen.add(t);
+        terms.push(t);
+    }
+    return terms;
+}
+
+/**
  * COLLECT — adapter registry + gap measure.
  * @param {object} input
  * @param {{ policy: object, eso: object, surface: object, stem: string, root?: string, reads?: object, registry?: object, injectSnippets?: object[] }} ctx
@@ -96,8 +171,16 @@ export async function runCollect(input, ctx) {
 
     const lawAdapter = registry.resolve('law');
     if (lawAdapter) {
-        for (const q of pack.lawQueries || []) {
-            const r = await lawAdapter.fetch(q, { root: ctx.root, policy: ctx.policy });
+        /*
+         * Fetch every term `detectGaps` will check, not only `lawQueries` (H4).
+         *
+         * The two lists are not the same: `tools` requires `harness-eso` but only queries
+         * `harness-tooling` / `decision-facade`. A required term that is never fetched can never
+         * appear in `lawText`, so its gap is emitted every turn and **cannot be closed** — which is
+         * exactly the `law:harness-eso` gap left open on `atrievefin` while the other two closed.
+         */
+        for (const q of lawTermsFor(pack)) {
+            const r = await lawAdapter.fetch({ query: q, type: 'doc' }, { root: ctx.root, policy: ctx.policy });
             trace.push(r.trace);
             snippets.push(...(r.snippets || []));
         }

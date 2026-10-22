@@ -40,6 +40,13 @@ function tempConsumer(opts = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-guards-'));
     fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
     fs.mkdirSync(path.join(root, '.cursor', 'session'), { recursive: true });
+    /*
+     * The spec these hooks are asked to read. A read only proves source was inspected if the path
+     * exists inside the consumer (H5), and these fixtures point at `document/harness/…`, which on a
+     * real consumer is the spec checkout.
+     */
+    fs.mkdirSync(path.join(root, 'document/harness/02.harness-eso'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'document/harness/02.harness-eso/00.index.md'), '# index\n');
     fs.writeFileSync(
         path.join(root, '.harness', 'decision-policy.json'),
         JSON.stringify({
@@ -71,6 +78,12 @@ test('guard-shell allows benign command', () => {
 test('gap-tracker closes gap after Read tool', () => {
     const root = tempConsumer();
     const preflightAt = new Date().toISOString();
+    /*
+     * The gap names a document the consumer can read. It used to be `harness-eso`, satisfied only
+     * because that substring appeared in the *directory* `document/harness/02.harness-eso/` — the
+     * over-match H1 removed: a required document term names a document, not an ancestor folder.
+     */
+    fs.writeFileSync(path.join(root, 'AGENTS.md'), '# law\n');
     fs.writeFileSync(
         path.join(root, '.cursor', 'session', '.eso-preflight.json'),
         JSON.stringify({
@@ -78,14 +91,14 @@ test('gap-tracker closes gap after Read tool', () => {
             at: preflightAt,
             level: 'partial',
             score: 0.5,
-            gaps: [{ kind: 'law', query: 'harness-eso' }],
+            gaps: [{ kind: 'law', query: 'AGENTS.md' }],
         }),
     );
     const { json } = runHook(
         'gap-tracker',
         {
             tool_name: 'Read',
-            tool_input: { path: 'document/harness/02.harness-eso/00.index.md' },
+            tool_input: { path: 'AGENTS.md' },
             generation_id: 'g1',
         },
         { cwd: root },
@@ -95,7 +108,7 @@ test('gap-tracker closes gap after Read tool', () => {
         fs.readFileSync(path.join(root, '.cursor', 'session', '.eso-gap-closure.json'), 'utf8'),
     );
     assert.equal(closure.preflightAt, preflightAt);
-    assert.ok(closure.closedGapIds.includes('law:harness-eso'));
+    assert.ok(closure.closedGapIds.includes('law:AGENTS.md'));
 });
 
 test('guard-brain blocks ask_deepseek when gaps open', () => {
@@ -299,7 +312,7 @@ test('antigravity parallel tool calls preserve file paths via .agy-tool-cache.js
         score: 0.3,
         gaps: [
             { kind: 'code', query: 'package.json' },
-            { kind: 'law', query: 'AGENTS.md' },
+            { kind: 'law', query: 'pipeline-gate' },
             { kind: 'code', query: 'dispatcher.mjs' },
         ]
     }));
@@ -334,12 +347,46 @@ test('antigravity parallel tool calls preserve file paths via .agy-tool-cache.js
         assert.deepEqual(res.json, {});
     }
 
-    // Verify gap closure has all 3 gaps closed!
+    /*
+     * Code gaps close here; the law gap is a separate contract.
+     *
+     * `package.json` / `dispatcher.mjs` are code gaps, and a code gap closes on a codegraph query as
+     * well as on a project-source read (H5), so these fixture paths are enough for them.
+     *
+     * The law gap `AGENTS.md` used to close only because `agents` is a substring of the *path* — the
+     * over-match H1 removed. The gap here is `pipeline-gate`, which no fixture path contains, and it
+     * stays open until a file that actually answers it is read (step 3).
+     */
     const closure = JSON.parse(fs.readFileSync(path.join(sessionPath, '.eso-gap-closure.json'), 'utf8'));
     assert.ok(closure.closedGapIds.includes('code:package.json'), 'gap for package.json must be closed');
-    assert.ok(closure.closedGapIds.includes('law:AGENTS.md'), 'gap for AGENTS.md must be closed');
     assert.ok(closure.closedGapIds.includes('code:dispatcher.mjs'), 'gap for dispatcher.mjs must be closed');
-    assert.equal(closure.allClosed, true);
+    assert.ok(
+        !closure.closedGapIds.includes('law:pipeline-gate'),
+        'reading unrelated files must not close a law gap',
+    );
+    assert.equal(closure.allClosed, false, 'a law gap still open is not all-closed');
+
+    // Step 3: read the law that answers it, through the same queue path.
+    const lawFile = path.join(root, '.cursor', 'rules', 'core.pipeline-gate.mdc');
+    fs.mkdirSync(path.dirname(lawFile), { recursive: true });
+    fs.writeFileSync(lawFile, '# gate\n');
+    const pre = runHook('guard-brain', {
+        conversationId: 'conv-parallel-1',
+        toolCall: { id: 'call_4', name: 'view_file', args: { AbsolutePath: lawFile } },
+    }, { cwd: root, tree: 'agents', args: ['--event', 'PreToolUse'] });
+    assert.equal(pre.status, 0);
+    const post = runHook('gap-tracker', {
+        conversationId: 'conv-parallel-1',
+        toolCall: { id: 'call_4', name: 'view_file' },
+    }, { cwd: root, tree: 'agents', args: ['--event', 'PostToolUse'] });
+    assert.equal(post.status, 0);
+
+    const closed = JSON.parse(fs.readFileSync(path.join(sessionPath, '.eso-gap-closure.json'), 'utf8'));
+    assert.ok(
+        closed.closedGapIds.includes('law:pipeline-gate'),
+        'reading the rule the gap names must close it',
+    );
+    assert.equal(closed.allClosed, true);
 });
 
 test('claude guard-shell denies dangerous command with hookSpecificOutput', () => {
@@ -400,7 +447,7 @@ test('claude gap-tracker closes gap on tool use', () => {
             at: preflightAt,
             level: 'partial',
             score: 0.5,
-            gaps: [{ kind: 'law', query: 'harness-eso' }],
+            gaps: [{ kind: 'law', query: 'AGENTS.md' }],
         }),
     );
 
@@ -409,7 +456,7 @@ test('claude gap-tracker closes gap on tool use', () => {
         cwd: root,
         hook_event_name: 'PostToolUse',
         tool_name: 'Read',
-        tool_input: { file_path: 'document/harness/02.harness-eso/00.index.md' },
+        tool_input: { file_path: 'AGENTS.md' },
     }, { cwd: root, tree: 'claude' });
 
     assert.equal(status, 0);
@@ -417,7 +464,7 @@ test('claude gap-tracker closes gap on tool use', () => {
         fs.readFileSync(path.join(sessionDir, '.eso-gap-closure.json'), 'utf8'),
     );
     assert.equal(closure.preflightAt, preflightAt);
-    assert.ok(closure.closedGapIds.includes('law:harness-eso'));
+    assert.ok(closure.closedGapIds.includes('law:AGENTS.md'));
 });
 
 test('claude pre-compact emits {} and records trace in .claude/session/route-trace.jsonl', () => {
