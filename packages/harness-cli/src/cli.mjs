@@ -13,6 +13,7 @@ import { runFixConsumer } from './fix-consumer-cmd.mjs';
 import { runCapabilityProbe } from './capability-probe-cmd.mjs';
 import { runVerifyHost } from './verify-host-cmd.mjs';
 import { runDshBridge } from './dsh-bridge-cmd.mjs';
+import { runDoctorDsh } from './doctor-dsh-cmd.mjs';
 import { runCheckContract } from './check-contract-cmd.mjs';
 import { runCheckTenant } from './check-tenant-cmd.mjs';
 import { runCheckMigration } from './check-migration-cmd.mjs';
@@ -32,6 +33,7 @@ function usage() {
   harnessctl fix consumer <path|--project <id>> [--dry-run] [--from-latest] [--force-provision] [--no-provision] [--strict] [--json]
   harnessctl token-diet [consumer | --project <id>] [--json]
   harnessctl capability probe [consumer | --project <id>] [--recipe <id>] [--provider <module.mjs>] [--json]
+  harnessctl doctor dsh [--profile <id>] [--home <path>] [--json]
   harnessctl dsh bridge --out <dir> [--config-path <path>] [--project-dir <dir>] [--force]
   harnessctl check contract <before.json> <after.json> [--direction response|request] [--json]
   harnessctl check tenant <file...> --tables <table,table> [--json]
@@ -86,6 +88,11 @@ async function main() {
 
     if (cmd === 'check' && argv[1] === 'contract') {
         runCheckContract(argv.slice(2));
+        return;
+    }
+
+    if (cmd === 'doctor' && argv[1] === 'dsh') {
+        runDoctorDsh(argv.slice(2));
         return;
     }
 

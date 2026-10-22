@@ -57,6 +57,9 @@ export function runDshBridge(argv = []) {
     console.log(`\nbundle written: ${result.dir}`);
     for (const file of result.files) console.log(`  ${file}`);
     console.log('\nInstall it in DSH: Plugins -> install a bundle, target = this directory.');
+    console.log('UNSAFE on the desktop app (0.2.1-rc.2): the bridge needs peerDependencies that duplicate');
+    console.log('app-shipped packages, which splits Symbol identity and kills every tool call (ATF-OPS-001).');
+    console.log('Check first: harnessctl doctor dsh --profile desktop');
     console.log('Prerequisite: the consumer has .claude/settings.json —');
     console.log('  already provisioned: harnessctl host-pack add-ide --profile claude-superset <consumer>');
     console.log('  fresh consumer:      harnessctl init profile <consumer> --host-mode claude\n');

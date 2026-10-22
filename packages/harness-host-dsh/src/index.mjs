@@ -15,6 +15,11 @@ export {
     INSTRUCTIONS_SOURCE,
 } from './cordis.mjs';
 export {
+    checkDshProfiles,
+    dshHome,
+    SYMBOL_BEARING_PACKAGES,
+} from './profile-doctor.mjs';
+export {
     buildDshBridgePatch,
     buildDshBundleManifest,
     renderBundleReadme,

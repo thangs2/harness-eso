@@ -119,8 +119,22 @@ harnessctl host-pack add-ide --profile claude-superset <consumer>
 harnessctl init profile <consumer> --host-mode claude
 \`\`\`
 
-The bundle declares \`@deepseek-ai/dsh-hooks-claude-code\` as a dependency because a DSH profile does
-not ship it; install it through DSH so the package is fetched into the profile.
+## Do not install this on the desktop app yet
+
+The bridge is not shipped inside \`app.asar\`, so it can only run with its peerDependencies present
+in the profile — and those peers include \`@deepseek-ai/dsh-tools\`, whose
+\`TOOL_RUNTIME_SCHEDULER\` is a \`Symbol()\`. A profile-local copy therefore splits Symbol identity:
+\`dsh-agent-loop\` gets \`undefined\` from \`ctx.tools[...]\` and **every tool call dies** with
+\`Cannot read properties of undefined (reading 'prepare')\`. That is ATF-OPS-001.
+
+Run the doctor before and after any install attempt; it must say \`healthy\`:
+
+\`\`\`bash
+harnessctl doctor dsh --profile desktop
+\`\`\`
+
+Blocked until upstream exposes the scheduler through the cordis context (or uses \`Symbol.for\`), so a
+duplicate module instance keeps working.
 
 ## Install
 
