@@ -37,7 +37,7 @@ function blockerView(blocker) {
 /**
  * Append one rejection record. Returns the record and the file it landed in.
  *
- * @param {{ root?: string, projectId?: string|null, host?: string, event?: string,
+ * @param {{ root?: string, projectId?: string|null, host?: string, event?: string, tool?: string|null,
  *           step?: number|null, agent?: string|null, stem?: string|null,
  *           blockers?: object[], errors?: object[], kind?: string, at?: string, file?: string }} input
  * @returns {{ record: object, file: string }}
@@ -50,6 +50,7 @@ export function appendBlockerRecord(input = {}) {
         host: input.host ?? null,
         projectId: input.projectId ?? (input.root ? projectIdFrom(input.root) || null : null),
         event: input.event ?? null,
+        tool: input.tool ?? null,
         step: input.step ?? null,
         agent: input.agent ?? null,
         stem: input.stem ?? null,
@@ -75,7 +76,8 @@ export function createBlockerRecorder(options = {}) {
     const { root, file, host = 'dsh' } = options;
     return (payload = {}) => {
         try {
-            const { record, file: written } = appendBlockerRecord({ ...payload, root, file, host });
+            // A caller that knows a more specific root (the session's consumer) wins over the default.
+            const { record, file: written } = appendBlockerRecord({ ...payload, root: payload.root ?? root, file, host });
             return { ok: true, file: written, record };
         } catch (err) {
             return { ok: false, file: file || blockerLogFile(), error: err.message };

@@ -41,6 +41,13 @@ harnessctl doctor dsh --profile desktop     # must say healthy
 The rules are the consumer's own `.harness/decision-policy.json`, read per call. A directory that is not
 an ESO consumer gets **no opinion** — the plugin never blocks a repo it was not installed for.
 
+## Audit trail
+
+Every refusal is appended to `~/.harness/eso-blockers.jsonl` (product state, append-only;
+`HARNESS_ESO_BLOCKER_LOG` overrides) — prompt rejections (`kind: hard-blocker`) and denied tool calls
+(`kind: tool-deny`, with the tool name, the path and the reason). `config.recordToolDecisions: false`
+keeps the blocks and drops the records.
+
 ## Known limits
 
 - **`ask` is not a gate on DSH**: a gated write went through under an `ask` decision, so the plugin denies

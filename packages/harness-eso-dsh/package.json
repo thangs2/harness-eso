@@ -1,6 +1,6 @@
 {
     "name": "@mu/harness-eso-dsh",
-    "version": "0.2.1",
+    "version": "0.2.3",
     "private": true,
     "type": "module",
     "description": "harness-eso as a DSH plugin \u2014 a self-contained bundle with no dependencies, mounted through the Plugins UI",

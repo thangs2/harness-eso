@@ -229,19 +229,24 @@ export function decideToolCall({ root = null, configRoot = null, sessionRoot = n
                 kind: 'deny',
                 reason: `harness-eso: ${rel} is locked by the consumer's path policy (locked tier)`,
                 path: rel,
+                /* The consumer the gate decided against, so a caller can attribute the record. */
+                root: consumer,
             };
         }
         if (mode === 'ask') {
-            return approval(`harness-eso: ${rel} needs approval (ask tier)`, rel, askMode);
+            return { ...approval(`harness-eso: ${rel} needs approval (ask tier)`, rel, askMode), root: consumer };
         }
         if (mode === 'gated') {
             const consent = consentCovers(projectId, rel);
             if (consent.ok) continue;
-            return approval(
-                `harness-eso: ${rel} is gated and has no live approval for project "${projectId || 'unknown'}"`,
-                rel,
-                askMode,
-            );
+            return {
+                ...approval(
+                    `harness-eso: ${rel} is gated and has no live approval for project "${projectId || 'unknown'}"`,
+                    rel,
+                    askMode,
+                ),
+                root: consumer,
+            };
         }
     }
     return null;

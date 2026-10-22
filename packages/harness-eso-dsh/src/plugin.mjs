@@ -22,7 +22,7 @@ import { loadDecisionPolicy } from '@mu/harness-foundation/pure';
  * facade, and those reach SQLite. The bundle must stay `node:*`-only, so this pulls exactly the three
  * modules the prompt gate needs.
  */
-import { appendBlockerRecord } from '../../harness-eso-core/src/blocker-log.mjs';
+import { appendBlockerRecord, createBlockerRecorder } from '../../harness-eso-core/src/blocker-log.mjs';
 import { loadCheckInputs, hardBlockersFromChecks } from '../../harness-eso-core/src/hard-blockers.mjs';
 import { resolveEsoPolicy } from '../../harness-eso-core/src/eso-policy.mjs';
 import { decideToolCall, findConsumerRoot } from './guards.mjs';
@@ -61,6 +61,12 @@ function makeLogger(ctx) {
  * @param {{ root?: string, onDecision?: (decision: object) => void }} [defaults]
  */
 export function createEsoDshPlugin(defaults = {}) {
+    /*
+     * One recorder for both gates: a rejection and a denied tool call are the same kind of fact, and a
+     * consumer must not have to wire two logs. Never throws — `createBlockerRecorder` reports failure.
+     */
+    const recordBlocker =
+        defaults.recordBlocker ?? createBlockerRecorder({ root: defaults.root, host: 'dsh' });
     return {
         name: 'harness-eso',
         /*
@@ -77,6 +83,8 @@ export function createEsoDshPlugin(defaults = {}) {
             const askMode = config.askMode === 'host' ? 'host' : 'deny';
             /* Row config is data; the plugin factory is the test/programmatic seam. Config wins. */
             const declaredChecks = config.checks ?? defaults.checks ?? null;
+            /* Every deny is recorded by default; a consumer that wants a quiet trail can turn it off. */
+            const recordToolDecisions = config.recordToolDecisions !== false && defaults.recordToolDecisions !== false;
             const onDecision = typeof defaults.onDecision === 'function' ? defaults.onDecision : null;
 
             /** The session's effective directory, or null when the service or session is absent. */
@@ -126,6 +134,30 @@ export function createEsoDshPlugin(defaults = {}) {
                     });
                     if (decision) {
                         report(decision, 'tools/pre-execute');
+                        /*
+                         * A denied tool call is a decision too, and the host does not log it: without
+                         * this record the only account of a blocked write is the model's own retelling.
+                         */
+                        if (recordToolDecisions && typeof recordBlocker === 'function') {
+                            // The gate already resolved the consumer; reuse it instead of guessing again.
+                            const recordRoot =
+                                decision.root ??
+                                findConsumerRoot(configRoot || sessionDirOf(exec?.agent) || process.cwd());
+                            recordBlocker({
+                                root: recordRoot || undefined,
+                                event: 'tools/pre-execute',
+                                kind: decision.kind === 'deny' ? 'tool-deny' : 'tool-ask',
+                                tool: exec?.name ?? null,
+                                blockers: [
+                                    {
+                                        source: 'policy',
+                                        kind: 'gate-decision',
+                                        ref: decision.path ?? null,
+                                        detail: decision.reason,
+                                    },
+                                ],
+                            });
+                        }
                         return { kind: decision.kind, reason: decision.reason };
                     }
                 } catch (err) {

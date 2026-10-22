@@ -364,3 +364,72 @@ test('a session outside any consumer still gets no opinion', async () => {
     );
     assert.equal(out.kind, 'allow');
 });
+
+test('a denied tool call is recorded, so the block is auditable afterwards', async () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const log = path.join(root, 'eso-blockers.jsonl');
+    await withBlockerLog(log, async () => {
+        const ctx = fakeCtx({ sessionDirs: [root] });
+        createEsoDshPlugin().apply(ctx);
+        const out = await ctx.listeners.get('tools/pre-execute')(
+            { name: 'write', arguments: { path: 'secrets/x.txt' }, agent: { session: { dirIndex: 0 } } },
+            async () => ({ kind: 'allow' }),
+        );
+        assert.equal(out.kind, 'deny');
+    });
+
+    const [record] = readBlockerRecords(log);
+    assert.equal(record.kind, 'tool-deny');
+    assert.equal(record.tool, 'write');
+    assert.equal(record.event, 'tools/pre-execute');
+    assert.equal(record.projectId, 'opt');
+    assert.equal(record.blockers[0].source, 'policy');
+    assert.equal(record.blockers[0].ref, 'secrets/x.txt');
+    assert.match(record.blockers[0].detail, /locked/);
+});
+
+test('an allowed tool call writes nothing to the trail', async () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const log = path.join(root, 'eso-blockers.jsonl');
+    await withBlockerLog(log, async () => {
+        const ctx = fakeCtx({ sessionDirs: [root] });
+        createEsoDshPlugin().apply(ctx);
+        await ctx.listeners.get('tools/pre-execute')(
+            { name: 'write', arguments: { path: 'src/app.js' }, agent: { session: { dirIndex: 0 } } },
+            async () => ({ kind: 'allow' }),
+        );
+    });
+    assert.deepEqual(readBlockerRecords(log), []);
+});
+
+test('recordToolDecisions can be turned off for a quiet trail', async () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const log = path.join(root, 'eso-blockers.jsonl');
+    await withBlockerLog(log, async () => {
+        const ctx = fakeCtx({ sessionDirs: [root] });
+        createEsoDshPlugin({ recordToolDecisions: false }).apply(ctx);
+        const out = await ctx.listeners.get('tools/pre-execute')(
+            { name: 'write', arguments: { path: 'secrets/x.txt' }, agent: { session: { dirIndex: 0 } } },
+            async () => ({ kind: 'allow' }),
+        );
+        assert.equal(out.kind, 'deny', 'the block still happens; only the record is off');
+    });
+    assert.deepEqual(readBlockerRecords(log), []);
+});
+
+test('the trail names the consumer even when no session directory is available', async () => {
+    // Absolute target, no injected service: the gate resolves the consumer from the path, and the record
+    // must carry the same project id rather than null.
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const log = path.join(root, 'eso-blockers.jsonl');
+    await withBlockerLog(log, async () => {
+        const ctx = fakeCtx();
+        createEsoDshPlugin().apply(ctx);
+        const out = await ctx.listeners.get('tools/pre-execute')(
+            { name: 'write', arguments: { path: path.join(root, 'secrets/x.txt') } },
+            async () => ({ kind: 'allow' }),
+        );
+        assert.equal(out.kind, 'deny');
+    });
+    assert.equal(readBlockerRecords(log)[0].projectId, 'opt');
+});
