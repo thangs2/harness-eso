@@ -71,14 +71,58 @@ function loadLatest(root) {
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
+/**
+ * The operator-facing docs a consumer is seeded with. `fix` refreshes all of them, not only the guide:
+ * a checklist that describes a `diagnostics.sh` from an older release is worse than one that says
+ * nothing, because the operator follows it and the commands do not match.
+ */
+const CONSUMER_DOCS = [
+  { src: ['WORKFLOW_GUIDE.md'], rel: '.harness/WORKFLOW_GUIDE.md', exec: false },
+  { src: ['ONBOARDING.md'], rel: '.harness/ONBOARDING.md', exec: false },
+  { src: ['diagnostics.sh'], rel: '.harness/diagnostics.sh', exec: true },
+];
+
 function syncWorkflowGuide(root, dryRun) {
-  const src = path.join(ESO_ROOT, 'profiles', 'templates', 'WORKFLOW_GUIDE.md');
-  const dest = path.join(root, '.harness', 'WORKFLOW_GUIDE.md');
-  if (!fs.existsSync(src)) return { ok: false, detail: `template missing: ${src}` };
-  if (dryRun) return { ok: true, detail: `dry-run: would copy WORKFLOW_GUIDE → ${dest}` };
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(src, dest);
-  return { ok: true, detail: `synced WORKFLOW_GUIDE.md` };
+  const synced = [];
+  const missing = [];
+  for (const doc of CONSUMER_DOCS) {
+    const src = path.join(ESO_ROOT, 'profiles', 'templates', ...doc.src);
+    if (!fs.existsSync(src)) {
+      missing.push(doc.rel);
+      continue;
+    }
+    synced.push(doc);
+  }
+  if (!synced.length) return { ok: false, detail: `templates missing: ${missing.join(', ')}` };
+  if (dryRun) {
+    return { ok: true, detail: `dry-run: would copy ${synced.map((d) => d.rel).join(', ')}` };
+  }
+  for (const doc of synced) {
+    const dest = path.join(root, doc.rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(path.join(ESO_ROOT, 'profiles', 'templates', ...doc.src), dest);
+    if (doc.exec) {
+      try {
+        fs.chmodSync(dest, 0o755);
+      } catch {
+        /* Windows: file modes are not the entrypoint */
+      }
+    }
+  }
+  const detail = `synced ${synced.map((d) => d.rel.split('/').pop()).join(', ')}`;
+  return { ok: true, detail: missing.length ? `${detail} (missing: ${missing.join(', ')})` : detail, synced: synced.map((d) => d.rel) };
+}
+
+/**
+ * Refresh only the docs an operator reads, without touching policy, hooks or session dirs.
+ *
+ * `harnessctl fix consumer` derives its work from failing maturity checks, so a consumer whose T1.1
+ * passes never picks up a newer checklist or a newer `diagnostics.sh`. Those two files are how the
+ * operator finds out what changed, so they have to be refreshable on their own — and that is the only
+ * reason this action exists.
+ */
+export function syncConsumerDocs(root, { dryRun = false } = {}) {
+  return syncWorkflowGuide(root, dryRun);
 }
 
 function syncSessionDirs(root, dryRun) {
@@ -227,8 +271,7 @@ function applySafe(root, consumerId, fails, opts) {
   if (needWorkflow) {
     const r = syncWorkflowGuide(root, opts.dryRun);
     applied.push({ action: 'sync-workflow-guide', checks: ['T1.1'], ...r });
-  }
-  if (needSessions) {
+  }  if (needSessions) {
     const r = syncSessionDirs(root, opts.dryRun);
     applied.push({ action: 'sync-session-dirs', checks: ['T1.2'], ...r });
   }

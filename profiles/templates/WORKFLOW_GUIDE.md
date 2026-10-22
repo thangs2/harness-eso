@@ -7,6 +7,10 @@
 >
 > Hướng dẫn này **generic**: nó mô tả harness-eso, không mô tả workflow riêng của một dự án nào. Quy
 > trình nội bộ của bạn (Jira, SDLC, wave…) thuộc tài liệu của chính repo bạn.
+>
+> **File này là reference, không phải checklist.** Nếu bạn vừa provision xong và cần biết *làm gì, theo
+> thứ tự nào*, đọc [`ONBOARDING.md`](./ONBOARDING.md) cùng thư mục rồi chạy `./.harness/diagnostics.sh`.
+> Quay lại đây khi cần hiểu **vì sao** một cơ chế hoạt động như vậy.
 
 ---
 
@@ -197,6 +201,7 @@ Tất cả chạy từ checkout harness-eso (hoặc `harnessctl` nếu đã cài
 
 | Việc | Lệnh |
 |---|---|
+| **Biết mình đang thiếu gì** | `./.harness/diagnostics.sh` (theo layer; `--json` cho CI) |
 | Provision consumer | `harnessctl init profile <path> --host-mode dual-ide` |
 | Thêm một IDE vào consumer đã có | `harnessctl host-pack add-ide <path> --profile claude-superset` |
 | Gỡ một IDE, giữ hook của bạn | `harnessctl host-pack remove-ide <path> --ide claude` |
@@ -263,7 +268,7 @@ package dir** → `harnessctl doctor dsh`. Sửa code plugin phải `remove_bund
 | Evidence luôn `insufficient` | provider không truy cập được (MCP/docgraph) | `harnessctl capability probe .` |
 | Write bị chặn dù file vô hại | path rơi vào `locked`/`gated` theo policy hiện tại | `harnessctl verify consumer . --strict` |
 | Mọi tool call trong DSH chết với `prepare` | profile có bản sao package app đã ship | `harnessctl doctor dsh` → `pathology-present` |
-| Guide này cũ | template đã đổi, consumer chưa sync | `harnessctl fix consumer . --no-provision` |
+| Guide này cũ | template đã đổi, consumer chưa sync | `harnessctl fix docs .` |
 
 Nếu `doctor dsh` báo `pathology-present`: **dừng**, đừng cài thêm plugin, xử lý theo hướng dẫn của
 lệnh đó (gỡ dependency trùng / cách ly `node_modules`) rồi mới chạy lại.
@@ -288,7 +293,7 @@ File này được copy từ `profiles/templates/WORKFLOW_GUIDE.md` của harnes
 không tự cập nhật. Sau khi nâng cấp harness-eso:
 
 ```bash
-harnessctl fix consumer . --no-provision     # sync guide + session dirs, không đổi policy
+harnessctl fix docs .     # sync guide + checklist + diagnostics.sh, không đổi policy
 ```
 
 Không sửa trực tiếp file này trong consumer: lần sync sau sẽ ghi đè.

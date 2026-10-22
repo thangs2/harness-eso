@@ -335,6 +335,48 @@ export function ensureConsumerWorkflowGuide(root) {
 }
 
 /**
+ * Seed the two artefacts an operator reads after a provision: the layer checklist and the read-only
+ * diagnostic it tells them to run.
+ *
+ * `WORKFLOW_GUIDE.md` explains how the harness works, which is the wrong shape for "I just installed
+ * this, what do I do now": an operator needs an ordered list per layer and one command that reports
+ * which layer is wrong. The guide is a reference, this is the entry point, and neither replaces the
+ * other. Both are copied **only when absent** — a consumer that edited its own copy keeps it.
+ *
+ * `diagnostics.sh` is written executable: a script the operator has to `chmod` is a script that
+ * reports "permission denied" on the one run that mattered.
+ *
+ * @param {string} root consumer root
+ * @returns {{relative: string, action: string}[]}
+ */
+export function ensureConsumerOnboarding(root) {
+    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
+    const harnessDir = path.join(root, '.harness');
+    const files = [
+        { src: ['templates', 'ONBOARDING.md'], rel: '.harness/ONBOARDING.md', exec: false },
+        { src: ['templates', 'diagnostics.sh'], rel: '.harness/diagnostics.sh', exec: true },
+    ];
+    const actions = [];
+    fs.mkdirSync(harnessDir, { recursive: true });
+    for (const file of files) {
+        const src = path.join(baseProfiles, ...file.src);
+        if (!fs.existsSync(src)) continue;
+        const dest = path.join(root, file.rel);
+        if (fs.existsSync(dest)) continue;
+        fs.copyFileSync(src, dest);
+        if (file.exec) {
+            try {
+                fs.chmodSync(dest, 0o755);
+            } catch {
+                /* Windows: the mode is meaningless and bash is not the entrypoint there */
+            }
+        }
+        actions.push({ relative: file.rel, action: 'created' });
+    }
+    return actions;
+}
+
+/**
  * Ensure Claude Code baseline integration exists in consumer:
  * 1. CLAUDE.md with law-gate marker pointing to AGENTS.md
  * 2. .mcp.json at root copied from .cursor/mcp.json if missing
@@ -702,6 +744,7 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
         ...installHostPack(root).actions,
         writeSidecarEnv(root, profileIds, port),
         ...ensureConsumerWorkflowGuide(root),
+        ...ensureConsumerOnboarding(root),
     ];
 
     const sidecarUrl = `http://127.0.0.1:${port}`;

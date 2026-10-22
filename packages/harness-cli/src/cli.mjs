@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import path from 'node:path';
 import { loadConfig } from '@mu/harness-observe-server';
 import { applyWorkspaceEnv } from './workspace-env.mjs';
 import { runObservatory } from './observatory-cmd.mjs';
@@ -31,6 +32,7 @@ function usage() {
   harnessctl verify consumer <path|--project <id>> [--json] [--strict] [--out <dir>]
   harnessctl verify host [consumer | --project <id>] [--recipe <id>] [--require-native] [--json]
   harnessctl fix consumer <path|--project <id>> [--dry-run] [--from-latest] [--force-provision] [--no-provision] [--strict] [--json]
+  harnessctl fix docs [consumer] [--dry-run]
   harnessctl token-diet [consumer | --project <id>] [--json]
   harnessctl capability probe [consumer | --project <id>] [--recipe <id>] [--provider <module.mjs>] [--json]
   harnessctl doctor dsh [--profile <id>] [--home <path>] [--json]
@@ -191,6 +193,22 @@ async function main() {
     if (cmd === 'fix' && argv[1] === 'consumer') {
         runFixConsumer(argv.slice(2));
         return;
+    }
+
+    /*
+     * `fix docs` exists on its own because `fix consumer` only acts on failing checks, and a consumer
+     * that passes T1.1 would never pick up a newer checklist or diagnostic script. Those files are how
+     * an operator learns what changed, so refreshing them must not depend on them being out of date.
+     */
+    if (cmd === 'fix' && argv[1] === 'docs') {
+        const rest = argv.slice(2);
+        const dryRun = rest.includes('--dry-run');
+        const positional = rest.filter((a) => !a.startsWith('-'));
+        const root = path.resolve(positional[0] || process.cwd());
+        const { syncConsumerDocs } = await import('./fix-consumer-cmd.mjs');
+        const result = syncConsumerDocs(root, { dryRun });
+        console.log(JSON.stringify({ root, ...result }, null, 2));
+        process.exit(result.ok ? 0 : 1);
     }
 
     usage();
