@@ -108,7 +108,13 @@ async function main() {
             console.error('usage: harnessctl capability probe [consumer | --project <id>] [--recipe <id>] [--provider <module.mjs>] [--json]');
             process.exit(2);
         }
-        await runCapabilityProbe(argv.slice(2));
+        /*
+         * `argv.slice(3)`, not `slice(2)`: the verb 'probe' is already consumed, and forwarding it made
+         * the subcommand's parser read it as the positional consumer — so `capability probe <path>` ran
+         * the probe against a directory named "probe", and `capability probe` alone died on it. The
+         * usage line above has always promised a positional consumer.
+         */
+        await runCapabilityProbe(argv.slice(3));
         return;
     }
 

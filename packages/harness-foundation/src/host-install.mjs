@@ -41,11 +41,16 @@ const GITIGNORE_MARKER = '# harness-eso: files this tool writes that must be com
 const GITIGNORE_ADMIT = [
     '!.gitignore',
     '!README.md',
-];
-const GITIGNORE_DENY = new Set([
+    /*
+     * The guide, the checklist and the diagnostic script are as much provisioned content as the host
+     * pack: a consumer's clone that has the hooks but not the "what do I do now" is unusable in the
+     * same way. `diagnostics.sh` also needs its executable bit committed.
+     */
     '!decision-policy.json',
     '!integrations.json',
     '!WORKFLOW_GUIDE.md',
+    '!ONBOARDING.md',
+    '!diagnostics.sh',
     '!sidecar.env',
     '!sidecar.env.example',
     '!eso-coverage.json',
@@ -53,7 +58,13 @@ const GITIGNORE_DENY = new Set([
     '!host-install-state.json',
     '!host-pack/',
     '!host-pack/**',
-]);
+];
+/*
+ * Lines removed rather than written. Nothing to deny today — the historical entry was a typo'd
+ * `!WORKFLOW_GUIDE.md` under prose that claimed it was admitted, which is precisely the drift the
+ * single admit list now prevents.
+ */
+const GITIGNORE_DENY = new Set([]);
 
 /**
  * Ensure `.harness/.gitignore` ignores all runtime and provisioned files.

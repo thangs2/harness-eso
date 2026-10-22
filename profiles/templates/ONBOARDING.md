@@ -138,7 +138,11 @@ Ba nguồn, ba loại bằng chứng, **không thay thế nhau**:
 |---|---|---|---|
 | law | `docgraph-cli` | "luật/hợp đồng nói gì?" | gap `law:*` không đóng được → write bị chặn |
 | code | `codegraph-cli` | "code này gọi ai, đổi nó vỡ gì?" | gap `code:*` không đóng được |
-| memory | `agentmemory-mcp` | "phiên trước đã quyết gì?" | **opt-in** — không khai thì resolve `none`, không lỗi |
+| memory | `agentmemory-mcp` | "phiên trước đã quyết gì?" | **opt-in** — không khai thì resolve `none`; diagnostic báo tên kind, bạn quyết định |
+
+> **`reason=none` ở `memory` là WARN, không phải BLOCKER** — nhưng nếu bạn *đã khai* `agentmemory` trong
+> `mcp.json` mà probe vẫn trả `none`, đó là cấu hình sai và gap `memory:*` sẽ không bao giờ đóng. Diagnostic
+> liệt kê **mọi** kind chết, không chỉ cái đầu tiên, nên đọc dòng `L3:capability` để biết chính xác cái nào.
 
 **Phải đúng:**
 
@@ -203,8 +207,11 @@ docgraph build                           # nếu chưa có .docgraph
 | Hạng mục | Điều kiện | Vì sao |
 |---|---|---|
 | `tokenDiet.enabled` | `true` | không bật = **mọi** rule load eagerly, mỗi lượt |
-| `tokenDiet.maxEagerRules` | số rule file ≤ trần | trần không ai đo là một lời khai |
+| `tokenDiet.maxEagerRules` | số **rule eager** ≤ trần | eager = `alwaysApply: true`, hoặc **không** khai `globs` |
 | `tokenDiet.maxEagerTokens` | có giá trị | ngân sách context cho rule |
+
+> Số rule trong thư mục **không phải** số eager. x79 có 50 file rule ở `.cursor/rules` nhưng chỉ 4 cái
+> load eagerly; 46 cái còn lại khai `globs` nên chỉ nạp khi đụng đúng path. Đếm file là đo sai đại lượng.
 
 **Kiểm:** `./.harness/diagnostics.sh L5` · `harnessctl token-diet . --json`
 

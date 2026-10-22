@@ -396,7 +396,7 @@ test('add-ide rejects an unknown profile and names the shipped ones', () => {
 // Clone survivability: the pack must be committable
 // ---------------------------------------------------------------------------
 
-test('provision keeps the host pack gitignored in a consumer .harness/.gitignore', () => {
+test('provision admits the host pack, and still ignores runtime state, in a consumer .harness/.gitignore', () => {
     const root = tempConsumer();
     fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
     fs.writeFileSync(
@@ -407,9 +407,14 @@ test('provision keeps the host pack gitignored in a consumer .harness/.gitignore
     installHostPack(root);
 
     const rules = fs.readFileSync(path.join(root, '.harness/.gitignore'), 'utf8');
-    assert.doesNotMatch(rules, /^!host-pack\//m, 'the pack directory must stay gitignored');
-    assert.doesNotMatch(rules, /^!host-pack\/\*\*/m, 'and its contents');
-    assert.doesNotMatch(rules, /^!host-install-state\.json$/m, 'host-install-state must stay gitignored');
+    /*
+     * The pack must be *admitted*, not excluded. A clone whose `hooks.json` points at
+     * `.harness/host-pack/harness-hook.mjs` that git never carried has every guard failing closed,
+     * which makes the consumer's IDE unusable — the failure this whole list exists to prevent.
+     */
+    assert.match(rules, /^!host-pack\/$/m, 'the pack directory must be committed');
+    assert.match(rules, /^!host-pack\/\*\*$/m, 'and its contents');
+    assert.doesNotMatch(rules, /^!harness\.db$/m, 'runtime state must stay ignored');
     assert.match(rules, /^\*$/m, 'the blanket ignore must survive');
 });
 
@@ -436,8 +441,9 @@ test('a consumer with no .harness/.gitignore gets the convention plus our rules'
     installHostPack(root);
     const rules = fs.readFileSync(path.join(root, '.harness/.gitignore'), 'utf8');
     assert.match(rules, /^\*$/m, 'runtime state must be ignored by default');
-    assert.doesNotMatch(rules, /^!decision-policy\.json$/m, 'decision-policy must stay gitignored');
-    assert.doesNotMatch(rules, /^!host-pack\/\*\*$/m, 'host-pack must stay gitignored');
+    assert.match(rules, /^!decision-policy\.json$/m, 'decision-policy must be committed — hooks read it');
+    assert.match(rules, /^!host-pack\/\*\*$/m, 'host-pack must be committed — hooks import it');
+    assert.match(rules, /^!diagnostics\.sh$/m, 'the diagnostic is operator-facing content, not state');
 });
 
 test('both superset profiles wire the same hook implementations', () => {

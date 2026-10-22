@@ -13,8 +13,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { ensureConsumerOnboarding } from '../packages/harness-foundation/src/host-install.mjs';
+import { ensureConsumerOnboarding, ensureHarnessGitignore } from '../packages/harness-foundation/src/host-install.mjs';
 import { syncConsumerDocs } from '../packages/harness-cli/src/fix-consumer-cmd.mjs';
+import { runCapabilityProbe } from '../packages/harness-cli/src/capability-probe-cmd.mjs';
 
 const ESO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATES = path.join(ESO_ROOT, 'profiles', 'templates');
@@ -196,5 +197,98 @@ test('the checklist only names harnessctl commands the CLI implements', () => {
             inline || routedInline || guarded || routedRunner,
             `checklist names "harnessctl ${cmd}" but the CLI does not dispatch it`,
         );
+    }
+});
+
+/*
+ * The three rows below exist because a real consumer reported the wrong thing while the product
+ * reported the right one. A diagnostic that disagrees with the tool it summarises is worse than no
+ * diagnostic: the operator fixes the measurement instead of the consumer.
+ */
+
+/** A consumer with the only rules that matter for the eager count: frontmatter decides, not the name. */
+function seedRules(root) {
+    const dir = path.join(root, '.cursor', 'rules');
+    fs.mkdirSync(dir, { recursive: true });
+    // 12 eager rules, 30 lazy ones: a file count says 42 (fail at ceiling 7), the frontmatter says 12.
+    for (let i = 0; i < 12; i += 1) {
+        fs.writeFileSync(path.join(dir, `core.eager-${i}.mdc`), `---\nalwaysApply: true\n---\n# rule ${i}\n`);
+    }
+    for (let i = 0; i < 30; i += 1) {
+        fs.writeFileSync(path.join(dir, `scope.lazy-${i}.mdc`), `---\nglobs: src/**\n---\n# rule ${i}\n`);
+    }
+}
+
+test('L5 counts eager rules by frontmatter, not by file count', () => {
+    const root = tempRoot();
+    ensureConsumerOnboarding(root);
+    fs.writeFileSync(
+        path.join(root, '.harness/decision-policy.json'),
+        JSON.stringify({ tokenDiet: { enabled: true, maxEagerRules: 20, maxEagerTokens: 10000 } }),
+    );
+    seedRules(root);
+
+    const rows = JSON.parse(runScript(root, ['L5', '--json']).stdout).layers.L5;
+    const ceiling = rows.find((r) => r.id === 'L5:eager-rules');
+    assert.equal(ceiling.status, 'PASS', '42 files but 12 eager rules is under a ceiling of 20');
+    assert.match(ceiling.detail, /12 eager/);
+    assert.ok(
+        rows.some((r) => r.id === 'L5:tree:cursor' && /12 eager, 30 lazy/.test(r.detail)),
+        'the per-tree split must come from the scanner',
+    );
+});
+
+test('L3 fails when any provider kind resolves to none, not only the first', () => {
+    const root = tempRoot();
+    ensureConsumerOnboarding(root);
+    // Real report shape: law/code resolve, memory/verifier/reasoner do not. Checking a single
+    // `"selected": null` match anywhere would pass or fail by luck of ordering; naming the kinds is
+    // the only version an operator can act on.
+    const report = {
+        kinds: [
+            { kind: 'law', selected: { id: 'docgraph-cli' }, reason: 'default' },
+            { kind: 'code', selected: { id: 'codegraph-cli' }, reason: 'default' },
+            { kind: 'memory', selected: null, reason: 'none' },
+            { kind: 'reasoner', selected: null, reason: 'none' },
+        ],
+    };
+    const stub = path.join(root, 'stub-harnessctl.mjs');
+    fs.writeFileSync(
+        stub,
+        `import fs from 'node:fs';\nconsole.log(fs.readFileSync(${JSON.stringify(
+            path.join(root, 'probe.json'),
+        )}, 'utf8'));\n`,
+    );
+    fs.writeFileSync(path.join(root, 'probe.json'), JSON.stringify(report));
+    const bin = path.join(root, 'bin');
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, 'harnessctl'), `#!/bin/sh\nexec node ${JSON.stringify(stub)}\n`, { mode: 0o755 });
+
+    const res = runScript(root, ['L3', '--json'], { PATH: `${bin}:${process.env.PATH}` });
+    const row = JSON.parse(res.stdout).layers.L3.find((r) => r.id === 'L3:capability');
+    assert.equal(row.status, 'FAIL');
+    assert.match(row.detail, /memory\(none\)/);
+    assert.match(row.detail, /reasoner\(none\)/);
+});
+
+test('capability probe accepts a positional consumer instead of treating it as the verb', async () => {
+    /*
+     * The usage line has always advertised `capability probe [consumer]`, but the dispatcher forwarded
+     * `argv.slice(2)` — verb included — so the subcommand read "probe" as the consumer path. Every
+     * caller that passed a path (including this diagnostic) got a probe of a directory named "probe".
+     */
+    const root = tempRoot();
+    fs.writeFileSync(path.join(root, 'harness.config.json'), '{}');
+    fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
+    const report = await runCapabilityProbe([root, '--json']);
+    assert.equal(report.root, path.resolve(root));
+});
+
+test('the seeded checklist and diagnostic are committed, not trapped by .harness/.gitignore', () => {
+    const root = tempRoot();
+    ensureHarnessGitignore(root);
+    const body = fs.readFileSync(path.join(root, '.harness', '.gitignore'), 'utf8');
+    for (const f of ['ONBOARDING.md', 'diagnostics.sh']) {
+        assert.match(body, new RegExp(`^!${f.replace('.', '\\.')}$`, 'm'), `${f} must be admitted`);
     }
 });

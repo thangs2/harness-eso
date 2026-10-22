@@ -89,12 +89,38 @@ json_get() {
     return 1
 }
 
-# Rule files a host tree would load eagerly. Counted once: both the "this tree has rules" row and the
-# token-diet ceiling row measure the same thing, and measuring it twice is how the two drift.
-rule_count() {
-    local dir="$1"
-    [ -d "$dir" ] || { echo 0; return; }
-    find "$dir" -maxdepth 1 \( -name '*.mdc' -o -name '*.md' \) 2>/dev/null | wc -l | tr -d ' '
+# The consumer's rules directory per host tree. Kept in one place because "where do rules live" is
+# asked by L2, L5 and the token-diet scan, and three answer sites is three answers.
+rules_dir() {
+    case "$1" in
+        cursor) printf '%s' "$(rel .cursor/rules)" ;;
+        agents) printf '%s' "$(rel .agents/rules)" ;;
+        claude) printf '%s' "$(rel .claude/rules)" ;;
+        *) return 1 ;;
+    esac
+}
+
+# Ask the product's own scanner for the eager/lazy split instead of counting files.
+#
+# Counting every `.mdc` is not the same question. A rule is *eager* only when it says
+# `alwaysApply: true` or declares no globs — x79 has 50 cursor rule files and 4 eager ones. The file
+# count therefore reported 109 eager rules against a ceiling of 7 and told the operator to re-scope
+# globs that were already scoped. Worse, it disagreed with `harnessctl token-diet` on the same repo,
+# and when a diagnostic contradicts the tool it is supposed to summarise, the diagnostic is wrong.
+#
+# Prints `eager lazy` for one tree, or non-zero when the scanner cannot answer (no node, no checkout).
+token_diet_counts() {
+    local tree="$1"
+    [ -n "${HARNESS_ESO_ROOT:-}" ] || return 1
+    [ -f "${HARNESS_ESO_ROOT}/packages/harness-foundation/src/token-diet.mjs" ] || return 1
+    have node || return 1
+    node --input-type=module -e '
+        const { pathToFileURL } = await import("node:url");
+        const { scanTokenDiet } = await import(pathToFileURL(process.argv[1]).href);
+        const report = scanTokenDiet(process.argv[2]).trees[process.argv[3]];
+        if (!report) process.exit(2);
+        process.stdout.write(`${report.eagerRules.length} ${report.lazyRules.length}`);
+    ' "${HARNESS_ESO_ROOT}/packages/harness-foundation/src/token-diet.mjs" "$ROOT" "$tree" 2>/dev/null
 }
 
 count_lines() { [ -f "$1" ] && wc -l <"$1" | tr -d ' ' || echo 0; }
@@ -171,7 +197,9 @@ l2() {
     for tree in cursor agents claude; do
         local dir=".$tree/rules"
         [ -d "$(rel "$dir")" ] || continue
-        n=$(rule_count "$(rel "$dir")")
+        # "Does this tree have rules at all" is a file-count question, not an eager/lazy one: one
+        # always-apply rule is still a configured tree.
+        n=$(find "$(rel "$dir")" -maxdepth 1 \( -name '*.mdc' -o -name '*.md' \) ! -iname 'readme.md' 2>/dev/null | wc -l | tr -d ' ')
         if [ "$n" -gt 0 ]; then
             _record L2 INFO "L2:rules:$tree" PASS "$n rule file(s) in $dir" ""
         else
@@ -235,15 +263,33 @@ l3() {
     done
 
     if [ -n "$HARNESSCTL" ]; then
-        local out
+        local out missing
         out=$(run_harnessctl capability probe "$ROOT" --json)
+        # Every kind, not just the first one that failed to resolve. Checking a single match meant a
+        # chain with `law`/`code` selected but `agentmemory`/`reasoner` dead reported PASS — the exact
+        # gap this row exists to surface.
+        missing=$(printf '%s' "$out" | node -e '
+            let raw = "";
+            process.stdin.on("data", (d) => { raw += d; });
+            process.stdin.on("end", () => {
+                let report;
+                try { report = JSON.parse(raw); } catch { process.stdout.write(""); return; }
+                process.stdout.write((report.kinds || [])
+                    .filter((k) => !k.selected)
+                    .map((k) => k.kind + "(" + k.reason + ")")
+                    .join(", "));
+            });
+        ' 2>/dev/null)
         case "$out" in
-            *'"selected": null'*|'')
-                _record L3 WARN "L3:capability" FAIL "a provider resolved to none — evidence for that kind cannot be collected" \
-                    "harnessctl capability probe . --verbose; check docgraph/codegraph are on PATH"
-                ;;
+            '')  _record L3 WARN "L3:capability" FAIL "capability probe produced no report" \
+                     "harnessctl capability probe $ROOT --json" ;;
             *)
-                _record L3 INFO "L3:capability" PASS "provider chain resolves (mind-set: $mode)" ""
+                if [ -n "$missing" ]; then
+                    _record L3 WARN "L3:capability" FAIL "no provider for: $missing — that evidence cannot be collected" \
+                        "install the adapter on PATH or declare it in decision-policy capabilities"
+                else
+                    _record L3 INFO "L3:capability" PASS "every provider kind resolves (mind-set: $mode)" ""
+                fi
                 ;;
         esac
     else
@@ -306,17 +352,32 @@ l5() {
             "set tokenDiet.enabled=true (harnessctl fix consumer . → provision seeds it)"
     fi
 
-    # Count what the diet is supposed to bound. A ceiling nobody measures is a claim.
-    local eager=0 tree
-    for tree in cursor agents claude; do
-        eager=$((eager + $(rule_count "$(rel ".$tree/rules")")))
-    done
-    if [ -n "$max_rules" ] && [ "$max_rules" != "null" ]; then
-        if [ "$eager" -le "$max_rules" ]; then
-            _record L5 WARN "L5:eager-rules" PASS "$eager rule file(s) ≤ ceiling $max_rules" ""
+    /*
+     * Measure what the diet actually bounds: rules the host loads *eagerly*. A ceiling nobody measures
+     * is a claim — but so is one measured on the wrong quantity, and counting files failed a repo whose
+     * eager set was a fifth of its rule count.
+     */    local eager="" tree counts scratch eager_n lazy_n
+    for tree in cursor agents; do
+        [ -d "$(rules_dir "$tree")" ] || continue
+        if counts=$(token_diet_counts "$tree"); then
+            eager_n="${counts%% *}"; lazy_n="${counts##* }"
+            eager=$(( ${eager:-0} + eager_n ))
+            _record L5 INFO "L5:tree:$tree" PASS "$eager_n eager, $lazy_n lazy (frontmatter)" ""
         else
-            _record L5 WARN "L5:eager-rules" FAIL "$eager rule file(s) > ceiling $max_rules" \
-                "scope rules per path (glob) instead of loading all of them, or raise maxEagerRules deliberately"
+            # No scanner: fall back to the raw count, but say so. A silently different number is how
+            # the diagnostic and `harnessctl token-diet` end up disagreeing on the same consumer.
+            scratch=$(find "$(rules_dir "$tree")" -maxdepth 1 -name '*.mdc' 2>/dev/null | wc -l | tr -d ' ')
+            eager=$(( ${eager:-0} + scratch ))
+            _record L5 INFO "L5:tree:$tree" SKIP "$scratch file(s), eager/lazy unknown" \
+                "export HARNESS_ESO_ROOT=/path/to/harness-eso for the frontmatter split"
+        fi
+    done
+    if [ -n "$max_rules" ] && [ "$max_rules" != "null" ] && [ -n "$eager" ]; then
+        if [ "$eager" -le "$max_rules" ]; then
+            _record L5 WARN "L5:eager-rules" PASS "$eager eager rule(s) ≤ ceiling $max_rules" ""
+        else
+            _record L5 WARN "L5:eager-rules" FAIL "$eager eager rule(s) > ceiling $max_rules" \
+                "set alwaysApply:false + globs on the rules that do not need to load everywhere, or raise maxEagerRules deliberately"
         fi
     fi
     if [ -n "$max_tokens" ] && [ "$max_tokens" != "null" ]; then
