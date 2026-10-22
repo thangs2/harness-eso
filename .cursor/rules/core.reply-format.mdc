@@ -1,0 +1,42 @@
+---
+description: Reply output format — plain markdown, never a JSON envelope
+alwaysApply: true
+---
+# Reply output format — the answer is text, not a serialization envelope
+
+**Prerequisite:** `core.law-gate.mdc` (`AGENTS.md` Read this session).
+
+## The requirement
+
+The user reads the assistant's final message directly. It must be **plain markdown text** — the same
+bytes a human would type.
+
+Never send the message inside an object or array:
+
+    Forbidden:  {"text": "...", "type": "text"}
+    Forbidden:  [{"text": "...", "type": "text"}]
+    Forbidden:  any nesting of the above
+
+This is not a style preference. The harness sometimes serializes a response one or more times, and the
+user sees `{"text": "[{\"text\": ...}]"}` instead of the answer. It has happened repeatedly, so "be
+careful" is not an acceptable control. Two mechanisms enforce it instead:
+
+| Mechanism | Role |
+|---|---|
+| `.cursor/hooks/detect-json-wrapper.mjs` + `.cursor/hooks.json` | Runs `afterAgentResponse`; parses the whole response as JSON and, *only* when it is an envelope, returns an `agent_message` telling the model to resend as plain text. Fail-open. |
+| `qc/output-wrapper.test.mjs` | Pins the three real samples **and** the negatives, so the detector cannot start firing on legitimate JSON inside a fenced code block. |
+
+## Rules for the response body
+
+* Prose, tables, lists and fenced code blocks are fine. Show JSON **inside** a fence — never *as* the
+  message.
+* Do not emit a JSON object or array as the top-level structure of the reply for any reason, including
+  "structured" answers, tool-like payloads, or checklists.
+* If a previous turn was wrapped, do not apologise at length — resend the same content as text.
+
+## Changing the detector
+
+It fires only when the **entire** trimmed response parses as `{text,type}` or `[{text,type}, …]`.
+Ordinary markdown, prose starting with `{`, and fenced JSON blocks are explicit negative test cases;
+keep them passing when touching the matcher. The unwrapper must terminate on malformed input — it is
+called on text that already failed once.
