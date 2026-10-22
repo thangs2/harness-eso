@@ -10,6 +10,7 @@ IDE Agent session
   → core.law-gate.mdc  — step 1: Read AGENTS.md (mandatory)
   → AGENTS.md          — supreme SoT
   → core.workspace-isolation → core.harness-agents → core.harness-product
+  → core.entrypoints (operator actions only via ./deploy.sh · provision.sh · verify-consumer.sh · console.sh)
   → glob rules / skills (must not contradict AGENTS.md)
 ```
 

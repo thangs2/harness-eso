@@ -6,6 +6,8 @@ Repo này **ship** sản phẩm Harness ESO (`@mu/harness-*`). Agent làm việc
 
 **Cursor Windows:** mở **folder gốc = harness-eso**; xem `docs/02.cursor-windows.md`. Docker: `./deploy.sh <consumer>` · `./console.sh up`.
 
+**Operator entrypoints (forced):** hành động trên consumer **chỉ** qua `./deploy.sh`, `./provision.sh`, `./verify-consumer.sh`, `./console.sh` (Windows: `harness.ps1 <command>`). Không gọi `node`/`bun`/`docker` trực tiếp để thay một bước của script — chi tiết `.cursor/rules/core.entrypoints.mdc`.
+
 **Cursor agent (forced):** IDE loads `.cursor/rules/` → **`core.law-gate.mdc`** bắt buộc **Read file này (`AGENTS.md`)** mỗi phiên trước khi làm việc; rule khác chỉ bổ sung, không thay law. Catalog: `.cursor/instructions.md` · MCP `.cursor/mcp.json` (`docs/03.cursor-mcp.md`).
 
 **Documentation pack (đọc trước khi sửa luồng dữ liệu):** `documents/00.README.md` — mô tả sản phẩm là gì, chạy thế nào, và **`documents/05.development/02.invariants.md`** liệt kê các bất biến kèm defect đã sinh ra chúng. Đây là gói bàn giao độc lập: không cần đọc repo consumer để hiểu sản phẩm.
@@ -27,6 +29,7 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 | Nguồn | Khi dùng | Gợi ý |
 |--------|-----------|--------|
 | **Codegraph** | Luồng gọi, symbol, blast radius trong **product** | MCP `codegraph` trong **`.cursor/mcp.json`** (index harness-eso). `codegraph_explore` · `projectPath` = root harness-eso; consumer-only → `../x79`. Không `.codegraph/` → `codegraph init -i` hoặc Read/Grep. |
+| **Reply output** | Mọi câu trả lời | Rule `core.reply-format.mdc`: plain markdown, **không** bọc `{text,type}`. Hook `.cursor/hooks/detect-json-wrapper.mjs` (`afterAgentResponse`) phát hiện + nhắc gửi lại; test `qc/output-wrapper.test.mjs`. |
 | **Docgraph** | Kiến thức, tài liệu, invariants trong **product** (hoặc law x79) | Index cục bộ tại `.docgraph/` (scope: `documents/`, rules). Dùng CLI **`docgraph --q "<terms>"`**. Tra cứu consumer x79: truyền CLI `docgraph --q ... --repo ../x79`. |
 | **AgentMemory** | Context phiên, preference operator | MCP **`agentmemory-mcp`** trong `.cursor/mcp.json` (`memory_smart_search` / `memory_save`). |
 | **DeepSeek** | Phân tích sâu, thiết kế, debug khó | MCP **`deepseek-direct`** trong `.cursor/mcp.json`: **`ask_deepseek_flash`** (default), **`ask_deepseek_pro`** khi cần. |
