@@ -29,7 +29,7 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 | Nguồn | Khi dùng | Gợi ý |
 |--------|-----------|--------|
 | **Codegraph** | Luồng gọi, symbol, blast radius trong **product** | MCP `codegraph` trong **`.cursor/mcp.json`** (index harness-eso). `codegraph_explore` · `projectPath` = root harness-eso; consumer-only → `../x79`. Không `.codegraph/` → `codegraph init -i` hoặc Read/Grep. |
-| **Reply output** | Mọi câu trả lời | Rule `core.reply-format.mdc`: plain markdown, **không** bọc `{text,type}`. Hook `.cursor/hooks/detect-json-wrapper.mjs` (`afterAgentResponse`) phát hiện + nhắc gửi lại; test `qc/output-wrapper.test.mjs`. |
+| **Reply output** | Mọi câu trả lời | Rule `core.reply-format.mdc`: plain markdown, **không** bọc `{text,type}`. Detector `.cursor/hooks/lib/agent-response.mjs`; guard `stop` (`wrapped-output-guard.mjs`, `followup_message`) — `afterAgentResponse` **không có output field** nên chỉ để quan sát. Đo tỉ lệ thật: `node .cursor/hooks/audit-wrapped-replies.mjs --days 30`. Test `qc/output-wrapper.test.mjs`. |
 | **Docgraph** | Kiến thức, tài liệu, invariants trong **product** (hoặc law x79) | Index cục bộ tại `.docgraph/` (scope: `documents/`, rules). Dùng CLI **`docgraph --q "<terms>"`**. Tra cứu consumer x79: truyền CLI `docgraph --q ... --repo ../x79`. |
 | **AgentMemory** | Context phiên, preference operator | MCP **`agentmemory-mcp`** trong `.cursor/mcp.json` (`memory_smart_search` / `memory_save`). |
 | **DeepSeek** | Phân tích sâu, thiết kế, debug khó | MCP **`deepseek-direct`** trong `.cursor/mcp.json`: **`ask_deepseek_flash`** (default), **`ask_deepseek_pro`** khi cần. |

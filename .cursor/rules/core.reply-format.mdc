@@ -19,12 +19,15 @@ Never send the message inside an object or array:
 
 This is not a style preference. The harness sometimes serializes a response one or more times, and the
 user sees `{"text": "[{\"text\": ...}]"}` instead of the answer. It has happened repeatedly, so "be
-careful" is not an acceptable control. Two mechanisms enforce it instead:
+careful" is not an acceptable control. These mechanisms enforce it instead:
 
 | Mechanism | Role |
 |---|---|
-| `.cursor/hooks/detect-json-wrapper.mjs` + `.cursor/hooks.json` | Runs `afterAgentResponse`; parses the whole response as JSON and, *only* when it is an envelope, returns an `agent_message` telling the model to resend as plain text. Fail-open. |
-| `qc/output-wrapper.test.mjs` | Pins the three real samples **and** the negatives, so the detector cannot start firing on legitimate JSON inside a fenced code block. |
+| `.cursor/hooks/lib/agent-response.mjs` | The one detector. Fires only when the **whole** text is an envelope — including the host-unescaped shape (`text` already holds `[{...}]`), which is what `afterAgentResponse` actually delivers. |
+| `.cursor/hooks/wrapped-output-guard.mjs` (`stop`, `loop_limit: 2`) | The only hook that can act: `afterAgentResponse` supports **no output fields**, so its `agent_message` was discarded. On a wrap, `stop` submits `followup_message` — the reminder to resend as plain text — at most once per turn. |
+| `.cursor/hooks/detect-json-wrapper.mjs` (`afterAgentResponse`) | Thin entry point on the same detector, kept for observability (Hooks output channel) and for hosts that do act on `agent_message`. |
+| `.cursor/hooks/audit-wrapped-replies.mjs` | Measures the real rate from `~/.cursor/projects/*/agent-transcripts` with the same detector: `node .cursor/hooks/audit-wrapped-replies.mjs --days 30`. |
+| `qc/output-wrapper.test.mjs` | Pins the three real samples, the host-delivered shape, **and** the negatives, so the detector cannot start firing on legitimate JSON inside a fenced code block. |
 
 ## Rules for the response body
 
@@ -36,7 +39,8 @@ careful" is not an acceptable control. Two mechanisms enforce it instead:
 
 ## Changing the detector
 
-It fires only when the **entire** trimmed response parses as `{text,type}` or `[{text,type}, …]`.
-Ordinary markdown, prose starting with `{`, and fenced JSON blocks are explicit negative test cases;
-keep them passing when touching the matcher. The unwrapper must terminate on malformed input — it is
-called on text that already failed once.
+It fires only when the **entire** trimmed response is `{text,type}` or `[{text,type}, …]`, or is a
+stringification of one. Ordinary markdown, prose starting with `{`, and fenced JSON blocks are explicit
+negative test cases; keep them passing when touching the matcher. A false positive costs a whole extra
+turn, so widen the pattern never — widen the *samples*. The unwrapper must terminate on malformed input
+— it is called on text that already failed once.

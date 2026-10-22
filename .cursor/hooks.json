@@ -5,6 +5,12 @@
       {
         "command": "node .cursor/hooks/detect-json-wrapper.mjs --hook"
       }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/hooks/wrapped-output-guard.mjs --stop",
+        "loop_limit": 2
+      }
     ]
   }
 }
