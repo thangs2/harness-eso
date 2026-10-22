@@ -74,6 +74,10 @@ json_field() {
     # $1 = file holding JSON (`-` reads stdin), $2 = JS expression evaluated with `j` bound to the
     # parsed object. Two arguments by construction: a pipeline `… | json_field "$(cat)"` was the
     # version that silently passed an empty string.
+    #
+    # A field the server no longer sends is the same class of bug as a stale image (see chặng 3): the
+    # expression returns `undefined`, and `process.stdout.write(undefined)` threw a Node type error
+    # that named neither the route nor the field. Fail with the expression instead.
     HARNESS_JSON_EXPR="$2" node -e '
 const fs = require("node:fs");
 const file = process.argv[1];
@@ -81,6 +85,10 @@ const raw = file === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(file, "u
 const j = JSON.parse(raw);
 const fn = new Function("j", process.env.HARNESS_JSON_EXPR);
 const out = fn(j);
+if (out === undefined) {
+    console.error(`json_field: expression returned undefined: ${process.env.HARNESS_JSON_EXPR}`);
+    process.exit(3);
+}
 process.stdout.write(typeof out === "string" ? out : JSON.stringify(out));
 ' "$1"
 }
@@ -192,11 +200,11 @@ cmd_verify() {
     step "[3/5] Product state — the Console reads the host registry"
     local meta
     meta=$(curl -fsS "${base}/api/meta") || die "GET /api/meta failed — the server is up but misbehaving; see ./console.sh logs"
-    local state_dir projects_dir
+    local state_dir registry_path
     state_dir=$(json_var "$meta" 'return j.productStateDir')
-    projects_dir=$(json_var "$meta" 'return j.projectsDir')
+    registry_path=$(json_var "$meta" 'return j.registryPath')
     ok "in-container product state: ${state_dir}"
-    ok "projects read from:         ${projects_dir}"
+    ok "registry:                   ${registry_path}"
     # The mount is the check: a fresh/empty volume still answers 200 with zero projects, which looks
     # exactly like "host has no projects yet". Compare against the host registry instead of guessing.
     local host_count=0

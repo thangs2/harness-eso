@@ -2,7 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG_NAME } from './repo-root.mjs';
 import { claimObservePort, normalizePort } from './observe-port.mjs';
-import { loadWorkspace, portableStatePath, resolveAgentRepoPath, writeJsonAtomic } from './workspace-store.mjs';
+import {
+    addProjectEntry,
+    loadWorkspace,
+    portableStatePath,
+    resolveAgentRepoPath,
+    updateProjectEntry,
+} from './workspace-store.mjs';
 import {
     HOST_PACK_REL,
     addHostProfile,
@@ -32,15 +38,11 @@ export {
     verifyHostPack,
 };
 
-export const PROJECTS_SUBDIR = 'projects';
-
-export function projectsDir(stateDir) {
-    return path.join(stateDir, PROJECTS_SUBDIR);
-}
-
-export function projectFile(stateDir, id) {
-    return path.join(projectsDir(stateDir), `${id}.json`);
-}
+/*
+ * Project documents live in `workspace.json` (see `workspace-store.mjs`, registry v2). These three
+ * names are kept because every caller already speaks them; they are now thin views over one file,
+ * which is the point — there is no `projects/<id>.json` left to disagree with the workspace.
+ */
 
 function slugify(name) {
     return String(name)
@@ -91,34 +93,30 @@ export function defaultProjectDraft({ displayName, id }) {
     };
 }
 
-export function listProjects(stateDir) {
-    const dir = projectsDir(stateDir);
-    if (!fs.existsSync(dir)) return [];
-    return fs
-        .readdirSync(dir)
-        .filter((f) => f.endsWith('.json'))
-        .map((f) => {
-            try {
-                return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-            } catch {
-                return null;
-            }
-        })
-        .filter(Boolean)
-        .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+/** Every project, newest activity first. `stateDir` is accepted for call-site compatibility. */
+export function listProjects() {
+    return [...loadWorkspace().projects].sort((a, b) =>
+        String(a.updatedAt ?? '') < String(b.updatedAt ?? '') ? 1 : -1,
+    );
 }
 
-export function loadProject(stateDir, id) {
-    const fp = projectFile(stateDir, id);
-    if (!fs.existsSync(fp)) return null;
-    return JSON.parse(fs.readFileSync(fp, 'utf8'));
+export function loadProject(_stateDir, id) {
+    return loadWorkspace().projects.find((p) => p.id === id) ?? null;
 }
 
-export function saveProject(stateDir, doc) {
-    fs.mkdirSync(projectsDir(stateDir), { recursive: true });
-    doc.updatedAt = new Date().toISOString();
-    writeJsonAtomic(projectFile(stateDir, doc.id), doc);
-    return doc;
+/**
+ * Persist the parts of a project document that are not registry columns.
+ *
+ * The registry row already holds id/displayName/root/port/profile; this writes the rest (status,
+ * plugins, hostMode, observe metadata) into the same entry. A caller spreading a whole document is
+ * still safe — the fields the row owns win, because the port resolver is the only decider.
+ */
+export function saveProject(_stateDir, doc) {
+    if (!doc?.id) throw new Error('saveProject requires a project id');
+    const patch = { ...doc };
+    delete patch.root;
+    delete patch.rootHost;
+    return updateProjectEntry(doc.id, patch);
 }
 
 /** Id = slug từ tên, cố định sau khi tạo (không đổi). */
@@ -142,8 +140,11 @@ export function createProject(stateDir, { displayName, port = null, root = '', p
      */
     doc.observe = { port: normalizePort(port) };
     doc.agentRepo = { root: String(root || '') };
+    doc.root = String(root || '');
+    doc.rootHost = String(root || '');
+    doc.profile = 'generic-eso';
     if (portSource) doc.observe.source = portSource;
-    return saveProject(stateDir, doc);
+    return addProjectEntry(doc);
 }
 
 function loadPluginCatalog(profilesDir) {

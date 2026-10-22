@@ -280,9 +280,18 @@ test('each profile is probed on its own port, not the first one', async (t) => {
             { id: 'beta', root: '/w/beta', rootHost: '/w/beta', port: base + 1 },
         ]),
     );
-    // Documents that still carry the pre-fix default are the state this route must survive.
-    writeProjectDoc(state, { version: 1, id: 'alpha', displayName: 'alpha', agentRepo: { root: '/w/alpha' }, observe: { port: base } });
-    writeProjectDoc(state, { version: 1, id: 'beta', displayName: 'beta', agentRepo: { root: '/w/beta' }, observe: { port: 8792 } });
+    /*
+     * Registry v2: the project document IS the registry entry, so the folder below is legacy state —
+     * the one operators still have on disk. The loader must fold it in, let the claimed row win the
+     * port, and then delete the folder.
+     */
+    writeProjectDoc(state, {
+        version: 1,
+        id: 'beta',
+        displayName: 'beta',
+        agentRepo: { root: '/w/beta' },
+        observe: { port: 8792 },
+    });
 
     // Run the Console as a child: `boot()` keeps its server in a local and starts an ingest loop that
     // is not `unref`ed, so an in-process copy would keep the runner alive after the assertions pass.
@@ -321,9 +330,20 @@ test('each profile is probed on its own port, not the first one', async (t) => {
     const projects = await fetch(`http://127.0.0.1:${consolePort}/api/projects`).then((r) => r.json());
     const betaRow = projects.items.find((p) => p.id === 'beta');
     assert.equal(betaRow.observe.port, base + 1, 'the list reports the port the stack actually uses');
-    assert.match(
-        betaRow.portConflict?.detail ?? '',
-        /document says 8792/,
-        'a stale document is reported, not silently repaired — the operator needs to see the divergence',
+    /*
+     * v1 kept the port in two files, so the list had to report a divergence between them. v2 keeps it
+     * in one, which means a divergence is impossible rather than merely reported — the documented
+     * port and the claimed port are the same number, and `portConflict` is null.
+     */
+    assert.equal(betaRow.portConflict, null, 'one registry cannot disagree with itself');
+    assert.deepEqual(
+        projects.items.map((p) => p.id).sort(),
+        ['alpha', 'beta'],
+        'the list is the registry: a project the workspace knew is never missing from it',
+    );
+    assert.equal(
+        fs.existsSync(path.join(state, 'projects')),
+        false,
+        'the legacy per-project folder is folded in and removed',
     );
 });

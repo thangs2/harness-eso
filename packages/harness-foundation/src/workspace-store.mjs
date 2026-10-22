@@ -71,15 +71,163 @@ export function ensureProductState() {
     fs.mkdirSync(dir, { recursive: true });
     const ws = workspaceFile();
     if (!fs.existsSync(ws)) {
-        writeJsonAtomic(ws, { version: 1, defaultProjectId: null, projects: [] });
+        writeJsonAtomic(ws, { version: WORKSPACE_VERSION, defaultProjectId: null, projects: [] });
     }
+}
+
+/*
+ * Registry migration: v1 (two sources) -> v2 (one).
+ *
+ * v1 kept a project in two files that had to be written together by hand: a thin row in this
+ * `workspace.json` (`id`, `root`, `port`, `profile`) and the real document in `projects/<id>.json`
+ * (`status`, `plugins`, `hostMode`, `observe.port`). Every writer wrote both, and every reader read
+ * one of them. The two disagreed on this machine: `/api/projects` listed 2 projects because it read
+ * the per-project files, while `/api/observe-ports` listed 4 because it read the workspace, and
+ * `baplatform` carried `agentRepo.root: ""` in the document while the workspace knew its root.
+ *
+ * v2 keeps the full document inline and folds the row into it, so a field cannot exist in one place
+ * and be missing in the other. `projects/` is then deleted — see `migrateProjectDocuments()`.
+ *
+ * The migration runs once, on first load, and only when `version < 2`. It never deletes anything it
+ * could not read: an unparseable document is reported and left on disk.
+ */
+export const WORKSPACE_VERSION = 2;
+
+export const LEGACY_PROJECTS_SUBDIR = 'projects';
+
+export function legacyProjectsDir() {
+    return path.join(productStateDir(), LEGACY_PROJECTS_SUBDIR);
+}
+
+function readLegacyProjectDocs() {
+    const dir = legacyProjectsDir();
+    if (!fs.existsSync(dir)) return { docs: [], broken: [] };
+    const docs = [];
+    const broken = [];
+    for (const name of fs.readdirSync(dir)) {
+        if (!name.endsWith('.json')) continue;
+        const file = path.join(dir, name);
+        try {
+            const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+            if (doc && doc.id) docs.push(doc);
+            else broken.push(file);
+        } catch {
+            broken.push(file);
+        }
+    }
+    return { docs, broken };
+}
+
+/**
+ * Fold a row and a legacy document into one entry. The row wins where the two differ, because it is
+ * the one `claimObservePort` and the compose stack already act on — a migration that "fixed" a port
+ * here would silently move a consumer's Observatory.
+ */
+export function mergeProjectEntry(row, doc) {
+    const merged = {
+        ...(doc || {}),
+        ...(row || {}),
+        id: row?.id || doc?.id,
+    };
+    merged.displayName = row?.displayName || doc?.displayName || merged.id;
+    // `rootHost` is the host path; `root` is what the process can open. Carry both, and fall back to
+    // whichever exists so a project registered before `rootHost` existed is not lost.
+    merged.root = row?.root || doc?.agentRepo?.root || '';
+    merged.rootHost = row?.rootHost || merged.root;
+    merged.observe = {
+        ...(doc?.observe || {}),
+        // A legacy document's port was a second copy. The claimed row is the one the stack uses.
+        port: normalizePort(row?.port) ?? normalizePort(doc?.observe?.port),
+    };
+    merged.agentRepo = { ...(doc?.agentRepo || {}), root: merged.root };
+    merged.profile = row?.profile || doc?.profile || 'generic-eso';
+    merged.plugins = doc?.plugins || merged.plugins || {};
+    merged.status = doc?.status || merged.status || 'draft';
+    if (!merged.hostMode) merged.hostMode = 'dual-ide';
+    return merged;
+}
+
+/**
+ * One-time fold of `projects/*.json` into `workspace.json`.
+ *
+ * Returns what happened so a caller (CLI, Console boot, `reconcile-observe-ports`) can print it
+ * once instead of silently rewriting the operator's state directory.
+ */
+export function migrateProjectDocuments() {
+    ensureProductState();
+    const doc = readJson(workspaceFile());
+    const version = doc.version ?? 1;
+    const rows = Array.isArray(doc.projects) ? doc.projects : [];
+    const { docs, broken } = readLegacyProjectDocs();
+    const hasLegacy = fs.existsSync(legacyProjectsDir());
+
+    if (version >= WORKSPACE_VERSION && !hasLegacy) {
+        return { migrated: false, version, folded: 0, adopted: 0, dropped: 0, broken: [] };
+    }
+
+    const byId = new Map();
+    const order = [];
+    const push = (entry) => {
+        if (!entry?.id) return;
+        if (!byId.has(entry.id)) order.push(entry.id);
+        byId.set(entry.id, entry);
+    };
+
+    for (const row of rows) {
+        const legacy = docs.find((d) => d.id === row.id) || null;
+        push(mergeProjectEntry(row, legacy));
+    }
+    // A document with no row was a project the Console could see and the CLI could not. Adopting it
+    // is the point of the merge: it was real, it had a port, it just never reached this file.
+    const rowIds = new Set(rows.map((r) => r?.id));
+    let adopted = 0;
+    for (const legacyDoc of docs) {
+        if (rowIds.has(legacyDoc.id)) continue;
+        adopted += 1;
+        push(mergeProjectEntry({ id: legacyDoc.id }, legacyDoc));
+    }
+
+    const projects = order.map((id) => byId.get(id));
+    const dropped = rows.length + adopted - projects.length;
+    const next = {
+        ...doc,
+        version: WORKSPACE_VERSION,
+        defaultProjectId: doc.defaultProjectId || projects[0]?.id || null,
+        projects,
+    };
+    writeJsonAtomic(workspaceFile(), next);
+
+    // Only after the new file is on disk AND parses back. A half-written registry is worse than two.
+    let removedDir = false;
+    if (hasLegacy && broken.length === 0) {
+        try {
+            const reread = readJson(workspaceFile());
+            if ((reread.version ?? 1) >= WORKSPACE_VERSION && Array.isArray(reread.projects)) {
+                fs.rmSync(legacyProjectsDir(), { recursive: true, force: true });
+                removedDir = true;
+            }
+        } catch {
+            /* leave the folder in place; the next load retries */
+        }
+    }
+
+    return {
+        migrated: true,
+        version: WORKSPACE_VERSION,
+        folded: docs.length - adopted,
+        adopted,
+        dropped,
+        broken,
+        removed: removedDir,
+    };
 }
 
 export function loadWorkspace() {
     ensureProductState();
+    migrateProjectDocuments();
     const doc = readJson(workspaceFile());
     return {
-        version: doc.version ?? 1,
+        version: doc.version ?? WORKSPACE_VERSION,
         defaultProjectId: doc.defaultProjectId ?? null,
         projects: Array.isArray(doc.projects) ? doc.projects : [],
     };
@@ -87,7 +235,80 @@ export function loadWorkspace() {
 
 export function saveWorkspace(doc) {
     ensureProductState();
-    writeJsonAtomic(workspaceFile(), doc);
+    writeJsonAtomic(workspaceFile(), { ...doc, version: Math.max(doc.version ?? 0, WORKSPACE_VERSION) });
+}
+
+/** Read one project's full document. The registry is the document; there is no second file. */
+export function loadProjectEntry(id) {
+    return findProject(loadWorkspace(), id);
+}
+
+/**
+ * Apply a change to one project in the registry, atomically with respect to other writers.
+ *
+ * Replaces the old `saveProject(stateDir, doc)`, which wrote a separate file. Callers that used to
+ * spread a modified document now pass a patch; `undefined` fields are ignored so a partial patch
+ * cannot erase `plugins` or `hostMode`.
+ */
+export function updateProjectEntry(id, patch) {
+    const workspace = loadWorkspace();
+    const idx = workspace.projects.findIndex((p) => p.id === id);
+    if (idx < 0) throw new Error(`unknown project: ${id}`);
+    const next = { ...workspace.projects[idx], ...stripUndefined(patch), id };
+    next.updatedAt = new Date().toISOString();
+    workspace.projects[idx] = next;
+    saveWorkspace(workspace);
+    return next;
+}
+
+function stripUndefined(patch) {
+    const out = {};
+    for (const [k, v] of Object.entries(patch || {})) {
+        if (v !== undefined) out[k] = v;
+    }
+    return out;
+}
+
+/*
+ * Duplicated from `project-registry.mjs` on purpose: the registry writer must not import the module
+ * that imports it. `project-registry.mjs` re-exports its own `defaultPlugins()`, and a test pins the
+ * two to the same shape, so a policy default cannot drift between a Console-created draft and one
+ * created through the CLI.
+ */
+function defaultPluginsForRegistry() {
+    return {
+        law: { adapterId: 'docgraph-cli' },
+        code: { adapterId: 'codegraph-cli' },
+        memory: { adapterId: 'noop-memory' },
+        jev: { adapterId: 'off', mode: 'off' },
+        l3_route: { adapterId: 'off' },
+        brain: { adapterId: 'deepseek-mcp' },
+    };
+}
+
+export function addProjectEntry(entry) {
+    const workspace = loadWorkspace();
+    const idx = workspace.projects.findIndex((p) => p.id === entry.id);
+    const now = new Date().toISOString();
+    const next = { createdAt: now, status: 'draft', hostMode: 'dual-ide', ...entry };
+    next.plugins = entry.plugins ?? defaultPluginsForRegistry();
+    next.updatedAt = now;
+    if (idx >= 0) workspace.projects[idx] = { ...workspace.projects[idx], ...next };
+    else workspace.projects.push(next);
+    if (!workspace.defaultProjectId) workspace.defaultProjectId = next.id;
+    saveWorkspace(workspace);
+    syncTenantsFromWorkspace(workspace);
+    return next;
+}
+
+export function removeProjectEntry(id) {
+    const workspace = loadWorkspace();
+    const before = workspace.projects.length;
+    workspace.projects = workspace.projects.filter((p) => p.id !== id);
+    if (workspace.defaultProjectId === id) workspace.defaultProjectId = workspace.projects[0]?.id ?? null;
+    saveWorkspace(workspace);
+    syncTenantsFromWorkspace(workspace);
+    return { removed: before - workspace.projects.length };
 }
 
 export function findProject(workspace, id) {

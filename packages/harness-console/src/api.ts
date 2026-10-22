@@ -191,7 +191,8 @@ export function fetchMeta() {
     return getJson<{
         ok: boolean;
         productStateDir: string;
-        projectsDir: string;
+        /** One registry file: every project document lives in this file's `projects[]`. */
+        registryPath: string;
         /** Agent workspace root to offer in the wizard — never the harness-eso checkout. */
         agentRootDefault?: string;
     }>('/api/meta');

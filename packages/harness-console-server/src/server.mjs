@@ -11,7 +11,6 @@ import {
     createProject,
     listProjects,
     loadProject,
-    projectsDir,
     saveProject,
 } from '@mu/harness-foundation/project-registry';
 import { initProfile, reloadHostConfig } from '@mu/harness-foundation/init-profile';
@@ -254,8 +253,11 @@ async function route(req, res) {
         json(res, 200, {
             ok: true,
             productStateDir: dir,
-            projectsDir: projectsDir(dir),
-            pattern: '<projectsDir>/<id>.json',
+            // The registry is one file now. Kept in the payload because the Console shows the path
+            // an operator should back up, and a stale `projects/` hint would send them to a folder
+            // the migration deletes.
+            registryPath: path.join(dir, 'workspace.json'),
+            pattern: '<productStateDir>/workspace.json · projects[]',
             // Consumer repo must be chosen explicitly — never the harness-eso checkout.
             agentRootDefault: defaultAgentRoot(),
         });
