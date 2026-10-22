@@ -42,7 +42,7 @@ describe('consumer maturity T3.4 docgraph Agent Zone', () => {
     const t34 = report.checks.find((c) => c.id === 'T3.4');
     assert.ok(t34, 'T3.4 check present');
     assert.equal(t34.status, 'FAIL');
-    assert.equal(report.standardVersion, '1.2.0');
+    assert.equal(report.standardVersion, '1.3.0');
   });
 
   it('PASSES when path:SDLC/00.agent-manifests is present', () => {
@@ -55,6 +55,9 @@ describe('consumer maturity T3.4 docgraph Agent Zone', () => {
         'path:AGENTS.md',
       ].join('\n') + '\n',
     );
+    // T3.4 asks whether the declared paths exist, so the fixture needs what it lists: a
+    // `path:` line in `docgraph.scope` is an existing path, not a claim about one (H6).
+    fs.writeFileSync(path.join(root, 'AGENTS.md'), '# law\n');
     const report = diagnoseConsumer(root);
     const t34 = report.checks.find((c) => c.id === 'T3.4');
     assert.equal(t34.status, 'PASS');

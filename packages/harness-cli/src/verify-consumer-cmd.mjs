@@ -85,6 +85,16 @@ function hasNestedKey(obj, dotted) {
   return true;
 }
 
+function readNestedKey(obj, dotted) {
+  const parts = dotted.split('.');
+  let cur = obj;
+  for (const p of parts) {
+    if (cur == null || typeof cur !== 'object' || !(p in cur)) return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
+
 function globMin(root, pattern, min) {
   // Minimal glob: only supports "dir/prefix*suffix" one star
   const absPattern = path.join(root, pattern);
@@ -155,6 +165,62 @@ function runProbe(root, probe) {
       evidence: hit
         ? `${rel} contains ${hit}`
         : `${rel} missing any of: ${patterns.join(' | ')}`,
+    };
+  }
+  /**
+   * A scope line is only a claim; the path it names is the fact.
+   *
+   * `file_contains_any` accepted `path:sdlc/00.agent-manifests` in `docgraph.scope` even when that
+   * directory did not exist, so a consumer scored T3.4 for declaring an Agent Zone it never had
+   * (H6). Here the line must name a path that exists as a directory.
+   */
+  if (type === 'file_contains_existing_path') {
+    const rel = probe.path || '';
+    const full = path.join(root, rel);
+    if (!fs.existsSync(full) || !fs.statSync(full).isFile()) {
+      return { ok: false, evidence: `missing file ${rel}` };
+    }
+    const lines = fs
+      .readFileSync(full, 'utf8')
+      .split(/\r?\n/)
+      .map((l) => l.trim());
+    const declared = [];
+    for (const line of lines) {
+      /*
+       * Every `path:` line in the file, not only the prefixes the check is about. `file_contains`
+       * probes run against a whole scope file, so the reported evidence has to describe what the file
+       * says; the check itself still asks whether the Agent Zone is among it.
+       */
+      if (!line.startsWith('path:')) continue;
+      const target = line.slice('path:'.length).split('#')[0].trim();
+      if (target) declared.push(target);
+    }
+    if (!declared.length) {
+      return { ok: false, evidence: `${rel} declares no path: line` };
+    }
+    const missing = declared.filter((p) => !exists(root, p));
+    return {
+      ok: missing.length === 0,
+      evidence: missing.length
+        ? `${rel} declares paths that do not exist: ${missing.join(', ')}`
+        : `${rel} declares existing paths: ${declared.join(', ')}`,
+    };
+  }
+  if (type === 'json_value') {
+    const doc = readJson(root, probe.path);
+    if (!doc) {
+      if (probe.allow_absent_as === false) return { ok: false, evidence: `cannot read JSON ${probe.path}` };
+      return { ok: Boolean(probe.allow_absent_as), evidence: `cannot read JSON ${probe.path}` };
+    }
+    const actual = hasNestedKey(doc, probe.key) ? readNestedKey(doc, probe.key) : undefined;
+    if (actual === undefined) {
+      const ok = Boolean(probe.allow_absent_as);
+      return { ok, evidence: `${probe.path} has no ${probe.key}${ok ? ' (allowed absent)' : ''}` };
+    }
+    const ok = actual === probe.equals;
+    return {
+      ok,
+      evidence: `${probe.path} ${probe.key} = ${JSON.stringify(actual)}${ok ? '' : ` (expected ${JSON.stringify(probe.equals)})`}`,
     };
   }
   return { ok: false, evidence: `unknown probe type: ${type}` };

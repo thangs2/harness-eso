@@ -1,5 +1,5 @@
 /**
- * v1.2.0 — T4.3–T4.5 / T5.2–T5.4 factory probes + templates exist.
+ * v1.3.0 — T4.3–T4.5 / T5.2–T5.4 factory probes + templates exist.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -38,11 +38,11 @@ describe('consumer maturity v1.2 T4/T5 factory templates', () => {
     assert.ok(fs.existsSync(TEMPLATE_VERIFY), 'verify-dual-harness template');
   });
 
-  it('standard version is 1.2.0', () => {
+  it('standard version is 1.3.0', () => {
     const std = JSON.parse(
       fs.readFileSync(path.join(ESO_ROOT, 'profiles/standards/consumer-maturity.v1.json'), 'utf8'),
     );
-    assert.equal(std.version, '1.2.0');
+    assert.equal(std.version, '1.3.0');
     const ids = std.tiers.flatMap((t) => t.checks.map((c) => c.id));
     for (const id of ['T4.3', 'T4.4', 'T4.5', 'T5.2', 'T5.3', 'T5.4']) {
       assert.ok(ids.includes(id), `missing ${id}`);
@@ -50,7 +50,7 @@ describe('consumer maturity v1.2 T4/T5 factory templates', () => {
   });
 });
 
-describe('consumer maturity v1.2 T4/T5 probes', () => {
+describe('consumer maturity v1.3 T4/T5 probes', () => {
   let root;
   before(() => {
     root = mkTmpConsumer();
@@ -61,7 +61,7 @@ describe('consumer maturity v1.2 T4/T5 probes', () => {
 
   it('FAILS T4.4 / T5.2 when factory surface missing', () => {
     const report = diagnoseConsumer(root);
-    assert.equal(report.standardVersion, '1.2.0');
+    assert.equal(report.standardVersion, '1.3.0');
     assert.equal(report.checks.find((c) => c.id === 'T4.4').status, 'FAIL');
     assert.equal(report.checks.find((c) => c.id === 'T5.2').status, 'FAIL');
   });
