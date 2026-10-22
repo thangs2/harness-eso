@@ -63,17 +63,24 @@ test('a locked path is denied with a reason the model can read', () => {
     assert.equal(decision.path, 'secrets/key.txt');
 });
 
-test('an ask-tier path asks instead of denying', () => {
+test('an ask-tier path is denied by default, because a host ask is not a gate', () => {
     const root = consumer({ paths: { locked: [], gated: [], ask: ['infra/'], sot: [] } });
-    const decision = decideToolCall({ root, name: 'edit', args: { file_path: path.join(root, 'infra/main.tf') } });
-    assert.equal(decision.kind, 'ask');
-    assert.match(decision.reason, /needs approval/);
+    const args = { file_path: path.join(root, 'infra/main.tf') };
+
+    const strict = decideToolCall({ root, name: 'edit', args });
+    assert.equal(strict.kind, 'deny');
+    assert.match(strict.reason, /needs approval/);
+    assert.match(strict.reason, /askMode=host/);
+
+    const hosted = decideToolCall({ root, name: 'edit', args, askMode: 'host' });
+    assert.equal(hosted.kind, 'ask', 'a consumer that trusts its host approval UI can opt in');
 });
 
-test('a gated path asks when there is no live consent, and allows when there is', () => {
+test('a gated path with no consent is denied by default and asks on request', () => {
     const root = consumer({ paths: { locked: [], gated: ['AGENTS.md'], ask: [], sot: [] } });
-    const target = { path: path.join(root, 'AGENTS.md') };
-    assert.equal(decideToolCall({ root, name: 'write', args: target }).kind, 'ask');
+    const args = { path: path.join(root, 'AGENTS.md') };
+    assert.equal(decideToolCall({ root, name: 'write', args }).kind, 'deny');
+    assert.equal(decideToolCall({ root, name: 'write', args, askMode: 'host' }).kind, 'ask');
 });
 
 test('a writable path is no opinion at all', () => {
@@ -100,6 +107,21 @@ test('a directory that is not an ESO consumer gets no opinion', () => {
     const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-dsh-plain-'));
     assert.equal(findConsumerRoot(plain), null);
     assert.equal(decideToolCall({ root: null, name: 'write', args: { path: path.join(plain, 'x') } }), null);
+});
+
+test('product state alone does not make a directory a consumer', () => {
+    // The CLI writes `.harness/` into the product checkout; that is state, not a declaration. Treating
+    // it as a marker made the gate police harness-eso itself.
+    const checkout = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-dsh-state-'));
+    fs.mkdirSync(path.join(checkout, '.harness', 'projects'), { recursive: true });
+    fs.writeFileSync(path.join(checkout, '.harness', 'workspace.json'), '{"projects":[]}\n');
+    assert.equal(findConsumerRoot(checkout), null);
+
+    // An explicit policy *is* a declaration, even without a config.
+    const declared = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-dsh-declared-'));
+    fs.mkdirSync(path.join(declared, '.harness'), { recursive: true });
+    fs.writeFileSync(path.join(declared, '.harness', 'decision-policy.json'), '{"paths":{"locked":["x/"]}}');
+    assert.equal(findConsumerRoot(declared), declared);
 });
 
 test('the root is found by walking up from the written path', () => {
@@ -161,9 +183,20 @@ test('the word "tee" in prose is not a redirect', () => {
     const message = ["git commit -F - <<'EOF'", 'a redirect or `tee` with an unresolvable target keeps the deny', 'EOF'].join('\n');
     assert.equal(decideToolCall({ root, name: 'bash', args: { command: message } }), null);
 
-    // `tee` to a variable is also "no intent" in the shared matcher — the plugin follows it, so the
-    // host pack and this gate cannot disagree about what counts as a write.
-    assert.equal(decideToolCall({ root, name: 'bash', args: { command: 'echo x | tee $TARGET' } }), null);
+    // `tee` to a variable is intent for the plugin (no event path here), so it is denied unsresolved.
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: 'echo x | tee $TARGET' } })?.kind, 'deny');
+});
+
+test('a shell write is gated from its own target, with no root passed in', () => {
+    // The live failure this pins: inside DSH the process cwd is the app directory, so a command that
+    // writes an absolute path in a consumer was judged with no consumer and allowed.
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const target = path.join(root, 'secrets/a.txt');
+    assert.equal(decideToolCall({ name: 'bash', args: { command: `echo x > ${target}` } })?.kind, 'deny');
+
+    const gated = consumer({ paths: { locked: [], gated: ['AGENTS.md'], ask: [], sot: [] } });
+    const ask = decideToolCall({ name: 'bash', args: { command: `echo x > ${path.join(gated, 'AGENTS.md')}` } });
+    assert.equal(ask?.kind, 'deny', 'gated defaults to deny: the host ask path is not enforcement');
 });
 
 test('a heredoc script that writes a protected relative path is still gated', () => {
@@ -186,15 +219,14 @@ test('a heredoc that names no path at all is not judged', () => {
     assert.equal(decideToolCall({ root, name: 'bash', args: { command } }), null);
 });
 
-test('a redirect to a shell variable is not write intent in the shared matcher', () => {
-    // Deliberate: `shellWriteTargets` ignores `$VAR` targets, so the host pack and this plugin agree.
-    // Only a script whose *body* writes (PY_WRITE_RE) is judged when the operator target is unknown.
+test('a redirect to a variable is intent for the plugin, and denied with no resolvable target', () => {
+    // The shared matcher ignores `$VAR` targets; the plugin cannot afford to, because unlike the host
+    // pack it has no event `path` as a second signal.
     const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
-    assert.equal(decideToolCall({ root, name: 'bash', args: { command: 'cat data > $TARGET' } }), null);
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: 'cat data > $TARGET' } })?.kind, 'deny');
 
     const script = ["python3 - <<'PY' > $OUT", "open('x','w').write('y')", 'PY'].join('\n');
-    const decision = decideToolCall({ root, name: 'bash', args: { command: script } });
-    assert.equal(decision?.kind, 'deny', 'a writing script with an unknown redirect target is denied');
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: script } })?.kind, 'deny');
 });
 
 test('the pre-step seam never changes an upstream decision', async () => {

@@ -32,8 +32,9 @@ export const SHELL_TOOLS = new Set(['bash', 'pwsh', 'shell', 'powershell']);
 /**
  * Walk up from a starting directory until a consumer root is found.
  *
- * A consumer is a directory that has `harness.config.json` or `.harness/`; anything else is not an ESO
- * workspace, and the plugin has no opinion there (it must not block an arbitrary repo the user opens).
+ * A consumer is a directory that declares itself with `harness.config.json` or
+ * `.harness/decision-policy.json`; anything else is not an ESO workspace, and the plugin has no opinion
+ * there (it must not block an arbitrary repo the user opens).
  */
 export function findConsumerRoot(start) {
     let dir = String(start || '').trim();
@@ -42,10 +43,18 @@ export function findConsumerRoot(start) {
     try {
         if (fs.statSync(dir).isFile()) dir = path.dirname(dir);
     } catch {
-        return null;
+        /* A target that does not exist yet is the normal case for a write (`secrets/new.txt`): walk up
+         * from where it would live instead of giving up on the call. */
     }
     for (let i = 0; i < 20; i += 1) {
-        if (fs.existsSync(path.join(dir, CONFIG_NAME)) || fs.existsSync(path.join(dir, '.harness'))) return dir;
+        /*
+         * A consumer **declares** itself: a config, or an explicit policy. `.harness/` alone is product
+         * state (the CLI writes workspace/tenants/pid there), so treating it as a marker made the gate
+         * police the product checkout itself — the one repo AGENTS.md says must not run ESO.
+         */
+        if (fs.existsSync(path.join(dir, CONFIG_NAME)) || fs.existsSync(path.join(dir, '.harness', 'decision-policy.json'))) {
+            return dir;
+        }
         const parent = path.dirname(dir);
         if (parent === dir) return null;
         dir = parent;
@@ -79,6 +88,23 @@ function relativeLiterals(command) {
         if (!out.includes(rel)) out.push(rel);
     }
     return out;
+}
+
+/**
+ * A tier that is not "allowed yet" becomes a deny by default.
+ *
+ * Reason: inside DSH an `ask` decision is not a gate. Its approval path belongs to the host's permission
+ * preset, and `deny` is the only answer that reliably stops the call — measured, on a gated path whose
+ * write went through under `ask`. A consumer that trusts its host's approval UI can opt in with
+ * `askMode: 'host'`; the default keeps the guard a guard.
+ */
+function approval(reason, rel, askMode) {
+    if (askMode === 'host') return { kind: 'ask', reason, path: rel };
+    return {
+        kind: 'deny',
+        reason: `${reason}; ask the operator to record consent, or set askMode=host to delegate to the host's approval UI`,
+        path: rel,
+    };
 }
 
 function argPath(args) {
@@ -118,75 +144,102 @@ export function resolveRoot({ configRoot = null, args = null } = {}) {
  * @param {{ root: string, name: string, args: object }} input
  * @returns {{ kind: 'deny'|'ask', reason: string, path?: string } | null} null means "no opinion"
  */
-export function decideToolCall({ root, name, args }) {
-    if (!root) return null;
+export function decideToolCall({ root = null, configRoot = null, name, args, askMode = 'deny' }) {
     const tool = String(name || '').toLowerCase();
 
-    // `loadDecisionPolicyForCwd()` takes no root — it resolves from the process cwd, which is the
-    // app directory inside DSH. The explicit root is the whole point of this gate.
-    const loaded = loadDecisionPolicy({ root });
-    const policy = loaded?.policy ?? {};
-    const resolved = resolvePathPolicy(policy);
-    const projectId = projectIdFrom(root);
-
-    const targets = [];
+    let command = null;
+    let raw = [];
     if (WRITE_TOOLS.has(tool)) {
         const target = argPath(args);
-        if (target) targets.push(path.isAbsolute(target) ? target : path.join(root, target));
+        if (target) raw.push(target);
     } else if (SHELL_TOOLS.has(tool)) {
-        const command = argCommand(args);
+        command = argCommand(args);
         if (!command) return null;
-        for (const target of shellWriteTargets(command)) {
-            if (target === '<unknown>' || !target) continue;
-            // A shell variable is not a path: `> $TARGET` must fall through to the unresolved case,
-            // not be joined to the root and quietly allowed.
-            if (target.includes('$') || target.startsWith('~')) continue;
-            targets.push(path.isAbsolute(target) ? target : path.join(root, target));
-        }
-        /*
-         * Before deciding what an unparsed write means, look at what it actually names.
-         *
-         * A Python heredoc writes through a string literal, which the shared matcher only finds when
-         * that literal is absolute. A repo-relative literal (`open('AGENTS.md','w')`) is a normal way
-         * to write and must be checked against the policy, not denied for being unparsed.
-         */
-        if (!targets.length) {
-            if (!shellHasWriteIntent(command)) return null;
-            if (!hasShellRedirect(command)) {
-                for (const rel of relativeLiterals(command)) targets.push(path.join(root, rel));
-                // A script that names no path at all is nothing this gate can judge.
-                if (!targets.length) return null;
-            } else {
-                /* A redirect or `tee` whose target cannot be resolved is still a write attempt, and a
-                 * channel with no evidence is the one case where denying is the safe direction (B5). */
-                return {
-                    kind: 'deny',
-                    reason: 'harness-eso: shell command has write intent but its target could not be resolved; split it into a plain path or run it manually',
-                };
-            }
-        }
+        raw = shellWriteTargets(command).filter(
+            (target) => target && target !== '<unknown>' && !target.includes('$') && !target.startsWith('~'),
+        );
     } else {
         return null;
     }
 
+    /*
+     * Root resolution has to consider **what the call writes**, not only the process cwd: inside DSH the
+     * cwd is the app directory, so a shell command writing `/work/consumer/secrets/x` is otherwise
+     * judged with no consumer at all and allowed. Absolute targets come first; a relative-only call
+     * still needs a configured root or a cwd that is a consumer.
+     */
+    const candidates = [];
+    if (root) candidates.push(root);
+    if (configRoot) candidates.push(configRoot);
+    for (const target of raw) {
+        if (path.isAbsolute(target)) candidates.push(path.dirname(target));
+    }
+    candidates.push(process.cwd());
+
+    let consumer = null;
+    for (const candidate of candidates) {
+        consumer = findConsumerRoot(candidate);
+        if (consumer) break;
+    }
+    if (!consumer) return null;
+
+    const loaded = loadDecisionPolicy({ root: consumer });
+    const policy = loaded?.policy ?? {};
+    const resolved = resolvePathPolicy(policy);
+    const projectId = projectIdFrom(consumer);
+
+    const targets = [];
+    for (const target of raw) targets.push(path.isAbsolute(target) ? target : path.join(consumer, target));
+
+    if (!targets.length && command) {
+        /*
+         * Before deciding what an unparsed write means, look at what it actually names: a Python
+         * heredoc writes through a string literal, which the shared matcher only finds when that
+         * literal is absolute.
+         */
+        /*
+         * Stricter than the shared matcher on purpose: the host pack gets the event's `path` as a second
+         * signal, this plugin does not. A redirect whose target is a variable (`> $OUT`) therefore counts
+         * as write intent here, and with no resolvable target it is denied below rather than ignored.
+         */
+        if (!shellHasWriteIntent(command) && !hasShellRedirect(command)) return null;
+        if (!hasShellRedirect(command)) {
+            for (const rel of relativeLiterals(command)) targets.push(path.join(consumer, rel));
+            if (!targets.length) return null; // a script that names no path is nothing this gate can judge
+        } else {
+            /* A redirect or `tee` whose target cannot be resolved is still a write attempt, and a
+             * channel with no evidence is the one case where denying is the safe direction (B5). */
+            return {
+                kind: 'deny',
+                reason:
+                    'harness-eso: shell command has write intent but its target could not be resolved; ' +
+                    'split it into a plain path or run it manually',
+            };
+        }
+    }
+
     for (const target of targets) {
-        const mode = pathMode(target, resolved, root);
+        const mode = pathMode(target, resolved, consumer);
         if (!mode) continue;
-        const rel = toRepoRelative(target, root);
+        const rel = toRepoRelative(target, consumer);
         if (mode === 'locked') {
-            return { kind: 'deny', reason: `harness-eso: ${rel} is locked by the consumer's path policy (locked tier)`, path: rel };
+            return {
+                kind: 'deny',
+                reason: `harness-eso: ${rel} is locked by the consumer's path policy (locked tier)`,
+                path: rel,
+            };
         }
         if (mode === 'ask') {
-            return { kind: 'ask', reason: `harness-eso: ${rel} needs approval (ask tier)`, path: rel };
+            return approval(`harness-eso: ${rel} needs approval (ask tier)`, rel, askMode);
         }
         if (mode === 'gated') {
             const consent = consentCovers(projectId, rel);
             if (consent.ok) continue;
-            return {
-                kind: 'ask',
-                reason: `harness-eso: ${rel} is gated and has no live approval for project "${projectId || 'unknown'}"`,
-                path: rel,
-            };
+            return approval(
+                `harness-eso: ${rel} is gated and has no live approval for project "${projectId || 'unknown'}"`,
+                rel,
+                askMode,
+            );
         }
     }
     return null;

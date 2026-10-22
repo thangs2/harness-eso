@@ -1,9 +1,9 @@
 {
     "name": "@mu/harness-eso-dsh",
-    "version": "0.1.3",
+    "version": "0.1.7",
     "private": true,
     "type": "module",
-    "description": "harness-eso as a DSH plugin — a self-contained bundle with no dependencies, mounted through the Plugins UI",
+    "description": "harness-eso as a DSH plugin \u2014 a self-contained bundle with no dependencies, mounted through the Plugins UI",
     "exports": {
         ".": "./src/plugin.mjs",
         "./plugin": "./dist/eso-plugin.mjs"

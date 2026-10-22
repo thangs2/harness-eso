@@ -15,7 +15,7 @@
  * must not be allowed to break the user's turn; the deny path is the only place that intentionally
  * stops something, and only when the consumer's policy says so.
  */
-import { decideToolCall, resolveRoot } from './guards.mjs';
+import { decideToolCall } from './guards.mjs';
 
 /** One line per event so a user can see the plugin is alive and what it decided. */
 function makeLogger(ctx) {
@@ -42,6 +42,9 @@ export function createEsoDshPlugin(defaults = {}) {
         apply(ctx, config = {}) {
             const log = makeLogger(ctx);
             const configRoot = config.root || defaults.root || null;
+            /* `host` delegates a not-yet-approved path to the host's approval UI; the default denies,
+             * because a host `ask` was measured to let the write through. */
+            const askMode = config.askMode === 'host' ? 'host' : 'deny';
             const onDecision = typeof defaults.onDecision === 'function' ? defaults.onDecision : null;
 
             const report = (decision, event) => {
@@ -68,10 +71,13 @@ export function createEsoDshPlugin(defaults = {}) {
              */
             const offTool = ctx.on('tools/pre-execute', async (exec, next) => {
                 try {
+                    // The guard resolves the consumer from what the call writes; passing only a root
+                    // here would miss every shell command, whose cwd is the app directory.
                     const decision = decideToolCall({
-                        root: resolveRoot({ configRoot, args: exec?.arguments }),
+                        configRoot,
                         name: exec?.name,
                         args: exec?.arguments ?? {},
+                        askMode,
                     });
                     if (decision) {
                         report(decision, 'tools/pre-execute');
