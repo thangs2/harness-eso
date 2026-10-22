@@ -13,6 +13,7 @@
 | `core.harness-tooling.mdc` | codegraph · docgraph · agentmemory · deepseek |
 | `core.harness-eso-spec.mdc` | Contract/spec, observe API, docs |
 | `core.codegraph.mdc` | `packages/**`, `qc/**` |
+| `core.doc.mermaid.mdc` | `documents/**` mermaid fences, `pipeline-diagrams.ts` |
 | `pkg.observe-server.mdc` | `harness-observe-server/**` |
 | `pkg.observatory-ui.mdc` | Observatory + Console SPA |
 

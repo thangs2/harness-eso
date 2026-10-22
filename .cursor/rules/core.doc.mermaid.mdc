@@ -1,0 +1,176 @@
+---
+description: Mermaid standard for documents/** and product diagram sources — read/write plane, Catppuccin roles, render-verified
+layer: doc
+alwaysApply: false
+version: "1.0.0-ESO"
+canonical: .cursor/rules/README.md
+globs: documents/**,packages/harness-console/src/diagrams/**
+---
+
+# Harness-ESO Mermaid standard
+
+**Authority:** `documents/06.diagrams/01.diagrams-mermaid.md` (conventions + §V1–§V24) và
+`documents/07.how-it-works/` (bộ hiện hành, 21 diagram). Rule này chỉ **chốt luật** cho hai chỗ đó —
+khi rule và tài liệu lệch nhau, sửa tài liệu trước rồi sửa rule.
+
+**Khi áp dụng:** tạo/sửa fence ` ```mermaid ` trong `documents/**`, hoặc sửa
+`packages/harness-console/src/diagrams/pipeline-diagrams.ts` (nguồn của §V26–§V29).
+
+---
+
+## 1. Forbidden
+
+| Lỗi | Vì sao |
+|:---|:---|
+| `style NodeId fill:#...` trên từng node | Dùng `classDef` + `:::className` (hoặc `class A,B name`). Style lẻ không đổi được theo vai trò và lệch palette. |
+| `box` / `box rgb(...)` trong `sequenceDiagram` | Dùng `rect rgba(r,g,b,a)`. |
+| Mũi tên trỏ vào **id subgraph** | Nối vào node có tên **bên trong** subgraph. Renderer bỏ qua hoặc vẽ hộp bao sai. |
+| HTML trong label (`<b>`, `<i>`, `<div>`) | Chỉ `<br/>` (xuống dòng trong label dài, đặt trong node có nhãn quote). |
+| Emoji trạng thái trong node | Dùng suffix text `· TD` / `· IP` / `· HIL` / `· Done` + class. Emoji chỉ ở bảng markdown. |
+| `:` `/` `(` `)` không quote trong flowchart label | `NodeId["Label text"]` là dạng mặc định. |
+| Label nhiều dòng trong flowchart | Một dòng, ngắn. Câu giải thích đặt **dưới** fence, không nhét vào node. |
+| Hai định nghĩa cho cùng một sự thật | Xem §5 — một chủ đề, một chuỗi fence. |
+| Vẽ thứ **không có trong code** mà không đánh dấu | Ghi rõ "chưa implement" ngay dưới fence (bài học §V22/§V27: `maxExpandRounds` không ai đọc). |
+| Câu "đã render" / "đã verify" chưa chạy `mmdc` | Claim phải có lệnh thật đứng sau; nếu chưa chạy thì đừng viết. |
+
+---
+
+## 2. Flowchart — `classDef` theo **vai trò**, một lần mỗi fence
+
+Hai plane là hai hệ tọa độ độc lập: **W** = write/guard (có thể deny), **R** = read/observe (không bao
+giờ deny). Không có mũi tên nào từ R về W.
+
+```text
+classDef w      fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+classDef r      fill:#11111b,stroke:#94e2d5,stroke-width:2px,color:#cdd6f4
+classDef shared fill:#11111b,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+classDef human  fill:#313244,stroke:#f9e2af,stroke-width:2px,color:#cdd6f4
+classDef stop   fill:#1e1e2e,stroke:#f38ba8,stroke-width:2px,color:#cdd6f4
+```
+
+| Vai trò | Class | Dùng cho |
+|:---|:---|:---|
+| write plane | `:::w` | host pack, DSH plugin, gate, checks, harnessctl khi ghi state |
+| read plane | `:::r` | ingest, REST, Observatory, provider fetch |
+| dữ liệu chung | `:::shared` | module `foundation` (`path-policy`, `shell-writes`, `blocker-log`), policy file, DB |
+| người | `:::human` | developer, operator, Console |
+| chặn / kết thúc xấu | `:::stop` | deny, reject, `none`, fail-closed path, `eso-blockers.jsonl` |
+
+Biến thể trong fence **chỉ** khi diagram cần phân biệt chi tiết hơn (giữ nguyên palette Catppuccin):
+
+| Nhóm | Class | Ghi chú |
+|:---|:---|:---|
+| pipeline step / fetch | `step` `src` `in` `out` `free` `good` `ok` | suy ra từ cặp `w`/`r` |
+| trạng thái chờ người | `ask` `warn` `ui` `guess` | `#313244` + `#f9e2af` |
+| trả tiền | `paid` | `#0f766e` + `#14b8a6` |
+| brain / L4 | `brain` `s2` `layer` | `#1e1e2e` + `#cba6f7` |
+| xấu / chưa có | `deny` `bad` `absent` | `#313244` + `#f38ba8` |
+
+Subgraph: id ngắn, title ngắn (`subgraph W ["W write plane"]`), không HTML. Data store:
+`DB[(harness.db)]:::shared` — dùng `shared` cho dữ liệu, `stop` cho trail/blockers.
+
+Theme init (dòng đầu fence) — bắt buộc cho mọi fence trong `documents/07.how-it-works/`, nơi cả bộ phải
+render được khi copy một fence ra ngoài doc (GitHub, PR comment). Fence khác dùng được nếu chỉ render trong
+repo, nhưng copy ra ngoài sẽ mất palette:
+
+```text
+%%{init: {"theme":"base","themeVariables":{"background":"#1e1e2e","primaryColor":"#313244","primaryTextColor":"#cdd6f4","primaryBorderColor":"#cba6f7","lineColor":"#89b4fa","secondaryColor":"#181825","tertiaryColor":"#11111b","clusterBkg":"#181825","clusterBorder":"#6c7086","edgeLabelBackground":"#1e1e2e","fontSize":"14px"}}}%%
+```
+
+---
+
+## 3. Sequence và state
+
+**sequenceDiagram**
+
+- Nhóm pha bằng `rect rgba(30, 58, 138, 0.15)` … `end` (không `box`).
+- Participant: `as` một cụm ngắn (`participant P as gate`).
+- `->>` = gọi đồng bộ, `-->>` = trả về/không đồng bộ. `Note over A,B:` cho ranh giới plane.
+- Nhánh quyết định bằng `alt` / `else` / `end`, không vẽ hai hình cho hai nhánh của cùng luồng.
+
+**stateDiagram-v2**
+
+- Trạng thái = tên định nghĩa trong code (`Sufficient`, `Partial`, `Insufficient`,
+  `DenyWrite`, `ConsentPending`), không phải câu tiếng Việt.
+- `[*] -->` cho điểm vào, transition phải có điều kiện (`: score gte T_high và gaps rỗng`).
+- Dựng từ code thật (`gate.mjs`), không từ shard thiết kế — xem §V21.
+
+---
+
+## 4. Wrapper markdown
+
+- Fence ` ```mermaid ` duy nhất; **không** dùng `pre`/blockquote bọc diagram.
+- Sau dòng `flowchart <dir>` và danh sách `classDef`: **một dòng trống**, rồi mới tới node. Không xếp
+  nhiều dòng trống liền nhau (artifact của sửa tay/normalize).
+- `classDef` chỉ khai báo class **thực sự được dùng** trong fence; mỗi class một lần, đứng trước mọi node.
+- Đoạn dưới fence 1–3 dòng: đọc điểm mấu chốt của hình (bất biến, không phải mô tả lại node).
+- Link chéo: fence mới trong chương → trỏ về §V tương ứng thay vì vẽ lại.
+
+Mẫu tối thiểu:
+
+````text
+```mermaid
+%%{init: ... }%%
+flowchart LR
+
+    classDef w fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+    classDef r fill:#11111b,stroke:#94e2d5,stroke-width:2px,color:#cdd6f4
+
+    A[node]:::w --> B[node]:::r
+```
+````
+
+---
+
+## 5. Một chủ đề, một nơi vẽ (chống drift)
+
+| Chủ đề | Nơi **duy nhất** được vẽ |
+|:---|:---|
+| Hai plane, topology package, turn lifecycle, guard, ingest, data model | `documents/06.diagrams/01.diagrams-mermaid.md` (§V1–§V24) |
+| Landscape / workflow / pipeline thời DSH-plugin | `documents/07.how-it-works/*.md` |
+| Bốn diagram wizard (`v1-coordinates`, `v2-abcd`, `v3-layers`, `taxonomy-bridge`) | **nguồn**: `packages/harness-console/src/diagrams/pipeline-diagrams.ts`; bản copy trong §V26–§V29 |
+
+Sửa diagram sản phẩm thì sửa **nguồn `.ts` trước**, rồi:
+
+```bash
+bun run sync:diagrams
+```
+
+`qc/diagram-parity.test.mjs` fail nếu bản copy lệch nguồn. Sửa chỉ một bên → `bun test` đỏ kèm tên diagram.
+Khi một chương văn bản cần hình: **link** tới §V, không vẽ bản thứ ba.
+
+---
+
+## 6. Render check (trước khi nói "đã render")
+
+```bash
+npx -y @mermaid-js/mermaid-cli -i diagram.mmd -o diagram.svg
+```
+
+- Repo không phụ thuộc `mmdc` lúc runtime; cài ngoài (`/tmp`) khi cần verify.
+- macOS: nếu puppeteer báo thiếu Chrome, trỏ `-p` tới config có
+  `executablePath` = `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`.
+- Fence dài hơn ~200 dòng hoặc có `alt` lồng nhau: render từng fence, không gộp.
+
+---
+
+## 7. Pre-merge checklist
+
+```text
+[ ] IDE preview không lỗi syntax
+[ ] Không `style Node` lẻ; mọi node có class theo vai trò
+[ ] Không mũi tên trỏ vào subgraph id; không `box` trong sequence
+[ ] Label một dòng, không HTML, không emoji
+[ ] Diagram ghi sự thật từ code hiện tại; phần "chưa có" được đánh dấu
+[ ] Không lặp một chủ đề đã có ở 06/07 hoặc ở nguồn `.ts`
+[ ] Bỏ trích dẫn "đã render" nếu chưa chạy mmdc lần này
+```
+
+---
+
+## 8. Ngoài phạm vi
+
+- **Console / Observatory SPA** — nguồn `pipeline-diagrams.ts`, React render; sửa ở đó.
+- **Ticket map, sprint, WBS của consumer** — luật của consumer (baplatform `sdlc.doc.mermaid.mdc`,
+  x79 shard), không áp vào repo này.
+- **Chat-only sketch** — dùng `/visualize`, không commit.

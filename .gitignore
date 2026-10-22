@@ -13,3 +13,6 @@ dist/
 .cursor/session/
 __pycache__/
 *.pyc
+
+# Docker CLI state (DOCKER_CONFIG) the deploy scripts point here: registry seed, buildx cache.
+.docker-config/

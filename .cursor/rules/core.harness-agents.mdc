@@ -31,6 +31,7 @@ canonical: AGENTS.md
 | `harness-observe-server/**` | `pkg.observe-server.mdc` |
 | `harness-observatory/**`, `harness-console/**` | `pkg.observatory-ui.mdc` |
 | `docker/**`, `compose.harness.yml` | `core.harness-product` § Docker |
+| `documents/**` mermaid fence | `core.doc.mermaid.mdc` |
 | `qc/**` | integration tests sau đổi spine |
 
 ## projectPath / cwd
