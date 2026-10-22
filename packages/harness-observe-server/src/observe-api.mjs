@@ -3,6 +3,8 @@ import { isTrackingDisabled } from './observe-config.mjs';
 import { dbCounts, openDb } from './observe-db.mjs';
 import { loadDecisionFlowForConversation, loadDecisionFlowForRequest } from './decision-flow.mjs';
 import { aggregates } from './aggregates.mjs';
+import { buildBrainGraph, dbFingerprint } from './brain-graph-build.mjs';
+import { resolveBrainFile } from './brain-file-read.mjs';
 import { listCalls, listDecisions, requestDetail } from './observe-request-detail.mjs';
 import { enrichRequestListRow } from './request-list-enrich.mjs';
 
@@ -122,6 +124,42 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
         return withDb((db) => aggregates(db, cfg, url));
     }
 
+    // E2: the graph is derived, so it is rebuilt only when the database changed. The fingerprint
+    // watches the main file *and* the WAL, because a WAL commit can leave the main mtime untouched.
+    let brainMemo = null;
+
+    function getBrainGraph() {
+        const key = dbFingerprint(cfg.storage.target);
+        if (brainMemo && brainMemo.key === key) return brainMemo.doc;
+        const doc = withDb((db) => buildBrainGraph({ db, cfg }));
+        brainMemo = { key, doc };
+        return doc;
+    }
+
+    /**
+     * Read one file for the Brain card.
+     *
+     * The caller supplies a **node id**, never a path: the server looks the id up in the graph it
+     * already served, so the client cannot name a file the graph does not contain, and no
+     * path-normalisation bug (Windows separators, trailing slashes, URL encoding) can widen the gate.
+     * The resolver then re-checks containment on the real path. GET only.
+     */
+    function getBrainFile(nodeId) {
+        const graph = getBrainGraph();
+        const node = graph.nodes.find((n) => n.id === nodeId && n.kind === 'note' && n.path);
+        if (!node) {
+            return {
+                ok: false,
+                code: 'not_allowed',
+                message: nodeId ? 'node is not a file node of this brain graph' : 'missing node id',
+                status: 403,
+            };
+        }
+        const result = resolveBrainFile({ requestedPath: node.path, root: cfg.root, allowedPaths: [node.path] });
+        if (!result.ok) return result;
+        return { ...result, nodeId: node.id, pathHost: node.pathHost ?? node.path };
+    }
+
     function getDecisionFlow(url) {
         const requestId = url.searchParams.get('requestId');
         const conversationId = url.searchParams.get('conversationId');
@@ -223,6 +261,8 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
         getCalls,
         getDecisions,
         getAggregates,
+        getBrainGraph,
+        getBrainFile,
         getDecisionFlow,
         getGateEvents,
         getGateSummary,

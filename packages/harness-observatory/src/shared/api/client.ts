@@ -10,8 +10,9 @@ import type {
     IngestRunReport,
     IngestStatus,
     RequestDetailResponse,
+    BrainFileResponse,
+    BrainGraphDocument,
     RequestListResponse,
-    RouteGraphDocument,
     TenantInfo,
     ToggleState,
     WorkspaceInfo,
@@ -76,14 +77,22 @@ export function fetchDecisionFlow(params: { requestId?: string; conversationId?:
     return getJson<DecisionFlowVm>(`/api/decision-flow?${q}`);
 }
 
-export async function fetchRouteGraph(): Promise<RouteGraphDocument> {
-    const res = await fetch('/api/route/graph.json', { headers: { Accept: 'application/json' } });
+export function fetchBrainGraph() {
+    return getJson<BrainGraphDocument>('/api/brain/graph.json');
+}
+
+/**
+ * The file preview carries its refusal reason in the body ("not previewable as text", "outside the
+ * project root"), so this call keeps that message instead of the generic `path → status`.
+ */
+export async function fetchBrainFile(nodeId: string): Promise<BrainFileResponse> {
+    const q = new URLSearchParams({ node: nodeId });
+    const res = await fetch(`/api/brain/file?${q}`, { headers: { Accept: 'application/json' } });
     if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        const msg = (body as { error?: string }).error || `route graph → ${res.status}`;
-        throw new Error(msg);
+        const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(body.message || body.error || `file → ${res.status}`);
     }
-    return res.json() as Promise<RouteGraphDocument>;
+    return res.json() as Promise<BrainFileResponse>;
 }
 
 export function fetchRequestDetail(id: string) {

@@ -2,9 +2,7 @@
 export const NAV_TABS: { path: string; label: string }[] = [
     { path: '/requests', label: 'Requests' },
     { path: '/calls', label: 'Calls' },
-    { path: '/tree', label: 'Tree' },
-    { path: '/graph', label: 'Graph' },
-    { path: '/runtime', label: 'Runtime' },
+    { path: '/brain', label: 'Brain' },
     { path: '/findings', label: 'Findings' },
     { path: '/targets', label: 'Targets' },
     { path: '/decisions', label: 'Decisions' },

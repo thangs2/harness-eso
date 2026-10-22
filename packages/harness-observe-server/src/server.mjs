@@ -155,6 +155,13 @@ export function createObserveApp(cfg, opts = {}) {
         if (p === '/api/gate/events') return json(api.getGateEvents(url));
         if (p === '/api/gate/summary') return json(api.getGateSummary());
         if (p === '/api/aggregates') return json(api.getAggregates(url));
+        if (p === '/api/brain/graph.json') return json(api.getBrainGraph());
+        if (p === '/api/brain/file') {
+            const nodeId = url.searchParams.get('node');
+            const result = api.getBrainFile(nodeId);
+            if (!result.ok) return json({ error: result.code, message: result.message }, result.status);
+            return json(result);
+        }
         if (p === '/api/route/graph.json') {
             const candidates = [
                 path.join(cfg.root, 'route-graph.json'),

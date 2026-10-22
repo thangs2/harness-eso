@@ -135,16 +135,60 @@ export interface DecisionFlowVm {
     designRef?: string;
 }
 
-export type RouteGraphDocument = Record<string, unknown> & {
-    nodes?: unknown[];
-    edges?: unknown[];
-    surfaces?: unknown[];
-    rules?: unknown[];
-    skills?: unknown[];
-    dirs?: unknown[];
-    directories?: unknown[];
-    buckets?: Record<string, unknown>;
-};
+/**
+ * Brain graph — `GET /api/brain/graph.json`. Server-owned contract: the server composes it from
+ * the observe DB only (brain-graph-build.mjs), so `meta.omitted` is the honest answer for a layer
+ * this deployment does not produce yet, and `meta.truncated` is the only way a cap may be shown.
+ */
+export type BrainKind = 'root' | 'area' | 'note' | 'skill' | 'tool' | 'run' | 'app';
+export type BrainLayer = 'core' | 'memory' | 'skills' | 'runs' | 'apps';
+
+export interface BrainNode {
+    id: string;
+    kind: BrainKind;
+    layer: BrainLayer;
+    label: string;
+    area: string | null;
+    /** Path as this *server* sees it — what the preview route opens. */
+    path: string | null;
+    /** Same file as the *host* saw it (Docker mount, otherwise identical to `path`). Display/copy this. */
+    pathHost: string | null;
+    /** Server verified it can open this node as a text file. False for directories and unmounted paths. */
+    previewable: boolean;
+    note: string | null;
+    changed: string | null;
+    degree: number;
+    weight: number;
+}
+
+export interface BrainLink {
+    s: string;
+    t: string;
+}
+
+export interface BrainFileResponse {
+    path: string;
+    relativePath: string;
+    bytes: number;
+    shownBytes: number;
+    truncated: boolean;
+    text: string;
+}
+
+export interface BrainGraphDocument {
+    version: number;
+    nodes: BrainNode[];
+    links: BrainLink[];
+    legend?: string;
+    meta: {
+        builtAt: string;
+        project: { id: string; label: string; rootPath: string };
+        sources: { source: string; present: boolean; rows: number }[];
+        omitted: { layer: string; reason: string }[];
+        truncated: { kind: string; shown: number; total: number }[];
+        limits: Record<string, number>;
+    };
+}
 
 export interface RequestListResponse {
     items: RequestListItem[];

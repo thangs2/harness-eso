@@ -7,8 +7,7 @@ import { DecisionsPage } from '@/pages/DecisionsPage';
 import { GatePage } from '@/pages/GatePage';
 import { ProjectsPage } from '@/pages/ProjectsPage';
 import { StatusPage } from '@/pages/StatusPage';
-import { RouteGraphPage } from '@/pages/RouteGraphPage';
-import { TreePage } from '@/pages/TreePage';
+import { BrainPage } from '@/pages/BrainPage';
 import { StubPage } from '@/pages/StubPage';
 
 export const appRouter = createBrowserRouter([
@@ -21,10 +20,7 @@ export const appRouter = createBrowserRouter([
             { path: 'requests', element: <RequestsListPage /> },
             { path: 'requests/:id', element: <RequestDetailPage /> },
             { path: 'calls', element: <CallsPage /> },
-            { path: 'tree', element: <TreePage /> },
-            { path: 'tree/:requestId', element: <TreePage /> },
-            { path: 'graph', element: <RouteGraphPage /> },
-            { path: 'runtime', element: <StubPage title="Runtime" hint="Class, brain tier, runtime flags." /> },
+            { path: 'brain', element: <BrainPage /> },
             { path: 'findings', element: <StubPage title="Findings" hint="L1 conformance overlay." /> },
             { path: 'targets', element: <StubPage title="Targets" hint="Hot files/rules in session." /> },
             { path: 'decisions', element: <DecisionsPage /> },
