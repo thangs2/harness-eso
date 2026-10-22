@@ -53,6 +53,31 @@ export function findConsumerRoot(start) {
     return null;
 }
 
+/**
+ * A shell redirect, or `tee` used as a command.
+ *
+ * `tee` must be a command, not the word: a commit message that says "a redirect or `tee`" is prose, and
+ * treating prose as a redirect denied a harmless `git commit -F - <<'EOF'`.
+ */
+function hasShellRedirect(command) {
+    const text = String(command || '');
+    return /[^<]>>?\s*[^\s&]/.test(text) || /\|\s*tee\b/.test(text) || /(?:^|[;&]\s*)tee\b/.test(text);
+}
+
+/** Repo-relative path literals a script names, e.g. `open('AGENTS.md','w')`. */
+const REL_LITERAL_RE =
+    /['"]([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*\.(?:md|mdx|mjs|cjs|js|ts|json|jsonl|ya?ml|sql|py|txt|toml|sh|ps1|css|html))['"]/g;
+
+function relativeLiterals(command) {
+    const out = [];
+    for (const match of String(command || '').matchAll(REL_LITERAL_RE)) {
+        const rel = match[1];
+        if (rel.startsWith('/') || rel.split('/').includes('..')) continue;
+        if (!out.includes(rel)) out.push(rel);
+    }
+    return out;
+}
+
 function argPath(args) {
     for (const key of ['path', 'file_path', 'filePath', 'target']) {
         const value = args?.[key];
@@ -110,16 +135,32 @@ export function decideToolCall({ root, name, args }) {
         if (!command) return null;
         for (const target of shellWriteTargets(command)) {
             if (target === '<unknown>' || !target) continue;
+            // A shell variable is not a path: `> $TARGET` must fall through to the unresolved case,
+            // not be joined to the root and quietly allowed.
+            if (target.includes('$') || target.startsWith('~')) continue;
             targets.push(path.isAbsolute(target) ? target : path.join(root, target));
         }
-        /* A write-intent command whose target cannot be resolved is still a write attempt. Denying
-         * on the unparsed case is the safe direction for a channel with no evidence (B5). */
+        /*
+         * Before deciding what an unparsed write means, look at what it actually names.
+         *
+         * A Python heredoc writes through a string literal, which the shared matcher only finds when
+         * that literal is absolute. A repo-relative literal (`open('AGENTS.md','w')`) is a normal way
+         * to write and must be checked against the policy, not denied for being unparsed.
+         */
         if (!targets.length) {
             if (!shellHasWriteIntent(command)) return null;
-            return {
-                kind: 'deny',
-                reason: 'harness-eso: shell command has write intent but its target could not be resolved; split it into a plain path or run it manually',
-            };
+            if (!hasShellRedirect(command)) {
+                for (const rel of relativeLiterals(command)) targets.push(path.join(root, rel));
+                // A script that names no path at all is nothing this gate can judge.
+                if (!targets.length) return null;
+            } else {
+                /* A redirect or `tee` whose target cannot be resolved is still a write attempt, and a
+                 * channel with no evidence is the one case where denying is the safe direction (B5). */
+                return {
+                    kind: 'deny',
+                    reason: 'harness-eso: shell command has write intent but its target could not be resolved; split it into a plain path or run it manually',
+                };
+            }
         }
     } else {
         return null;

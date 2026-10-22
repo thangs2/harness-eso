@@ -143,6 +143,47 @@ test('the handler returns deny straight from the gate without calling next()', a
     assert.equal(decisions[0].event, 'tools/pre-execute');
 });
 
+test('the word "tee" in prose is not a redirect', () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const message = ["git commit -F - <<'EOF'", 'a redirect or `tee` with an unresolvable target keeps the deny', 'EOF'].join('\n');
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: message } }), null);
+
+    // `tee` to a variable is also "no intent" in the shared matcher — the plugin follows it, so the
+    // host pack and this gate cannot disagree about what counts as a write.
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: 'echo x | tee $TARGET' } }), null);
+});
+
+test('a heredoc script that writes a protected relative path is still gated', () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const command = ["python3 - <<'PY'", "open('secrets/key.txt','w').write('x')", 'PY'].join('\n');
+    const decision = decideToolCall({ root, name: 'bash', args: { command } });
+    assert.equal(decision?.kind, 'deny');
+    assert.match(decision.reason, /secrets\/key\.txt/);
+});
+
+test('a heredoc script that writes only writable relative paths proceeds', () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const command = ["python3 - <<'PY'", "open('src/app.js','w').write('x')", "open('README.md','a').write('y')", 'PY'].join('\n');
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command } }), null);
+});
+
+test('a heredoc that names no path at all is not judged', () => {
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    const command = ["python3 - <<'PY'", "print('hello')", 'PY'].join('\n');
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command } }), null);
+});
+
+test('a redirect to a shell variable is not write intent in the shared matcher', () => {
+    // Deliberate: `shellWriteTargets` ignores `$VAR` targets, so the host pack and this plugin agree.
+    // Only a script whose *body* writes (PY_WRITE_RE) is judged when the operator target is unknown.
+    const root = consumer({ paths: { locked: ['secrets/'], gated: [], ask: [], sot: [] } });
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: 'cat data > $TARGET' } }), null);
+
+    const script = ["python3 - <<'PY' > $OUT", "open('x','w').write('y')", 'PY'].join('\n');
+    const decision = decideToolCall({ root, name: 'bash', args: { command: script } });
+    assert.equal(decision?.kind, 'deny', 'a writing script with an unknown redirect target is denied');
+});
+
 test('the pre-step seam never changes an upstream decision', async () => {
     const ctx = fakeCtx();
     createEsoDshPlugin().apply(ctx);

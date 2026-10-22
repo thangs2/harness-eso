@@ -33,7 +33,8 @@ test('the generated patch inserts exactly one row, and it points at this package
     assert.match(patch, /^- insert:/m);
     assert.match(patch, new RegExp(`id: ${ROW_ID}\\b`));
     assert.equal(patch.split('id:').length - 1, 1, 'one row only: a duplicate id mounts the plugin twice');
-    assert.match(patch, new RegExp(`name: '${ROW_NAME.replace(/[/@.]/g, (c) => `\\${c}`)}'`));
+    assert.ok(patch.includes(`name: '${ROW_NAME}'`), `row must point at ${ROW_NAME}`);
+    assert.equal(ROW_NAME.startsWith('./'), true, 'a relative name is anchored beside the patch file');
 });
 
 test('the bundle exports the plugin shape DSH loads', async () => {
