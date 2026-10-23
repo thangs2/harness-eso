@@ -143,6 +143,45 @@ export function resolveEnforceWrites(rawEso = {}) {
 }
 
 /**
+ * The source list this turn is measured with (G-01).
+ *
+ * `DEFAULT_ESO_POLICY.sources` enables `docgraph-cli` and `codegraph-cli`. Folding it under the
+ * consumer's block, as this used to, meant a consumer whose `eso` block names only `mode` /
+ * `enforceWrites` silently got an evidence pipeline it never asked for: docgraph answered nothing,
+ * every miss became a required gap, and the score could not reach `T_high` — `atrievefin`'s permanent
+ * `insufficient` (`score: 0` in its attestation).
+ *
+ * It lives here rather than in the host pack because **two** callers run `orchestrateTurn`: the host
+ * pack's preflight and the observe plane's ingest. A decision made in one of them is a verdict the
+ * other one disagrees with (A1). `AGENTS.md` keeps the engine defaults for library callers; this is
+ * the one place where "did the consumer ask for this provider" is answered for both.
+ *
+ * `sourcesDeclared` is passed by the host pack, which reads the consumer's file before the policy
+ * loader merges defaults **into** it. Absent flag (library callers, tests) means "trust the block":
+ * the merge has already run, and a provider present without `enabled: true` is indistinguishable from
+ * one the default supplied.
+ *
+ * @param {object|undefined} rawSources the block as the policy loader left it
+ * @param {{ declared?: boolean }} [opts]
+ * @returns {object} the sources block for `esoPolicy`
+ */
+export function declaredSources(rawSources, opts = {}) {
+    const sources = rawSources && typeof rawSources === 'object' ? rawSources : {};
+    if (opts.declared === false) {
+        return { ...sources, law: { enabled: false }, code: { enabled: false } };
+    }
+    if (opts.declared !== true) return { ...sources };
+    const next = {};
+    for (const [kind, src] of Object.entries(sources)) {
+        next[kind] = src && typeof src === 'object' && src.enabled === true ? src : { ...(src && typeof src === 'object' ? src : {}), enabled: false };
+    }
+    for (const kind of ['law', 'code']) {
+        if (!next[kind]) next[kind] = { enabled: false };
+    }
+    return next;
+}
+
+/**
  * @param {object} policy — full decision policy
  */
 export function resolveEsoPolicy(policy) {
@@ -150,11 +189,17 @@ export function resolveEsoPolicy(policy) {
     const mode = ESO_MODES.includes(raw.mode) ? raw.mode : DEFAULT_ESO_POLICY.mode;
     const enforceWrites = resolveEnforceWrites(raw);
     const preflightRaw = raw.preflight || {};
-    const sources = { ...DEFAULT_ESO_POLICY.sources, ...(raw.sources || {}) };
+    const sources = declaredSources(raw.sources);
     return {
         enabled: raw.enabled !== false,
         mode,
         enforceWrites,
+        /**
+         * Whether the **consumer wrote** `enforceWrites`, as opposed to the strict default supplying
+         * it (G-08). The gate has no use for this flag; the verdict and the deny message do — a refusal
+         * explained by a key nobody wrote is the one an operator cannot act on.
+         */
+        enforceWritesDeclared: ENFORCE_WRITES_VALUES.includes(raw.enforceWrites),
         thresholds: {
             T_low: Number(raw.thresholds?.T_low ?? DEFAULT_ESO_POLICY.thresholds.T_low),
             T_high: Number(raw.thresholds?.T_high ?? DEFAULT_ESO_POLICY.thresholds.T_high),

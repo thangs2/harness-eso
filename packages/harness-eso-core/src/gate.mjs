@@ -34,9 +34,25 @@ export function buildTurnVerdict(params) {
 
     const level = measure.level;
     const jevOnPartial = eso.preflight?.jevOnPartial === true;
+    /*
+     * A gap **nothing in this repo can close** must not hold the write gate shut (G-02/G-03).
+     *
+     * `fail_closed` means "do not publish on unproven evidence". A `law` gap whose term the law
+     * adapter already answered with nothing is not unproven evidence the agent can produce: it is a
+     * statement that this corpus does not contain the document. Counting it the same way as a file
+     * the agent simply did not read meant that a consumer could read everything it owns, close every
+     * closable gap, and still be refused — `atrievefin`, 2026-10-23, every turn, with the deny
+     * blaming "insufficient context".
+     *
+     * The gap stays in the document and stays visible (it is not removed — register R6); it stops
+     * being a **write** condition. Score still carries the miss: `lawRatio` is computed from the pack,
+     * so the number does not improve because of this.
+     */
+    const blockingGaps = (Array.isArray(gaps) ? gaps : []).filter((g) => g?.unanswerable !== true);
+    const gapsProven = blockingGaps.length === 0;
     let allowProtectedWrite = level === 'sufficient';
     if (enforceWrites === 'fail_closed') {
-        allowProtectedWrite = level === 'sufficient';
+        allowProtectedWrite = level === 'sufficient' || (level === 'partial' && gapsProven);
         if (jevOnPartial && level === 'partial') {
             allowProtectedWrite = false;
         }
@@ -87,6 +103,14 @@ export function buildTurnVerdict(params) {
         hardBlockers,
         consent: { required: consentRequired, state: consentState },
         enforceWrites,
+        /**
+         * Was `fail_closed` written by the consumer, or supplied by the strict default? (G-08)
+         *
+         * `resolveEnforceWrites` is deliberately conservative, and an atrievefin policy that names only
+         * `mode: hint` was being refused under a posture its operator never wrote. The default stays;
+         * what changes is that a refusal can no longer be explained by a key that is not in the file.
+         */
+        enforceWritesSource: eso.enforceWritesDeclared === false ? 'default' : 'declared',
         esoMode: eso.mode,
         jevOnPartial: jevOnPartial && level === 'partial',
         evidenceBundleRef: null,

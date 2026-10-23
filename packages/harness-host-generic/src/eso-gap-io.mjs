@@ -30,6 +30,60 @@ export function gapClosurePath(root = process.cwd(), tree = harnessTree()) {
     return `${sessionDir(root, tree)}/.eso-gap-closure.json`;
 }
 
+/**
+ * Where a consumer's **non-answers** are remembered (G-13).
+ *
+ * Product state, not the session dir: the fact being stored is about the repo ("this corpus has no
+ * document for this term"), which outlives the session that discovered it — and the session dir is one
+ * the agent can write, so a stored non-answer there would be a gate input the gated party owns.
+ */
+export function lawMissPath(root = process.cwd()) {
+    return path.join(String(root || process.cwd()), '.harness', 'law-misses.json');
+}
+const LAW_MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Terms this repo answered with nothing, within the TTL, keyed by the query the pack asked.
+ *
+ * Deliberately **not** a cache of evidence: only the absence is remembered, and only to change what the
+ * preflight *reports*. Every turn still asks the adapter (E2 allows skipping derived work, not
+ * measurement), so an index rebuild is noticed on the next turn without any invalidation hook.
+ *
+ * @returns {Record<string, {missedAt: string, adapterTrace?: string}>}
+ */
+export function readLawMisses(root = process.cwd(), now = Date.now()) {
+    const doc = readJsonFile(lawMissPath(root));
+    const terms = doc?.terms;
+    if (!terms || typeof terms !== 'object') return {};
+    const fresh = {};
+    for (const [term, entry] of Object.entries(terms)) {
+        const at = Date.parse(entry?.missedAt || '');
+        if (!Number.isFinite(at) || now - at > LAW_MISS_TTL_MS) continue;
+        fresh[term] = entry;
+    }
+    return fresh;
+}
+
+/**
+ * Record this turn's misses and forget the terms that answered this time.
+ *
+ * Forget, don't merge, on success: a term that produced rows is no longer unanswerable, and keeping the
+ * old row would make the next preflight report a stale non-answer as current.
+ */
+export function rememberLawMisses(root, misses, answered = []) {
+    const file = lawMissPath(root);
+    const now = new Date().toISOString();
+    const terms = readLawMisses(root);
+    for (const m of misses || []) terms[m] = { missedAt: now };
+    for (const a of answered || []) delete terms[a];
+    try {
+        writeJsonFile(file, { ok: true, updatedAt: now, terms });
+    } catch {
+        // Product state may be read-only (a container); the gate must not fail because of a hint.
+    }
+    return terms;
+}
+
 export function bundleStampPath(root = process.cwd(), tree = harnessTree()) {
     return `${sessionDir(root, tree)}/.eso-bundle-stamp.json`;
 }
@@ -680,6 +734,14 @@ export function shouldBlockBrain(preflight, closure, policy) {
     const gaps = Array.isArray(preflight.gaps) ? preflight.gaps : [];
     if (!gaps.length) return false;
     /*
+     * A gap nothing in this repo can close cannot be a Brain condition either (G-09). `enforceBrain`
+     * asks for a reasoning record before a *protected write*, and the record is keyed to evidence; a
+     * term the corpus does not contain was making the Brain stamp unreachable on the same terms it
+     * made the evidence unreachable — two levers for one unanswerable gap. Register R6: the gap stays
+     * in the document and stays visible; it does not gate.
+     */
+    if (gaps.every((g) => g?.unanswerable === true)) return false;
+    /*
      * A closure written for an older generation of the **same** conversation still speaks for this
      * one (P-28): re-firing preflight must not re-arm a Brain block the agent already satisfied.
      */
@@ -718,6 +780,15 @@ export function writeBundleStampFromPreflight(preflight, policy, root = process.
         mode: gateMode,
         enforceWrites: enforceWrites || null,
         preflightAt: preflight.at || null,
+        /*
+         * Two facts the deny message needs and the stamp used to drop (G-08, G-02). Both are read from
+         * the preflight document: it is the verdict this stamp describes, and re-deriving them here
+         * would be a second answer to the same question.
+         */
+        enforceWritesSource: preflight.enforceWritesSource === 'default' ? 'default' : 'declared',
+        unanswerableGaps: Array.isArray(preflight.unanswerableGaps)
+            ? preflight.unanswerableGaps.filter((g) => g && typeof g === 'object' && g.id).map((g) => ({ id: String(g.id) }))
+            : [],
         // Whether this verdict is the initial measurement or one taken as gaps closed (H3). A reader
         // comparing the stamp with the closure file needs to know which instant it describes.
         ...(preflight.closure ? { closure: preflight.closure, updatedAt: preflight.updatedAt ?? null } : {}),
@@ -748,6 +819,8 @@ export function writeBundleStampFromPreflight(preflight, policy, root = process.
                 fingerprint: preflight.fingerprint ?? null,
                 invIds: preflight.pinnedInvariants ?? preflight.invIds ?? [],
                 ttlSec: preflight.ttlSec ?? 600,
+                enforceWritesSource: payload.enforceWritesSource,
+                unanswerableGaps: payload.unanswerableGaps,
             });
         }
     } catch {

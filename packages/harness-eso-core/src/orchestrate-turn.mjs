@@ -2,7 +2,7 @@ import { decide } from '@mu/harness-decision';
 import { findRepoRoot, isoNow } from '@mu/harness-foundation/pure';
 import { runCollect } from './collect.mjs';
 import { buildTurnVerdict } from './gate.mjs';
-import { loadEsoPolicy, resolveEsoPolicy } from './eso-policy.mjs';
+import { loadEsoPolicy, declaredSources, resolveEsoPolicy } from './eso-policy.mjs';
 import { loadHarnessProfile } from './profile-load.mjs';
 
 /**
@@ -23,6 +23,14 @@ export async function orchestrateTurn(event, options = {}) {
         : loadHarnessProfile(options.profileId ?? 'generic-eso', options.cfg);
     const policy = profileLoad.policy;
     const eso = resolveEsoPolicy(policy);
+    /*
+     * The sources block is decided **here**, once, for both callers (G-01). The host pack knows whether
+     * the consumer's file named `sources` (it reads that file before the loader merges defaults into it)
+     * and says so with `sourcesDeclared`; an ingest run does not, and trusts the merged block as written.
+     */
+    eso.sources = declaredSources(policy?.eso?.sources, {
+        declared: policy?.eso?.sourcesDeclared === true ? true : policy?.eso?.sourcesDeclared === false ? false : undefined,
+    });
 
     if (!eso.enabled) {
         return { skipped: true, reason: 'eso_disabled' };
@@ -74,6 +82,7 @@ export async function orchestrateTurn(event, options = {}) {
         retrieval: collected.retrieval,
         gaps: collected.gaps,
         measure: collected.measure,
+        lawMisses: collected.lawMisses,
         verdict,
     };
 }

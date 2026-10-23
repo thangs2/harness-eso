@@ -528,3 +528,68 @@ test('claude guard-write.py allows writing inside .claude/session/ without brain
 });
 
 
+
+test('guard-write.py DENY_ESO names the defaulted lever and the unanswerable gap (G-08/G-12)', () => {
+    /*
+     * The deny text is the one artefact an operator reads. Before this, it offered three remedies and
+     * none of them could be executed by its reader: the evidence gate ignores `eso.mode` (it reads
+     * `enforceWrites`), docgraph cannot close a `law` gap a corpus does not contain, and HIL consent
+     * covers `ask` / `gated`, not evidence. Both facts are in the verdict; neither reached the message.
+     */
+    const root = tempConsumer();
+    // The Brain gate would refuse first; this test is about the evidence gate's sentence.
+    fs.writeFileSync(
+        path.join(root, '.harness', 'decision-policy.json'),
+        JSON.stringify({
+            version: 1,
+            eso: { enabled: true, mode: 'hint', enforceWrites: 'fail_closed', cognition: { enforceBrain: 'off', gapAttestation: false } },
+            paths: { locked: [], gated: ['src/'], ask: [] },
+        }),
+    );
+    const stampPath = path.join(root, '.claude', 'session', '.eso-bundle-stamp.json');
+    fs.mkdirSync(path.dirname(stampPath), { recursive: true });
+    fs.writeFileSync(
+        stampPath,
+        JSON.stringify({
+            ok: true,
+            at: new Date().toISOString(),
+            allowWrite: false,
+            level: 'partial',
+            score: 0.55,
+            mode: 'fail_closed',
+            enforceWrites: 'fail_closed',
+            enforceWritesSource: 'default',
+            unanswerableGaps: [{ id: 'law:harness-tooling' }],
+        }),
+    );
+
+    const templateScript = path.resolve(import.meta.dirname, '../profiles/templates/hooks/guard-write.py');
+    const destDir = path.join(root, '.claude', 'hooks');
+    fs.mkdirSync(destDir, { recursive: true });
+    const destScript = path.join(destDir, 'guard-write.py');
+    fs.copyFileSync(templateScript, destScript);
+
+    const res = spawnSync(
+        'python3',
+        [destScript],
+        {
+            input: JSON.stringify({
+                session_id: 'claude-sess-eso',
+                cwd: root,
+                hook_event_name: 'PreToolUse',
+                tool_name: 'Write',
+                tool_input: { file_path: 'src/app.mjs', content: 'export const x = 1;\n' },
+            }),
+            cwd: root,
+            encoding: 'utf8',
+            env: { ...process.env, HARNESS_TREE: 'claude', HARNESS_ALLOW_SESSION_STAMP_FALLBACK: '1' },
+        },
+    );
+    const output = JSON.parse(res.stdout || '{}');
+    const reason = JSON.stringify(output);
+    assert.equal(res.status, 0);
+    assert.match(reason, /fail-closed/, reason);
+    assert.match(reason, /law:harness-tooling/, 'names the gap nothing can close');
+    assert.match(reason, /NOT written in \.harness\/decision-policy\.json/, 'names the defaulted key');
+    assert.doesNotMatch(reason, /set eso\.mode/, 'never offers a lever the gate does not read');
+});

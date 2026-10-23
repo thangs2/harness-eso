@@ -15,7 +15,7 @@ import path from 'node:path';
 import { buildPreflightProjection, orchestrateTurn } from '@mu/harness-eso-core';
 import { computeFastFingerprint, findRepoRoot } from '@mu/harness-foundation/pure';
 import { detectShape, emitHook, harnessTree, loadPolicyForCwd, readStdin, sessionDir } from './hook-io.mjs';
-import { mergeGapClosure, readPreflight, writeBundleStampFromPreflight } from './eso-gap-io.mjs';
+import { mergeGapClosure, readLawMisses, readPreflight, rememberLawMisses, writeBundleStampFromPreflight } from './eso-gap-io.mjs';
 
 /**
  * The one-line instruction a hint-mode preflight leaves for the agent.
@@ -32,8 +32,9 @@ function buildEvidencePreflightBlock(pre) {
         parts.push(`Gaps: ${pre.gaps.map((g) => g.kind || g.query || 'gap').join(', ')}.`);
     }
     if (Array.isArray(pre.lawMisses) && pre.lawMisses.length) {
+        const known = Array.isArray(pre.lawMissesKnown) && pre.lawMissesKnown.length ? ` (already recorded for this repo: ${pre.lawMissesKnown.join(', ')})` : '';
         parts.push(
-            `Law index returned nothing for: ${pre.lawMisses.join(', ')} — reading cannot close these; cite the gap in the answer instead of retrying.`,
+            `Law index returned nothing for: ${pre.lawMisses.join(', ')}${known} — reading cannot close these; cite the gap in the answer instead of retrying.`,
         );
     }
     return parts.join(' ');
@@ -67,6 +68,27 @@ function stemFromPrompt(data) {
 /** Consumer root for this turn: the config anchor, falling back to the host's cwd. */
 function consumerRoot() {
     return findRepoRoot(process.cwd()) || process.cwd();
+}
+
+/**
+ * Did the consumer's own `decision-policy.json` name `eso.sources`? (G-01)
+ *
+ * Asked **before** `loadDecisionPolicy` merges `DEFAULT_ESO_POLICY.sources` into the document, because
+ * after that merge "never declared" and "declared as the default" are the same value. The answer
+ * travels down as `eso.sourcesDeclared` and `orchestrateTurn` decides what it means — the ingest
+ * worker runs the same fold, so a decision taken only here would be a verdict the observe plane
+ * disagrees with.
+ */
+function readDeclaredSources(root) {
+    if (!root) return false;
+    const fp = path.join(root, '.harness', 'decision-policy.json');
+    try {
+        if (!fs.existsSync(fp)) return false;
+        const raw = JSON.parse(fs.readFileSync(fp, 'utf8'));
+        return Boolean(raw && typeof raw === 'object' && raw.eso && typeof raw.eso === 'object' && raw.eso.sources);
+    } catch {
+        return false;
+    }
 }
 
 export async function run() {
@@ -145,17 +167,25 @@ export async function run() {
      * consumer's `.harness/decision-policy.json` already carries the profile defaults merged in
      * at provision time, so re-merging here would be a second, divergent source of thresholds.
      * It also means the host pack needs no copy of `profiles/` at runtime.
+     *
+     * What this call must add is the one fact the merge destroys: whether the consumer's own file
+     * named `eso.sources` (G-01). `orchestrateTurn` turns the verdict into a source list, so the
+     * ingest worker and this hook cannot disagree about which providers were asked for.
      */
     const { policy } = loadPolicyForCwd();
+    const esoPolicy = {
+        ...policy,
+        eso: { ...policy.eso, sourcesDeclared: readDeclaredSources(root) },
+    };
 
     let projection;
     const t0 = Date.now();
     try {
-        const result = await orchestrateTurn(turn, { phase: 'preflight', cfg: { root }, policy });
+        const result = await orchestrateTurn(turn, { phase: 'preflight', cfg: { root }, policy: esoPolicy });
         if (result.skipped) {
             projection = { ok: true, skipped: true, reason: result.reason, at: new Date().toISOString() };
         } else {
-            projection = buildPreflightProjection(turn, result, { latencyMs: Date.now() - t0, root, policy });
+            projection = buildPreflightProjection(turn, result, { latencyMs: Date.now() - t0, root, policy: esoPolicy });
         }
     } catch (err) {
         /*
@@ -177,6 +207,23 @@ export async function run() {
         if (projection) {
             projection.conversationId = sessionId;
             if (!projection.fingerprint && currentFp) projection.fingerprint = currentFp;
+            /*
+             * Remember what the corpus could not answer (G-13). Before this, every turn re-asked the same
+             * term, got nothing, and reported it as a fresh gap — three atrievefin sessions in a row
+             * carried an identical `law:*` set and nothing said it had been answered before.
+             *
+             * The non-answer is recorded, never the evidence: `lawMisses` comes from this turn's adapter
+             * trace, and a term that answered this time is forgotten. A later turn whose stored list is
+             * non-empty but whose fresh misses are empty has nothing to do here.
+             */
+            const answered = (projection.pack?.requiredDocTerms || []).filter(
+                (t) => !(projection.lawMisses || []).includes(t),
+            );
+            const knownBefore = Object.keys(readLawMisses(root));
+            const known = rememberLawMisses(root, projection.lawMisses, answered);
+            const repeated = (projection.lawMisses || []).filter((t) => knownBefore.includes(t));
+            if (repeated.length) projection.lawMissesKnown = repeated;
+            projection.lawMisses = Object.keys(known);
         }
         writePreflightFile(root, tree, projection);
         /*
@@ -186,7 +233,7 @@ export async function run() {
          * the ones this preflight added as `reopenedBy: preflight-refire`.
          */
         mergeGapClosure(projection, root, tree);
-        writeBundleStampFromPreflight(projection, policy, root, tree);
+        writeBundleStampFromPreflight(projection, esoPolicy, root, tree);
     } catch {
         /* fail-open on session file writes */
     }
@@ -217,11 +264,44 @@ export async function run() {
 
     if (projection.ok === false && projection.enforceWrites === 'fail_closed') {
         out.permission = 'deny';
-        out.user_message =
-            'ESO preflight insufficient for dev slice — run gap fetch or narrow to a question.';
+        out.user_message = denyReasonFor(projection);
         out.agent_message = out.user_message;
     }
     emitHook(out, shape);
+}
+
+/**
+ * The deny, in the words of the verdict that produced it (G-12).
+ *
+ * This said "run gap fetch or narrow to a question" for every refusal — the same sentence for a turn that
+ * never measured anything and a turn that measured everything its repo contains. It also never mentioned
+ * that `fail_closed` can be a default the consumer did not write (G-08), or that a gap may be one no
+ * reading can close (G-02), which are the two facts that decide what the operator does next.
+ */
+export function denyReasonFor(projection) {
+    const parts = [
+        `ESO preflight ${projection?.level ?? 'insufficient'} (score ${Number(projection?.score ?? 0).toFixed(2)}).`,
+    ];
+    const unanswerable = (projection?.unanswerableGaps || []).map((g) => g?.id).filter(Boolean);
+    if (unanswerable.length) {
+        parts.push(
+            `These gaps cannot be closed by reading this repo — report them instead of retrying: ${unanswerable.join(', ')}.`,
+        );
+    }
+    const open = (projection?.gaps || []).filter((g) => g?.unanswerable !== true);
+    if (open.length) {
+        parts.push(
+            `Close the remaining gaps (${open
+                .map((g) => `${g?.kind || 'gap'}:${g?.query || '?'}`)
+                .join(', ')}) — read the files and re-run the query the preflight names.`,
+        );
+    }
+    if (projection?.enforceWritesSource === 'default') {
+        parts.push(
+            '`enforceWrites` is NOT declared in .harness/decision-policy.json; the strict default `fail_closed` is in force. Setting `eso.mode` does not change it.',
+        );
+    }
+    return parts.join(' ');
 }
 
 function writePreflightFile(root, tree, projection) {

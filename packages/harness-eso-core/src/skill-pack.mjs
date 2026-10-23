@@ -48,7 +48,20 @@ const PACKS = {
  * @param {object} [policy]
  */
 export function resolveSkillPack(surface, policy = {}) {
-    const bucket = surface?.bucket === 'root' ? 'tools' : surface?.bucket || 'general';
+    /*
+     * `root` is its **own** pack, not `tools` (G-01).
+     *
+     * It used to resolve to `tools`, whose `requiredDocTerms` are `harness-tooling`,
+     * `decision-facade` and `harness-eso` — documents that exist in this repo and nowhere else. A
+     * prompt classified `root` on a consumer therefore inherited three law gaps that no reading of
+     * *that* repo could ever close, and the evidence score could not pass `T_high` in any turn. The
+     * `root` pack below already declared zero terms; the mapping is what shadowed it.
+     *
+     * A consumer that genuinely wants the tooling terms in its root turns declares its own
+     * `skillPacks.tools` or `skillPacks.root` (the policy branch below), which is a decision it can
+     * explain; inheriting them by bucket was not.
+     */
+    const bucket = surface?.bucket || 'general';
     const packs = policy?.skillPacks || policy?.eso?.skillPacks;
     const policyPack = packs?.[bucket];
     if (policyPack && typeof policyPack === 'object') {

@@ -183,6 +183,18 @@ export function writeEsoAttestation(projectId, input, secret = undefined) {
         allowWrite: input?.allowWrite === true,
         enforceWrites: input?.enforceWrites ?? null,
         mode: input?.mode ?? null,
+        /**
+         * Whether `enforceWrites` was written by the consumer or supplied by the strict default (G-08),
+         * and the gaps no reading in this repo can close (G-02). The guard's deny message reads both; a
+         * verdict that omits them forces the guard to describe a refusal from fields it does not have.
+         *
+         * Reported only, never decided on: these two keys are outside the MAC's field list (see
+         * `computeReceiptMac`), so a receipt minted by an older pack stays valid and simply says nothing.
+         */
+        enforceWritesSource: input?.enforceWritesSource === 'default' ? 'default' : 'declared',
+        unanswerableGaps: Array.isArray(input?.unanswerableGaps)
+            ? input.unanswerableGaps.filter((g) => g && typeof g === 'object' && g.id).map((g) => ({ id: String(g.id) }))
+            : [],
         fingerprint: input?.fingerprint ? String(input.fingerprint) : null,
         invIds,
         ttlSec,

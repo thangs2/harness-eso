@@ -60,6 +60,54 @@ DENY_ESO = (
     f"Stamp: {SESSION_REL}/{ESO_STAMP_NAME}"
 )
 
+
+def deny_eso_message() -> str:
+    """`DENY_ESO`, plus what actually refused (§G-12).
+
+    The old text offered three remedies and none of them could be executed by the party reading it: the
+    evidence gate ignores `eso.mode` (it reads `enforceWrites`), docgraph closes no `law` gap the corpus
+    does not contain, and HIL consent covers `ask` / `gated`, not evidence. It also named the *session*
+    stamp while the decision came from product state, and product state is written on every preflight.
+
+    Every sentence here is a fact read from the verdict: which gate, whether the key was defaulted, which
+    gap is closable by nothing, and — when the verdict is simply stale — the one action that helps.
+    """
+    verdict = eso_verdict()
+    reasons = verdict.get("reasons") or []
+    label = "attestation (product state)" if verdict.get("source") == "attestation" else "session stamp (legacy)"
+    parts = [f"ESO gate (fail-closed): protected write refused. Verdict: {label}."]
+    if "unattributable" in reasons:
+        parts.append(
+            "The attestation failed its MAC check — it was edited outside product state. "
+            "Run preflight again (submit a prompt) so the hook rewrites it."
+        )
+    elif "expired" in reasons:
+        parts.append(
+            "The attestation is older than its TTL. It is rewritten by the next preflight — submit a prompt, then retry the write."
+        )
+    else:
+        level = verdict.get("level") or "unknown"
+        parts.append(f"Evidence level: {level}; a `partial` publishes only when every reported gap is closed.")
+        unanswerable = verdict.get("unanswerable") or []
+        if unanswerable:
+            parts.append(
+                "These gaps cannot be closed by any reading in this repo — they are reported, not required: "
+                + ", ".join(unanswerable)
+                + "."
+            )
+        parts.append(
+            "Close the remaining gaps (read the files the preflight lists, then re-run the query it names), or ask "
+            "the operator to change the policy."
+        )
+    if verdict.get("defaulted"):
+        parts.append(
+            "`enforceWrites` was NOT written in .harness/decision-policy.json; the strict default `fail_closed` is in force. "
+            "Setting `eso.mode` does not change this — write `enforceWrites` explicitly if that is not what you want."
+        )
+    else:
+        parts.append("`enforceWrites: fail_closed` was declared in the consumer policy.")
+    return " ".join(parts)
+
 DENY_BRAIN = (
     "Brain gate (fail-closed): protected path requires DeepSeek Brain first. "
     "Call ask_deepseek_pro (or [BRAIN FALLBACK] ask_deepseek_flash), then write "
@@ -447,31 +495,57 @@ def allow_session_stamp_fallback() -> bool:
     return True
 
 
-def eso_fail_closed_blocks() -> bool:
-    """Does the evidence gate block this write?
+def eso_verdict() -> dict:
+    """The evidence verdict this write is judged by, and why the gate refused (§G-12/G-08).
 
-    Prefers the product-state attestation the pack's preflight hook wrote; falls back to the session
-    stamp when no attestation exists AND fallback is enabled (a consumer whose pack has not been
-    refreshed). The two carry the same fields, so the decision logic below is shared rather than
-    duplicated — a second copy of "what does fail_closed mean" is how the guard and the pack would come to
-    disagree.
+    `eso_fail_closed_blocks` returns a bool, and a bool cannot explain itself. atrievefin's operator was
+    told to "set eso.mode=hint/observe" while the guard was reading `enforceWrites: fail_closed` — a key
+    their policy file does not contain — and that gate had already exempted the one gap it could not
+    close (§G-02). Both are facts in the stamp; neither reached the message. So the reader is split out:
+
+      `gate`   — `fail_closed` | `off` | `unknown` (from `mode` / `enforceWrites`)
+      `reasons`— why this write is blocked: `unattributable` (MAC tampered), `expired` (TTL), `level`
+      `unanswerable` — gap ids the preflight named as closable by nothing
+      `source` — `attestation` (product state) or `session` (legacy fallback)
+      `defaulted` — `enforceWrites` was supplied by the strict default, not written by the consumer
+
+    Empty dict when no verdict exists at all (a consumer whose pack has not been refreshed).
     """
     data = eso_attestation()
+    source = "attestation"
     if not data and allow_session_stamp_fallback():
         data = session_stamp()
+        source = "session"
     if not data:
-        return False
+        return {}
+
     mode = data.get("mode")
     enforce_writes = data.get("enforceWrites")
     # Promax: eso.mode hint + enforceWrites fail_closed (stamp may keep mode=hint).
-    if mode != "fail_closed" and enforce_writes != "fail_closed":
-        return False
+    gate = "fail_closed" if mode == "fail_closed" or enforce_writes == "fail_closed" else (
+        "off" if mode or enforce_writes else "unknown"
+    )
+    level = data.get("level") or ""
+    unanswerable = [str(g.get("id")) for g in (data.get("unanswerableGaps") or []) if isinstance(g, dict) and g.get("id")]
+    result = {
+        "gate": gate,
+        "level": level,
+        "source": source,
+        "unanswerable": unanswerable,
+        "reasons": [],
+        # The pack records whether the consumer wrote the key (`enforceWritesSource: default`); an absent
+        # field means the stamp predates that disclosure, so nothing is claimed about it.
+        "defaulted": data.get("enforceWritesSource") == "default",
+    }
+    if gate != "fail_closed":
+        return result
     if data.get("allowWrite") is True:
         # P2: State Hardening — Verify HMAC and TTL on Product State Receipt
         if data.get("mac"):
             secret = get_attest_secret(project_id())
             if not verify_receipt_mac(data, secret):
-                return True  # Tampered attestation: block!
+                result["reasons"] = ["unattributable"]
+                return result
             at_str = data.get("at")
             if at_str:
                 try:
@@ -479,15 +553,31 @@ def eso_fail_closed_blocks() -> bool:
                     age = (datetime.now(timezone.utc) - at_dt).total_seconds()
                     ttl = int(data.get("ttlSec") or 600)
                     if age > ttl:
-                        return True  # Expired receipt: block!
+                        result["reasons"] = ["expired"]
+                        return result
                 except Exception:
-                    return True
-        return False
+                    result["reasons"] = ["expired"]
+                    return result
+        return result
     closure = _read_json(ROOT / SESSION_REL / ".eso-gap-closure.json")
     if closure.get("allClosed") is True and (not data.get("preflightAt") or closure.get("preflightAt") == data.get("preflightAt")):
-        return False
-    level = data.get("level") or ""
-    return level in ("insufficient", "partial")
+        return result
+    if level in ("insufficient", "partial"):
+        result["reasons"] = ["level"]
+    return result
+
+
+def eso_fail_closed_blocks() -> bool:
+    """Does the evidence gate block this write?
+
+    Prefers the product-state attestation the pack's preflight hook wrote; falls back to the session
+    stamp when no attestation exists AND fallback is enabled (a consumer whose pack has not been
+    refreshed). The two carry the same fields, so the decision logic in `eso_verdict` is shared rather
+    than duplicated — a second copy of "what does fail_closed mean" is how the guard and the pack would
+    come to disagree.
+    """
+    verdict = eso_verdict()
+    return bool(verdict) and verdict.get("gate") == "fail_closed" and bool(verdict.get("reasons"))
 
 
 def get_attest_secret(pid: str) -> str:
@@ -727,7 +817,7 @@ def main() -> int:
 
     if not hook_exempt(rel) and requires_brain_stamp(rel):
         if eso_fail_closed_blocks():
-            deny(DENY_ESO)
+            deny(deny_eso_message())
             return 0
         if not brain_stamp_valid():
             deny(DENY_BRAIN)

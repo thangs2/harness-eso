@@ -54,8 +54,24 @@ export function buildPreflightProjection(turn, result, opts = {}) {
         score: sufficiency.score ?? verdict.score ?? 0,
         mode: verdict.esoMode,
         enforceWrites: verdict.enforceWrites,
+        /** `declared` or `default` — the consumer wrote `enforceWrites`, or the strict default supplied it (G-08). */
+        enforceWritesSource: verdict.enforceWritesSource,
         gaps: sufficiency.gaps ?? verdict.gaps ?? [],
         lawMisses,
+        /**
+         * The gaps nothing in this repo can close (G-02), and why. A reader that receives a deny must
+         * be able to tell "you have not read it" from "reading will not help" — the second one is the
+         * operator's problem, not the agent's, and before this field both looked identical.
+         */
+        unanswerableGaps: (sufficiency.gaps ?? verdict.gaps ?? [])
+            .filter((g) => g?.unanswerable === true)
+            .map((g) => ({ id: `${g.kind}:${g.query}`, reason: 'law adapter returned no rows for this term' })),
+        /**
+         * The pack this verdict was measured against. Without it a deny is not reproducible: the gap
+         * set is a function of the pack, and `atrievefin`'s stuck gate could not be explained from its
+         * own `.eso-preflight.json` because the document did not say which terms were being demanded.
+         */
+        pack: result.pack ? { bucket: result.pack.bucket, requiredDocTerms: result.pack.requiredDocTerms ?? [] } : null,
         brainTierHint: turn.brainTierHint || 'flash',
         surface,
         metrics: { latencyMsTotal: opts.latencyMs ?? 0 },

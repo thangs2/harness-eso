@@ -289,7 +289,15 @@ test('Gate G2: missing fingerprint on disk fails closed (no HOT short-circuit)',
     assert.notEqual(res.json.esoPreflight?.cognitiveState, 'HOT');
 });
 
-test('Preflight Hook: initial turn with insufficient evidence emits COLD gap directive', () => {
+test('Preflight Hook: a root prompt with sources off needs no evidence at all (G-01)', () => {
+    /*
+     * The intent of this fixture was "nothing was measured, so say so". After G-01 that is two cases,
+     * and they must not be confused: with no `sources` declared nothing is fetched, the `root` pack
+     * requires nothing, and the honest verdict is **sufficient** — the old assertion was pinning the
+     * defect, which reported `insufficient` for a turn that owed no evidence. The `Gaps:`-less
+     * directive is still emitted when the turn is genuinely missing something, which the test after
+     * this one covers.
+     */
     const root = tempConsumer();
     fs.mkdirSync(path.join(root, '.cursor', 'session'), { recursive: true });
 
@@ -300,6 +308,24 @@ test('Preflight Hook: initial turn with insufficient evidence emits COLD gap dir
     }, { cwd: root, tree: 'cursor' });
 
     assert.equal(res.status, 0);
-    assert.ok(res.json.additional_context?.includes('[ESO EVIDENCE GAP -'));
+    assert.equal(res.json.esoPreflight?.level, 'sufficient');
+    assert.equal(res.json.additional_context?.includes('[ESO EVIDENCE GAP -'), false);
+});
+
+test('Preflight Hook: a prompt that names code still gets the COLD gap directive', () => {
+    // `packages/harness-…` routes to the `tools` pack, which demands a read and three law documents —
+    // the strict case this repo owns. The fixture has no law index, so the directive must appear and
+    // must name the terms nothing can answer (G-02).
+    const root = tempConsumer();
+    fs.mkdirSync(path.join(root, '.cursor', 'session'), { recursive: true });
+
+    const res = runHook('preflight', {
+        conversationId: 'sess-cold-tools',
+        prompt: 'fix packages/harness-eso-core/src/gate.mjs',
+        invocationNum: 0,
+    }, { cwd: root, tree: 'cursor' });
+
+    assert.equal(res.status, 0);
+    assert.ok(res.json.additional_context?.includes('[ESO EVIDENCE GAP -'), res.json.additional_context);
 });
 
