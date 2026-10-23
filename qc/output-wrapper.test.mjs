@@ -32,6 +32,26 @@ const REAL_DOUBLE = `{"text": "[{\\"text\\": \\"baplatform went amber — it was
 // A third nesting, as seen in the transcript.
 const REAL_TRIPLE = `{"text": "[{\\"text\\": \\"[{\\\\\\"text\\\\\\": \\\\\\"Kiểm tra\\\\\\", \\\\\\"type\\\\\\": \\\\\\"text\\\\\\"}]\\", \\"type\\": \\"text\\"}]", "type": "text"}`;
 
+/*
+ * The shape the user actually complained about, twice (fineso / atrievefin, 2026-10-23). `type`'s
+ * *value* was written into the `text` key, so once parsed the object is `{"text":"text"}`, which the
+ * "a generic `{text}` object is not this bug" guard used to rule out. Pinned verbatim from
+ * `fineso/agent-session-20261023T0400Z/eso-preflight-040715Z-refire.json` → `userQueryStem`.
+ */
+const REAL_DUPLICATED_TYPE = `[{"text": "The hook re-created the closure file at 04:06:06Z (my post-tool-hint probe reset it). Confirming the real rows survive:", "text": "text"}] lỗi format json wrapper`;
+
+test('detects the duplicated-`type` envelope the host actually delivered (P-32)', () => {
+    const bare = 'The hook re-created the closure file at 04:06:06Z';
+    const wrapped = `[{"text": "${bare}", "text": "text"}]`;
+    assert.equal(detectWrappedOutput(wrapped), true);
+    assert.equal(inspectAgentText(wrapped).wrapped, true);
+    // The sentinel is not content: peeling must never hand `"text"` back as the corrected reply.
+    assert.notEqual(unwrapWrappedOutput(wrapped), 'text');
+    // The full observed sample carries the user's own words after the JSON; that is not the whole
+    // message, and firing on it would accuse a reply that merely quoted one.
+    assert.equal(detectWrappedOutput(REAL_DUPLICATED_TYPE), false);
+});
+
 test('detects the real single-layer envelope', () => {
     assert.equal(detectWrappedOutput(REAL_SINGLE), true);
 });

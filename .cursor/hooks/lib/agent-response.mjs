@@ -32,10 +32,19 @@ function isEnvelopeObject(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const keys = Object.keys(value);
     if (keys.length === 0 || keys.length > ENVELOPE_KEYS.size) return false;
-    // `type` must be one of the literals the host uses, and `text` must be a string. A generic
-    // `{ text }` object from an API sample is not this bug.
+    /*
+     * `type` must be one of the literals the host uses, and `text` must be a string. A generic
+     * `{ text }` object from an API sample is not this bug.
+     *
+     * The duplicated literal is (P-32): `fineso` and `atrievefin` both delivered
+     * `[{"text": "…", "text": "text"}]` — `type`'s *value* written into the `text` key, which JSON.parse
+     * keeps as the last occurrence. Requiring `type !== text` missed exactly the shape the user saw and
+     * asked about twice ("lỗi format json wrapper"). An object whose `text` is the literal `"text"` and
+     * whose only other key is `text` is a serialization artefact, never prose.
+     */
     if (value.type !== undefined && !KNOWN_TYPES.has(value.type)) return false;
     if (typeof value.text !== 'string') return false;
+    if (value.type === undefined && value.text !== 'text') return false;
     return keys.every((k) => ENVELOPE_KEYS.has(k));
 }
 
@@ -78,6 +87,19 @@ export function detectWrappedOutput(response) {
 }
 
 /**
+ * The payload text of one envelope part.
+ *
+ * In the duplicated shape (P-32) `text` holds the string `"text"` because the serializer wrote `type`'s
+ * value into it; peeling yields the empty string rather than the sentinel, so the caller can fall back
+ * to the envelope itself instead of presenting `"text"` as the correction.
+ */
+function envelopeText(part) {
+    if (!part || typeof part !== 'object') return '';
+    if (part.type === undefined && part.text === 'text') return '';
+    return typeof part.text === 'string' ? part.text : '';
+}
+
+/**
  * Peel envelopes until plain text is left. Terminates on malformed input: each step must yield a
  * strictly shorter string, and the depth is capped.
  *
@@ -93,13 +115,13 @@ export function unwrapWrappedOutput(response) {
         const parsed = parseIfJson(trimmed);
         if (!parsed.ok) return current;
         if (isEnvelopeArray(parsed.value)) {
-            const next = parsed.value.map((p) => p.text).join('');
+            const next = parsed.value.map((p) => envelopeText(p)).join('');
             if (next.length === 0 || next === current) return current;
             current = next;
             continue;
         }
         if (isEnvelopeObject(parsed.value)) {
-            const next = parsed.value.text;
+            const next = envelopeText(parsed.value);
             if (next.length === 0 || next === current) return current;
             current = next;
             continue;
@@ -133,6 +155,23 @@ export function extractResponseText(payload) {
  */
 export function inspectAgentText(text) {
     if (detectWrappedOutput(text)) return { wrapped: true, peeled: unwrapWrappedOutput(text) };
+    /*
+     * The host-unescaped shape (P-32): `text` is `{"text": "<stringified envelope>"}`. Peeling the
+     * outer object yields the inner string, which is itself an envelope and is what the reminder
+     * should ask the agent not to send again.
+     */
+    const parsed = typeof text === 'string' ? parseIfJson(text) : { ok: false };
+    if (parsed.ok) {
+        const outer = parsed.value;
+        const inner =
+            outer && typeof outer === 'object' && !Array.isArray(outer) && typeof outer.text === 'string'
+                ? outer.text
+                : null;
+        if (inner && detectWrappedOutput(inner)) {
+            return { wrapped: true, peeled: unwrapWrappedOutput(inner) };
+        }
+    }
+    if (typeof text !== 'string') return { wrapped: false, peeled: text ?? '' };
     const peeled = unwrapWrappedOutput(text);
     return { wrapped: peeled !== text && detectWrappedOutput(peeled), peeled };
 }
