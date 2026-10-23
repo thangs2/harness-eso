@@ -39,8 +39,12 @@
  * "protect nothing here". That distinction is load-bearing: without it, shipping this feature would
  * have been an unannounced removal of every protection.
  *
- * Mirrors `guard-write.py`'s list as it stood before this moved into policy, minus `sdlc/`. `locked`
- * is what `locked-paths.txt` held — a path no gate can open.
+ * Mechanism-generic since P-27: this list ships **inside the host pack**, so it must protect things
+ * every consumer has (playbooks, both IDE trees, the guards, the evidence tree) and must not name one
+ * consumer's architecture. It used to carry `frontend/`, `backend/mu-*`, `document/mu/` — another
+ * product's directories — and `guard-write.py` falls back to this file only for a consumer that
+ * declares no `paths` at all, so `fineso` observed it as "inert today, another product's list the
+ * moment `paths` is dropped".
  */
 export const DEFAULT_PATH_POLICY = {
     /*
@@ -50,16 +54,12 @@ export const DEFAULT_PATH_POLICY = {
      * opened by a turn that happened to collect enough evidence (H7).
      */
     locked: [
-        'document/mu/be/00.law/',
         '.cursor/mcp.json',
         '.vscode/mcp.json',
         '.agents/mcp_config.json',
         '.mcp.json',
     ],
     gated: [
-        'frontend/',
-        'backend/mu-*',
-        'document/mu/',
         'AGENTS.md',
         '.cursorrules',
         '.cursor/instructions.md',
@@ -77,6 +77,17 @@ export const DEFAULT_PATH_POLICY = {
         '.cursor/hooks/guard-shell.py',
         '.agents/hooks/guard-write.py',
         '.agents/hooks/guard-shell.py',
+        /*
+         * Governance prose and harness state, gated for every consumer (P-27).
+         *
+         * `SDLC/` and `sdlc/` are where a consumer keeps its law, context contract and agent manifests;
+         * `.harness/` holds the decision policy and host pack. Both are what the gate is *about*, so a
+         * consumer that lists `paths` without them left its own law writable by an ungated turn
+         * (`atrievefin`: `SDLC/00.governance/03.decision-register.md` → `allow`; `fineso`: same).
+         */
+        'SDLC/',
+        'sdlc/',
+        '.harness/',
     ],
     /*
      * Paths that require a **human** signal, not evidence. `ask` exists because some writes should not
@@ -141,18 +152,24 @@ export function toRepoRelative(target, root) {
  * would resurrect defaults it deliberately removed — the `sdlc/` case exactly.
  *
  * @param {{ paths?: object } | null | undefined} policy  the loaded decision policy
- * @returns {{ locked: string[], gated: string[], ask: string[], sot: string[], declared: boolean }}
+ * @returns {{ locked: string[], gated: string[], ask: string[], sot: string[], declared: boolean, replaced: string[] }}
  */
 export function resolvePathPolicy(policy) {
     const declared = policy?.paths && typeof policy.paths === 'object';
     const out = {};
+    /* Which tiers the consumer's own file overrode — reported, so a replaced default is never silent. */
+    const replaced = [];
     for (const key of ['locked', 'gated', 'ask', 'sot']) {
         const fromPolicy = declared ? policy.paths[key] : undefined;
-        out[key] = Array.isArray(fromPolicy)
-            ? fromPolicy.map(String).filter(Boolean)
-            : [...DEFAULT_PATH_POLICY[key]];
+        if (Array.isArray(fromPolicy)) {
+            out[key] = fromPolicy.map(String).filter(Boolean);
+            replaced.push(key);
+        } else {
+            out[key] = [...DEFAULT_PATH_POLICY[key]];
+        }
     }
     out.declared = Boolean(declared);
+    out.replaced = replaced;
     return out;
 }
 

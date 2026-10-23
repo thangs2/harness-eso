@@ -75,7 +75,10 @@
             ".agents/hooks/locked-paths.txt",
             "scripts/ci/",
             "installation/docgraph/",
-            "docgraph.scope"
+            "docgraph.scope",
+            "SDLC/",
+            "sdlc/",
+            ".harness/"
         ],
         "ask": [],
         "sot": []

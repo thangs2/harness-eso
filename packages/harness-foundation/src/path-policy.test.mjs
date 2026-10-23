@@ -32,7 +32,18 @@ test('a consumer that declares nothing keeps the historical protection', () => {
     const resolved = resolvePathPolicy(undefined);
     assert.equal(resolved.declared, false);
     assert.deepEqual(resolved.gated, DEFAULT_PATH_POLICY.gated);
-    assert.equal(pathMode('document/mu/be/03.scaffolding/x.md', resolved), 'gated');
+    /*
+     * Mechanism-generic since P-27: the pack ships this list, so it may only protect what every
+     * consumer has. It used to assert `document/mu/be/03.scaffolding/` — another product's tree — and
+     * `fineso` observed the consequence: `guard-write.py` falls back to this file only when a consumer
+     * declares no `paths`, so the list was inert there and would have protected a foreign architecture
+     * the moment `paths` was dropped.
+     */
+    assert.equal(pathMode('document/mu/be/03.scaffolding/x.md', resolved), null, 'no product-specific paths');
+    assert.equal(pathMode('AGENTS.md', resolved), 'gated');
+    assert.equal(pathMode('SDLC/00.governance/03.decision-register.md', resolved), 'gated');
+    assert.equal(pathMode('sdlc/00.governance/x.md', resolved), 'gated');
+    assert.equal(pathMode('.harness/decision-policy.json', resolved), 'gated');
     assert.equal(pathMode('scripts/ci/verify.sh', resolved), 'gated');
 });
 
