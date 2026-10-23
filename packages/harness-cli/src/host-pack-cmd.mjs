@@ -130,7 +130,7 @@ function cmdStatus({ opts, positional }) {
 /**
  * Reinstall the pack and re-reconcile every IDE tree that is already wired.
  *
- * This is the upgrade path, and it is deliberately **not** `init profile` again: that re-runs tenant
+ * This is the upgrade path, and it is deliberately **not** `init profile` again: that re-runs project
  * creation and the policy merge, so an operator who only wants the new hook build would be
  * re-deciding provisioning questions. Refresh touches the pack and the hook wiring, nothing else.
  */

@@ -27,7 +27,7 @@ import { createDshSkillsLaw } from './law-provider.mjs';
  *   searchEvents?: Function,
  *   providers?: object[],
  *   memoryId?: string,
- *   checks?: { contract?: object, tenant?: object, migration?: object },
+ *   checks?: { contract?: object, project?: object, migration?: object },
  * }} options
  */
 export function createDshEsoPlugin(options = {}) {

@@ -22,19 +22,19 @@ test('session hits become evidence with provenance', async () => {
         searchEvents: async (q) => {
             seen.push(q);
             return [
-                { text: 'tenant id must be explicit', score: 0.8, seq: 42, sessionId: 's-1' },
-                { snippet: 'approval policy is per tenant', seq: 43, sessionId: 's-1' },
+                { text: 'project id must be explicit', score: 0.8, seq: 42, sessionId: 's-1' },
+                { snippet: 'approval policy is per project', seq: 43, sessionId: 's-1' },
                 { text: '', seq: 44 },
             ];
         },
         limit: 5,
     });
 
-    const out = await provider.fetch('tenant', { conversationId: 's-1', root: '/repo' });
+    const out = await provider.fetch('project', { conversationId: 's-1', root: '/repo' });
     assert.equal(out.snippets.length, 2, 'a hit without text is not evidence');
     assert.equal(out.snippets[0].provenance.sessionSeq, 42);
     assert.equal(out.snippets[0].provenance.sessionId, 's-1');
-    assert.equal(out.snippets[1].text, 'approval policy is per tenant');
+    assert.equal(out.snippets[1].text, 'approval policy is per project');
     assert.equal(seen[0].sessionId, 's-1');
     assert.equal(seen[0].cwd, '/repo');
     assert.equal(provider.capability, 'native');

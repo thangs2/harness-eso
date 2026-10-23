@@ -32,7 +32,7 @@ import { ingestGateTrail } from './ingest-gate.mjs';
  * on the caller's thread. Holding one connection for the process removes the churn, and the
  * migration scan collapses to once per target.
  *
- * The pool is keyed by file path so a caller that switches tenants (tests, the CLI) still gets a
+ * The pool is keyed by file path so a caller that switches registry (tests, the CLI) still gets a
  * connection to the right database; a stale entry is closed rather than leaked.
  */
 let pool = { target: null, db: null, migrated: false };

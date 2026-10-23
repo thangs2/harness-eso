@@ -42,7 +42,7 @@ test('loadContextContract returns contractMissing=true when file is absent witho
 test('loadContextContract loads and parses valid context contract JSON', () => {
     const sampleContract = {
         version: 1,
-        globalInvariants: ['INV-TENANT-01'],
+        globalInvariants: ['INV-PROJECT-01'],
         domains: {
             bookings: {
                 keywords: ['booking', 'appointment', 'reservation'],
@@ -62,7 +62,7 @@ test('loadContextContract loads and parses valid context contract JSON', () => {
         const contract = loadContextContract(root);
         assert.equal(contract.contractMissing, false);
         assert.equal(contract.version, 1);
-        assert.deepEqual(contract.globalInvariants, ['INV-TENANT-01']);
+        assert.deepEqual(contract.globalInvariants, ['INV-PROJECT-01']);
         assert.ok(contract.domains.bookings);
         assert.ok(contract.domains.billing);
     } finally {
@@ -117,7 +117,7 @@ test('resolveDomainContract matches domain by file paths', () => {
 
 test('compilePinnedInvariants calculates union with globals and intersects with attested', () => {
     const contract = {
-        globalInvariants: ['INV-TENANT-01'],
+        globalInvariants: ['INV-PROJECT-01'],
         domains: {
             bookings: {
                 keywords: ['booking'],
@@ -129,21 +129,21 @@ test('compilePinnedInvariants calculates union with globals and intersects with 
     // Attested evidence contains various invariants discovered during turn
     const context = {
         stem: 'Create new booking appointment',
-        attestedInvariants: ['INV-BOOKING-01', 'INV-TENANT-01', 'INV-UNRELATED-99'],
+        attestedInvariants: ['INV-BOOKING-01', 'INV-PROJECT-01', 'INV-UNRELATED-99'],
     };
 
     const compiled = compilePinnedInvariants(contract, context);
     assert.equal(compiled.domain, 'bookings');
     assert.equal(compiled.contractMissing, false);
-    // Pinned should contain only relevant invariants: INV-TENANT-01 (global) and INV-BOOKING-01 (domain)
-    assert.ok(compiled.pinnedInvariants.includes('INV-TENANT-01'));
+    // Pinned should contain only relevant invariants: INV-PROJECT-01 (global) and INV-BOOKING-01 (domain)
+    assert.ok(compiled.pinnedInvariants.includes('INV-PROJECT-01'));
     assert.ok(compiled.pinnedInvariants.includes('INV-BOOKING-01'));
     assert.ok(!compiled.pinnedInvariants.includes('INV-UNRELATED-99'));
 });
 
 test('preflight projection scopes pinnedInvariants to domain when contract exists', () => {
     const contractObj = {
-        globalInvariants: ['INV-TENANT-01'],
+        globalInvariants: ['INV-PROJECT-01'],
         domains: {
             bookings: {
                 keywords: ['booking', 'appointment'],
@@ -167,7 +167,7 @@ test('preflight projection scopes pinnedInvariants to domain when contract exist
                 snippets: [
                     {
                         kind: 'law',
-                        text: '- **INV-BOOKING-01**: Must check slot availability\n- **INV-TENANT-01**: Validate tenant isolation\n- **INV-BILLING-09**: Invoice required',
+                        text: '- **INV-BOOKING-01**: Must check slot availability\n- **INV-PROJECT-01**: Validate project isolation\n- **INV-BILLING-09**: Invoice required',
                     },
                 ],
             },
@@ -177,7 +177,7 @@ test('preflight projection scopes pinnedInvariants to domain when contract exist
         assert.equal(projection.contractMissing, false);
         assert.equal(projection.domain, 'bookings');
         assert.ok(projection.pinnedInvariants.includes('INV-BOOKING-01'));
-        assert.ok(projection.pinnedInvariants.includes('INV-TENANT-01'));
+        assert.ok(projection.pinnedInvariants.includes('INV-PROJECT-01'));
         // Unrelated invariant is excluded from pinned set
         assert.ok(!projection.pinnedInvariants.includes('INV-BILLING-09'));
     } finally {

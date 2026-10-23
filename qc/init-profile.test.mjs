@@ -13,16 +13,16 @@ const PROFILES_DIR = path.join(ESO_ROOT, 'profiles');
 test('init profile --plan lists dual-ide host files', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-init-plan-'));
     const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-init' });
-    const planned = initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: true });
+    const planned = initProfile(project, PROFILES_DIR, '/tmp/registry.json', { dryRun: true });
     const rels = planned.files.map((f) => f.relative);
     assert.ok(rels.includes('.cursor/hooks.json'));
     assert.ok(rels.includes('.agents/hooks.json'));
 });
 
-test('init profile apply writes tenant + host on consumer', () => {
+test('init profile apply writes project + host on consumer', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-init-apply-'));
     const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-init-apply' });
-    const applied = initProfile(project, PROFILES_DIR, '/tmp/tenants.json', {
+    const applied = initProfile(project, PROFILES_DIR, '/tmp/registry.json', {
         dryRun: false,
         // Only the install/merge bookkeeping is under test here; the pack self-check has its own
         // tests in qc/host-pack.test.mjs and costs ~0.7s per provision.
@@ -57,14 +57,14 @@ test('init profile apply writes tenant + host on consumer', () => {
 test('init profile preserves operator edits to consumer guard scripts', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-init-preserve-'));
     const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-init-preserve' });
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    initProfile(project, PROFILES_DIR, '/tmp/registry.json', { dryRun: false, verify: false });
 
     const guardFile = path.join(root, '.cursor/hooks/guard-write.py');
     const customContent = '# operator custom write policy\nimport sys\n';
     fs.writeFileSync(guardFile, customContent, 'utf8');
 
     // Re-provisioning must not clobber operator edits
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    initProfile(project, PROFILES_DIR, '/tmp/registry.json', { dryRun: false, verify: false });
     assert.equal(fs.readFileSync(guardFile, 'utf8'), customContent, 'operator customizations must survive provision');
 });
 
@@ -79,7 +79,7 @@ test('reloadHostConfig rewrites host-bootstrap.json with a fresh appliedAt', { t
     initProfile(projectDraftForConsumer(root, {
         hostMode: 'dual-ide',
         projectId: 'qc-reload',
-    }), PROFILES_DIR, '/tmp/tenants.json', {
+    }), PROFILES_DIR, '/tmp/registry.json', {
         dryRun: false,
         verify: false,
     });
@@ -101,11 +101,11 @@ test('reloadHostConfig rewrites host-bootstrap.json with a fresh appliedAt', { t
 test('re-provisioning the SAME profile does not rewrite appliedAt', { timeout: 15000 }, () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-bootstrap-stable-'));
     const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-stable' });
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    initProfile(project, PROFILES_DIR, '/tmp/registry.json', { dryRun: false, verify: false });
     const bootstrapPath = path.join(root, '.harness', 'host-bootstrap.json');
     const before = fs.readFileSync(bootstrapPath, 'utf8');
 
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    initProfile(project, PROFILES_DIR, '/tmp/registry.json', { dryRun: false, verify: false });
     assert.equal(
         fs.readFileSync(bootstrapPath, 'utf8'),
         before,
@@ -120,12 +120,12 @@ test('init profile --force rewrites a stale harness.config.json', { timeout: 150
         project: { id: 'stale-id' },
         storage: { driver: 'sqlite', sqlite: { path: '.harness/harness.db' } },
         ingest: { harnesses: [{ id: 'cursor', tree: '.cursor', shape: 'cursor', spineOptions: { transcriptDir: null } }] },
-        tenancy: { mode: 'isolated', registry: '~/.harness/tenants.json' },
+        registry: { mode: 'isolated', registry: '~/.harness/registry.json' },
     };
     fs.writeFileSync(path.join(root, 'harness.config.json'), JSON.stringify(stale, null, 4));
 
     const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-force' });
-    const withoutForce = initProfile(project, PROFILES_DIR, '/tmp/tenants.json', {
+    const withoutForce = initProfile(project, PROFILES_DIR, '/tmp/registry.json', {
         harnessEsoRoot: ESO_ROOT,
         dryRun: false,
     });
@@ -139,7 +139,7 @@ test('init profile --force rewrites a stale harness.config.json', { timeout: 150
         'stale-id',
     );
 
-    const forced = initProfile(project, PROFILES_DIR, '/tmp/tenants.json', {
+    const forced = initProfile(project, PROFILES_DIR, '/tmp/registry.json', {
         harnessEsoRoot: ESO_ROOT,
         dryRun: false,
         force: true,
@@ -149,18 +149,18 @@ test('init profile --force rewrites a stale harness.config.json', { timeout: 150
     );
     const after = JSON.parse(fs.readFileSync(path.join(root, 'harness.config.json'), 'utf8'));
     assert.equal(after.project.id, 'qc-force');
-    assert.equal(after.tenancy.registry, '/tmp/tenants.json');
+    assert.equal(after.registry.registry, '/tmp/registry.json');
     // Dead legacy keys from the retired `configure add` path are gone.
     assert.equal(after.ingest.harnesses[0].spineOptions, undefined);
 });
 
-test('reloadHostConfig forceTenant rewrites the anchor; policy stays merge-only', () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-reload-tenant-'));
+test('reloadHostConfig forceProject rewrites the anchor; policy stays merge-only', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-reload-project-'));
     const project = projectDraftForConsumer(root, {
         hostMode: 'dual-ide',
-        projectId: 'qc-reload-tenant',
+        projectId: 'qc-reload-project',
     });
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', {
+    initProfile(project, PROFILES_DIR, '/tmp/registry.json', {
         dryRun: false,
         verify: false,
     });
@@ -180,26 +180,26 @@ test('reloadHostConfig forceTenant rewrites the anchor; policy stays merge-only'
 
     const res = reloadHostConfig(project, PROFILES_DIR, {
         harnessEsoRoot: ESO_ROOT,
-        tenantsRegistryPath: '/tmp/tenants.json',
-        forceTenant: true,
+        registryPath: '/tmp/registry.json',
+        forceProject: true,
     });
-    assert.equal(res.tenantRefreshed, true);
+    assert.equal(res.projectRefreshed, true);
     assert.equal(
         JSON.parse(fs.readFileSync(path.join(root, 'harness.config.json'), 'utf8')).project.id,
-        'qc-reload-tenant',
+        'qc-reload-project',
     );
     const after = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
     assert.equal(after.jev.mode, 'off');
     assert.equal(after.operatorTuning.customThreshold, 0.42);
 });
 
-test('reloadHostConfig without forceTenant leaves the anchor alone', () => {
+test('reloadHostConfig without forceProject leaves the anchor alone', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-reload-host-only-'));
     const project = projectDraftForConsumer(root, {
         hostMode: 'dual-ide',
         projectId: 'qc-host-only',
     });
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', {
+    initProfile(project, PROFILES_DIR, '/tmp/registry.json', {
         dryRun: false,
         verify: false,
     });
@@ -207,7 +207,7 @@ test('reloadHostConfig without forceTenant leaves the anchor alone', () => {
     fs.writeFileSync(path.join(root, 'harness.config.json'), JSON.stringify(stale, null, 4));
 
     const res = reloadHostConfig(project, PROFILES_DIR);
-    assert.equal(res.tenantRefreshed, false);
+    assert.equal(res.projectRefreshed, false);
     assert.equal(
         JSON.parse(fs.readFileSync(path.join(root, 'harness.config.json'), 'utf8')).project.id,
         'stale',
@@ -227,7 +227,7 @@ test('init profile merges decision-policy when file already exists', () => {
         }),
     );
     const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-init-merge' });
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', {
+    initProfile(project, PROFILES_DIR, '/tmp/registry.json', {
         dryRun: false,
         verify: false,
     });
@@ -240,7 +240,7 @@ test('init profile merges decision-policy when file already exists', () => {
 test('provisioned guard-write.py respects allowSessionStampFallback setting', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-guard-fallback-'));
     const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-fallback' });
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    initProfile(project, PROFILES_DIR, '/tmp/registry.json', { dryRun: false, verify: false });
 
     const guardWritePath = path.join(root, '.cursor/hooks/guard-write.py');
     assert.ok(fs.existsSync(guardWritePath));
@@ -300,7 +300,7 @@ test('init profile dual-ide provisions Antigravity rules, core skills and sessio
     fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n');
 
     const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-antigravity' });
-    const res = initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    const res = initProfile(project, PROFILES_DIR, '/tmp/registry.json', { dryRun: false, verify: false });
 
     assert.equal(res.ok, true);
 
@@ -324,7 +324,7 @@ test('init profile all-ide provisions triple-host parity across Cursor, Antigrav
     fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n');
 
     const project = projectDraftForConsumer(root, { hostMode: 'all-ide', projectId: 'qc-all-ide' });
-    const res = initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    const res = initProfile(project, PROFILES_DIR, '/tmp/registry.json', { dryRun: false, verify: false });
 
     assert.equal(res.ok, true);
 

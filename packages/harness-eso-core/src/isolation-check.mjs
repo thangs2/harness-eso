@@ -1,21 +1,21 @@
 /**
- * Tenant-isolation check (RFC 18 M5).
+ * Project-isolation check (RFC 18 M5).
  *
- * The failure this targets is silent and expensive: a new query or migration touches a tenant-scoped
- * table without naming the tenant, and every test passes because the test database has one tenant.
+ * The failure this targets is silent and expensive: a new query or migration touches a project-scoped
+ * table without naming the project, and every test passes because the test database has one project.
  *
  * It is a **heuristic over SQL text**, and it says so. Two rules keep it honest:
- *   - Only tables the caller declares as tenant-scoped are examined. Guessing scope from a name
- *     (`%tenant%`) would flag joins that are correct and miss tables that are not obvious.
- *   - A statement is exempt when it carries an explicit marker (`/* tenant:global *\/`), so a
- *     deliberate cross-tenant admin query is a documented decision rather than a finding.
+ *   - Only tables the caller declares as project-scoped are examined. Guessing scope from a name
+ *     (`%project%`) would flag joins that are correct and miss tables that are not obvious.
+ *   - A statement is exempt when it carries an explicit marker (`/* isolation:global *\/`), so a
+ *     deliberate cross-project admin query is a documented decision rather than a finding.
  *
- * A tenant marker anywhere in the statement satisfies it. That is deliberately conservative: the
- * check is here to catch "nobody thought about tenancy", not to prove the predicate is correct.
+ * A project marker anywhere in the statement satisfies it. That is deliberately conservative: the
+ * check is here to catch "nobody thought about registry", not to prove the predicate is correct.
  */
 
-export const TENANT_MARKER = /tenant[_\s-]?id|@tenant|#\{?tenant/i;
-export const EXEMPT_MARKER = /tenant\s*:\s*global/i;
+export const ISOLATION_MARKER = /caller[_\s-]?id|@caller|#\{?caller/i;
+export const ISOLATION_EXEMPT = /isolation\s*:\s*global/i;
 
 const TABLE_REFERENCE = /\b(?:from|join|update|delete\s+from|insert\s+into)\s+(?:if\s+not\s+exists\s+)?[`"[]?([A-Za-z0-9_.]+)[`"\]]?/gi;
 
@@ -37,19 +37,19 @@ function normaliseTables(tables) {
 }
 
 /**
- * @param {{ file?: string, content: string, tenantTables?: string[] }} input
+ * @param {{ file?: string, content: string, scopedTables?: string[] }} input
  * @returns {{ file: string, findings: Array<{kind:string,table:string,detail:string,statement:string}> }}
  */
-export function checkTenantIsolation(input = {}) {
+export function checkIsolation(input = {}) {
     const file = input.file ?? '<memory>';
-    const tenantTables = normaliseTables(input.tenantTables);
+    const scopedTables = normaliseTables(input.scopedTables);
     const findings = [];
-    if (!tenantTables.size) return { file, findings };
+    if (!scopedTables.size) return { file, findings };
 
     const statements = String(input.content ?? '').split(';');
     for (const raw of statements) {
         if (!raw.trim()) continue;
-        if (EXEMPT_MARKER.test(raw)) continue;
+        if (ISOLATION_EXEMPT.test(raw)) continue;
 
         const statement = stripComments(raw);
         const lower = statement.toLowerCase();
@@ -57,19 +57,19 @@ export function checkTenantIsolation(input = {}) {
         TABLE_REFERENCE.lastIndex = 0;
         for (const match of statement.matchAll(TABLE_REFERENCE)) {
             const name = match[1].toLowerCase().split('.').pop();
-            if (tenantTables.has(name)) tables.add(match[1]);
+            if (scopedTables.has(name)) tables.add(match[1]);
         }
         if (!tables.size) continue;
-        if (TENANT_MARKER.test(lower)) continue;
+        if (ISOLATION_MARKER.test(lower)) continue;
 
         for (const table of tables) {
             const isInsert = /\binsert\s+into\b/i.test(statement);
             findings.push({
-                kind: isInsert ? 'insert-without-tenant' : 'query-without-tenant',
+                kind: isInsert ? 'insert-without-caller' : 'query-without-caller',
                 table,
                 detail: isInsert
-                    ? `INSERT into tenant-scoped "${table}" without a tenant column`
-                    : `statement reads/writes tenant-scoped "${table}" without a tenant filter`,
+                    ? `INSERT into project-scoped "${table}" without a project column`
+                    : `statement reads/writes project-scoped "${table}" without a project filter`,
                 statement: statement.trim().replace(/\s+/g, ' ').slice(0, 200),
             });
         }
@@ -79,10 +79,10 @@ export function checkTenantIsolation(input = {}) {
 }
 
 /** Check several files at once, keeping the file name on every finding. */
-export function checkTenantFiles(files = [], options = {}) {
+export function checkIsolationFiles(files = [], options = {}) {
     const findings = [];
     for (const { file, content } of files) {
-        const result = checkTenantIsolation({ file, content, tenantTables: options.tenantTables });
+        const result = checkIsolation({ file, content, scopedTables: options.scopedTables });
         for (const finding of result.findings) findings.push({ ...finding, file });
     }
     return { files: files.length, findings };

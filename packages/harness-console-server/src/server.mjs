@@ -19,8 +19,8 @@ import {
     loadWorkspace,
     productStateDir,
     saveWorkspace,
-    syncTenantsFromWorkspace,
-    tenantsFile,
+    syncProjectsFromWorkspace,
+    registryFile,
 } from '@mu/harness-foundation/workspace';
 import {
     assertPortAvailable,
@@ -141,7 +141,7 @@ function provisionProject(project) {
     const applied = initProfile(
         { ...project, observe: { ...(project.observe || {}), port } },
         profilesDir(),
-        tenantsFile(),
+        registryFile(),
         {
             dryRun: false,
         },
@@ -161,7 +161,7 @@ function provisionProject(project) {
     else workspace.projects.push(row);
     workspace.defaultProjectId = workspace.defaultProjectId || project.id;
     saveWorkspace(workspace);
-    syncTenantsFromWorkspace(workspace);
+    syncProjectsFromWorkspace(workspace);
 
     project.status = 'provisioned';
     project.provisionedAt = new Date().toISOString();
@@ -370,7 +370,7 @@ async function route(req, res) {
             else workspace.projects.push(row);
             workspace.defaultProjectId = workspace.defaultProjectId || doc.id;
             saveWorkspace(workspace);
-            syncTenantsFromWorkspace(workspace);
+            syncProjectsFromWorkspace(workspace);
             json(res, 201, { ok: true, project: doc });
         } catch (err) {
             json(res, 400, { ok: false, error: String(err?.message || err) });
@@ -476,7 +476,7 @@ async function route(req, res) {
                     const row = workspace.projects.find((x) => x.id === project.id);
                     if (row) row.port = wanted;
                     saveWorkspace(workspace);
-                    syncTenantsFromWorkspace(workspace);
+                    syncProjectsFromWorkspace(workspace);
                 }
                 project.observe = { ...project.observe, ...body.observe, port: wanted ?? recorded };
             }
@@ -524,7 +524,7 @@ async function route(req, res) {
 
         if (action === '/preview' && req.method === 'GET') {
             try {
-                const planned = initProfile(project, profilesDir(), tenantsFile(), { dryRun: true });
+                const planned = initProfile(project, profilesDir(), registryFile(), { dryRun: true });
                 json(res, 200, {
                     ok: true,
                     root: planned.root,
@@ -547,7 +547,7 @@ async function route(req, res) {
 
         // Rewrite host config: hooks.json (merged + de-duplicated), hook bins, sidecar.env,
         // and .harness/host-bootstrap.json with a fresh appliedAt.
-        // Body `{ "tenant": true }` additionally rewrites the tenant anchor
+        // Body `{ "project": true }` additionally rewrites the project anchor
         // (harness.config.json) — the repair path for an anchor that `create-if-missing`
         // would otherwise leave stale forever.
         if (action === '/reload' && req.method === 'POST') {
@@ -557,8 +557,8 @@ async function route(req, res) {
                     res,
                     200,
                     reloadHostConfig(project, profilesDir(), {
-                        tenantsRegistryPath: tenantsFile(),
-                        forceTenant: body?.tenant === true,
+                        registryPath: registryFile(),
+                        forceProject: body?.project === true,
                     }),
                 );
             } catch (err) {

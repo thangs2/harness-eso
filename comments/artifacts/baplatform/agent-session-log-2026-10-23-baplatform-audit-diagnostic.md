@@ -305,7 +305,7 @@ not populated on the deny-log path (`-32001`-class observability defect, not a g
 
 | Surface | Value A | Value B | Agree |
 |---|---|---|---|
-| Port | `harness.config.json server.port 8793` | `tenants.json` / `workspace.json` / compose `8793` | ✅ (4 sources) |
+| Port | `harness.config.json server.port 8793` | `registry.json` / `workspace.json` / compose `8793` | ✅ (4 sources) |
 | Observe health | `/health` `000` | `/healthz` `200` | ❌ F-04 |
 | `eso.mode` | policy `hint` | preflight `mode: hint` + verdict `esoMode: hint` | ✅ (compare `x79`, where stamp said `observe`) |
 | `enforceWrites` | policy `fail_closed` | preflight `fail_closed` · stamp `fail_closed` · attest `fail_closed` | ✅ |
@@ -315,7 +315,7 @@ not populated on the deny-log path (`-32001`-class observability defect, not a g
 | `guard-write.py` | `.cursor` `26323 B` | `.agents` `26323 B` | ✅ identical |
 | `guard-shell.py` | `.cursor` `14279 B` | `.agents` `14206 B` | ❌ F-06 |
 | Host pack | installed `791ec8cc…` | dist `32435c89…` | ❌ F-05 |
-| Project isolation | `tenants.json` 8792/8793/8794/8795 | `docker ps` four distinct containers | ✅ no port clobber |
+| Project isolation | `registry.json` 8792/8793/8794/8795 | `docker ps` four distinct containers | ✅ no port clobber |
 | `.agents` activity | `host-install-state` declares 6 blocks | last trace `2026-10-19` | ❌ F-05 |
 
 ---
@@ -335,7 +335,7 @@ down; `docker ps` should have been the first check, not the recovery.
 
 **A-3 · Nearly reported a port clobber as a finding.**
 `lsof -iTCP:8793` shows `Google`, `com.docker` and a `dockerd` — my first read was "the port is shared with
-other projects". `~/.harness/workspace.json` has four projects on four ports, and `tenant.json` matches
+other projects". `~/.harness/workspace.json` has four projects on four ports, and `project.json` matches
 `harness.config.json`. The `lsof` rows are Chrome's *client* sockets into the container. I dropped the
 finding; the audit above states it as ✅ instead.
 

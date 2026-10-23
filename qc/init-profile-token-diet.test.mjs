@@ -13,7 +13,7 @@ const PROFILES_DIR = path.join(REPO_ROOT, 'profiles');
 test('initProfile seeds micro-rules and returns tokenDiet audit report', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'init-profile-diet-'));
     try {
-        const tenantsRegistry = path.join(tmp, 'tenants.json');
+        const registryFile = path.join(tmp, 'registry.json');
         const consumerRepo = path.join(tmp, 'my-consumer');
         fs.mkdirSync(consumerRepo, { recursive: true });
 
@@ -27,7 +27,7 @@ test('initProfile seeds micro-rules and returns tokenDiet audit report', () => {
             hostMode: 'dual-ide',
         });
 
-        const res = initProfile(project, PROFILES_DIR, tenantsRegistry, { verify: false });
+        const res = initProfile(project, PROFILES_DIR, registryFile, { verify: false });
 
         assert.equal(res.ok, true);
         assert.equal(typeof res.tokenDiet, 'object');

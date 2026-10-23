@@ -217,7 +217,7 @@ No `harness` / `harness-eso` binary is on `PATH` for the consumer — lifecycle 
 
 1. `./verify-consumer.sh atrievefin` re-run at write time (see A-6) — the committed
    `consumer-maturity-latest.md` is the consumer's own 13:02Z copy, not a fresh run.
-2. Observe API / console UI against tenant `atrievefin` (`/api/requests`, `/api/decisions`,
+2. Observe API / console UI against project `atrievefin` (`/api/requests`, `/api/decisions`,
    `/api/gate/summary`) — only `/health` was read; `x79` already covered the surface.
 3. `eso.enforceWrites: fail_closed` actually **rejecting** a protected write on this consumer
    (would require attempting a gated write; deliberately not done — the user asked read-only).

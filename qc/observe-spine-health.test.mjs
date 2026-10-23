@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { createObserveApp, bootObserveDb } from '@mu/harness-observe-server';
 
-function tempTenant() {
+function makeConfig() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-spine-'));
     const dbPath = path.join(root, '.harness', 'harness.db');
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -37,7 +37,7 @@ function tempTenant() {
 }
 
 test('GET /health reports degraded ingest spine when transcript dir missing', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     bootObserveDb(cfg);
     const prev = process.env.HARNESS_CURSOR_MOUNT;
     process.env.HARNESS_CURSOR_MOUNT = '/host-cursor';
@@ -59,7 +59,7 @@ test('GET /health reports degraded ingest spine when transcript dir missing', as
 });
 
 test('GET /health reports healthy (not degraded) when transcript dir exists with 0 files', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     const transDir = path.join(cfg.root, 'empty-transcripts');
     fs.mkdirSync(transDir, { recursive: true });
     cfg.ingest.transcriptDir = transDir;
@@ -79,7 +79,7 @@ test('GET /health reports healthy (not degraded) when transcript dir exists with
 });
 
 test('GET /health reports healthy when cursor mount exists even if project subfolder is pending', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     const fakeMount = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-cursor-mount-'));
     cfg.ingest.transcriptDir = path.join(fakeMount, 'projects', 'dummy-slug', 'agent-transcripts');
     bootObserveDb(cfg);

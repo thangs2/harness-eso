@@ -17,7 +17,7 @@ function flowDetailInput(detail: RequestDetailResponse): FlowDetailInput {
         rules: detail.rules,
         events: detail.events,
         llmCalls: detail.llmCalls as Array<{ toolNames?: string }> | undefined,
-        rootPath: detail.tenantRootPath,
+        rootPath: detail.callerRootPath,
     };
 }
 

@@ -13,7 +13,7 @@ import type {
     BrainFileResponse,
     BrainGraphDocument,
     RequestListResponse,
-    TenantInfo,
+    ProjectInfo,
     ToggleState,
     WorkspaceInfo,
 } from './types';
@@ -99,8 +99,8 @@ export function fetchRequestDetail(id: string) {
     return getJson<RequestDetailResponse>(`/api/requests/${encodeURIComponent(id)}`);
 }
 
-export function fetchTenant() {
-    return getJson<TenantInfo>('/api/tenant');
+export function fetchProject() {
+    return getJson<ProjectInfo>('/api/project');
 }
 
 export function fetchHealth() {

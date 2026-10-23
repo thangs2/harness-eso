@@ -12,7 +12,7 @@ const MIGRATIONS = path.resolve(
     '../packages/harness-observe-server/db/migrations',
 );
 
-function tenant({ ledgerEnabled = true, prefix = 'facade-backfill' } = {}) {
+function project({ ledgerEnabled = true, prefix = 'facade-backfill' } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), `harness-${prefix}-`));
     const dbPath = path.join(root, '.harness', 'harness.db');
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -41,7 +41,7 @@ function tenant({ ledgerEnabled = true, prefix = 'facade-backfill' } = {}) {
         storage: { driver: 'sqlite', target: dbPath, remoteUrl: null },
         server: { host: '127.0.0.1', port: 8792 },
         ingest: { pollMs: 2000, transcriptDir: '', hookFiles: [] },
-        tenancy: { mode: 'isolated', registry: '' },
+        registry: { mode: 'isolated', registry: '' },
         decisionPolicyPath: path.join(root, '.harness', 'decision-policy.json'),
     };
     const db = openDb(dbPath);
@@ -76,7 +76,7 @@ const facadeRows = (db, id) =>
         .map((r) => r.event_type);
 
 test('runFacadeBackfill is disabled when the ledger is off', async () => {
-    const { cfg, db } = tenant({ ledgerEnabled: false, prefix: 'facade-off' });
+    const { cfg, db } = project({ ledgerEnabled: false, prefix: 'facade-off' });
     seedRequest(db, cfg, 'r:1', 1);
     const out = await runFacadeBackfill(db, cfg, { limit: 5 });
     assert.equal(out.disabled, true);
@@ -86,7 +86,7 @@ test('runFacadeBackfill is disabled when the ledger is off', async () => {
 });
 
 test('runFacadeBackfill leaves requests that already have a turn_start row', async () => {
-    const { cfg, db } = tenant({ prefix: 'facade-prior' });
+    const { cfg, db } = project({ prefix: 'facade-prior' });
     seedRequest(db, cfg, 'r:1', 1);
     db.run(
         `INSERT INTO decision_ledger (id, project_id, conversation_id, request_id, event_type, jev_mode, enforced_verdict, created_at)
@@ -102,7 +102,7 @@ test('runFacadeBackfill leaves requests that already have a turn_start row', asy
 });
 
 test('runFacadeBackfill reports pending so a caller can see convergence', async () => {
-    const { cfg, db } = tenant({ prefix: 'facade-pending' });
+    const { cfg, db } = project({ prefix: 'facade-pending' });
     seedRequest(db, cfg, 'r:1', 1);
     const out = await runFacadeBackfill(db, cfg, { limit: 1 });
     assert.equal(out.disabled, false);
@@ -115,7 +115,7 @@ test('a decided request actually gets a turn_start ledger row', async () => {
     // Regression: `decide()` only persists when ctx.writeLedger is true, and the ingest
     // caller did not pass it — so the facade reported work done while writing nothing, and
     // every design graph stayed on the coarse transcript fallback.
-    const { cfg, db } = tenant({ prefix: 'facade-writes' });
+    const { cfg, db } = project({ prefix: 'facade-writes' });
     seedRequest(db, cfg, 'r:1', 1);
     const out = await runFacadeBackfill(db, cfg, { limit: 1 });
     assert.equal(out.disabled, false);
@@ -145,7 +145,7 @@ test('a decided request actually gets a turn_start ledger row', async () => {
 });
 
 test('runEsoBackfill is disabled when eso.enabled is false', async () => {
-    const { cfg, db } = tenant({ prefix: 'eso-off' });
+    const { cfg, db } = project({ prefix: 'eso-off' });
     fs.writeFileSync(
         cfg.decisionPolicyPath,
         JSON.stringify({ version: 1, ledger: { enabled: true }, eso: { enabled: false } }),

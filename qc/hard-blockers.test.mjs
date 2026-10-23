@@ -44,19 +44,19 @@ test('a breaking contract change is a blocker named by path, not a score', () =>
     });
 });
 
-test('tenant findings become blockers, and the marked exception stays out', () => {
+test('project findings become blockers, and the marked exception stays out', () => {
     const { blockers } = hardBlockersFromChecks({
-        tenant: {
-            tenantTables: ['orders'],
+        project: {
+            scopedTables: ['orders'],
             files: [
                 { file: 'q.sql', content: 'select * from orders;' },
-                { file: 'global.sql', content: 'select * from orders /* tenant:global */;' },
+                { file: 'global.sql', content: 'select * from orders /* isolation:global */;' },
             ],
         },
     });
     assert.equal(blockers.length, 1);
-    assert.equal(blockers[0].source, 'tenant');
-    assert.equal(blockers[0].kind, 'query-without-tenant');
+    assert.equal(blockers[0].source, 'project');
+    assert.equal(blockers[0].kind, 'query-without-caller');
     assert.equal(blockers[0].ref, 'q.sql');
     assert.equal(blockers[0].table, 'orders');
 });
@@ -78,7 +78,7 @@ test('migration findings become blockers, and an approved statement is not one',
 test('nothing declared is no blockers, and no silent pass is invented', () => {
     const { blockers, checked } = hardBlockersFromChecks({});
     assert.deepEqual(blockers, []);
-    assert.deepEqual(checked, { contract: 0, tenant: 0, migration: 0 });
+    assert.deepEqual(checked, { contract: 0, project: 0, migration: 0 });
     assert.equal(hasHardBlockers({ hardBlockers: blockers }), false);
 });
 
@@ -91,12 +91,12 @@ test('an unreadable path is an error, not a silent pass', () => {
     assert.equal(loaded.migration.files.length, 0);
 });
 
-test('tenant without tables refuses to check anything and says why', () => {
+test('project without tables refuses to check anything and says why', () => {
     const root = workspace();
-    const loaded = loadCheckInputs(root, { tenant: { files: ['q.sql'] } });
-    assert.equal(loaded.tenant, null);
-    assert.equal(loaded.errors[0].source, 'tenant');
-    assert.match(loaded.errors[0].detail, /tenant\.tables is required/);
+    const loaded = loadCheckInputs(root, { project: { files: ['q.sql'] } });
+    assert.equal(loaded.project, null);
+    assert.equal(loaded.errors[0].source, 'project');
+    assert.match(loaded.errors[0].detail, /project\.tables is required/);
 });
 
 test('declared inputs are read from the root and become blockers end to end', () => {
@@ -105,14 +105,14 @@ test('declared inputs are read from the root and become blockers end to end', ()
     write(root, 'queries/q.sql', 'select * from orders;');
 
     const loaded = loadCheckInputs(root, {
-        tenant: { files: ['queries/q.sql'], tables: ['orders'] },
+        project: { files: ['queries/q.sql'], tables: ['orders'] },
         migration: { files: ['migrations/001.sql'] },
     });
     assert.equal(loaded.errors.length, 0);
     assert.equal(loaded.migration.files[0].file, 'migrations/001.sql');
 
     const { blockers } = hardBlockersFromChecks(loaded);
-    assert.deepEqual(blockers.map((b) => b.source), ['tenant', 'migration']);
+    assert.deepEqual(blockers.map((b) => b.source), ['project', 'migration']);
 });
 
 test('blockers attach to a live result and a skipped preflight stays skipped', () => {
@@ -125,7 +125,7 @@ test('blockers attach to a live result and a skipped preflight stays skipped', (
 });
 
 test('strict rejection also denies when a declared check could not be read (B1)', () => {
-    const unreadable = { hardBlockers: [], checkErrors: [{ source: 'tenant', detail: 'nope' }] };
+    const unreadable = { hardBlockers: [], checkErrors: [{ source: 'project', detail: 'nope' }] };
     assert.equal(rejectOnHardBlockers(unreadable), false);
     assert.equal(rejectOnHardBlockers(unreadable, { strict: true }), true);
     assert.equal(rejectOnHardBlockers({ hardBlockers: [{}] }), true);
@@ -187,20 +187,20 @@ test('a consumer can declare checks in policy, and invalid entries are dropped w
         eso: {
             checks: {
                 contract: { before: 'a.json', after: 'b.json' },
-                tenant: { files: ['q.sql'], tables: ['orders', ''] },
+                project: { files: ['q.sql'], tables: ['orders', ''] },
                 migration: { files: ['001.sql'] },
             },
         },
     });
     assert.deepEqual(resolved.checks, {
         contract: { before: 'a.json', after: 'b.json', direction: 'response' },
-        tenant: { files: ['q.sql'], tables: ['orders'] },
+        project: { files: ['q.sql'], tables: ['orders'] },
         migration: { files: ['001.sql'] },
     });
 
     // Invalid entries disappear instead of throwing on the preflight path.
     const partial = resolveEsoPolicy({
-        eso: { checks: { tenant: { files: ['q.sql'] }, contract: { before: 'a.json' } } },
+        eso: { checks: { project: { files: ['q.sql'] }, contract: { before: 'a.json' } } },
     });
     assert.equal(partial.checks, null);
 

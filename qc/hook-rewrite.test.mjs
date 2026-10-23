@@ -24,7 +24,7 @@ function fixture() {
         storage: { driver: 'sqlite', target: path.join(dataDir, 'harness.db'), remoteUrl: null },
         server: { host: '127.0.0.1', port: 8792 },
         ingest: { pollMs: 2000, transcriptDir: '', hookFiles: [] },
-        tenancy: { mode: 'isolated', registry: '' },
+        registry: { mode: 'isolated', registry: '' },
         decisionPolicyPath: path.join(dataDir, 'decision-policy.json'),
     };
     const db = openDb(cfg.storage.target);

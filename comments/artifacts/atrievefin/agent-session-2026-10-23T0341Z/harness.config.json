@@ -35,9 +35,9 @@
             }
         ]
     },
-    "tenancy": {
+    "registry": {
         "mode": "isolated",
-        "registry": "~/.harness/tenants.json"
+        "registry": "~/.harness/registry.json"
     },
     "integrations": {
         "law": {

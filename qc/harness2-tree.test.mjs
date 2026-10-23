@@ -32,7 +32,7 @@ function harnessTree({ hooksInEditable = false, surface = true } = {}) {
     );
     write(
         'sub_agents/reviewer/AGENT.md',
-        ['---', 'description: reviews a diff before merge', '---', '', 'Review the diff for tenant filters before you approve it.'].join('\n'),
+        ['---', 'description: reviews a diff before merge', '---', '', 'Review the diff for project filters before you approve it.'].join('\n'),
     );
     write('scripts/check_schema.py', 'print("schema ok")\n');
 
@@ -84,7 +84,7 @@ test('a skill in an optimized tree is law evidence with a real file and line', a
 
 test('a delegated agent role is law too, because a model reads it before acting', async () => {
     const root = harnessTree();
-    const { snippets } = await createDshSkillsLaw({ root }).fetch({ text: 'tenant filters review' });
+    const { snippets } = await createDshSkillsLaw({ root }).fetch({ text: 'project filters review' });
     const role = snippets.find((s) => s.provenance.file === 'sub_agents/reviewer/AGENT.md');
     assert.ok(role, `expected the subagent role in ${snippets.map((s) => s.provenance.file).join(', ')}`);
 });

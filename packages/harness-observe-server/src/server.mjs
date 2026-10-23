@@ -134,7 +134,7 @@ export function createObserveApp(cfg, opts = {}) {
                 },
             );
         }
-        if (p === '/api/tenant') return json(api.tenantInfo());
+        if (p === '/api/project') return json(api.projectInfo());
         if (p === '/api/requests') return json(api.listRequests(url));
         if (p.startsWith('/api/requests/')) {
             const id = decodeURIComponent(p.slice('/api/requests/'.length));
@@ -190,7 +190,7 @@ export function createObserveApp(cfg, opts = {}) {
         if (p === '/api/ingest/status') {
             return json(getCachedIngestStatus(cfg, () => ingestStatus(cfg)));
         }
-        if (p === '/api/tenants') return json(api.tenants());
+        if (p === '/api/registry') return json(api.registry());
         if (p === '/api/workspace' || p.startsWith('/api/workspace/')) {
             const ws = await handleWorkspaceRequest(p, req);
             if (ws) return ws;

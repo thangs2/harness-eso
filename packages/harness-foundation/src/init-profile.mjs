@@ -75,13 +75,13 @@ function writePlanFiles(plan) {
  * Canonical consumer bootstrap — only supported way to create harness files on a repo (e.g. x79).
  * @param {object} project harness-console project JSON shape
  * @param {string} profilesDir ship unit profiles/
- * @param {string} tenantsRegistryPath
+ * @param {string} registryPath
  * @param {{ dryRun?: boolean, force?: boolean, verify?: boolean }} opts
-     *      * `force` rewrites an existing `harness.config.json` (see `tenantProvisionAction`).
+     *      * `force` rewrites an existing `harness.config.json` (see `provisionAction`).
  *   `observePort` pins the port instead of claiming one from the workspace.
  */
-export function initProfile(project, profilesDir, tenantsRegistryPath, opts = {}) {
-    const plan = buildProvisionPlan(project, profilesDir, tenantsRegistryPath, {
+export function initProfile(project, profilesDir, registryPath, opts = {}) {
+    const plan = buildProvisionPlan(project, profilesDir, registryPath, {
         force: opts.force === true,
         observePort: opts.observePort ?? project.observe?.port,
     });
@@ -157,12 +157,12 @@ export function projectDraftForConsumer(consumerPath, opts = {}) {
 }
 
 /**
- * Rewrite the host side of a consumer — and optionally its tenant anchor.
+ * Rewrite the host side of a consumer — and optionally its project anchor.
  *
  * Host side (always): hook bins, `hooks.json` (merged and de-duplicated), `sidecar.env`,
  * and `.harness/host-bootstrap.json` with a fresh `appliedAt`.
  *
- * `forceTenant` additionally rewrites `harness.config.json` (and merges
+ * `forceProject` additionally rewrites `harness.config.json` (and merges
  * `decision-policy.json`, re-writes `integrations.json`) — the repair path for an anchor
  * that `create-if-missing` would otherwise leave stale forever. `decision-policy.json` is
  * still only merged, never force-written: the plan's keys are re-applied, but operator
@@ -170,15 +170,15 @@ export function projectDraftForConsumer(consumerPath, opts = {}) {
  *
  * @param {object} project harness-console project JSON shape
  * @param {string} profilesDir ship unit profiles/
- * @param {{ tenantsRegistryPath?: string, forceTenant?: boolean, verify?: boolean }} opts
+ * @param {{ registryPath?: string, forceProject?: boolean, verify?: boolean }} opts
  */
 export function reloadHostConfig(project, profilesDir, opts = {}) {
-    const forceTenant = opts.forceTenant === true;
-    const plan = buildProvisionPlan(project, profilesDir, opts.tenantsRegistryPath || '', {
-        force: forceTenant,
+    const forceProject = opts.forceProject === true;
+    const plan = buildProvisionPlan(project, profilesDir, opts.registryPath || '', {
+        force: forceProject,
         observePort: opts.observePort ?? project.observe?.port,
     });
-    const files = forceTenant ? writePlanFiles(plan) : [];
+    const files = forceProject ? writePlanFiles(plan) : [];
     const host = applyHostProfiles(plan.root, plan.hostProfiles, {
         observePort: plan.observePort,
         verify: opts.verify,
@@ -187,7 +187,7 @@ export function reloadHostConfig(project, profilesDir, opts = {}) {
         ok: true,
         root: plan.root,
         hostProfileIds: plan.hostProfileIds,
-        tenantRefreshed: forceTenant,
+        projectRefreshed: forceProject,
         observePort: plan.observePort,
         observeUrl: `http://127.0.0.1:${plan.observePort}`,
         bootstrap: host.bootstrap,

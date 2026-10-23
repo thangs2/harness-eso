@@ -164,16 +164,16 @@ export function ConfigPage() {
                         disabled={!id}
                         onClick={() => {
                             if (!id) return;
-                            void reloadProjectHost(id, { tenant: true })
+                            void reloadProjectHost(id, { project: true })
                                 .then((r) =>
                                     setReloadMsg(
-                                        `Đã ghi lại host + tenant (${r.hostProfileIds.join(', ')}) — ${r.files.length} file.`,
+                                        `Đã ghi lại host + project (${r.hostProfileIds.join(', ')}) — ${r.files.length} file.`,
                                     ),
                                 )
                                 .catch((err) => setReloadMsg(`Lỗi: ${(err as Error).message}`));
                         }}
                     >
-                        Ghi lại tenant config
+                        Ghi lại project config
                     </button>
                     <Link to="/" className="secondary">
                         <button type="button" className="secondary">Hủy</button>

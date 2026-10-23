@@ -49,7 +49,7 @@ tree that *looks* provisioned will not gate anything.
 
 | Layer | Evidence |
 |---|---|
-| Identity / tenancy | `harness.config.json`: `project.id=atrievefin`, `server.port=8795`, `storage.driver=sqlite` → `.harness/harness.db`. Tenant registry `~/.harness/tenants.json` lists `atrievefin → 8795` beside `x79/8792`, `baplatform/8793`, `fineso/8794`. |
+| Identity / registry | `harness.config.json`: `project.id=atrievefin`, `server.port=8795`, `storage.driver=sqlite` → `.harness/harness.db`. Project registry `~/.harness/registry.json` lists `atrievefin → 8795` beside `x79/8792`, `baplatform/8793`, `fineso/8794`. |
 | Host pack | `.harness/host-bootstrap.json`: `profileIds=[cursor-superset, agents-superset]`, applied `2026-10-23T03:40:35Z`, `hostPack.ok=true`. `host-pack.json` v0.1.0, **3/3 file hashes match** (`harness-hook.mjs=32435c89…`, `route-hook.py=f598da42…`, `path-policy.default.json`). |
 | Hook wiring (Cursor) | `.cursor/hooks.json` declares 9 lanes: `preToolUse` (guard-write.py · guard-brain), `beforeShellExecution` (guard-shell.py · pack guard-shell), `beforeSubmitPrompt` (preflight · route), `afterFileEdit`, `preCompact`, `postToolUse` (gap-tracker · post-tool-hint · route), `stop`. All 9 produce rows in this session's `turn.jsonl`. |
 | Guard scripts | `.cursor/hooks/guard-write.py` (29 KB) and `guard-shell.py` are **byte-identical** in `.cursor/`, `.agents/`, `.claude/`. |
@@ -224,7 +224,7 @@ degraded; **L** = hygiene.
 | F-08 | **H** | pack + consumer | **Law adapter blind.** `docgraph` index is 3 days stale (37/51 newer), `--harness cursor` hides `.agents/**` law, and the three preflight `law:*` queries (`harness-eso`, `decision-facade`, `harness-tooling`) return **zero rows** → `score=0` on every turn, `closedGapIds:[]`, all protected writes permanently denied until HIL. |
 | F-09 | M | consumer | `paths.gated` in `decision-policy.json` **omits** `SDLC/**`, `.harness/**`, `.claude/**` (the latter even though `.claude/hooks/*.py` are guarded twins). `SDLC/00.governance/03.decision-register.md` → `allow`. The decision register is editable by an ungated write. |
 | F-10 | L | consumer | `.cursor/rules` has 7 `.mdc` and **0 `.md`**, while `.agents/rules` and `.claude/rules` each carry **7 `.md` + 7 `.mdc`** twins with identical bodies. Three trees × duplicated rules = 21 rule files for 7 rules; the `.md` twins exist only to be read by a non-Cursor harness. |
-| F-11 | L | consumer | Observatory console at `:8792` is **x79's** console (tenant registry), not atrievefin's; `8795` is the sidecar, and no console route was found on it. `.cursor/instructions.md` advertises `http://127.0.0.1:8792` as "Observatory" for this repo — pointing an atrievefin operator at another tenant's dashboard. |
+| F-11 | L | consumer | Observatory console at `:8792` is **x79's** console (project registry), not atrievefin's; `8795` is the sidecar, and no console route was found on it. `.cursor/instructions.md` advertises `http://127.0.0.1:8792` as "Observatory" for this repo — pointing an atrievefin operator at another project's dashboard. |
 | F-12 | L | consumer | `memory.adapterId=noop-memory` while the `.mcp.json` agentmemory server is configured (`AGENTMEMORY_URL=http://localhost:3311`); `:3311/health` and `/mcp` both `404` in this session, so the memory adapter is honest — but `.agentmemory/` on disk (state_store.db, BM25 index) holds data the harness never reads. The rules' "memory_smart_search at turn start" is satisfied only by the MCP server being *listed*, not by the adapter. |
 
 ---
@@ -286,5 +286,5 @@ All raw inputs for this log are in [`./agent-session-2026-10-23T0341Z/`](./agent
 | `eso-bundle-stamp.json` | verdict mirror `03:43:10Z`, `allowWrite:false`, `mode:fail_closed` |
 | `pipeline-brain-stamp.json` | pro-tier stamp from 2026-10-22 (F-04) |
 | `decision-policy.json` · `integrations.json` · `host-bootstrap.json` · `host-pack.json` | consumer config as read |
-| `cursor-hooks.json` · `agents-hooks.json` · `harness.config.json` | live hook manifests + tenant config |
+| `cursor-hooks.json` · `agents-hooks.json` · `harness.config.json` | live hook manifests + project config |
 | `consumer-maturity-latest.md` / `.json` | fresh `verify-consumer.sh` v1.3.0 run, `T2`, `pass=18 fail=8` |

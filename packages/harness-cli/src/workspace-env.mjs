@@ -16,7 +16,7 @@ const CLI_SRC = path.dirname(fileURLToPath(import.meta.url));
 export const ESO_ROOT = path.resolve(CLI_SRC, '../../..');
 
 /** State files that used to live in the checkout and now belong to the operator's home. */
-const MOVED_STATE = ['workspace.json', 'tenants.json'];
+const MOVED_STATE = ['workspace.json', 'registry.json'];
 
 /**
  * Move product state out of the checkout, once.

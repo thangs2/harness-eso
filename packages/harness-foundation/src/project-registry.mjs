@@ -257,8 +257,8 @@ export function policyFromProject(project, profileJson, catalog = null) {
     return policy;
 }
 
-/** Tenant file strategy per Console UX §6.1. */
-export function tenantProvisionAction(relative, exists, force = false) {
+/** Project file strategy per Console UX §6.1. */
+export function provisionAction(relative, exists, force = false) {
     const r = String(relative || '').replace(/\\/g, '/');
     if (r === CONFIG_NAME || r.endsWith('/harness.config.json')) {
         if (!exists) return 'create-if-missing';
@@ -324,7 +324,7 @@ export function provisionFileGroup(relative) {
     const r = String(relative || '').replace(/\\/g, '/');
     if (r.startsWith('.cursor/')) return 'cursor';
     if (r.startsWith('.agents/')) return 'agents';
-    return 'tenant';
+    return 'project';
 }
 
 function hostPreviewFiles(root, hostProfile, hostProfileId, observePort) {
@@ -333,7 +333,7 @@ function hostPreviewFiles(root, hostProfile, hostProfileId, observePort) {
             path: path.join(root, '.harness', 'sidecar.env'),
             relative: '.harness/sidecar.env',
             action: 'write',
-            group: 'tenant',
+            group: 'project',
             preview: {
                 HARNESS_SIDECAR_URL: `http://127.0.0.1:${observePort}`,
             },
@@ -342,7 +342,7 @@ function hostPreviewFiles(root, hostProfile, hostProfileId, observePort) {
             path: path.join(root, '.harness', 'host-bootstrap.json'),
             relative: '.harness/host-bootstrap.json',
             action: 'write',
-            group: 'tenant',
+            group: 'project',
             preview: { profileIds: hostProfileId, note: 'written on provision' },
         },
     ];
@@ -389,11 +389,11 @@ function hostPreviewFiles(root, hostProfile, hostProfileId, observePort) {
  * Files that provision will create or skip if present.
  * @param {object} project
  * @param {string} profilesDir
- * @param {string} tenantsRegistryPath
+ * @param {string} registryPath
  * @param {{ force?: boolean, observePort?: number }} [opts] `force` rewrites a stale `harness.config.json`;
  *   `observePort` pins the port instead of claiming one from the workspace
  */
-export function buildProvisionPlan(project, profilesDir, tenantsRegistryPath, opts = {}) {
+export function buildProvisionPlan(project, profilesDir, registryPath, opts = {}) {
     const force = opts.force === true;
     const rawRoot = String(project.agentRepo?.root || '').trim();
     if (!rawRoot) {
@@ -453,7 +453,7 @@ export function buildProvisionPlan(project, profilesDir, tenantsRegistryPath, op
         // Written in `~` form, not as an absolute host path. This lands in a file the operator may
         // commit, so it must not encode one machine's home directory — and `loadConfig` expands `~`
         // when it reads the registry back.
-        tenancy: { mode: 'isolated', registry: portableStatePath(tenantsRegistryPath) },
+        registry: { mode: 'isolated', registry: portableStatePath(registryPath) },
         integrations: project.plugins,
     };
 
@@ -465,22 +465,22 @@ export function buildProvisionPlan(project, profilesDir, tenantsRegistryPath, op
         {
             path: harnessConfigPath,
             relative: CONFIG_NAME,
-            action: tenantProvisionAction(CONFIG_NAME, fs.existsSync(harnessConfigPath), force),
-            group: 'tenant',
+            action: provisionAction(CONFIG_NAME, fs.existsSync(harnessConfigPath), force),
+            group: 'project',
             preview: harnessConfig,
         },
         {
             path: policyPath,
             relative: '.harness/decision-policy.json',
-            action: tenantProvisionAction('.harness/decision-policy.json', fs.existsSync(policyPath)),
-            group: 'tenant',
+            action: provisionAction('.harness/decision-policy.json', fs.existsSync(policyPath)),
+            group: 'project',
             preview: policy,
         },
         {
             path: integrationsPath,
             relative: '.harness/integrations.json',
-            action: tenantProvisionAction('.harness/integrations.json', fs.existsSync(integrationsPath)),
-            group: 'tenant',
+            action: provisionAction('.harness/integrations.json', fs.existsSync(integrationsPath)),
+            group: 'project',
             preview: project.plugins,
         },
     ];

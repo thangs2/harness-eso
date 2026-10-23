@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { NAV_TABS } from './navTabs';
-import { fetchHealth, fetchTenant } from '@/shared/api/client';
+import { fetchHealth, fetchProject } from '@/shared/api/client';
 import { ErrorBanner } from '@/ui/Feedback';
 import { connectObserveSse } from '@/shared/events/observeRefresh';
 
 export function ShellLayout() {
-    const [tenantLabel, setTenantLabel] = useState<string | null>(null);
+    const [callerLabel, setCallerLabel] = useState<string | null>(null);
     const [healthOk, setHealthOk] = useState<boolean | null>(null);
     const [turns, setTurns] = useState<number | null>(null);
     const [spineWarnings, setSpineWarnings] = useState<string[]>([]);
@@ -46,9 +46,9 @@ export function ShellLayout() {
                 .catch(() => setHealthOk(false));
         };
         pollHealth();
-        fetchTenant()
-            .then((t) => setTenantLabel(`${t.displayName} · ${t.id}`))
-            .catch(() => setTenantLabel(null));
+        fetchProject()
+            .then((t) => setCallerLabel(`${t.displayName} · ${t.id}`))
+            .catch(() => setCallerLabel(null));
         const id = window.setInterval(pollHealth, 15000);
         return () => {
             stopSse();
@@ -65,7 +65,7 @@ export function ShellLayout() {
                             <h1 className="text-base font-semibold m-0">Harness Observatory</h1>
                             <p className="obs-sub m-0 text-xs">
                                 Read-only audit · {typeof window !== 'undefined' && window.location.port ? `port ${window.location.port}` : 'port 8792'}
-                                {tenantLabel ? ` · ${tenantLabel}` : ''}
+                                {callerLabel ? ` · ${callerLabel}` : ''}
                             </p>
                         </div>
                         <div

@@ -138,16 +138,16 @@ export function ProvisionDonePage() {
                         type="button"
                         className="secondary"
                         onClick={() =>
-                            void reloadProjectHost(id, { tenant: true })
+                            void reloadProjectHost(id, { project: true })
                                 .then((r) =>
                                     setReloadMsg(
-                                        `Đã ghi lại host + tenant config (${r.hostProfileIds.join(', ')}) — appliedAt ${r.bootstrap?.appliedAt ?? '—'}. Reload Cursor để hooks.json mới có hiệu lực.`,
+                                        `Đã ghi lại host + project config (${r.hostProfileIds.join(', ')}) — appliedAt ${r.bootstrap?.appliedAt ?? '—'}. Reload Cursor để hooks.json mới có hiệu lực.`,
                                     ),
                                 )
                                 .catch((err) => setReloadMsg(`Lỗi: ${(err as Error).message}`))
                         }
                     >
-                        Ghi lại tenant config
+                        Ghi lại project config
                     </button>
                 )}
                 {id && <Link to={`/projects/${id}/config`}>Sửa cấu hình</Link>}

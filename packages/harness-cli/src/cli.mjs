@@ -16,7 +16,7 @@ import { runVerifyHost } from './verify-host-cmd.mjs';
 import { runDshBridge } from './dsh-bridge-cmd.mjs';
 import { runDoctorDsh } from './doctor-dsh-cmd.mjs';
 import { runCheckContract } from './check-contract-cmd.mjs';
-import { runCheckTenant } from './check-tenant-cmd.mjs';
+import { runCheckIsolation } from './check-isolation-cmd.mjs';
 import { runCheckMigration } from './check-migration-cmd.mjs';
 
 applyWorkspaceEnv();
@@ -38,7 +38,7 @@ function usage() {
   harnessctl doctor dsh [--profile <id>] [--home <path>] [--json]
   harnessctl dsh bridge --out <dir> [--config-path <path>] [--project-dir <dir>] [--force]
   harnessctl check contract <before.json> <after.json> [--direction response|request] [--json]
-  harnessctl check tenant <file...> --tables <table,table> [--json]
+  harnessctl check project <file...> --tables <table,table> [--json]
   harnessctl check migration <file...> [--json]
   harnessctl configure list | harnessctl configure use <id>
   harnessctl observatory up|down|restart|status|health|logs|build|smoke [--project <id>]
@@ -83,8 +83,8 @@ async function main() {
         return;
     }
 
-    if (cmd === 'check' && argv[1] === 'tenant') {
-        runCheckTenant(argv.slice(2));
+    if (cmd === 'check' && argv[1] === 'isolation') {
+        runCheckIsolation(argv.slice(2));
         return;
     }
 

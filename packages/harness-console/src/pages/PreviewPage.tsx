@@ -10,11 +10,11 @@ type PreviewFile = {
     action: string;
     exists: boolean;
     preview: unknown;
-    group?: 'tenant' | 'cursor' | 'agents';
+    group?: 'project' | 'cursor' | 'agents';
 };
 
 const GROUP_LABEL: Record<string, string> = {
-    tenant: 'Tenant / .harness',
+    project: 'Project / .harness',
     cursor: 'Cursor (.cursor)',
     agents: 'Antigravity (.agents)',
 };
@@ -22,7 +22,7 @@ const GROUP_LABEL: Record<string, string> = {
 function inferGroup(relative: string): PreviewFile['group'] {
     if (relative.startsWith('.cursor/')) return 'cursor';
     if (relative.startsWith('.agents/')) return 'agents';
-    return 'tenant';
+    return 'project';
 }
 
 function actionBadge(action: string) {
@@ -73,11 +73,11 @@ export function PreviewPage() {
     }, [id]);
 
     const grouped = useMemo(() => {
-        const order = ['tenant', 'cursor', 'agents'] as const;
+        const order = ['project', 'cursor', 'agents'] as const;
         const map = new Map<string, PreviewFile[]>();
         for (const g of order) map.set(g, []);
         for (const f of files) {
-            const g = f.group ?? inferGroup(f.relative) ?? 'tenant';
+            const g = f.group ?? inferGroup(f.relative) ?? 'project';
             map.get(g)?.push(f);
         }
         return order.map((g) => ({ id: g, label: GROUP_LABEL[g], items: map.get(g) ?? [] }));
@@ -165,7 +165,7 @@ export function PreviewPage() {
                     onChange={(e) => setConfirmed(e.target.checked)}
                 />
                 {' '}
-                Tôi đã xem danh sách file (tenant + IDE host pack) và chấp nhận ghi/merge trên consumer.
+                Tôi đã xem danh sách file (project + IDE host pack) và chấp nhận ghi/merge trên consumer.
             </label>
 
             <button

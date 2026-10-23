@@ -12,9 +12,9 @@ test('the host runtime forwards its providers into preflight', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-runtime-'));
     const runtime = createHostRuntime({ root, policy: policyWithNativeMemory(), providers: [nativeMemoryProvider()] });
 
-    const out = await runtime.preflight({ event: 'turn_start', userQueryStem: 'tenant id', turnId: 't1' });
+    const out = await runtime.preflight({ event: 'turn_start', userQueryStem: 'project id', turnId: 't1' });
     assert.equal(out.skipped, false);
-    assert.ok(out.retrieval.snippets.some((s) => s.text.includes('tenant id')), 'native evidence reached the engine');
+    assert.ok(out.retrieval.snippets.some((s) => s.text.includes('project id')), 'native evidence reached the engine');
     assert.ok(out.retrieval.trace.some((line) => line.includes('native:test-memory')), 'the provider trace is recorded');
 });
 
@@ -29,6 +29,6 @@ test('the probe explains the native binding', () => {
 test('without a provider the same policy falls through to none', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-runtime-'));
     const runtime = createHostRuntime({ root, policy: policyWithNativeMemory() });
-    const out = await runtime.preflight({ event: 'turn_start', userQueryStem: 'tenant id', turnId: 't2' });
+    const out = await runtime.preflight({ event: 'turn_start', userQueryStem: 'project id', turnId: 't2' });
     assert.equal(out.retrieval.snippets.length, 0);
 });

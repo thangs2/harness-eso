@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { createObserveApp, bootObserveDb } from '@mu/harness-observe-server';
 
-function tempTenant() {
+function makeConfig() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-v1-'));
     const dbPath = path.join(root, '.harness', 'harness.db');
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -43,7 +43,7 @@ function tempTenant() {
 }
 
 test('POST /v1/preflight returns TurnVerdict projection', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     bootObserveDb(cfg);
     const app = createObserveApp(cfg, { pollIngest: false });
     app.setPort(8810);
@@ -79,7 +79,7 @@ test('POST /v1/preflight returns TurnVerdict projection', async () => {
  *
  * Two things make this comparison meaningful rather than flaky:
  *
- * 1. **The tenant's ESO sources are disabled.** COLLECT shells out to `docgraph` / `codegraph` with
+ * 1. **The project's ESO sources are disabled.** COLLECT shells out to `docgraph` / `codegraph` with
  *    an 8s/12s timeout and caches results on disk, so two live runs can legitimately see different
  *    snippets — and under a loaded CI box one spawn can time out where the other does not. That is
  *    variance in the *input*, not in the projection, and comparing two noisy runs would be a test
@@ -90,7 +90,7 @@ test('POST /v1/preflight returns TurnVerdict projection', async () => {
  *    and the key set is compared explicitly so a route that drops or invents a field fails.
  */
 test('local preflight and the HTTP route project the same document', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     // No adapter spawning: see the note above. This is the fixture, not a workaround.
     fs.writeFileSync(
         path.join(cfg.root, '.harness', 'decision-policy.json'),

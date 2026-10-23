@@ -15,7 +15,7 @@ import {
     defaultProductStateDir,
     portableStatePath,
     productStateDir,
-    tenantsFile,
+    registryFile,
     workspaceFile,
 } from '../packages/harness-foundation/src/workspace-store.mjs';
 import { migrateLegacyProductState } from '../packages/harness-cli/src/workspace-env.mjs';
@@ -56,7 +56,7 @@ test('product state defaults to ~/.harness, never inside the checkout', () => {
         // The whole point: the operator's project list must not move with the source tree.
         assert.ok(!dir.startsWith(ESO_ROOT), 'product state must not live in the product checkout');
         assert.ok(workspaceFile().startsWith(dir));
-        assert.ok(tenantsFile().startsWith(dir));
+        assert.ok(registryFile().startsWith(dir));
     });
 });
 
@@ -76,12 +76,12 @@ test('an empty override falls back to the default rather than resolving to ""', 
 });
 
 test('portableStatePath collapses $HOME so consumer files carry no absolute host path', () => {
-    const inside = path.join(os.homedir(), '.harness', 'tenants.json');
-    assert.equal(portableStatePath(inside), '~/.harness/tenants.json');
+    const inside = path.join(os.homedir(), '.harness', 'registry.json');
+    assert.equal(portableStatePath(inside), '~/.harness/registry.json');
     assert.equal(portableStatePath(os.homedir()), '~');
     // Outside the home directory there is nothing to collapse, so it is left alone.
-    assert.equal(portableStatePath('/tmp/tenants.json'), '/tmp/tenants.json');
-    assert.equal(portableStatePath('/opt/harness/tenants.json'), '/opt/harness/tenants.json');
+    assert.equal(portableStatePath('/tmp/registry.json'), '/tmp/registry.json');
+    assert.equal(portableStatePath('/opt/harness/registry.json'), '/opt/harness/registry.json');
     // A checkout under $HOME collapses too — which is exactly why the leak test below passes even
     // though this repo lives inside the operator's home directory.
     assert.equal(portableStatePath(ESO_ROOT), `~${ESO_ROOT.slice(os.homedir().length)}`);
@@ -106,10 +106,10 @@ function draftProject(root) {
 
 test('the provisioned consumer config carries no path to the product checkout', () => {
     const root = tempConsumer();
-    const plan = buildProvisionPlan(draftProject(root), PROFILES_DIR, tenantsFile());
-    const registry = plan.files.find((f) => f.relative === 'harness.config.json')?.preview?.tenancy?.registry;
+    const plan = buildProvisionPlan(draftProject(root), PROFILES_DIR, registryFile());
+    const registry = plan.files.find((f) => f.relative === 'harness.config.json')?.preview?.registry?.registry;
 
-    assert.equal(registry, '~/.harness/tenants.json');
+    assert.equal(registry, '~/.harness/registry.json');
     assert.ok(!String(registry).includes(ESO_ROOT), 'must not embed the checkout path');
     assert.ok(!path.isAbsolute(registry), 'a committed file must not carry one machine home dir');
 });
@@ -117,8 +117,8 @@ test('the provisioned consumer config carries no path to the product checkout', 
 test('a consumer provisioned end to end has no absolute checkout path anywhere', () => {
     const root = tempConsumer();
     const project = draftProject(root);
-    initProfile(project, PROFILES_DIR, tenantsFile(), { dryRun: false, verify: false });
-    applyHostProfiles(root, buildProvisionPlan(project, PROFILES_DIR, tenantsFile()).hostProfiles, {
+    initProfile(project, PROFILES_DIR, registryFile(), { dryRun: false, verify: false });
+    applyHostProfiles(root, buildProvisionPlan(project, PROFILES_DIR, registryFile()).hostProfiles, {
         observePort: 8792,
         verify: false,
     });

@@ -156,7 +156,7 @@ export function previewProject(id: string) {
             action: string;
             exists: boolean;
             preview: unknown;
-            group?: 'tenant' | 'cursor' | 'agents';
+            group?: 'project' | 'cursor' | 'agents';
         }>;
     }>(`/api/projects/${encodeURIComponent(id)}/preview`);
 }
@@ -169,22 +169,22 @@ export function provisionProject(id: string) {
 /**
  * Rewrite the consumer's host side: hook bins, `hooks.json` (merged and de-duplicated),
  * `sidecar.env`, and `.harness/host-bootstrap.json` with a fresh `appliedAt`. Use after
- * editing host profiles, without re-running the tenant provision.
+ * editing host profiles, without re-running the project provision.
  *
- * `tenant: true` also rewrites the tenant anchor (`harness.config.json` + merge
+ * `project: true` also rewrites the project anchor (`harness.config.json` + merge
  * `decision-policy.json`) — the repair path for an anchor that `create-if-missing` would
  * otherwise leave stale. Operator edits in `decision-policy.json` are preserved.
  */
-export function reloadProjectHost(id: string, opts: { tenant?: boolean } = {}) {
+export function reloadProjectHost(id: string, opts: { project?: boolean } = {}) {
     const path = `/api/projects/${encodeURIComponent(id)}/reload`;
     return sendJson<{
         ok: boolean;
         root: string;
         hostProfileIds: string[];
-        tenantRefreshed: boolean;
+        projectRefreshed: boolean;
         bootstrap: { appliedAt?: string };
         files: Array<{ relative: string; action?: string; status?: string }>;
-    }>(path, 'POST', { tenant: opts.tenant === true });
+    }>(path, 'POST', { project: opts.project === true });
 }
 
 export function fetchMeta() {

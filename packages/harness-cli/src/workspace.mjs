@@ -3,7 +3,7 @@ export {
     loadWorkspace,
     resolveProject,
     saveWorkspace,
-    syncTenantsFromWorkspace,
+    syncProjectsFromWorkspace,
     workspaceFile,
     productStateDir,
     ensureProductState,

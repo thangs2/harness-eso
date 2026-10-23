@@ -39,7 +39,7 @@ test('a removed response status is breaking', () => {
 test('a removed response field is breaking, at any depth', () => {
     const before = spec({
         responses: {
-            200: { content: { 'application/json': { schema: { type: 'object', properties: { meta: { type: 'object', properties: { tenantId: { type: 'string' } } } } } } } },
+            200: { content: { 'application/json': { schema: { type: 'object', properties: { meta: { type: 'object', properties: { callerId: { type: 'string' } } } } } } } },
         },
     });
     const after = spec({
@@ -47,7 +47,7 @@ test('a removed response field is breaking, at any depth', () => {
     });
     const out = diffContracts(before, after);
     assert.deepEqual(out.breaking.map((b) => b.kind), ['field-removed']);
-    assert.match(out.breaking[0].path, /meta\.tenantId$/);
+    assert.match(out.breaking[0].path, /meta\.callerId$/);
 });
 
 test('a type change is breaking and stops descending', () => {

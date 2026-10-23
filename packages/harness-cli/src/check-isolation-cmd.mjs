@@ -1,20 +1,20 @@
 /**
- * `harnessctl check tenant <file...> --tables orders,invoices` — flag SQL that touches a declared
- * tenant-scoped table without naming the tenant.
+ * `harnessctl check isolation <file...> --tables orders,invoices` — flag SQL that touches a declared
+ * project-scoped table without naming the project.
  *
  * The table list is an argument on purpose: this command must not guess which tables are scoped.
  */
 import fs from 'node:fs';
-import { checkTenantFiles } from '@mu/harness-eso-core';
+import { checkIsolationFiles } from '@mu/harness-eso-core';
 
-export function checkTenantPaths(paths, tenantTables) {
-    return checkTenantFiles(
+export function checkIsolationPaths(paths, scopedTables) {
+    return checkIsolationFiles(
         paths.map((file) => ({ file, content: fs.readFileSync(file, 'utf8') })),
-        { tenantTables },
+        { scopedTables },
     );
 }
 
-export function runCheckTenant(argv = []) {
+export function runCheckIsolation(argv = []) {
     const opts = { tables: [], json: false };
     const paths = [];
     for (let i = 0; i < argv.length; i += 1) {
@@ -25,17 +25,17 @@ export function runCheckTenant(argv = []) {
         else throw new Error(`unknown flag: ${a}`);
     }
     if (!paths.length || !opts.tables.length) {
-        throw new Error('usage: harnessctl check tenant <file...> --tables <table,table> [--json]');
+        throw new Error('usage: harnessctl check isolation <file...> --tables <table,table> [--json]');
     }
 
-    const report = checkTenantPaths(paths, opts.tables);
+    const report = checkIsolationPaths(paths, opts.tables);
     if (opts.json) {
         console.log(JSON.stringify(report, null, 2));
         if (report.findings.length) process.exitCode = 1;
         return report;
     }
 
-    console.log(`\ntenant isolation  ${report.files} file(s), tables: ${opts.tables.join(', ')}`);
+    console.log(`\nisolation  ${report.files} file(s), tables: ${opts.tables.join(', ')}`);
     if (!report.findings.length) {
         console.log('  no finding\n');
         return report;

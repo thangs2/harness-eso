@@ -187,7 +187,7 @@ deploy_single_consumer() {
         [[ "$do_build" == "true" ]] && echo "  - bun run build:observatory"
         [[ "$do_build" == "true" ]] && echo "  - node <cli> observatory build"
         echo "  - node <cli> observatory restart --project $id"
-        echo "  - GET http://127.0.0.1:$port/health, then /api/tenant must report \"$id\""
+        echo "  - GET http://127.0.0.1:$port/health, then /api/project must report \"$id\""
         [[ "$do_smoke" == "true" ]] && echo "  - node <cli> observatory smoke"
         return 0
     fi
@@ -214,13 +214,13 @@ deploy_single_consumer() {
     fi
 
     # A healthy container is not proof that it serves *this* consumer: the port may be held by another
-    # project's stack, and `/health` answers 200 either way. Ask the tenant endpoint which project the
+    # project's stack, and `/health` answers 200 either way. Ask the project endpoint which project the
     # stack is configured for.
     local served
-    served=$(curl -fsS "http://127.0.0.1:${port}/api/tenant" 2>/dev/null || true)
+    served=$(curl -fsS "http://127.0.0.1:${port}/api/project" 2>/dev/null || true)
     if [[ -n "$served" ]] && ! printf '%s' "$served" | grep -q "\"$id\""; then
         echo "❌ The stack on :$port is NOT '$id' — another consumer holds the port."
-        echo "   /api/tenant returned: $served"
+        echo "   /api/project returned: $served"
         echo "   Fix: ./console.sh verify   (shows which project owns :$port)"
         return 1
     fi

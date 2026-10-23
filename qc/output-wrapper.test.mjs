@@ -148,17 +148,65 @@ test('does not accuse a reply that mentions the envelope shape but is not one', 
     assert.equal(inspectAgentText(fenced).wrapped, false);
 });
 
+/**
+ * Each verdict test gets its own trail file: the guard now reads its own history, so a shared file
+ * would make the tests depend on each other's order.
+ */
+function withTrail(fn) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wrapped-guard-'));
+    try {
+        return fn(path.join(dir, 'wrapped-output.json'), dir);
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
 test('stop hook asks for a resend once, and stops after a second failed attempt', () => {
-    const wrapped = { status: 'completed', text: JSON.stringify([{ text: 'hi', type: 'text' }]) };
-    assert.match(stopVerdict({ ...wrapped, loop_count: 0 }).followup_message, /plain markdown/);
-    // Second consecutive wrap: the reminder is not landing, so do not spin.
-    assert.deepEqual(stopVerdict({ ...wrapped, loop_count: 1 }), {});
+    withTrail((stateFile) => {
+        const wrapped = { status: 'completed', text: JSON.stringify([{ text: 'hi', type: 'text' }]) };
+        assert.match(stopVerdict({ ...wrapped, loop_count: 0 }, { stateFile }).followup_message, /plain markdown/);
+        // Second consecutive wrap: the reminder is not landing, so do not spin.
+        assert.deepEqual(stopVerdict({ ...wrapped, loop_count: 1 }, { stateFile }), {});
+    });
+});
+
+test('a resend wrapped again is not reminded twice, even without `loop_count`', () => {
+    withTrail((stateFile) => {
+        const wrapped = { status: 'completed', text: JSON.stringify([{ text: 'hi', type: 'text' }]) };
+        const now = Date.parse('2026-10-23T10:10:03.140Z');
+        // First wrap of the turn: the host supplies no `loop_count` on an ordinary turn.
+        assert.match(stopVerdict(wrapped, { stateFile, now }).followup_message, /plain markdown/);
+        // The resend came back wrapped too, 1 ms later — same outcome must not be asked for again.
+        assert.deepEqual(stopVerdict(wrapped, { stateFile, now: now + 1 }), {});
+        // A later turn is a fresh wrap: the previous one is not "the same turn".
+        assert.match(stopVerdict(wrapped, { stateFile, now: now + 60_000 }).followup_message, /plain markdown/);
+    });
+});
+
+test('the wrap trail records one attempt number per turn, not two for the same check', () => {
+    withTrail((stateFile) => {
+        const wrapped = { status: 'completed', text: JSON.stringify([{ text: 'hi', type: 'text' }]) };
+        const now = Date.parse('2026-10-23T10:10:03.140Z');
+        stopVerdict(wrapped, { stateFile, now });
+        stopVerdict(wrapped, { stateFile, now: now + 1 });
+        const events = fs
+            .readFileSync(stateFile, 'utf8')
+            .split('\n')
+            .filter(Boolean)
+            .map((line) => JSON.parse(line));
+        assert.deepEqual(
+            events.map((e) => `${e.event}:${e.attempt}`),
+            ['wrap-detected:1', 'wrap-detected:2', 'wrap-unresolved:2'],
+        );
+    });
 });
 
 test('stop hook stays silent on a clean reply, an aborted turn, or unreadable input', () => {
-    assert.deepEqual(stopVerdict({ status: 'completed', loop_count: 0, text: '## Done\n\nAll good.' }), {});
-    assert.deepEqual(stopVerdict({ status: 'aborted', loop_count: 0, text: REAL_SINGLE }), {});
-    assert.deepEqual(stopVerdict({ status: 'completed', loop_count: 0 }), {});
+    withTrail((stateFile) => {
+        assert.deepEqual(stopVerdict({ status: 'completed', loop_count: 0, text: '## Done\n\nAll good.' }, { stateFile }), {});
+        assert.deepEqual(stopVerdict({ status: 'aborted', loop_count: 0, text: REAL_SINGLE }, { stateFile }), {});
+        assert.deepEqual(stopVerdict({ status: 'completed' }, { stateFile }), {});
+    });
 });
 
 /** A transcript line as the host writes it: `role: assistant`, text blocks inside `message.content`. */

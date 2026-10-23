@@ -18,7 +18,7 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
         }
     }
 
-    function tenantInfo() {
+    function projectInfo() {
         return withDb((db) => {
             const counts = dbCounts(db);
             return {
@@ -176,15 +176,15 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
         });
     }
 
-    function tenants() {
+    function registry() {
         try {
-            if (!cfg.tenancy?.registry || !fs.existsSync(cfg.tenancy.registry)) {
-                return { items: [{ id: cfg.project.id, rootPath: cfg.root, db: cfg.storage.target }], registry: cfg.tenancy?.registry, exists: false };
+            if (!cfg.registry?.registry || !fs.existsSync(cfg.registry.registry)) {
+                return { items: [{ id: cfg.project.id, rootPath: cfg.root, db: cfg.storage.target }], registry: cfg.registry?.registry, exists: false };
             }
-            const raw = JSON.parse(fs.readFileSync(cfg.tenancy.registry, 'utf8'));
-            return { tenants: raw.tenants || [], registry: cfg.tenancy.registry, exists: true, self: cfg.project.id };
+            const raw = JSON.parse(fs.readFileSync(cfg.registry.registry, 'utf8'));
+            return { registry: raw.registry || [], registry: cfg.registry.registry, exists: true, self: cfg.project.id };
         } catch (err) {
-            return { tenants: [], registry: cfg.tenancy?.registry, exists: true, error: err.message };
+            return { registry: [], registry: cfg.registry?.registry, exists: true, error: err.message };
         }
     }
 
@@ -255,7 +255,7 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
 
     return {
         withDb,
-        tenantInfo,
+        projectInfo,
         listRequests,
         getRequestDetail,
         getCalls,
@@ -266,6 +266,6 @@ export function createApiHelpers(cfg, { startedAt, actualPort }) {
         getDecisionFlow,
         getGateEvents,
         getGateSummary,
-        tenants,
+        registry,
     };
 }

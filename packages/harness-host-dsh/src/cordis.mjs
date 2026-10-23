@@ -18,7 +18,7 @@
  * Enforcement is deliberately NOT re-implemented here. DSH ships `@deepseek-ai/dsh-hooks-claude-code`
  * (0.2.1-rc.2), which runs the consumer's `.claude/settings.json` on its interception seams — that is
  * the pack's guards, one enforcement path rather than two that can disagree. This plugin adds
- * evidence, and rejects on a hard blocker: a named finding from a declared `contract`, `tenant` or
+ * evidence, and rejects on a hard blocker: a named finding from a declared `contract`, `project` or
  * `migration` check. A score is never consulted — the checks exclude their own marked exceptions.
  *
  * A reject carries no reason in the host's contract, so every rejection is appended to the product

@@ -109,7 +109,7 @@ def shape_of(harness: str) -> str:
             return p["shape"]
     return harness
 
-# The tenant config lives at the repo root and is the walk-up anchor for the
+# The project config lives at the repo root and is the walk-up anchor for the
 # whole tool (tracer, server, ingest). The tracer reads it for one reason only:
 # to learn whether tracking is OFF, so it can get out of the way immediately.
 CONFIG_NAME = "harness.config.json"

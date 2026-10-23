@@ -20,7 +20,7 @@ const TRANSCRIPT_LINE = (query) =>
         },
     });
 
-function tenant(query = 'first prompt') {
+function project(query = 'first prompt') {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-idle-'));
     const transcriptDir = path.join(root, 'transcripts');
     fs.mkdirSync(transcriptDir, { recursive: true });
@@ -61,7 +61,7 @@ function tenant(query = 'first prompt') {
 }
 
 test('a second pass with no new input is reported idle and skips derived work', async () => {
-    const { cfg } = tenant();
+    const { cfg } = project();
     try {
         const first = await runIngestOnce(cfg);
         assert.equal(first.ok, true);
@@ -86,7 +86,7 @@ test('a second pass with no new input is reported idle and skips derived work', 
 });
 
 test('appending a transcript line makes the next pass non-idle again', { timeout: 120_000 }, async () => {
-    const { cfg, transcriptPath } = tenant();
+    const { cfg, transcriptPath } = project();
     try {
         await runIngestOnce(cfg);
         assert.equal((await runIngestOnce(cfg)).idle, true);
@@ -105,7 +105,7 @@ test('appending a transcript line makes the next pass non-idle again', { timeout
 });
 
 test('the pooled connection is reused across passes', async () => {
-    const { cfg } = tenant();
+    const { cfg } = project();
     try {
         const a = await runIngestOnce(cfg);
         const b = await runIngestOnce(cfg);
@@ -119,7 +119,7 @@ test('the pooled connection is reused across passes', async () => {
 });
 
 test('control: a fresh connection does re-run the migration scan', async () => {
-    const { cfg } = tenant();
+    const { cfg } = project();
     try {
         await runIngestOnce(cfg);
         // Prove the previous assertion is about pooling and not about `migrate` never returning
@@ -207,7 +207,7 @@ async function startWorker(cfg) {
 }
 
 test('the worker boots, reports, accepts a run command, and exits cleanly', async () => {
-    const { cfg } = tenant();
+    const { cfg } = project();
     const w = await startWorker(cfg);
     try {
         const ready = await w.waitFor((m) => m.type === 'ready');
@@ -233,7 +233,7 @@ test('the worker boots, reports, accepts a run command, and exits cleanly', asyn
 });
 
 test('the worker coalesces concurrent runs instead of overlapping them', async () => {
-    const { cfg } = tenant();
+    const { cfg } = project();
     const w = await startWorker(cfg);
     try {
         await w.waitFor((m) => m.type === 'ready');

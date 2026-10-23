@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 
 -- --------------------------------------------------------------------------
--- tenant. One DB belongs to exactly one project: the config at the repo root
+-- project. One DB belongs to exactly one project: the config at the repo root
 -- decides which. A future dashboard reads this row over HTTP rather than
 -- opening another project's database file.
 -- --------------------------------------------------------------------------

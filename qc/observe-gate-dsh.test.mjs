@@ -81,7 +81,7 @@ test('a DSH session becomes a conversation, a request per turn, calls per step a
         { type: 'request/header', seq: 1, time: 1001, data: { header: { config: { model: 'deepseek-flash' } } } },
         { type: 'turn/start', seq: 2, time: 1002, data: { turn: 1 } },
         { type: 'step/start', seq: 3, time: 1003, data: { turn: 1, step: 1 } },
-        { type: 'user/message', seq: 4, time: 1004, data: { content: [{ type: 'text', text: 'ship the tenant fix' }] } },
+        { type: 'user/message', seq: 4, time: 1004, data: { content: [{ type: 'text', text: 'ship the project fix' }] } },
         { type: 'assistant/message', seq: 5, time: 1005, data: { message: { content: [{ type: 'text', text: 'on it' }] } } },
         { type: 'tool/call', seq: 6, time: 1006, data: { name: 'write', arguments: { path: 'secrets/a.txt' } } },
         { type: 'tool/result', seq: 7, time: 1007, data: { name: 'write' } },
@@ -104,7 +104,7 @@ test('a DSH session becomes a conversation, a request per turn, calls per step a
 
     const request = db.get('SELECT id, user_query, status, call_count, tool_count, model_id FROM request');
     assert.equal(request.id, 'session-abc:1');
-    assert.equal(request.user_query, 'ship the tenant fix');
+    assert.equal(request.user_query, 'ship the project fix');
     assert.equal(request.status, 'completed');
     assert.equal(request.call_count, 1);
     assert.equal(request.tool_count, 1);

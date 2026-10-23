@@ -117,7 +117,7 @@ export function requestDetail(db, cfg, id) {
 
     return {
         request,
-        tenantRootPath: cfg.root,
+        callerRootPath: cfg.root,
         requestMetrics: requestHeaderMetrics(request, mcpCallStats, tools),
         mcpCallStats,
         decisionFlow,

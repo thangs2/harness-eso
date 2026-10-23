@@ -13,7 +13,7 @@ const LINE = (q) =>
         message: { content: [{ type: 'text', text: `<timestamp>Mon Jan 1 2026</timestamp><user_query>${q}</user_query>` }] },
     });
 
-function tenant() {
+function project() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-stamp-'));
     const transcriptDir = path.join(root, 'transcripts');
     fs.mkdirSync(transcriptDir, { recursive: true });
@@ -75,7 +75,7 @@ function tenant() {
  * whatever the host pack last wrote — and if the host pack never wrote one, there must be none.
  */
 test('ingest does not write the host session stamp', async () => {
-    const { cfg, root } = tenant();
+    const { cfg, root } = project();
     try {
         const before = bundleStampPath(root, 'cursor');
         assert.equal(fs.existsSync(before), false, 'fixture starts with no stamp');
@@ -96,7 +96,7 @@ test('ingest does not write the host session stamp', async () => {
 });
 
 test('ingest leaves a host-pack-written stamp untouched', async () => {
-    const { cfg, root } = tenant();
+    const { cfg, root } = project();
     try {
         // The host pack answers for the live turn: sufficient + allowed.
         const packVerdict = {

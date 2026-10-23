@@ -49,7 +49,7 @@ export function findConsumerRoot(start) {
     for (let i = 0; i < 20; i += 1) {
         /*
          * A consumer **declares** itself: a config, or an explicit policy. `.harness/` alone is product
-         * state (the CLI writes workspace/tenants/pid there), so treating it as a marker made the gate
+         * state (the CLI writes workspace/registry/pid there), so treating it as a marker made the gate
          * police the product checkout itself — the one repo AGENTS.md says must not run ESO.
          */
         if (fs.existsSync(path.join(dir, CONFIG_NAME)) || fs.existsSync(path.join(dir, '.harness', 'decision-policy.json'))) {

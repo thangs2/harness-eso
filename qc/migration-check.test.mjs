@@ -24,7 +24,7 @@ test('the approved marker records a reviewed exception', () => {
 });
 
 test('harmless DDL stays silent', () => {
-    assert.deepEqual(kinds('CREATE INDEX idx_orders_tenant ON orders (tenant_id)'), []);
+    assert.deepEqual(kinds('CREATE INDEX idx_orders_caller ON orders (caller_id)'), []);
     assert.deepEqual(kinds('ALTER TABLE orders DROP CONSTRAINT fk_old'), []);
     assert.deepEqual(kinds('DROP INDEX IF EXISTS idx_old'), []);
 });

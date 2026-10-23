@@ -50,9 +50,9 @@ export function RequestDrillBlocks({ detail, activeTab: controlledTab, onTabChan
         return flowRulesByBucket({
             attached: detail.attached,
             rules: detail.rules,
-            rootPath: detail.tenantRootPath,
+            rootPath: detail.callerRootPath,
         }).reduce((n, g) => n + g.items.length, 0);
-    }, [detail.attached, detail.rules, detail.tenantRootPath]);
+    }, [detail.attached, detail.rules, detail.callerRootPath]);
 
     const totalStepsCount = useMemo(() => {
         return events.filter((e) => e.eventType === 'postToolUse' || e.tool).length;
@@ -336,7 +336,7 @@ export function RequestDrillBlocks({ detail, activeTab: controlledTab, onTabChan
                                     <li key={i}>
                                         <span className="font-mono text-cyan-400">{e.eventType}</span>
                                         {e.tool ? <span className="text-slate-400"> · tool: {e.tool}</span> : ''}
-                                        {e.path ? <span className="text-slate-400"> · path: {relPath(detail.tenantRootPath, e.path)}</span> : ''}
+                                        {e.path ? <span className="text-slate-400"> · path: {relPath(detail.callerRootPath, e.path)}</span> : ''}
                                     </li>
                                 ))}
                             </ul>
@@ -430,7 +430,7 @@ export function RequestDrillBlocks({ detail, activeTab: controlledTab, onTabChan
                                             <td className="font-mono text-cyan-400">{e.eventType ?? '—'}</td>
                                             <td className="font-mono text-slate-200">{e.tool ?? '—'}</td>
                                             <td className="font-mono text-slate-300 max-w-xs truncate" title={e.command || e.path}>
-                                                {e.command || (e.path ? relPath(detail.tenantRootPath, e.path) : '—')}
+                                                {e.command || (e.path ? relPath(detail.callerRootPath, e.path) : '—')}
                                             </td>
                                             <td className="font-mono text-slate-500 text-[11px]">{e.hookAt ?? '—'}</td>
                                         </tr>

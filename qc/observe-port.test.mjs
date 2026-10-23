@@ -165,7 +165,7 @@ test('provisioning writes one port into the consumer anchor and sidecar.env', (t
         'a draft must not invent a port — that was the second registry that disagreed with the first',
     );
 
-    const result = initProfile(draft, PROFILES_DIR, path.join(state, 'tenants.json'), {
+    const result = initProfile(draft, PROFILES_DIR, path.join(state, 'registry.json'), {
         dryRun: false,
         verify: false,
         observePort: 8793,

@@ -149,11 +149,11 @@ function cmdSmoke(port) {
     const base = `http://127.0.0.1:${port}`;
     console.log(`==> GET ${base}/health`);
     console.log(curlJson(`${base}/health`));
-    console.log(`==> GET ${base}/api/tenant`);
+    console.log(`==> GET ${base}/api/project`);
     try {
-        console.log(curlJson(`${base}/api/tenant`));
+        console.log(curlJson(`${base}/api/project`));
     } catch {
-        console.log('(tenant endpoint not responding or not provisioned)');
+        console.log('(project endpoint not responding or not provisioned)');
     }
     console.log(`==> GET ${base}/api/ingest/status`);
     console.log(curlJson(`${base}/api/ingest/status`));

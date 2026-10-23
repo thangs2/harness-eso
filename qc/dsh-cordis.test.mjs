@@ -38,7 +38,7 @@ function setup(extra = {}) {
     const plugin = createEsoCordisPlugin({
         root,
         policy: policyWithNativeMemory(),
-        searchEvents: async () => [{ text: 'tenant id is request scoped', seq: 1, sessionId: 's' }],
+        searchEvents: async () => [{ text: 'project id is request scoped', seq: 1, sessionId: 's' }],
         ...extra,
     });
     plugin.apply(ctx);
@@ -53,7 +53,7 @@ test('the plugin registers exactly agent/pre-step and unwinds', () => {
 
 test('next() returns the decision and the instruction message lands after the last claimed message', async () => {
     const { handler } = setup({ createMessage: instructions });
-    const m1 = { role: 'user', content: [{ type: 'text', text: 'tenant id?' }], source: { kind: 'user' } };
+    const m1 = { role: 'user', content: [{ type: 'text', text: 'project id?' }], source: { kind: 'user' } };
     const m2 = { role: 'assistant', content: [{ type: 'text', text: 'checking' }], source: { kind: 'assistant' } };
     const tool = { role: 'tool', content: [{ type: 'text', text: '{}' }], source: { kind: 'tool' } };
     const payload = { agent: {}, messages: [m1, m2], step: 2, signal: { aborted: false } };
@@ -71,7 +71,7 @@ test('next() returns the decision and the instruction message lands after the la
 
 test('without a host message factory the decision is untouched, not patched with an invented shape', async () => {
     const { handler } = setup();
-    const m1 = { role: 'user', content: [{ type: 'text', text: 'tenant id?' }], source: { kind: 'user' } };
+    const m1 = { role: 'user', content: [{ type: 'text', text: 'project id?' }], source: { kind: 'user' } };
     const decision = { kind: 'continue', messages: [m1] };
     const out = await handler({ messages: [m1], signal: {} }, async () => decision);
     assert.equal(out, decision);

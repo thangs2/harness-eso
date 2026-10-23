@@ -25,7 +25,7 @@
 | `.harness/host-bootstrap.json` | profile đã áp, phiên bản pack, kết quả verify | `harnessctl` |
 | `.cursor/hooks.json`, `.agents/hooks.json`, `.claude/settings.json` | nơi host gọi hook; **hook của bạn được giữ nguyên** | host + `harnessctl` |
 | `.<tree>/session/` | bằng chứng của phiên: `.eso-preflight.json`, `route-trace.jsonl`, gap, hint | agent (được phép) |
-| `~/.harness/` | **product state**: project registry, tenant, attestation, `eso-blockers.jsonl` | chỉ ESO |
+| `~/.harness/` | **product state**: project registry, project, attestation, `eso-blockers.jsonl` | chỉ ESO |
 
 Nguyên tắc: **record mà gate tin nằm ở `~/.harness/`**, agent không ghi được. Thứ agent ghi được
 (`.<tree>/session/`) chỉ là bằng chứng để đọc lại, không bao giờ là căn cứ để cho qua.
@@ -89,7 +89,7 @@ một hook không fire, bước đó không có bằng chứng.
 | 3 | Recon | thu bằng chứng theo `sources`: law = **docgraph**, code = **codegraph**, memory = **agentmemory** (opt-in) | trong preflight | `adapter-registry.mjs`, `collect.mjs` |
 | 4 | Sufficiency + gate | chấm level/score/gaps → `TurnVerdict`; **cổng quyết định là tier của path và hard blocker**, score chỉ mô tả | preflight | `gate.mjs`, `attest.mjs`, `hard-blockers.mjs` |
 | 5 | Brain allocation | guard buộc chọn tier `pro` / `flash` / direct trước khi gọi model | `preToolUse` (brain) | `guard-brain-hook.mjs`, `reasoner.mjs` |
-| 6 | Exec + verify | guard shell/write; check deterministic trước khi merge | `beforeShellExecution`, `check *` | `guard-shell-hook.mjs`, `contract-diff`, `tenant-check`, `migration-check` |
+| 6 | Exec + verify | guard shell/write; check deterministic trước khi merge | `beforeShellExecution`, `check *` | `guard-shell-hook.mjs`, `contract-diff`, `isolation-check`, `migration-check` |
 | 7 | Distill + handoff | gap closure, hint sau tool, chi phí trước compact, lưu bài học | `postToolUse`, `preCompact` | `gap-tracker`, `post-tool-hint`, `pre-compact` |
 
 ### 3.1 Vì sao vẫn cần docgraph + codegraph + agentmemory
@@ -108,7 +108,7 @@ Memory là **opt-in**: consumer chưa khai thì resolve `none`, không tự gọ
 - **Không đổi**: 7 bước, thứ tự, hook nào làm bước nào.
 - **Đã đổi ở bước 4**: quyết định không còn dựa trên ngưỡng score (đo được: 2/2 tín hiệu quality gate là
   false positive). Cổng bây giờ là **tier path** (`locked`/`ask`/`gated` + consent) và **hard blocker**
-  (`contract`/`tenant`/`migration`). Score vẫn được tính để mô tả, không dùng để cho qua.
+  (`contract`/`project`/`migration`). Score vẫn được tính để mô tả, không dùng để cho qua.
 - **Đã đổi ở bước 3**: nguồn bằng chứng chọn bằng dữ liệu (`sources`, recipe), không hard-code ba công cụ.
 
 ### 3.3 Host khác thì khác ở đâu
@@ -141,14 +141,14 @@ Ba check deterministic, chạy trên input do bạn khai (`eso.checks`):
 | Check | Bắt gì | Ví dụ |
 |---|---|---|
 | `contract` | breaking change trên OpenAPI subset | xoá path, xoá field response, đổi type |
-| `tenant` | statement chạm bảng tenant mà không có tenant filter | `select * from orders` |
+| `project` | statement chạm bảng project mà không có project filter | `select * from orders` |
 | `migration` | DDL không backward-compatible | `drop table`, `rename`, `set not null` |
 
 Blocker **không phải điểm số**: nó có `source`, `kind`, `ref` (file/path/table), `detail`. Nếu một
 finding là ngoại lệ đã review, ghi quyết định **tại nguồn**:
 
 ```sql
-select * from orders /* tenant:global */;
+select * from orders /* isolation:global */;
 alter table orders drop column legacy /* breaking:approved */;
 ```
 
@@ -209,7 +209,7 @@ Tất cả chạy từ checkout harness-eso (hoặc `harnessctl` nếu đã cài
 | Kiểm tra host đã nối đúng chưa | `harnessctl verify host <path>` (H0–H5) |
 | Xem provider nào đang phục vụ | `harnessctl capability probe <path> --recipe dsh-native` |
 | Kiểm contract trước/sau | `harnessctl check contract before.json after.json` |
-| Kiểm tenant | `harnessctl check tenant <file> --tables orders` |
+| Kiểm project | `harnessctl check isolation <file> --tables orders` |
 | Kiểm migration | `harnessctl check migration <file>` |
 | Kiểm profile DSH có nguy cơ hỏng | `harnessctl doctor dsh --profile desktop` |
 | Bật observability | `harnessctl observatory up` (một URL: `:8792`) |
@@ -236,7 +236,7 @@ H4/H5 mặc định `skip` khi không áp dụng; `skip` không phải `pass`.
 ```bash
 harnessctl check contract api/before.json api/after.json
 harnessctl check migration db/migrations/*.sql
-harnessctl check tenant db/queries/*.sql --tables orders
+harnessctl check isolation db/queries/*.sql --tables orders
 ```
 
 **Sau khi sửa policy hoặc thêm check:**
@@ -250,7 +250,7 @@ harnessctl capability probe .             # provider resolution đúng như bạ
 
 1. Đọc lý do trong prompt/tool result — nó nêu `ref` và tier.
 2. `tail ~/.harness/eso-blockers.jsonl` để thấy quyết định đã ghi.
-3. Nếu là finding: ghi marker tại nguồn (`tenant:global`, `breaking:approved`) — đừng nới ngưỡng.
+3. Nếu là finding: ghi marker tại nguồn (`isolation:global`, `breaking:approved`) — đừng nới ngưỡng.
 4. Nếu là tier: sửa `paths` trong `.harness/decision-policy.json` (thay thế, không nối).
 
 **Khi cài hoặc nâng cấp DSH plugin:** build → `plugin_manager install_bundle` với **absolute

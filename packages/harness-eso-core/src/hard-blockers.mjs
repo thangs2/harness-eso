@@ -3,9 +3,9 @@
  *
  * Finding #2 of the advance program: a 0–1 score never protected anything, because a threshold that
  * is tuned to pass is not a gate. A blocker is different in kind — a named, reproducible finding from
- * a check (`contract`, `tenant`, `migration`) with a `file`/`path` you can open. Nothing here scores,
+ * a check (`contract`, `project`, `migration`) with a `file`/`path` you can open. Nothing here scores,
  * sums or ranks; if a finding is acceptable, the decision is recorded **at the source**
- * (`/* tenant:global *\/`, `/* breaking:approved *\/`), not by lowering a threshold.
+ * (`/* isolation:global *\/`, `/* breaking:approved *\/`), not by lowering a threshold.
  *
  * The split is deliberate:
  *
@@ -20,11 +20,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { diffContracts } from './contract-diff.mjs';
-import { checkTenantFiles } from './tenant-check.mjs';
+import { checkIsolationFiles } from './isolation-check.mjs';
 import { checkMigrationFiles } from './migration-check.mjs';
 
 /**
- * @typedef {{ source: 'contract'|'tenant'|'migration', kind: string, ref: string, detail: string, table?: string }} HardBlocker
+ * @typedef {{ source: 'contract'|'project'|'migration', kind: string, ref: string, detail: string, table?: string }} HardBlocker
  */
 
 function readText(root, rel, errors, source) {
@@ -58,9 +58,9 @@ function readJson(root, value, errors, source, label) {
  *
  * @param {string} root
  * @param {{ contract?: { before?: string|object, after?: string|object, direction?: 'response'|'request' },
- *           tenant?: { files?: string[], tables?: string[] },
+ *           project?: { files?: string[], tables?: string[] },
  *           migration?: { files?: string[] } }} [checks]
- * @returns {{ contract: object|null, tenant: { files: object[], tenantTables: string[] }|null,
+ * @returns {{ contract: object|null, project: { files: object[], scopedTables: string[] }|null,
  *             migration: { files: object[] }|null, errors: Array<{source:string, detail:string}> }}
  */
 export function loadCheckInputs(root = process.cwd(), checks = {}) {
@@ -72,19 +72,19 @@ export function loadCheckInputs(root = process.cwd(), checks = {}) {
         if (before && after) contract = { before, after, direction: checks.contract.direction };
     }
 
-    let tenant = null;
-    if (checks.tenant) {
-        const tables = (checks.tenant.tables ?? []).map((t) => String(t).trim()).filter(Boolean);
+    let project = null;
+    if (checks.project) {
+        const tables = (checks.project.tables ?? []).map((t) => String(t).trim()).filter(Boolean);
         if (!tables.length) {
-            errors.push({ source: 'tenant', detail: 'tenant.tables is required: an isolation check without tables checks nothing' });
+            errors.push({ source: 'project', detail: 'project.tables is required: an isolation check without tables checks nothing' });
         } else {
             const files = [];
-            for (const rel of checks.tenant.files ?? []) {
-                const read = readText(root, rel, errors, 'tenant');
+            for (const rel of checks.project.files ?? []) {
+                const read = readText(root, rel, errors, 'project');
                 if (read) files.push(read);
             }
-            // An array, not a Set: `checkTenantIsolation` normalises with `.map`, which a Set lacks.
-            tenant = { files, tenantTables: tables };
+            // An array, not a Set: `checkIsolation` normalises with `.map`, which a Set lacks.
+            project = { files, scopedTables: tables };
         }
     }
 
@@ -98,20 +98,20 @@ export function loadCheckInputs(root = process.cwd(), checks = {}) {
         migration = { files };
     }
 
-    return { contract, tenant, migration, errors };
+    return { contract, project, migration, errors };
 }
 
 /**
- * Turn check output into blockers. Deterministic order: contract, tenant, migration — the same order
+ * Turn check output into blockers. Deterministic order: contract, project, migration — the same order
  * the CLI prints them, so two runs on one tree produce one list.
  *
- * @param {{ contract?: object|null, tenant?: object|null, migration?: object|null }} inputs
+ * @param {{ contract?: object|null, project?: object|null, migration?: object|null }} inputs
  * @returns {{ blockers: HardBlocker[], checked: object }}
  */
 export function hardBlockersFromChecks(inputs = {}) {
     /** @type {HardBlocker[]} */
     const blockers = [];
-    const checked = { contract: 0, tenant: 0, migration: 0 };
+    const checked = { contract: 0, project: 0, migration: 0 };
 
     if (inputs.contract) {
         const { breaking, checked: routes } = diffContracts(inputs.contract.before, inputs.contract.after, {
@@ -123,12 +123,12 @@ export function hardBlockersFromChecks(inputs = {}) {
         }
     }
 
-    if (inputs.tenant) {
-        const { files, findings } = checkTenantFiles(inputs.tenant.files, { tenantTables: inputs.tenant.tenantTables });
-        checked.tenant = files ?? 0;
+    if (inputs.project) {
+        const { files, findings } = checkIsolationFiles(inputs.project.files, { scopedTables: inputs.project.scopedTables });
+        checked.project = files ?? 0;
         for (const finding of findings) {
             blockers.push({
-                source: 'tenant',
+                source: 'project',
                 kind: finding.kind,
                 ref: finding.file,
                 table: finding.table,

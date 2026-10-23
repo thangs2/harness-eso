@@ -52,7 +52,7 @@ const stringList = (value) => (Array.isArray(value) ? value.filter((item) => typ
  * which is why the warning exists.
  *
  * @param {unknown} raw
- * @returns {{ contract?: object, tenant?: object, migration?: object } | null}
+ * @returns {{ contract?: object, project?: object, migration?: object } | null}
  */
 export function normaliseChecks(raw) {
     if (!raw || typeof raw !== 'object') return null;
@@ -75,14 +75,14 @@ export function normaliseChecks(raw) {
         }
     }
 
-    if (raw.tenant !== undefined) {
-        const files = stringList(raw.tenant?.files);
-        const tables = stringList(raw.tenant?.tables);
-        if (files.length && tables.length) out.tenant = { files, tables };
+    if (raw.project !== undefined) {
+        const files = stringList(raw.project?.files);
+        const tables = stringList(raw.project?.tables);
+        if (files.length && tables.length) out.project = { files, tables };
         else {
             warnAboutCheck(
-                'tenant',
-                'eso.checks.tenant needs both files and tables (an isolation check without tables checks nothing) — ignored',
+                'project',
+                'eso.checks.project needs both files and tables (an isolation check without tables checks nothing) — ignored',
             );
         }
     }

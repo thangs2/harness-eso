@@ -29,7 +29,7 @@ export function nativeMemoryProvider() {
         ceiling: 0.6,
         async fetch() {
             return {
-                snippets: [{ kind: 'memory', text: 'tenant id comes from the request context', provenance: { kind: 'session', sessionSeq: 7 } }],
+                snippets: [{ kind: 'memory', text: 'project id comes from the request context', provenance: { kind: 'session', sessionSeq: 7 } }],
                 trace: 'native:test-memory:1',
             };
         },

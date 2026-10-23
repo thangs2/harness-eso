@@ -630,7 +630,7 @@ export function EndToEndFlowDiagram({ detail, className = '' }: EndToEndFlowDiag
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-300 m-0 leading-relaxed">
-                                            Exception tier: greenfield bounded contexts, cross-module money/tenant redesign, or law conflicts.
+                                            Exception tier: greenfield bounded contexts, cross-module money/project redesign, or law conflicts.
                                         </p>
                                     </div>
                                 </div>

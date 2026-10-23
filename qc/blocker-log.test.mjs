@@ -43,9 +43,9 @@ test('a rejection record keeps the blocker names and drops fields nobody can act
         event: 'agent/pre-step',
         step: 3,
         agent: 'a1',
-        stem: 'ship the tenant fix',
+        stem: 'ship the project fix',
         blockers: [{ source: 'migration', kind: 'drop-table', ref: '001.sql', detail: 'the table disappears', statement: 'x' }],
-        errors: [{ source: 'tenant', detail: 'cannot read q.sql', stack: 'ignored' }],
+        errors: [{ source: 'project', detail: 'cannot read q.sql', stack: 'ignored' }],
     });
 
     assert.equal(record.kind, 'rejected');
@@ -53,7 +53,7 @@ test('a rejection record keeps the blocker names and drops fields nobody can act
     assert.deepEqual(record.blockers, [
         { source: 'migration', kind: 'drop-table', ref: '001.sql', detail: 'the table disappears' },
     ]);
-    assert.deepEqual(record.errors, [{ source: 'tenant', detail: 'cannot read q.sql' }]);
+    assert.deepEqual(record.errors, [{ source: 'project', detail: 'cannot read q.sql' }]);
     assert.equal(record.at, '2026-10-21T12:00:00Z');
 });
 
@@ -77,7 +77,7 @@ test('the recorder reports a write failure instead of throwing, so the reject st
     const notADir = tempFile();
     fs.writeFileSync(notADir, 'i am a file\n');
     const record = createBlockerRecorder({ file: path.join(notADir, 'nested', 'blockers.jsonl') });
-    const result = record({ blockers: [{ source: 'tenant', kind: 'query-without-tenant', ref: 'q.sql' }] });
+    const result = record({ blockers: [{ source: 'project', kind: 'query-without-caller', ref: 'q.sql' }] });
     assert.equal(result.ok, false);
     assert.match(result.error, /ENOTDIR|EEXIST|not a directory/i);
 });

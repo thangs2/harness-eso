@@ -74,7 +74,7 @@ that should never bloat the context window during execution. We had a meeting la
 about how databases work and someone suggested using MongoDB.
 
 ## Invariants
-- **INV-001**: System must always validate tenant isolation before write operations.
+- **INV-001**: System must always validate project isolation before write operations.
 - **INV-002**: Ledger entries are strictly append-only.
 
 Here is some additional discursive discussion explaining the history behind INV-001.

@@ -43,7 +43,7 @@ function fixture() {
         storage: { driver: 'sqlite', target: dbPath, remoteUrl: null },
         server: { host: '127.0.0.1', port: 8792 },
         ingest: { pollMs: 2000, transcriptDir: '', hookFiles: [] },
-        tenancy: { mode: 'isolated', registry: '' },
+        registry: { mode: 'isolated', registry: '' },
         decisionPolicyPath: path.join(root, '.harness', 'decision-policy.json'),
     };
     /*

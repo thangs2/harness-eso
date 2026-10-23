@@ -175,9 +175,9 @@ export function resolveObserveStoragePaths(root, projectId, configStorage) {
         ? path.resolve(process.env.HARNESS_DATA_ROOT)
         : defaultObserveDataRoot();
     const id = projectId || 'default';
-    const tenantDir = path.join(dataRoot, id);
+    const projectDir = path.join(dataRoot, id);
     void root;
-    return { dataDir: tenantDir, storageTarget: path.join(tenantDir, 'harness.db') };
+    return { dataDir: projectDir, storageTarget: path.join(projectDir, 'harness.db') };
 }
 
 export function loadConfig(startDir = process.cwd()) {
@@ -248,9 +248,9 @@ export function loadConfig(startDir = process.cwd()) {
                 '.claude/session/route-trace.jsonl',
             ]).map((f) => (path.isAbsolute(f) ? f : path.join(root, f))),
         },
-        tenancy: {
-            mode: (config.tenancy && config.tenancy.mode) || 'isolated',
-            registry: expandHome((config.tenancy && config.tenancy.registry) || '~/.harness/tenants.json'),
+        registry: {
+            mode: (config.registry && config.registry.mode) || 'isolated',
+            registry: expandHome((config.registry && config.registry.registry) || '~/.harness/registry.json'),
         },
         gateTrailPath: gateTrailPath(),
         decisionPolicyPath: decisionPolicyFile(root),

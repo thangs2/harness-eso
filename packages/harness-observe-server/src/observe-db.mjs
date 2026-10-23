@@ -35,7 +35,7 @@ export function migrate(db) {
     return done;
 }
 
-/** Insert or replace the single project row (= this tenant). */
+/** Insert or replace the single project row (= this project). */
 export function upsertProject(db, cfg) {
     const now = isoNow();
     db.run(

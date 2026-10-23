@@ -21,7 +21,7 @@ export const PRODUCT_STATE_ENV = 'HARNESS_PRODUCT_STATE_DIR';
  * `~/.harness` — the product's own state.
  *
  * This used to default to `<harness-eso>/.harness`, i.e. inside the product checkout. That made
- * the checkout a runtime dependency of the operator workflow: the project registry, the tenant
+ * the checkout a runtime dependency of the operator workflow: the project registry, the project
  * list and the workspace index all lived in the repo, so `git clean`, a branch switch or moving
  * the checkout silently changed which projects the console could see. It also contradicted the
  * deployment model — the product runs as containers and must not care where the source tree is.
@@ -42,8 +42,8 @@ export function workspaceFile() {
     return path.join(productStateDir(), 'workspace.json');
 }
 
-export function tenantsFile() {
-    return path.join(productStateDir(), 'tenants.json');
+export function registryFile() {
+    return path.join(productStateDir(), 'registry.json');
 }
 
 /**
@@ -297,7 +297,7 @@ export function addProjectEntry(entry) {
     else workspace.projects.push(next);
     if (!workspace.defaultProjectId) workspace.defaultProjectId = next.id;
     saveWorkspace(workspace);
-    syncTenantsFromWorkspace(workspace);
+    syncProjectsFromWorkspace(workspace);
     return next;
 }
 
@@ -307,7 +307,7 @@ export function removeProjectEntry(id) {
     workspace.projects = workspace.projects.filter((p) => p.id !== id);
     if (workspace.defaultProjectId === id) workspace.defaultProjectId = workspace.projects[0]?.id ?? null;
     saveWorkspace(workspace);
-    syncTenantsFromWorkspace(workspace);
+    syncProjectsFromWorkspace(workspace);
     return { removed: before - workspace.projects.length };
 }
 
@@ -335,16 +335,16 @@ export function resolveProject(workspace, idOrNull) {
     return p;
 }
 
-export function syncTenantsFromWorkspace(workspace) {
-    // The tenant anchor is what a consumer's own tools read, so the port here is the same one
+export function syncProjectsFromWorkspace(workspace) {
+    // The project anchor is what a consumer's own tools read, so the port here is the same one
     // `observeUrlFor` hands out — not a second `|| 8792` that can disagree with the registry.
-    const tenants = workspace.projects.map((p) => ({
+    const registry = workspace.projects.map((p) => ({
         id: p.id,
         root: p.root,
         configPath: path.join(p.root, 'harness.config.json'),
         serverUrl: `http://127.0.0.1:${normalizePort(p.port) ?? claimObservePort(workspace, p.id)}`,
     }));
-    writeJsonAtomic(tenantsFile(), { tenants });
+    writeJsonAtomic(registryFile(), { registry });
 }
 
 /**
@@ -373,7 +373,7 @@ function loadProfile(profileName) {
     return readJson(profilePath);
 }
 
-function defaultHarnessConfig({ projectId, displayName, port, tenantsRegistryPath }) {
+function defaultHarnessConfig({ projectId, displayName, port, registryPath }) {
     return {
         version: 1,
         project: { id: projectId, displayName: displayName || projectId },
@@ -403,7 +403,7 @@ function defaultHarnessConfig({ projectId, displayName, port, tenantsRegistryPat
                 },
             ],
         },
-        tenancy: { mode: 'isolated', registry: tenantsRegistryPath },
+        registry: { mode: 'isolated', registry: registryPath },
     };
 }
 
@@ -431,7 +431,7 @@ export function configureAdd(opts) {
 
     const configPath = path.join(consumerPath, CONFIG_NAME);
     let createdConfig = false;
-    const registryPath = tenantsFile();
+    const registryPath = registryFile();
     if (!fs.existsSync(configPath)) {
         writeJsonAtomic(
             configPath,
@@ -439,7 +439,7 @@ export function configureAdd(opts) {
                 projectId,
                 displayName,
                 port,
-                tenantsRegistryPath: registryPath,
+                registryPath: registryPath,
             }),
         );
         createdConfig = true;
@@ -467,7 +467,7 @@ export function configureAdd(opts) {
         workspace.defaultProjectId = projectId;
     }
     saveWorkspace(workspace);
-    syncTenantsFromWorkspace(workspace);
+    syncProjectsFromWorkspace(workspace);
 
     return {
         ok: true,
@@ -476,7 +476,7 @@ export function configureAdd(opts) {
         configPath,
         policyPath,
         workspaceFile: workspaceFile(),
-        tenantsFile: registryPath,
+        registryFile: registryPath,
         serverUrl: `http://127.0.0.1:${port}`,        created: { config: createdConfig, policy: createdPolicy },
     };
 }

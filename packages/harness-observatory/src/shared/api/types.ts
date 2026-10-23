@@ -253,7 +253,7 @@ export interface TokenSummary {
 
 export interface RequestDetailResponse extends RequestConsentVm {
     /** Consumer repo root — for promax-style relative paths in flow steps. */
-    tenantRootPath?: string;
+    callerRootPath?: string;
     request?: Record<string, unknown>;
     requestMetrics?: RequestHeaderMetrics;
     mcpCallStats?: McpCallStatsRow | null;
@@ -316,7 +316,7 @@ export interface ConfigureAddResult {
     error?: string;
 }
 
-export interface TenantInfo {
+export interface ProjectInfo {
     id: string;
     displayName: string;
     rootPath: string;

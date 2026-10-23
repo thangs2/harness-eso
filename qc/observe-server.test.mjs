@@ -7,14 +7,14 @@ import { createObserveApp, bootObserveDb } from '@mu/harness-observe-server';
 import { runIngestOnce } from '@mu/harness-observe-server';
 import { buildLive } from '../packages/harness-observe-server/src/route-watch.mjs';
 
-function tempTenant() {
+function makeConfig() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-observe-'));
     const dbPath = path.join(root, '.harness', 'harness.db');
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     fs.writeFileSync(
         path.join(root, 'harness.config.json'),
         JSON.stringify({
-            project: { id: 'qc-tenant', displayName: 'QC' },
+            project: { id: 'qc-project', displayName: 'QC' },
             server: { host: '127.0.0.1', port: 0 },
             storage: { driver: 'sqlite', sqlite: { path: '.harness/harness.db' } },
         }),
@@ -24,7 +24,7 @@ function tempTenant() {
         root,
         configPath: path.join(root, 'harness.config.json'),
         dataDir: path.join(root, '.harness'),
-        project: { id: 'qc-tenant', displayName: 'QC' },
+        project: { id: 'qc-project', displayName: 'QC' },
         enabled: true,
         sentinelPath: path.join(root, '.harness', 'DISABLED'),
         storage: { driver: 'sqlite', target: dbPath, remoteUrl: null },
@@ -36,7 +36,7 @@ function tempTenant() {
 }
 
 test('ingest is idempotent (migrate + project row)', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     bootObserveDb(cfg);
     const a = await runIngestOnce(cfg, { force: true });
     const b = await runIngestOnce(cfg, { force: true });
@@ -47,7 +47,7 @@ test('ingest is idempotent (migrate + project row)', async () => {
 });
 
 test('API contract: version + POST-only ingest/run', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     bootObserveDb(cfg);
     const app = createObserveApp(cfg, { pollIngest: false });
     app.setPort(8800);
@@ -69,8 +69,8 @@ test('API contract: version + POST-only ingest/run', async () => {
     assert.equal(report.ok, true);
 });
 
-test('buildLive runs on empty tenant root', () => {
-    const cfg = tempTenant();
+test('buildLive runs on empty project root', () => {
+    const cfg = makeConfig();
     const snap = buildLive({ root: cfg.root, files: [], ruleIndex: { present: false, generatedAt: null } });
     assert.equal(typeof snap.generatedAt, 'string');
     assert.equal(snap.root, cfg.root);
@@ -78,7 +78,7 @@ test('buildLive runs on empty tenant root', () => {
 });
 
 test('GET /live.json returns legacy snapshot with revision', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     bootObserveDb(cfg);
     const app = createObserveApp(cfg, { pollIngest: false });
     app.setPort(8801);

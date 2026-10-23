@@ -21,7 +21,7 @@ import {
     migrateProjectDocuments,
     productStateDir,
     saveWorkspace,
-    syncTenantsFromWorkspace,
+    syncProjectsFromWorkspace,
     workspaceFile,
 } from '@mu/harness-foundation/workspace';
 import { assignObservePort, composeProjectName, normalizePort } from '@mu/harness-foundation/observe-port';
@@ -104,7 +104,7 @@ for (const [port, ids] of conflicts) {
     }
 }
 saveWorkspace(ws);
-syncTenantsFromWorkspace(ws);
+syncProjectsFromWorkspace(ws);
 
 const after = duplicatePorts(loadWorkspace());
 if (after.length) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local Observatory dev: observe API + Vite HMR on :5190
 #
-# Consumer = repo có harness.config.json (ESO tenant).
+# Consumer = repo có harness.config.json (ESO project).
 # Default consumer: sibling ../x79 (standard harness-eso dev). Do NOT point here unless you mean it.
 #
 # Observe state (harness.db + blobs) does NOT live in the consumer repo: it goes to
@@ -18,7 +18,7 @@
 # API: http://127.0.0.1:${HARNESS_OBSERVE_PORT:-8792} (proxied as /api)
 #
 # If something already listens on the observe port, only Vite starts — stop that server first
-# if it was started with a different --root (wrong tenant).
+# if it was started with a different --root (wrong project).
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -77,7 +77,7 @@ if curl -sf "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
   fi
   echo "==> observe API already up on :${PORT} (reusing — must match consumer $CONSUMER or stop it first)"
 else
-  echo "==> observe-server tenant: $CONSUMER"
+  echo "==> observe-server project: $CONSUMER"
   echo "==> observe-server --root $CONSUMER (port $PORT)"
   node "$ROOT/packages/harness-observe-server/src/server.mjs" --root "$CONSUMER" --port "$PORT" &
   SERVER_PID=$!

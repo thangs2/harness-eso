@@ -89,7 +89,7 @@ Same verdict, 33 ms vs 613 ms hook path: the hook path pays for transcript + law
 | Endpoint | Result |
 |---|---|
 | `/api/version` | `serverVersion 0.1.0`, `apiVersion 1`, `openapi-observe-v1.yaml` |
-| `/api/tenant` | `x79`, `rootPath /data/repo`, `sentinelExists false`, watches `.cursor` + `.agents` + `.claude` |
+| `/api/project` | `x79`, `rootPath /data/repo`, `sentinelExists false`, watches `.cursor` + `.agents` + `.claude` |
 | `/api/requests` | **3225**, `decisionVerdict` per row, grouped by conversation |
 | `/api/calls` | per-call `toolNames`, `textChars`, `emitChars`, `estTokens` |
 | `/api/decisions` | facade ledger — both `eso_insufficient` and `eso_sufficient` (`topProbability 1`) |

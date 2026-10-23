@@ -3,12 +3,12 @@ import {
     fetchApiVersion,
     fetchHealth,
     fetchIngestStatus,
-    fetchTenant,
+    fetchProject,
     fetchToggleState,
     postIngestRun,
     postToggle,
 } from '@/shared/api/client';
-import type { ApiVersion, HealthResponse, IngestStatus, TenantInfo } from '@/shared/api/types';
+import type { ApiVersion, HealthResponse, IngestStatus, ProjectInfo } from '@/shared/api/types';
 import { subscribeObserveRefresh } from '@/shared/events/observeRefresh';
 import { ErrorBanner } from '@/ui/Feedback';
 import { PageHeader } from '@/ui/PageHeader';
@@ -16,7 +16,7 @@ import { Panel } from '@/ui/Panel';
 
 export function StatusPage() {
     const [version, setVersion] = useState<ApiVersion | null>(null);
-    const [tenant, setTenant] = useState<TenantInfo | null>(null);
+    const [project, setProject] = useState<ProjectInfo | null>(null);
     const [health, setHealth] = useState<HealthResponse | null>(null);
     const [ingest, setIngest] = useState<IngestStatus | null>(null);
     const [tracking, setTracking] = useState<boolean | null>(null);
@@ -28,13 +28,13 @@ export function StatusPage() {
         try {
             const [v, t, h, i, tg] = await Promise.all([
                 fetchApiVersion(),
-                fetchTenant(),
+                fetchProject(),
                 fetchHealth(),
                 fetchIngestStatus(),
                 fetchToggleState(),
             ]);
             setVersion(v);
-            setTenant(t);
+            setProject(t);
             setHealth(h);
             setIngest(i);
             setTracking(tg.enabled);
@@ -96,12 +96,12 @@ export function StatusPage() {
                             ? `${version.package} v${version.serverVersion} (contract ${version.apiVersion})`
                             : '…'}
                     </dd>
-                    <dt>Tenant</dt>
-                    <dd>{tenant ? `${tenant.displayName} (${tenant.id})` : '…'}</dd>
+                    <dt>Project</dt>
+                    <dd>{project ? `${project.displayName} (${project.id})` : '…'}</dd>
                     <dt>Root</dt>
-                    <dd className="obs-mono">{tenant?.rootPath ?? '—'}</dd>
+                    <dd className="obs-mono">{project?.rootPath ?? '—'}</dd>
                     <dt>Server</dt>
-                    <dd className="obs-mono">{tenant?.server?.url ?? '—'}</dd>
+                    <dd className="obs-mono">{project?.server?.url ?? '—'}</dd>
                     <dt>Health</dt>
                     <dd>
                         {health

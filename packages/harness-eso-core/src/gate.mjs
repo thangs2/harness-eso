@@ -65,7 +65,7 @@ export function buildTurnVerdict(params) {
      * A hard blocker closes the write channel, not the conversation.
      *
      * Sufficiency says "we may not know enough to write safely"; a blocker says "this write is
-     * demonstrably wrong" (a dropped column, a query with no tenant filter, a removed route). Both
+     * demonstrably wrong" (a dropped column, a query with no project filter, a removed route). Both
      * stop writes. Ending the whole step is a host decision — DSH has an explicit reject for that —
      * and a host that cannot express it must not be forced into one by the engine.
      */

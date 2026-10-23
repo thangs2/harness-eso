@@ -4,8 +4,8 @@ import { loadProject, saveProject } from '@mu/harness-foundation/project-registr
 import {
     ensureProductState,
     productStateDir,
-    syncTenantsFromWorkspace,
-    tenantsFile,
+    syncProjectsFromWorkspace,
+    registryFile,
     loadWorkspace,
     saveWorkspace,
 } from '@mu/harness-foundation/workspace';
@@ -78,7 +78,7 @@ export function runInitProfile(argv) {
     });
     project.observe = { ...(project.observe || {}), port };
 
-    const result = initProfile(project, profilesDir(), tenantsFile(), {
+    const result = initProfile(project, profilesDir(), registryFile(), {
         dryRun: opts.dryRun,
         force: opts.force,
         observePort: port,
@@ -99,7 +99,7 @@ export function runInitProfile(argv) {
         else workspace.projects.push(row);
         workspace.defaultProjectId = workspace.defaultProjectId || project.id;
         saveWorkspace(workspace);
-        syncTenantsFromWorkspace(workspace);
+        syncProjectsFromWorkspace(workspace);
 
         project.status = 'provisioned';
         project.provisionedAt = new Date().toISOString();

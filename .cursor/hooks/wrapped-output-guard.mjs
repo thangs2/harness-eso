@@ -27,6 +27,17 @@ import { extractResponseText, inspectAgentText, REMINDER } from './lib/agent-res
 /** One retry; a second wrap in a row is evidence the reminder is not landing, not something to loop on. */
 const MAX_ATTEMPTS = 2;
 
+/**
+ * Two `stop` events closer together than this are the same turn being re-checked, not a resend.
+ *
+ * This window exists because `loop_count` is not a turn counter: it only appears after a follow-up has
+ * already been refused, so on the resend turn it is absent and `attempts` was computed as 1 again. The
+ * 2026-10-23 audit trail showed the consequence — 73 `wrap-detected` in two days, of which 36 were the
+ * same check firing twice **1 ms apart**, so `MAX_ATTEMPTS` never held and the retry budget was spent
+ * on a second reminder instead of on the resend.
+ */
+const SAME_TURN_MS = 5_000;
+
 const STATE_FILE = path.join('.cursor', 'session', 'wrapped-output.json');
 
 function readStdin() {
@@ -47,29 +58,79 @@ function readJson(raw) {
     }
 }
 
-/** Best-effort audit trail; the guard must work when `.cursor/session/` is not writable. */
-function record(payload) {
+/**
+ * Append one trail entry.
+ *
+ * The stamp is taken from the caller's clock, not `new Date()`: `stopVerdict` compares this timestamp
+ * against `opts.now`, and two clocks in one decision is how the resend check silently stopped firing.
+ */
+function record(payload, file = STATE_FILE, now = Date.now()) {
     try {
-        fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-        fs.appendFileSync(STATE_FILE, `${JSON.stringify({ at: new Date().toISOString(), ...payload })}\n`);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.appendFileSync(file, `${JSON.stringify({ at: new Date(now).toISOString(), ...payload })}\n`);
     } catch {
         /* observability, never a blocker */
     }
 }
 
 /**
+ * The most recent wrap recorded, or `null` when the trail is unreadable/absent.
+ *
+ * `stop` never received a working turn counter, so the trail is the only evidence of "this is the
+ * resend, not the first wrap". A missing file must read as "no previous wrap" — the guard's job is to
+ * ask for a resend, and refusing to ask because it cannot read its own history would be the worse bug.
+ *
+ * @param {string} [file]
+ * @param {number} [now]
+ */
+function lastWrap(file = STATE_FILE, now = Date.now()) {
+    let raw;
+    try {
+        raw = fs.readFileSync(file, 'utf8');
+    } catch {
+        return null;
+    }
+    const lines = raw.split('\n');
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        let entry;
+        try {
+            entry = JSON.parse(line);
+        } catch {
+            continue;
+        }
+        if (!entry || entry.event !== 'wrap-detected') continue;
+        const at = Date.parse(entry.at);
+        return { at: Number.isFinite(at) ? at : 0, recent: now - at < SAME_TURN_MS };
+    }
+    return null;
+}
+
+/**
  * @param {object} payload the `stop` event input
+ * @param {{ stateFile?: string, now?: number }} [opts] test seams
  * @returns {{ followup_message?: string }}
  */
-export function stopVerdict(payload) {
+export function stopVerdict(payload, opts = {}) {
+    const now = opts.now ?? Date.now();
     const status = typeof payload.status === 'string' ? payload.status : 'completed';
     if (status !== 'completed') return {};
-    const attempts = Number.isFinite(payload.loop_count) ? Number(payload.loop_count) + 1 : 1;
     const { wrapped } = inspectAgentText(extractResponseText(payload));
     if (!wrapped) return {};
-    record({ event: 'wrap-detected', attempt: attempts });
+    /*
+     * Attempt count = how many wraps the *conversation* has produced. `loop_count` is used when the
+     * host supplies it; otherwise the trail decides, and a wrap recorded moments ago means the resend
+     * we already asked for came back wrapped too — so the reminder is not landing and must not repeat.
+     */
+    const previous = lastWrap(opts.stateFile, now);
+    const attempts =
+        (Number.isFinite(payload.loop_count) ? Number(payload.loop_count) : 0) +
+        (previous?.recent ? 1 : 0) +
+        1;
+    record({ event: 'wrap-detected', attempt: attempts }, opts.stateFile, now);
     if (attempts >= MAX_ATTEMPTS) {
-        record({ event: 'wrap-unresolved', attempt: attempts });
+        record({ event: 'wrap-unresolved', attempt: attempts }, opts.stateFile, now);
         return {};
     }
     return { followup_message: REMINDER };

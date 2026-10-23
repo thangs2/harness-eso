@@ -194,7 +194,7 @@ export function buildBrainGraph({ db, cfg, limits = {}, builtAt = isoNow() }) {
                 builtAt,
                 project: { id: projectId, label: cfg.project.displayName || projectId, rootPath: cfg.root },
                 sources: [{ source: 'project', present: false, rows: 0 }],
-                omitted: [{ layer: 'all', reason: 'project row missing — database not initialised for this tenant' }],
+                omitted: [{ layer: 'all', reason: 'project row missing — database not initialised for this project' }],
                 truncated: [],
             },
         };

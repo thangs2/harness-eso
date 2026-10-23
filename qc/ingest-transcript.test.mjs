@@ -29,7 +29,7 @@ const SAMPLE_TRANSCRIPT = [
     '',
 ].join('\n');
 
-function tenantWithTranscript(transcriptPath) {
+function consumerWithTranscript(transcriptPath) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ingest-'));
     const dbPath = path.join(root, '.harness', 'harness.db');
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -64,7 +64,7 @@ function tenantWithTranscript(transcriptPath) {
 
 test('ingestTranscript creates one request and one llm_call', () => {
     const transcriptPath = path.join(os.tmpdir(), `qc-transcript-${Date.now()}.jsonl`);
-    const cfg = tenantWithTranscript(transcriptPath);
+    const cfg = consumerWithTranscript(transcriptPath);
     const db = openDb(cfg.storage.target);
     migrate(db);
     upsertProject(db, cfg);
@@ -94,8 +94,8 @@ test('parsePromptTs applies the annotated zone, not the process timezone', () =>
 
 test('ingestTranscript stores started_at as true UTC for a zoned prompt', () => {
     const transcriptPath = path.join(os.tmpdir(), `qc-transcript-tz-${Date.now()}.jsonl`);
-    const cfg = tenantWithTranscript(transcriptPath);
-    // tenantWithTranscript seeds a sample transcript; replace it with the zoned prompt.
+    const cfg = consumerWithTranscript(transcriptPath);
+    // consumerWithTranscript seeds a sample transcript; replace it with the zoned prompt.
     fs.writeFileSync(
         transcriptPath,
         [
@@ -126,7 +126,7 @@ test('ingestTranscript stores started_at as true UTC for a zoned prompt', () => 
 
 test('runIngestOnce twice does not duplicate requests', async () => {
     const transcriptPath = path.join(os.tmpdir(), `qc-transcript-${Date.now()}-2.jsonl`);
-    const cfg = tenantWithTranscript(transcriptPath);
+    const cfg = consumerWithTranscript(transcriptPath);
     const prevFacade = process.env.HARNESS_DECISION_FACADE;
     const prevEso = process.env.HARNESS_ESO;
     process.env.HARNESS_DECISION_FACADE = '0';

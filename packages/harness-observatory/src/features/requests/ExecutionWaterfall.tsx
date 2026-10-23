@@ -82,7 +82,7 @@ export function ExecutionWaterfall({ detail }: ExecutionWaterfallProps) {
             rules: detail.rules,
             events: detail.events,
             llmCalls: detail.llmCalls as Array<{ toolNames?: string }> | undefined,
-            rootPath: detail.tenantRootPath,
+            rootPath: detail.callerRootPath,
         }),
         [detail],
     );
@@ -278,7 +278,7 @@ export function ExecutionWaterfall({ detail }: ExecutionWaterfallProps) {
                                             className="font-mono text-slate-300 truncate text-[11px]"
                                             title={f.path}
                                         >
-                                            {relPath(detail.tenantRootPath, f.path)}
+                                            {relPath(detail.callerRootPath, f.path)}
                                         </span>
                                         <span className="shrink-0 px-1.5 py-0.5 rounded bg-black/30 font-mono text-[10px] text-slate-400">
                                             {f.actions ?? `${f.reads}r/${f.edits}e`}

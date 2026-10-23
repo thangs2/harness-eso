@@ -30,7 +30,7 @@ export {
     productStateDir,
     resolveProject,
     saveWorkspace,
-    syncTenantsFromWorkspace,
+    syncProjectsFromWorkspace,
     workspaceFile,
 } from './workspace-store.mjs';
 export {

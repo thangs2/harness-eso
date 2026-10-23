@@ -9,7 +9,7 @@ import { aggregates } from '../packages/harness-observe-server/src/aggregates.mj
 import { refreshMcpCallStats } from '../packages/harness-observe-server/src/mcp-call-stats.mjs';
 import { assistantStats } from '../packages/harness-observe-server/src/ingest-transcript.mjs';
 
-function tempTenant() {
+function makeConfig() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-agg-'));
     const dbPath = path.join(root, '.harness', 'harness.db');
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -67,7 +67,7 @@ function seedRequests(db, cfg) {
 }
 
 test('aggregates buckets hour grain', () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     const db = openDb(cfg.storage.target);
     seedRequests(db, cfg);
     const url = new URL('http://127.0.0.1/api/aggregates?bucket=hour');
@@ -81,7 +81,7 @@ test('aggregates buckets hour grain', () => {
 });
 
 test('GET /api/aggregates via HTTP handler', async () => {
-    const cfg = tempTenant();
+    const cfg = makeConfig();
     bootObserveDb(cfg);
     const db = openDb(cfg.storage.target);
     seedRequests(db, cfg);

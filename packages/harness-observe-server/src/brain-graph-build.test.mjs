@@ -267,7 +267,7 @@ test('the API helper serves the graph and rebuilds only when the database file c
     assert.equal(second.nodes.filter((n) => n.kind === 'note').length, 2);
 });
 
-test('an uninitialised tenant yields an explained empty graph, not a fake one', (t) => {
+test('an uninitialised project yields an explained empty graph, not a fake one', (t) => {
     const db = freshDb(t);
     const graph = buildBrainGraph({ db, cfg: { project: { id: 'nope' }, root: '/work/proj' }, builtAt: '2026-10-22T00:00:00Z' });
     assert.deepEqual(graph.nodes, []);

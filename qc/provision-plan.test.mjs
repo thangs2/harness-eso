@@ -9,7 +9,7 @@ import {
     buildProvisionPlan,
     policyFromProject,
     resolveHostProfileIds,
-    tenantProvisionAction,
+    provisionAction,
 } from '@mu/harness-foundation/project-registry';
 
 const ESO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,7 +47,7 @@ test('resolveHostProfileIds rejects hostProfile none', () => {
 test('buildProvisionPlan dual-ide lists both IDE hook trees and preflight paths', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-plan-'));
     const project = draftProject({ agentRepo: { root } });
-    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
     const rels = plan.files.map((f) => f.relative);
 
     // The pack is installed once for all IDEs; only the config that wires it is per-IDE.
@@ -70,7 +70,7 @@ test('applyHostProfiles dual-ide merges hooks.json on consumer', () => {
     );
 
     const project = draftProject({ agentRepo: { root } });
-    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
     applyHostProfiles(root, plan.hostProfiles, {
         observePort: 8792, verify: false,
     });
@@ -91,7 +91,7 @@ test('applyHostProfiles dual-ide merges hooks.json on consumer', () => {
 test('applyHostProfiles is idempotent — re-running does not duplicate hooks', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-apply-twice-'));
     const project = draftProject({ agentRepo: { root } });
-    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
     for (let i = 0; i < 3; i += 1) {
         applyHostProfiles(root, plan.hostProfiles, { observePort: 8792, verify: false });
     }
@@ -126,7 +126,7 @@ test('re-provision migrates legacy per-IDE shims to the pack, without leaving a 
         }),
     );
     const project = draftProject({ agentRepo: { root } });
-    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
     applyHostProfiles(root, plan.hostProfiles, { observePort: 8792, verify: false });
 
     const hooks = JSON.parse(fs.readFileSync(path.join(root, '.cursor', 'hooks.json'), 'utf8'));
@@ -157,7 +157,7 @@ test('re-provision prunes a legacy hook the product no longer ships', () => {
         }),
     );
     const project = draftProject({ agentRepo: { root } });
-    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
     applyHostProfiles(root, plan.hostProfiles, { observePort: 8792, verify: false });
 
     const list = JSON.parse(fs.readFileSync(path.join(root, '.cursor', 'hooks.json'), 'utf8')).hooks
@@ -183,19 +183,19 @@ test('buildProvisionPlan refuses the harness-eso product repo as consumer', () =
     );
 });
 
-test('tenantProvisionAction create-if-missing vs merge vs skip', () => {
-    assert.equal(tenantProvisionAction('harness.config.json', false), 'create-if-missing');
-    assert.equal(tenantProvisionAction('harness.config.json', true), 'skip');
-    assert.equal(tenantProvisionAction('.harness/decision-policy.json', false), 'create-if-missing');
-    assert.equal(tenantProvisionAction('.harness/decision-policy.json', true), 'merge');
-    assert.equal(tenantProvisionAction('.harness/integrations.json', true), 'write');
+test('provisionAction create-if-missing vs merge vs skip', () => {
+    assert.equal(provisionAction('harness.config.json', false), 'create-if-missing');
+    assert.equal(provisionAction('harness.config.json', true), 'skip');
+    assert.equal(provisionAction('.harness/decision-policy.json', false), 'create-if-missing');
+    assert.equal(provisionAction('.harness/decision-policy.json', true), 'merge');
+    assert.equal(provisionAction('.harness/integrations.json', true), 'write');
 });
 
-test('tenantProvisionAction force rewrites only the anchor, never the policy', () => {
-    assert.equal(tenantProvisionAction('harness.config.json', true, true), 'write');
-    assert.equal(tenantProvisionAction('harness.config.json', false, true), 'create-if-missing');
+test('provisionAction force rewrites only the anchor, never the policy', () => {
+    assert.equal(provisionAction('harness.config.json', true, true), 'write');
+    assert.equal(provisionAction('harness.config.json', false, true), 'create-if-missing');
     // decision-policy.json stays merge-only at any force level.
-    assert.equal(tenantProvisionAction('.harness/decision-policy.json', true, true), 'merge');
+    assert.equal(provisionAction('.harness/decision-policy.json', true, true), 'merge');
 });
 
 test('buildProvisionPlan force flips the anchor action to write', () => {
@@ -203,12 +203,12 @@ test('buildProvisionPlan force flips the anchor action to write', () => {
     const project = draftProject({ agentRepo: { root } });
     fs.writeFileSync(
         path.join(root, 'harness.config.json'),
-        JSON.stringify({ version: 1, project: { id: 'stale' }, tenancy: { registry: '~/.harness/tenants.json' } }),
+        JSON.stringify({ version: 1, project: { id: 'stale' }, registry: { registry: '~/.harness/registry.json' } }),
     );
-    const plain = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plain = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
     assert.equal(plain.files.find((f) => f.relative === 'harness.config.json')?.action, 'skip');
 
-    const forced = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json', { force: true });
+    const forced = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json', { force: true });
     assert.equal(forced.files.find((f) => f.relative === 'harness.config.json')?.action, 'write');
 });
 
@@ -242,7 +242,7 @@ test('antigravity hooks use AG-native event names and shapes, with no Cursor voc
      */
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-agy-route-'));
     const project = draftProject({ agentRepo: { root } });
-    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
     applyHostProfiles(root, plan.hostProfiles, { observePort: 8792, verify: false });
     const hooks = JSON.parse(fs.readFileSync(path.join(root, '.agents', 'hooks.json'), 'utf8'));
 
@@ -300,7 +300,7 @@ test('removing the flat hook set from a profile cleans up the consumer', () => {
      */
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-drop-'));
     const project = draftProject({ agentRepo: { root } });
-    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
 
     // 1. the old shape: the agents profile used to carry a Cursor-vocabulary `merge`.
     const legacy = plan.hostProfiles.map((p) =>
@@ -339,7 +339,7 @@ test('removing the flat hook set from a profile cleans up the consumer', () => {
 test('a block dropped from the profile is removed from the consumer', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-drop-block-'));
     const project = draftProject({ agentRepo: { root } });
-    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/tenants.json');
+    const plan = buildProvisionPlan(project, PROFILES_DIR, '/tmp/registry.json');
     applyHostProfiles(root, plan.hostProfiles, { observePort: 8792, verify: false });
 
     const hooksPath = path.join(root, '.agents', 'hooks.json');
