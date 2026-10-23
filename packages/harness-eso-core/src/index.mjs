@@ -4,6 +4,7 @@ export {
     ENFORCE_WRITES_VALUES,
     resolveEnforceWrites,
     resolveEsoPolicy,
+    declaredSources,
     loadEsoPolicy as loadEsoPolicyFromCfg,
 } from './eso-policy.mjs';
 export { loadHarnessProfile } from './profile-load.mjs';

@@ -168,6 +168,7 @@ export async function runCollect(input, ctx) {
     const registry = ctx.registry || createSourceRegistry(ctx.policy);
     const snippets = [...(ctx.injectSnippets || [])];
     const trace = [];
+    const lawMisses = [];
 
     const lawAdapter = registry.resolve('law');
     if (lawAdapter) {
@@ -182,7 +183,13 @@ export async function runCollect(input, ctx) {
         for (const q of lawTermsFor(pack)) {
             const r = await lawAdapter.fetch({ query: q, type: 'doc' }, { root: ctx.root, policy: ctx.policy });
             trace.push(r.trace);
-            snippets.push(...(r.snippets || []));
+            if (Array.isArray(r.snippets) && r.snippets.length > 0) snippets.push(...r.snippets);
+            /*
+             * The adapter answered with **nothing**, and that is a fact about the corpus, not about
+             * the turn (G-02). It is recorded so the projection can name the gap as unanswerable
+             * instead of leaving it indistinguishable from "the agent has not read it yet".
+             */
+            else if (String(r.trace || '').endsWith(`:miss:${q}`)) lawMisses.push(q);
         }
     }
     const codeAdapter = registry.resolve('code');
@@ -213,7 +220,23 @@ export async function runCollect(input, ctx) {
     };
     const stem = ctx.stem ?? input?.userQueryStem ?? '';
     const gaps = detectGaps(pack, retrieval, stem);
+    /*
+     * Name the gaps that **no reading in this repo can close** (G-02).
+     *
+     * A `law` gap closes only on a path stem or on a `docgraph`/`Grep` query naming the term
+     * (`closesGap`). When the law adapter already answered with nothing, nothing the agent can read
+     * will produce that term, so the gap is not "unread" — it is unanswerable. Marking it lets the
+     * projection and the deny message say so, instead of reporting the same denial it would report
+     * for a turn that never tried.
+     *
+     * Not a removal: the gap stays required (`R6` in the defect register). A gate that stops asking
+     * would never notice a genuinely unread document.
+     */
+    const unanswerable = new Set(lawMisses);
+    for (const g of gaps) {
+        if (g.kind === 'law' && unanswerable.has(g.query)) g.unanswerable = true;
+    }
     const measure = scoreSufficiency(pack, retrieval, gaps, stem, ctx.eso.thresholds);
 
-    return { pack, retrieval, gaps, measure };
+    return { pack, retrieval, gaps, measure, lawMisses };
 }
