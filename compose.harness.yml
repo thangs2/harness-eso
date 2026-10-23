@@ -26,6 +26,17 @@ services:
             HARNESS_CLAUDE_MOUNT: /host-claude-projects
             HARNESS_DSH_MOUNT: /host-dsh
             HARNESS_REPO_ROOT_HOST: ${HARNESS_REPO_ROOT:?Set HARNESS_REPO_ROOT}
+            # Poll interval for the ingest worker. It existed in `observe-config.mjs` from the start but
+            # was never listed here, so `composeEnv()`'s `{...process.env}` was dropped by compose and
+            # every container ran the 2000 ms fallback: 4 stacks each re-scanning the transcript and
+            # DSH spines every 2 s. On a macOS bind mount each `readdir` is a virtiofs round-trip, so
+            # idle cost was ~380% CPU across 4 containers (measured 2026-10-23, `docker stats`).
+            #
+            # 10 s is the default because ingest is a background job and the UI already refreshes over
+            # SSE on a real change — a slower poll costs nothing a human can perceive. Override per
+            # operator with `HARNESS_INGEST_POLL_MS=<ms>` in the shell that runs `deploy.sh`; 500 ms is
+            # the floor enforced in `startIngestLoop`.
+            HARNESS_INGEST_POLL_MS: ${HARNESS_INGEST_POLL_MS:-10000}
         volumes:
             # Consumer repo — read-only. This is the only path that identifies a project.
             - ${HARNESS_REPO_ROOT:?Set HARNESS_REPO_ROOT}:/data/repo:ro

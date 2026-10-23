@@ -1267,6 +1267,63 @@ function isOwnerMatchingProject(owner, cfgRoot) {
     return false;
 }
 
+/*
+ * Owner-resolution cache.
+ *
+ * `discoverTranscripts` asks every configured project to classify every candidate transcript, and
+ * classification reads the first 128 KiB of the file and parses up to 150 records of it. Measured on
+ * a real machine (2026-10-23, inside the container, both spans over 40 files):
+ *
+ *   x79         5.53 ms/file ×  78 candidates ≈ 431 ms per cycle
+ *   baplatform 10.75 ms/file × 122 candidates ≈ 1311 ms per cycle
+ *
+ * That matched the whole `discoverTranscripts` cost (~458 ms / ~433 ms measured), which is paid
+ * **every poll** — while the answer only changes when the file does. Most candidates are also
+ * classified and then discarded (a project scans its siblings' transcripts and claims none of them),
+ * so the work was not merely repeated, it was mostly thrown away.
+ *
+ * The answer is a pure function of the file's bytes, so the cache key is the same triple the stale
+ * cursor check uses — `size` catches growth, `mtimeMs` catches an in-place rewrite. A TTL would be
+ * wrong in both directions: too long and a rewrite is invisible for that window, too short and an
+ * idle machine keeps paying. A changed file simply misses.
+ *
+ * Bounded on purpose. A transcript's first 128 KiB is parsed, not cached, so entries are two small
+ * strings and a boolean; the cap keeps a machine with thousands of conversations from growing it
+ * without limit. Oldest-inserted is evicted first, which is the right shape for a poll that walks
+ * the same list in the same order.
+ */
+const OWNER_CACHE_MAX = 4096;
+const ownerCache = new Map();
+
+/** Drop the whole cache. Exported for tests that rewrite fixtures. */
+export function resetOwnerCache() {
+    ownerCache.clear();
+}
+
+function cachedOwnerInfo(transcriptPath) {
+    let key;
+    try {
+        const st = fs.statSync(transcriptPath);
+        key = `${transcriptPath}\u0000${st.size}\u0000${st.mtimeMs}`;
+    } catch {
+        // Unreadable now; do not cache, and let the caller's own read fail identically.
+        return undefined;
+    }
+    const hit = ownerCache.get(key);
+    if (hit !== undefined) return hit;
+    return { key };
+}
+
+function storeOwnerInfo(key, value) {
+    if (ownerCache.has(key)) ownerCache.delete(key);
+    ownerCache.set(key, value);
+    if (ownerCache.size > OWNER_CACHE_MAX) {
+        // Map iteration is insertion-ordered, so the first key is the oldest.
+        const oldest = ownerCache.keys().next().value;
+        ownerCache.delete(oldest);
+    }
+}
+
 /**
  * Detailed owner resolution result including whether the transcript has IDE window metadata.
  *
@@ -1274,6 +1331,14 @@ function isOwnerMatchingProject(owner, cfgRoot) {
  * @returns {{ owner: string | null, hasMetadata: boolean }}
  */
 export function resolveTranscriptOwnerInfo(transcriptPath) {
+    const look = cachedOwnerInfo(transcriptPath);
+    if (look !== undefined && look.key === undefined) return look;
+    const result = resolveTranscriptOwnerInfoUncached(transcriptPath);
+    if (look !== undefined) storeOwnerInfo(look.key, result);
+    return result;
+}
+
+function resolveTranscriptOwnerInfoUncached(transcriptPath) {
     let text;
     try {
         const fd = fs.openSync(transcriptPath, 'r');
@@ -1404,6 +1469,71 @@ export function resolveTranscriptOwner(transcriptPath) {
     return resolveTranscriptOwnerInfo(transcriptPath).owner;
 }
 
+/*
+ * Conversations this project's own hooks recorded, cached per file version.
+ *
+ * `discoverTranscripts` runs every poll, and it used to `readFileSync` **every** hook file in full
+ * on each pass just to collect the `conversationId` values — the one field it reads. Measured
+ * inside a container (2026-10-23, 20 iterations): 17.05 ms on x79 and 63.45 ms on baplatform, which
+ * was the largest remaining cost of a discovery pass once owner resolution was cached.
+ *
+ * This is E3 applied to a log: the answer only changes when the file does, so it is cached on
+ * `(path, size, mtimeMs)` — the same triple the owner cache and the stale-cursor check use. Not a
+ * tail read, because a hook file may be rotated or rewritten in place and a tail would then silently
+ * drop the older ids; a changed size or mtime misses instead, which is correct in both directions.
+ */
+const HOOK_CONV_CACHE_MAX = 256;
+const hookConvCache = new Map();
+
+/** Drop the hook-conversation cache. Exported for tests that rewrite fixtures. */
+export function resetHookConversationCache() {
+    hookConvCache.clear();
+}
+
+function hookCacheStore(key, value) {
+    if (hookConvCache.has(key)) hookConvCache.delete(key);
+    hookConvCache.set(key, value);
+    if (hookConvCache.size > HOOK_CONV_CACHE_MAX) {
+        const oldest = hookConvCache.keys().next().value;
+        hookConvCache.delete(oldest);
+    }
+}
+
+function collectHookConversations(hookFiles = []) {
+    const out = new Set();
+    for (const hFile of hookFiles) {
+        let key;
+        try {
+            const st = fs.statSync(hFile);
+            key = `${hFile}\u0000${st.size}\u0000${st.mtimeMs}`;
+        } catch {
+            continue; // absent or unreadable this pass; nothing to contribute
+        }
+        const hit = hookConvCache.get(key);
+        if (hit !== undefined) {
+            for (const id of hit) out.add(id);
+            continue;
+        }
+        const ids = new Set();
+        try {
+            const hText = fs.readFileSync(hFile, 'utf8');
+            for (const hLine of hText.split('\n')) {
+                if (!hLine.includes('conversationId')) continue;
+                try {
+                    const parsed = JSON.parse(hLine);
+                    if (parsed.conversationId) ids.add(parsed.conversationId);
+                } catch {}
+            }
+        } catch {
+            // A file that vanished between stat and read contributes nothing; do not cache the miss.
+            continue;
+        }
+        hookCacheStore(key, ids);
+        for (const id of ids) out.add(id);
+    }
+    return out;
+}
+
 export function discoverTranscripts(cfg) {
     const dir = cfg.ingest.transcriptDir;
     const out = [];
@@ -1419,21 +1549,8 @@ export function discoverTranscripts(cfg) {
     }
 
     // Known conversations that this project's own hooks recorded locally
-    const localHookConvs = new Set();
     const hookFiles = cfg.ingest?.hookFiles || [];
-    for (const hFile of hookFiles) {
-        if (!fs.existsSync(hFile)) continue;
-        try {
-            const hText = fs.readFileSync(hFile, 'utf8');
-            for (const hLine of hText.split('\n')) {
-                if (!hLine.includes('conversationId')) continue;
-                try {
-                    const parsed = JSON.parse(hLine);
-                    if (parsed.conversationId) localHookConvs.add(parsed.conversationId);
-                } catch {}
-            }
-        } catch {}
-    }
+    const localHookConvs = collectHookConversations(hookFiles);
 
     const brainDirs = cfg.ingest.brainDirs || [];
     const root = path.resolve(cfg.root);

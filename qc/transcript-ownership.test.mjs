@@ -6,6 +6,8 @@ import test from 'node:test';
 
 import {
     discoverTranscripts,
+    resetHookConversationCache,
+    resetOwnerCache,
     resolveTranscriptOwner,
 } from '../packages/harness-observe-server/src/ingest-transcript.mjs';
 
@@ -248,6 +250,123 @@ test('the owner resolves from user_information workspace mapping when no documen
     fs.writeFileSync(file, `${JSON.stringify({ step_index: 0, content })}\n`);
 
     assert.equal(path.resolve(resolveTranscriptOwner(file)), path.resolve(proj));
+});
+
+test('owner resolution reads the transcript once per unchanged file', () => {
+    /*
+     * Regression for the poll cost measured on 2026-10-23: `discoverTranscripts` classified every
+     * candidate transcript on every cycle at 5–11 ms/file, which is the whole ~450 ms a cycle spent
+     * on a machine with ~80 conversations — most of them classified and then discarded for being
+     * another project's.
+     *
+     * Counting reads, not wall time, is what makes this test fail when the cache is removed: the
+     * uncached implementation opens and reads the file on every call, so `reads` is 2 instead of 1.
+     */
+    resetOwnerCache();
+    const proj = consumer('proj-cache');
+    const brain = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-brain-cache-'));
+    const conv = path.join(brain, 'conv-cache', '.system_generated', 'logs');
+    fs.mkdirSync(conv, { recursive: true });
+    const file = path.join(conv, 'transcript.jsonl');
+    const content = `Active Document: ${path.join(proj, 'doc.md')}\n<USER_REQUEST>hi</USER_REQUEST>`;
+    fs.writeFileSync(file, `${JSON.stringify({ step_index: 0, content })}\n`);
+
+    const realReadSync = fs.readSync;
+    let reads = 0;
+    fs.readSync = (...args) => {
+        reads += 1;
+        return realReadSync(...args);
+    };
+    try {
+        assert.equal(path.resolve(resolveTranscriptOwner(file)), path.resolve(proj));
+        assert.equal(path.resolve(resolveTranscriptOwner(file)), path.resolve(proj));
+    } finally {
+        fs.readSync = realReadSync;
+    }
+    assert.equal(reads, 1, 'an unchanged file must be read once, not once per call');
+});
+
+test('a rewritten transcript is re-resolved instead of served from cache', () => {
+    /*
+     * The cache key is `(path, size, mtimeMs)`, not a TTL, so that a rewrite is never invisible for a
+     * window of time. This pins the other half of the trade: touching the file must invalidate it.
+     */
+    resetOwnerCache();
+    const a = consumer('proj-reuse-a');
+    const b = consumer('proj-reuse-b');
+    const brain = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-brain-reuse-'));
+    const conv = path.join(brain, 'conv-reuse', '.system_generated', 'logs');
+    fs.mkdirSync(conv, { recursive: true });
+    const file = path.join(conv, 'transcript.jsonl');
+
+    fs.writeFileSync(file, `${JSON.stringify({ step_index: 0, content: `Active Document: ${path.join(a, 'x.md')}` })}\n`);
+    assert.equal(path.resolve(resolveTranscriptOwner(file)), path.resolve(a), 'first answer');
+
+    fs.writeFileSync(file, `${JSON.stringify({ step_index: 0, content: `Active Document: ${path.join(b, 'y.md')}` })}\n`);
+    assert.equal(path.resolve(resolveTranscriptOwner(file)), path.resolve(b), 'rewrite must not be cached');
+});
+
+test('hook files are read once per unchanged version, and a rewrite is re-read', () => {
+    /*
+     * `discoverTranscripts` ran on every poll and read every hook file in full to collect the
+     * `conversationId` values — measured at 17 ms (x79) and 63 ms (baplatform) per pass inside a
+     * container, the largest remaining discovery cost once owner resolution was cached. This pins
+     * both halves: an unchanged file is read once, and a rewrite is not served from the cache.
+     */
+    resetHookConversationCache();
+    const brain = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-brain-hook-'));
+    const conv = path.join(brain, 'conv-hook', '.system_generated', 'logs');
+    fs.mkdirSync(conv, { recursive: true });
+    const logFile = path.join(conv, 'transcript.jsonl');
+    fs.writeFileSync(logFile, `${JSON.stringify({ step_index: 0, content: 'user turn' })}\n`);
+
+    const hookFile = path.join(brain, 'route-trace.jsonl');
+    fs.writeFileSync(hookFile, `${JSON.stringify({ conversationId: 'conv-hook' })}\n`);
+
+    const cfg = {
+        ok: true,
+        root: fs.mkdtempSync(path.join(os.tmpdir(), 'harness-hook-root-')),
+        project: { id: 'hook-proj' },
+        ingest: { pollMs: 2000, transcriptDir: path.join(brain, 'none'), brainDirs: [brain], hookFiles: [hookFile] },
+    };
+
+    const realReadFileSync = fs.readFileSync;
+    let reads = 0;
+    fs.readFileSync = (...args) => {
+        if (String(args[0]).endsWith('route-trace.jsonl')) reads += 1;
+        return realReadFileSync(...args);
+    };
+    try {
+        assert.deepEqual(discoverTranscripts(cfg), [logFile], 'the hook ids claim the conversation');
+        assert.deepEqual(discoverTranscripts(cfg), [logFile]);
+    } finally {
+        fs.readFileSync = realReadFileSync;
+    }
+    assert.equal(reads, 1, 'an unchanged hook file must be read once, not once per pass');
+});
+
+test('a hook file rewritten to drop an id stops claiming that conversation', () => {
+    resetHookConversationCache();
+    const brain = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-brain-hook2-'));
+    const conv = path.join(brain, 'conv-hook2', '.system_generated', 'logs');
+    fs.mkdirSync(conv, { recursive: true });
+    const logFile = path.join(conv, 'transcript.jsonl');
+    fs.writeFileSync(logFile, `${JSON.stringify({ step_index: 0, content: 'user turn' })}\n`);
+
+    const hookFile = path.join(brain, 'route-trace.jsonl');
+    fs.writeFileSync(hookFile, `${JSON.stringify({ conversationId: 'conv-hook2' })}\n`);
+
+    const cfg = {
+        ok: true,
+        root: fs.mkdtempSync(path.join(os.tmpdir(), 'harness-hook-root2-')),
+        project: { id: 'hook-proj-2' },
+        ingest: { pollMs: 2000, transcriptDir: path.join(brain, 'none'), brainDirs: [brain], hookFiles: [hookFile] },
+    };
+
+    assert.deepEqual(discoverTranscripts(cfg), [logFile], 'claimed while the id is present');
+
+    fs.writeFileSync(hookFile, `${JSON.stringify({ conversationId: 'someone-else' })}\n`);
+    assert.deepEqual(discoverTranscripts(cfg), [], 'a rewrite must not be served from cache');
 });
 
 test('the owner resolves from tool calls Cwd when window metadata is absent', () => {
