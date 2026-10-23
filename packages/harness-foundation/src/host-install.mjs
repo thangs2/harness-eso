@@ -839,7 +839,11 @@ export function applyHostProfile(consumerRoot, profile, opts = {}) {
         appliedAt: new Date().toISOString(),
         hostPack: packVersion(),
     };
-    writeJsonAtomic(path.join(root, '.harness', 'host-bootstrap.json'), bootstrap);
+    writeBootstrapState(root, {
+        ...bootstrap,
+        profileIds: [profile.id],
+        profileId: profile.id,
+    });
     actions.push({ relative: '.harness/host-bootstrap.json', action: 'write' });
 
     if (profile.cursor) {
@@ -893,7 +897,6 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
         hostPack: { version: packVersion(), ok: false, failures: [] },
     };
     actions.push({ relative: '.harness/host-bootstrap.json', action: 'write' });
-
     for (const profile of profiles) {
         if (profile.cursor) {
             actions.push(...applyHostTree(root, 'cursor', profile.cursor, profile.id).actions);
@@ -918,7 +921,7 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
     if (opts.verify !== false) {
         const check = verifyHostPack(root);
         bootstrap.hostPack = { version: check.version, ok: check.ok, failures: check.failures ?? [] };
-        writeJsonAtomic(path.join(root, '.harness', 'host-bootstrap.json'), bootstrap);
+        writeBootstrapState(root, bootstrap);
         if (!check.ok) {
             throw new Error(
                 `host pack verification failed for ${check.failures?.join(', ') || check.reason || 'unknown'} — the consumer would run with guards that cannot decide`,
@@ -927,8 +930,49 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
         return { actions, bootstrap, verification: check };
     }
 
-    writeJsonAtomic(path.join(root, '.harness', 'host-bootstrap.json'), bootstrap);
+    writeBootstrapState(root, bootstrap);
     return { actions, bootstrap };
+}
+
+/**
+ * Write the bootstrap record plus the machine-local file it must never be confused with.
+ *
+ * `host-bootstrap.json` is **committed** (the `.harness/.gitignore` admits it) because it says what was
+ * provisioned — profile ids, the pack version. Its `appliedAt` is written once, when the profile
+ * changes; re-deriving it on every provision would put a diff in every developer's working tree on
+ * every run, and the file's only facts would be buried in noise.
+ *
+ * The port is the part that is *not* shared state: `sidecar.env` carries `HARNESS_TOKEN` and the stack
+ * port for **this** machine, so a second developer cloning the repo must not inherit the first one's.
+ * `sidecarUrl` therefore never reaches this file — see the destructure below.
+ */
+function writeBootstrapState(root, bootstrap) {
+    const file = path.join(root, '.harness', 'host-bootstrap.json');
+    let previous = null;
+    try {
+        previous = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+        previous = null;
+    }
+    const sameProvision =
+        previous &&
+        previous.profileIds?.length === bootstrap.profileIds?.length &&
+        (previous.profileIds || []).every((id) => (bootstrap.profileIds || []).includes(id)) &&
+        previous.profileId === bootstrap.profileId;
+    /*
+     * `sidecarUrl` is dropped, not merely stabilised. It encodes the port THIS machine's stack listens
+     * on; committing it means the next clone inherits it and a teammate's agent talks to someone
+     * else's Observatory. The port lives in `sidecar.env`, which is ignored, and every caller that
+     * needs it reads `appliedAt`/`profileIds` from here and the URL from there.
+     */
+    const { sidecarUrl: _machineLocal, ...shared } = bootstrap;
+    void _machineLocal;
+    const next = {
+        ...shared,
+        appliedAt: sameProvision ? previous.appliedAt : bootstrap.appliedAt,
+    };
+    writeJsonAtomic(file, next);
+    return { ...bootstrap, action: 'write' };
 }
 
 /** Version of the built host pack, for bootstrap metadata and outdated detection. */
@@ -1217,7 +1261,7 @@ export function addHostProfile(root, profileId, profilesDir, opts = {}) {
 
     const check = verifyHostPack(root);
     bootstrap.hostPack = { version: check.version, ok: check.ok, failures: check.failures ?? [] };
-    writeJsonAtomic(bootstrapPath, bootstrap);
+    writeBootstrapState(root, bootstrap);
     if (!check.ok) {
         throw new Error(`host pack verification failed for ${check.failures?.join(', ')}`);
     }

@@ -114,7 +114,15 @@ function writeManifest() {
         entry: 'harness-hook.mjs',
         routeHelper: 'route-hook.py',
         files,
-        builtAt: new Date().toISOString(),
+        /*
+         * `SOURCE_DATE_EPOCH` (the reproducible-builds convention, set by release tooling) makes the
+         * manifest stable, so two builds of unchanged sources produce identical bytes. Without it every
+         * developer's build carries a different `builtAt` and the committed pack shows a modification
+         * that is not one.
+         */
+        builtAt: new Date(
+            (Number(process.env.SOURCE_DATE_EPOCH) || Math.floor(Date.now() / 1000)) * 1000,
+        ).toISOString(),
     };
     fs.writeFileSync(path.join(OUT_DIR, 'host-pack.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     return manifest;

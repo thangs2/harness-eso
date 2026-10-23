@@ -70,27 +70,47 @@ test('init profile preserves operator edits to consumer guard scripts', () => {
 
 test('reloadHostConfig rewrites host-bootstrap.json with a fresh appliedAt', { timeout: 15000 }, async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-reload-'));
-    const project = projectDraftForConsumer(root, {
+    /*
+     * `sidecarUrl` depends on the machine's stack port, so it is recorded in the *ignored*
+     * `sidecar.env`, never in the committed bootstrap: admitting a port into a shared file makes a
+     * second developer's clone point at the first one's stack.
+     */
+    const project = { root, project: { id: 'qc-reload', hostMode: 'dual-ide' }, hostMode: 'dual-ide' };
+    initProfile(projectDraftForConsumer(root, {
         hostMode: 'dual-ide',
         projectId: 'qc-reload',
-    });
-    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', {
+    }), PROFILES_DIR, '/tmp/tenants.json', {
         dryRun: false,
         verify: false,
     });
     const bootstrapPath = path.join(root, '.harness', 'host-bootstrap.json');
     const before = JSON.parse(fs.readFileSync(bootstrapPath, 'utf8'));
-    await new Promise((r) => setTimeout(r, 5));
+    assert.equal('sidecarUrl' in before, false, 'the port must not be in the committed file');
 
-    const reloaded = reloadHostConfig(project, PROFILES_DIR);
+    // The profile CHANGED, which is when the record says a provision happened.
+    const changed = projectDraftForConsumer(root, { hostMode: 'superset', hostProfile: 'cursor-superset', projectId: 'qc-reload' });
+    await new Promise((r) => setTimeout(r, 5));
+    const reloaded = reloadHostConfig(changed, PROFILES_DIR);
     assert.equal(reloaded.ok, true);
-    assert.deepEqual(reloaded.hostProfileIds, ['cursor-superset', 'agents-superset']);
 
     const after = JSON.parse(fs.readFileSync(bootstrapPath, 'utf8'));
-    assert.deepEqual(after.profileIds, ['cursor-superset', 'agents-superset']);
     assert.notEqual(after.appliedAt, before.appliedAt);
-    // Host-only: tenant files are left alone by a reload.
     assert.ok(fs.existsSync(path.join(root, 'harness.config.json')));
+});
+
+test('re-provisioning the SAME profile does not rewrite appliedAt', { timeout: 15000 }, () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-bootstrap-stable-'));
+    const project = projectDraftForConsumer(root, { hostMode: 'dual-ide', projectId: 'qc-stable' });
+    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    const bootstrapPath = path.join(root, '.harness', 'host-bootstrap.json');
+    const before = fs.readFileSync(bootstrapPath, 'utf8');
+
+    initProfile(project, PROFILES_DIR, '/tmp/tenants.json', { dryRun: false, verify: false });
+    assert.equal(
+        fs.readFileSync(bootstrapPath, 'utf8'),
+        before,
+        'an unchanged provision must not produce a diff in every developer tree',
+    );
 });
 
 test('init profile --force rewrites a stale harness.config.json', { timeout: 15000 }, () => {
