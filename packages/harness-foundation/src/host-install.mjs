@@ -436,6 +436,97 @@ export function ensureConsumerGuards(root, treeKey) {
 }
 
 /**
+ * Rewrite a consumer's guard files from the shipped templates — the **explicit** path.
+ *
+ * `ensureConsumerGuards` above is `create-if-missing`, on purpose: it runs on every provision, and a
+ * provision must never overwrite something an operator edited. But "never overwrite" without a way to
+ * overwrite left no upgrade path at all: atrievefin, 2026-10-23, ran a `guard-write.py` from before the
+ * deny-message fix through a `./provision.sh --force` that reported success (G-17). This function is
+ * that path, and it is only ever called by a command that names it.
+ *
+ * The rules that keep it safe:
+ *
+ *   - every file it is about to replace is first copied to `<name>.bak-<timestamp>` (one per run, so a
+ *     second run does not shadow the operator's original);
+ *   - a file that looks operator-owned (a `def` the template does not have, or the explicit marker) is
+ *     **skipped** unless `force` is set, and the skip is reported with the reason a human needs;
+ *   - a file that is already identical is reported as `current` and not touched — no timestamp churn,
+ *     so `git status` stays quiet on an up-to-date consumer.
+ *
+ * @param {string} root consumer root
+ * @param {{ treeKeys?: string[], force?: boolean, dryRun?: boolean }} [opts]
+ * @returns {{ actions: { file: string, action: 'updated'|'current'|'skipped'|'created', backup?: string, reason?: string }[], templatesDir: string }}
+ */
+export function syncConsumerGuards(root, opts = {}) {
+    const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
+    const templatesDir = path.join(baseProfiles, 'templates', 'hooks');
+    const treeKeys =
+        Array.isArray(opts.treeKeys) && opts.treeKeys.length
+            ? opts.treeKeys
+            : ['cursor', 'claude', 'agents'].filter((k) => fs.existsSync(path.join(root, `.${k}`)));
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const actions = [];
+
+    for (const treeKey of treeKeys) {
+        const targetHooksDir = path.join(root, `.${treeKey}`, 'hooks');
+        for (const name of ['guard-write.py', 'guard-shell.py', 'pre-tool-use.py']) {
+            const src = path.join(templatesDir, name);
+            if (!fs.existsSync(src)) continue;
+            const dest = path.join(targetHooksDir, name);
+            const shown = `.${treeKey}/hooks/${name}`;
+
+            if (!fs.existsSync(dest)) {
+                if (!opts.dryRun) {
+                    fs.mkdirSync(targetHooksDir, { recursive: true });
+                    fs.copyFileSync(src, dest);
+                    try {
+                        fs.chmodSync(dest, 0o755);
+                    } catch {
+                        /* best effort, as above */
+                    }
+                }
+                actions.push({ file: shown, action: 'created' });
+                continue;
+            }
+
+            const mine = fs.readFileSync(dest, 'utf8');
+            const shipped = fs.readFileSync(src, 'utf8');
+            if (mine === shipped) {
+                actions.push({ file: shown, action: 'current' });
+                continue;
+            }
+
+            /*
+             * Operator-owned: a `def` the template does not ship, or the explicit marker. Refusing by
+             * default is the same rule `ensureConsumerGuards` follows; the difference is that this
+             * command can say *no* out loud and tell the operator how to override it.
+             */
+            const shippedDefs = new Set([...shipped.matchAll(/^def ([a-z_][\w]*)/gm)].map((m) => m[1]));
+            const extraDefs = [...mine.matchAll(/^def ([a-z_][\w]*)/gm)].map((m) => m[1]).filter((d) => !shippedDefs.has(d));
+            const marked = /HARNESS: (customised|operator-owned)\b/i.test(mine);
+            if ((extraDefs.length || marked) && !opts.force) {
+                actions.push({
+                    file: shown,
+                    action: 'skipped',
+                    reason: marked
+                        ? 'marked operator-owned (HARNESS: customised) — pass --force to replace'
+                        : `carries ${extraDefs.length} function(s) the template does not ship (${extraDefs.slice(0, 3).join(', ')}) — pass --force to replace`,
+                });
+                continue;
+            }
+
+            const backup = `${dest}.bak-${stamp}`;
+            if (!opts.dryRun) {
+                fs.copyFileSync(dest, backup);
+                fs.copyFileSync(src, dest);
+            }
+            actions.push({ file: shown, action: 'updated', backup: path.relative(root, backup) });
+        }
+    }
+    return { actions, templatesDir };
+}
+
+/**
  * Ensure baseline token-diet compliant micro-rules exist in target IDE tree.
  * Creates .<treeKey>/rules/core.conversation-hygiene.mdc, core.pipeline-gate.mdc,
  * and core.scope-fallback.mdc only if missing on disk.

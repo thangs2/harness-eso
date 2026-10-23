@@ -28,6 +28,7 @@ const SUITES = [
     'packages/harness-system-one/src',
     'packages/harness-host-generic/src',
     'packages/harness-observe-server/src',
+    'packages/harness-cli/src',
     'qc',
 ];
 
@@ -85,4 +86,6 @@ if (failed) {
     console.error(`${failed} suite(s) failed`);
     process.exit(1);
 }
-console.log(`all ${results.length} suites passed`);
+console.log(
+    `all ${results.length} suites passed (${results.filter((r) => r.status === 'pass').length} with tests, ${results.filter((r) => r.status === 'none').length} with none)`,
+);

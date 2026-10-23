@@ -14,6 +14,9 @@ import { policyWithNativeMemory } from './fixtures/host-runtime-fixture.mjs';
  * `sub_agents/**`, `scripts/**`, `.codex/` — which is also the tree Harness² edits. ESO should read it
  * without a second provider, and should be able to guard it without the guard being editable.
  */
+/* 2026-10-20T09:00Z — before the preflight stamp below, so the verdict counts as this build's. */
+const packMtime = Date.parse('2026-10-20T09:00:00Z') / 1000;
+
 function harnessTree({ hooksInEditable = false, surface = true } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness2-tree-'));
     const write = (rel, body) => {
@@ -38,6 +41,8 @@ function harnessTree({ hooksInEditable = false, surface = true } = {}) {
 
     // ESO's own hook pack, installed where the Codex substrate looks for hooks.
     write('.harness/host-pack/harness-hook.mjs', '// pack\n');
+    /* H2 compares the verdict against the pack's mtime (G-19): pin the pack in the past, not "now". */
+    fs.utimesSync(path.join(root, '.harness/host-pack/harness-hook.mjs'), packMtime, packMtime);
     write(
         '.codex/hooks.json',
         JSON.stringify({

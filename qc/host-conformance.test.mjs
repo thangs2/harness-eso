@@ -6,11 +6,34 @@ import test from 'node:test';
 
 import { runHostConformance } from '../packages/harness-eso-core/src/conformance.mjs';
 
-function fixture({ preflight = true, trace = true, hooks = true, pack = true, invalidPreflight = false, codex = false, surface = null } = {}) {
+function fixture({
+    preflight = true,
+    trace = true,
+    hooks = true,
+    pack = true,
+    invalidPreflight = false,
+    codex = false,
+    surface = null,
+    /*
+     * Defaults describe a host provisioned *before* its last preflight ran, which is every healthy
+     * consumer. Pinning both keeps the suite independent of the clock: the pack is written with its
+     * mtime set, never with "now".
+     */
+    packMtime = '2026-10-20T09:00:00Z',
+    preflightAt = '2026-10-21T10:00:00Z',
+    preflightLevel = 'sufficient',
+} = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-conf-'));
     fs.mkdirSync(path.join(root, '.harness', 'host-pack'), { recursive: true });
     fs.mkdirSync(path.join(root, '.cursor', 'session'), { recursive: true });
-    if (pack) fs.writeFileSync(path.join(root, '.harness', 'host-pack', 'harness-hook.mjs'), '// pack');
+    if (pack) {
+        const packFile = path.join(root, '.harness', 'host-pack', 'harness-hook.mjs');
+        fs.writeFileSync(packFile, '// pack');
+        if (packMtime) {
+            const seconds = Math.floor(Date.parse(packMtime) / 1000);
+            fs.utimesSync(packFile, seconds, seconds);
+        }
+    }
     if (hooks) {
         fs.writeFileSync(
             path.join(root, '.cursor', 'hooks.json'),
@@ -42,7 +65,7 @@ function fixture({ preflight = true, trace = true, hooks = true, pack = true, in
     if (preflight) {
         fs.writeFileSync(
             path.join(root, '.cursor', 'session', '.eso-preflight.json'),
-            invalidPreflight ? '{not json' : JSON.stringify({ level: 'sufficient', score: 1, at: '2026-10-21T10:00:00Z' }),
+            invalidPreflight ? '{not json' : JSON.stringify({ level: preflightLevel, score: 1, at: preflightAt }),
         );
     }
     if (trace) fs.writeFileSync(path.join(root, '.cursor', 'session', 'route-trace.jsonl'), '{"event":"preInvocation"}\n');
@@ -85,6 +108,46 @@ test('a broken preflight file fails H2 instead of counting as evidence', () => {
     const report = runHostConformance(fixture({ invalidPreflight: true }));
     assert.equal(report.tiers.find((t) => t.id === 'H2').status, 'fail');
     assert.equal(report.tierReached, 'H1');
+});
+
+/*
+ * G-19. Atrievefin, 2026-10-23: the pack was refreshed at 14:29 UTC with the new guards, and
+ * `verify host` still reported `PASS H2  …: insufficient at 2026-10-23T11:21:18Z` — a verdict
+ * written by the previous pack, ten hours earlier. H2 asked "is there a verdict", never "is it this
+ * build's verdict", so the probe reported the past as the present. These two cases pin both sides.
+ */
+test('G-19: a preflight verdict older than the installed pack fails H2', () => {
+    const report = runHostConformance(
+        fixture({ packMtime: '2026-10-23T14:29:30Z', preflightAt: '2026-10-23T11:21:18Z', preflightLevel: 'insufficient' }),
+    );
+    const h2 = report.tiers.find((t) => t.id === 'H2');
+    assert.equal(h2.status, 'fail');
+    assert.match(h2.detail, /predates the installed pack/);
+    assert.equal(report.tierReached, 'H1');
+    assert.equal(report.ok, false);
+});
+
+test('G-19: a preflight verdict written after the pack install still passes H2', () => {
+    const report = runHostConformance(
+        fixture({ packMtime: '2026-10-23T14:29:30Z', preflightAt: '2026-10-23T14:35:02Z', preflightLevel: 'insufficient' }),
+    );
+    assert.equal(report.tiers.find((t) => t.id === 'H2').status, 'pass');
+    assert.equal(report.tierReached, 'H3');
+});
+
+test('G-19: a sub-second mtime/verdict rounding is not a failure', () => {
+    /* The hook stamps whole seconds, the pack carries milliseconds — same second must agree. */
+    const report = runHostConformance(
+        fixture({ packMtime: '2026-10-23T14:29:30.900Z', preflightAt: '2026-10-23T14:29:30Z' }),
+    );
+    assert.equal(report.tiers.find((t) => t.id === 'H2').status, 'pass');
+});
+
+test('G-19: an unparseable `at` fails H2 instead of slipping through', () => {
+    const report = runHostConformance(fixture({ packMtime: '2026-10-23T14:29:30Z', preflightAt: 'yesterday-ish' }));
+    const h2 = report.tiers.find((t) => t.id === 'H2');
+    assert.equal(h2.status, 'fail');
+    assert.match(h2.detail, /not a parseable time/);
 });
 
 test('hooks without the pack stop at H0-H1', () => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `harness host-pack <status|refresh|add-ide|remove-ide>` — manage the consumer's installed pack.
+ * `harness host-pack <status|refresh|sync-guards|add-ide|remove-ide>` — manage the consumer's installed pack.
  *
  * Why these four and not a generic "config" verb: the pack is a **build output** copied into the
  * consumer, its wiring in `hooks.json` is co-owned with the consumer, and its health is a runtime
@@ -8,6 +8,7 @@
  *
  *   status       what is installed, whether it matches the build, and whether it runs
  *   refresh      reinstall + reconcile every wired IDE tree (the upgrade path)
+ *   sync-guards  replace the consumer's copied Python guards with the shipped ones (G-17)
  *   add-ide      apply one more host profile descriptor
  *   remove-ide   unwire one tree, leaving the consumer's own hooks alone
  */
@@ -22,8 +23,10 @@ import {
     loadHostProfile,
     packVersion,
     removeHostTree,
+    syncConsumerGuards,
     verifyHostPack,
 } from '@mu/harness-foundation/host-install';
+import { checkGuardFreshness } from '@mu/harness-eso-core';
 import { loadWorkspace } from '@mu/harness-foundation/workspace';
 import { ESO_ROOT } from './workspace-env.mjs';
 
@@ -44,7 +47,21 @@ function die(msg) {
  * wants which.
  */
 function resolveConsumer(opts, positional) {
-    if (positional) return path.resolve(positional);
+    /*
+     * A bare word is a **project id**, not a relative path.
+     *
+     * `path.resolve("atrievefin")` produced `<cwd>/atrievefin` — a directory that does not exist — and the
+     * command then reported "nothing to sync" against a consumer that was right there in the registry.
+     * Atrievefin, 2026-10-23. An argument that looks like a path (`./x`, `/x`, `../x`) still is one.
+     */
+    if (positional && /[\\/]/.test(positional)) return path.resolve(positional);
+    if (positional) {
+        const ws = loadWorkspace();
+        const row = (ws.projects || []).find((p) => p.id === positional);
+        if (row) return path.resolve(row.rootHost || row.root);
+        if (fs.existsSync(path.resolve(positional))) return path.resolve(positional);
+        die(`unknown project "${positional}" — harnessctl configure list`);
+    }
     if (opts.project) {
         const ws = loadWorkspace();
         const row = ws.projects.find((p) => p.id === opts.project);
@@ -56,7 +73,7 @@ function resolveConsumer(opts, positional) {
 }
 
 function parse(argv) {
-    const opts = { project: null, ide: null, profile: null, verify: false, json: false };
+    const opts = { project: null, ide: null, profile: null, verify: false, json: false, force: false, dryRun: false };
     const positional = [];
     for (let i = 0; i < argv.length; i += 1) {
         const a = argv[i];
@@ -65,6 +82,8 @@ function parse(argv) {
         else if (a === '--profile') opts.profile = argv[++i];
         else if (a === '--verify') opts.verify = true;
         else if (a === '--json') opts.json = true;
+        else if (a === '--force') opts.force = true;
+        else if (a === '--dry-run') opts.dryRun = true;
         else if (a.startsWith('-')) die(`unknown flag: ${a}`);
         else positional.push(a);
     }
@@ -171,6 +190,48 @@ function cmdRefresh({ opts, positional }) {
     if (!check.ok) die('verification failed; the consumer would run with guards that cannot decide');
 }
 
+/**
+ * `sync-guards` — replace the consumer's copied guard files with the shipped ones (G-17).
+ *
+ * This exists because `provision` cannot do it: `ensureConsumerGuards` is create-if-missing so an
+ * operator's edit is never silently reverted, and that left no upgrade path at all. atrievefin ran a
+ * pre-fix `guard-write.py` through a successful `./provision.sh --force`. The command is explicit,
+ * backs up before writing, skips files that look operator-owned, and reports what it did per file.
+ */
+function cmdSyncGuards({ opts, positional }) {
+    const root = resolveConsumer(opts, positional[0]);
+    const res = syncConsumerGuards(root, {
+        treeKeys: opts.ide ? [opts.ide] : undefined,
+        force: opts.force === true,
+        dryRun: opts.dryRun === true,
+    });
+    const { actions, templatesDir } = res;
+    console.log(`host-pack sync-guards  ${root}`);
+    console.log(`  templates    ${templatesDir}`);
+    if (!actions.length) console.log('  nothing to sync — no IDE tree with a hooks directory');
+    for (const a of actions) {
+        const tail = a.backup ? `  (backup ${a.backup})` : a.reason ? `  — ${a.reason}` : '';
+        console.log(`  ${a.action.padEnd(8)} ${a.file}${tail}`);
+    }
+    const failed = actions.filter((a) => a.action === 'skipped');
+    if (opts.json) console.log(JSON.stringify(res, null, 2));
+
+    /*
+     * Re-verify through the same reader H1 uses. A guard command that says "updated" and a conformance
+     * check that still says stale would be two answers to one question, and this repo has been bitten by
+     * that before (G-08's two resolvers).
+     */
+    const freshness = checkGuardFreshness(root);
+    console.log(`  guards       ${freshness.status} — ${freshness.detail}`);
+    if (opts.dryRun) {
+        console.log('  (dry-run — nothing written)');
+        return;
+    }
+    if (freshness.status === 'stale' || freshness.status === 'not-applied') {
+        die(`guards are still ${freshness.status} after sync${failed.length ? ` (${failed.length} skipped)` : ''}`);
+    }
+}
+
 function cmdAddIde({ opts, positional }) {
     const root = resolveConsumer(opts, positional[0]);
     const profileId = opts.profile || opts.ide;
@@ -214,12 +275,14 @@ export function runHostPack(subcommand, argv) {
             return cmdStatus(parsed);
         case 'refresh':
             return cmdRefresh(parsed);
+        case 'sync-guards':
+            return cmdSyncGuards(parsed);
         case 'add-ide':
             return cmdAddIde(parsed);
         case 'remove-ide':
             return cmdRemoveIde(parsed);
         default:
-            die(`unknown subcommand "${subcommand}" (try: status refresh add-ide remove-ide)`);
+            die(`unknown subcommand "${subcommand}" (try: status refresh sync-guards add-ide remove-ide)`);
             return undefined;
     }
 }

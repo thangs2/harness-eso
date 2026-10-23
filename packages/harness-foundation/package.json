@@ -12,6 +12,7 @@
         "./project-registry": "./src/project-registry.mjs",
         "./host-install": "./src/host-install.mjs",
         "./init-profile": "./src/init-profile.mjs",
+        "./ownership-report": "./src/ownership-report.mjs",
         "./consent": "./src/consent.mjs",
         "./token-diet": "./src/token-diet.mjs",
         "./token-estimate": "./src/token-estimate.mjs"

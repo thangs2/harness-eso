@@ -5,8 +5,9 @@ import { applyWorkspaceEnv } from './workspace-env.mjs';
 import { runObservatory } from './observatory-cmd.mjs';
 import { runConsole } from './console-cmd.mjs';
 import { configureListCli, configureUseCli } from './project-init.mjs';
-import { runInitProfile } from './init-profile-cmd.mjs';
+import { runInitProfile, runInitReport } from './init-profile-cmd.mjs';
 import { runHostPack } from './host-pack-cmd.mjs';
+import { runOwnershipCmd } from './ownership-cmd.mjs';
 import { runStorageGc, storageStatus } from './storage-gc.mjs';
 import { runTokenDiet } from './token-diet-cmd.mjs';
 import { runVerifyConsumer } from './verify-consumer-cmd.mjs';
@@ -28,7 +29,8 @@ function usage() {
   ./harness up
 
   harnessctl init profile <consumer-path> [--plan] [--id <id>] [--name <name>] [--host-mode dual-ide|all-ide|claude|superset]
-  harnessctl host-pack status|refresh|add-ide|remove-ide [consumer | --project <id>]
+  harnessctl init report <consumer-path|--project <id>> [--json]   (which policy keys are product vs consumer)
+  harnessctl host-pack status|refresh|sync-guards|add-ide|remove-ide [consumer | --project <id>]
   harnessctl verify consumer <path|--project <id>> [--json] [--strict] [--out <dir>]
   harnessctl verify host [consumer | --project <id>] [--recipe <id>] [--require-native] [--json]
   harnessctl fix consumer <path|--project <id>> [--dry-run] [--from-latest] [--force-provision] [--no-provision] [--strict] [--json]
@@ -53,6 +55,16 @@ async function main() {
 
     if (cmd === 'init' && argv[1] === 'profile') {
         console.log(JSON.stringify(runInitProfile(argv.slice(2)), null, 2));
+        return;
+    }
+
+    if (cmd === 'init' && argv[1] === 'report') {
+        runInitReport(argv.slice(2));
+        return;
+    }
+
+    if (cmd === 'ownership' && argv[1] === 'explain') {
+        runOwnershipCmd(argv.slice(2));
         return;
     }
 
