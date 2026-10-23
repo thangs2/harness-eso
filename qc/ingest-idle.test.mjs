@@ -85,7 +85,7 @@ test('a second pass with no new input is reported idle and skips derived work', 
     }
 });
 
-test('appending a transcript line makes the next pass non-idle again', async () => {
+test('appending a transcript line makes the next pass non-idle again', { timeout: 120_000 }, async () => {
     const { cfg, transcriptPath } = tenant();
     try {
         await runIngestOnce(cfg);

@@ -182,7 +182,12 @@ test('a single layer reports only that layer', () => {
     assert.deepEqual(Object.keys(report.layers), ['L3']);
 });
 
-test('every layer the checklist documents is one the script can run', () => {
+test('every layer the checklist documents is one the script can run', { timeout: 120_000 }, () => {
+    /*
+     * Budget, not decoration: nine real script invocations at ~0.8s each exceed node:test's 5000ms
+     * default on a loaded machine, and a killed child reports as a wrong result rather than as a
+     * timeout in the assertion text.
+     */
     const onboarding = fs.readFileSync(path.join(TEMPLATES, 'ONBOARDING.md'), 'utf8');
     const documented = [...onboarding.matchAll(/^## (L\d) — /gm)].map((m) => m[1]);
     assert.deepEqual(documented, ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8']);

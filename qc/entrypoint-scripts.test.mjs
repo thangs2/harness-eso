@@ -42,7 +42,21 @@ function runScript(script, args, opts = {}) {
     });
     // Strip ANSI so assertions read the message a human reads.
     const strip = (s) => String(s || '').replace(/\u001b\[[0-9;]*m/g, '');
-    return { status: res.status, stdout: strip(res.stdout), stderr: strip(res.stderr), error: res.error };
+    return {
+        status: res.status,
+        /*
+         * `status` is `null` whenever the child died from a signal, and the failure then reads as
+         * "wrong exit code" when the truth is "the process was killed". Bun kills a child that
+         * outlives the suite's runner window on its own, so the test that writes a diagnosis in 5s
+         * and the one that is killed both look identical without this. (Measured: the same
+         * `console.sh verify` case is 1 pass / 0 fail under `node --test` and 1 fail / 3 runs under
+         * `bun test`, with `status: null` every time.)
+         */
+        signal: res.signal ?? null,
+        stdout: strip(res.stdout),
+        stderr: strip(res.stderr),
+        error: res.error,
+    };
 }
 
 function withTempState(t) {
@@ -156,12 +170,23 @@ test('provision.sh resolves the port from the registry, not from a top-level fie
     assert.doesNotMatch(out, /chưa có observe port|no observe port/i, 'a registered port is not "missing"');
 });
 
-test('console.sh verify explains an undeployed Console instead of timing out', () => {
+test('console.sh verify explains an undeployed Console instead of timing out', { timeout: 120_000 }, () => {
+    /*
+     * The timeout is not decoration. This case spawns the real script, which probes a port and waits
+     * `CONSOLE_WAIT_SECONDS` before answering — 5–9s on a loaded machine, and node:test's 5000ms default
+     * kills it mid-wait. The failure then reads as "wrong exit code" (status `null` from a killed child),
+     * which is the shape that kept this test looking flaky while it was simply under-budget.
+     */
     // No container is expected on a random port; the contract is "fail fast with a diagnosis".
     const port = String(20000 + Math.floor(Math.random() * 20000));
     const r = runScript('console.sh', ['verify'], {
         env: { HARNESS_CONSOLE_PORT: port, CONSOLE_WAIT_SECONDS: '2' },
     });
+    assert.equal(
+        r.signal,
+        null,
+        `console.sh was killed by ${r.signal} instead of answering — a runner limit, not a verdict`,
+    );
     assert.equal(r.status, 1, 'an absent Console is a failure, not a warning');
     const out = r.stdout + r.stderr;
     assert.match(out, /nothing is serving on :\d+/, 'the first line must say what is wrong');
