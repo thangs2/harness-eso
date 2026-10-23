@@ -244,6 +244,20 @@
             "hint": "docgraph init / build at consumer root",
             "autoSafe": false
           }
+        },
+        {
+          "id": "T2.5",
+          "title": "Docgraph index is not older than the rules it indexes",
+          "severity": "INFO",
+          "probe": {
+            "type": "index_fresh",
+            "path": ".docgraph"
+          },
+          "remediation": {
+            "action": "index-rebuild",
+            "hint": "Rebuild the docgraph index at the consumer root (docgraph build / docgraph init -i), then re-run verify",
+            "autoSafe": true
+          }
         }
       ]
     },

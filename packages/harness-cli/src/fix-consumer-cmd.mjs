@@ -62,7 +62,40 @@ function parse(argv) {
 function isAutoSafe(check) {
   const rem = check.remediation || {};
   if (typeof rem.autoSafe === 'boolean') return rem.autoSafe;
-  return ['provision', 'sync', 'host-pack-refresh'].includes(rem.action);
+  return ['provision', 'sync', 'host-pack-refresh', 'index-rebuild'].includes(rem.action);
+}
+
+/**
+ * Rebuild the consumer's law index (P-03).
+ *
+ * This used to be an `action: docs` line — "docgraph init / build at consumer root" — left for the
+ * operator, and every consumer that was audited had skipped it: `atrievefin` 37/51 rule files stale,
+ * `baplatform` 27. The remedy was known, written down, and never run, which is exactly the shape of a
+ * step that belongs in the tool. It stays `autoSafe` because it is idempotent: rebuilding a cache
+ * changes no source file.
+ *
+ * It never guesses the binary. `docgraph` comes from the consumer's own PATH or `DOCGRAPH_BIN`; when
+ * it is absent the answer is a named skip, not a silent success.
+ */
+function rebuildLawIndex(root, dryRun) {
+  if (!fs.existsSync(path.join(root, 'docgraph.scope'))) {
+    return { ok: false, detail: 'no docgraph.scope — nothing to index (T2.1)' };
+  }
+  const bin = process.env.DOCGRAPH_BIN || 'docgraph';
+  if (dryRun) return { ok: true, detail: `would run: ${bin} build (cwd ${root})` };
+  // `init -i` creates the index; `build` refreshes it. A consumer with none gets both.
+  const hasIndex = fs.existsSync(path.join(root, '.docgraph'));
+  const args = hasIndex ? ['build'] : ['init', '-i'];
+  const r = spawnSync(bin, args, { cwd: root, encoding: 'utf8', timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
+  if (r.error?.code === 'ENOENT') {
+    return { ok: false, detail: `${bin} not on PATH — install it, or pass DOCGRAPH_BIN` };
+  }
+  if (r.error?.code === 'ETIMEDOUT') return { ok: false, detail: `${bin} ${args.join(' ')} timed out` };
+  if (r.status !== 0) {
+    const err = String(r.stderr || r.stdout || '').trim().split('\n').pop() || `exit ${r.status}`;
+    return { ok: false, detail: `${bin} ${args.join(' ')} failed: ${err}` };
+  }
+  return { ok: true, detail: `${bin} ${args.join(' ')} (cwd ${root})` };
 }
 
 function loadLatest(root) {
@@ -232,6 +265,7 @@ function applySafe(root, consumerId, fails, opts) {
   const skipped = [];
   let needProvision = false;
   let needHostPack = false;
+  let needIndexRebuild = false;
   let needWorkflow = false;
   let needSessions = false;
   let needDocgraphAgentZone = false;
@@ -244,6 +278,7 @@ function applySafe(root, consumerId, fails, opts) {
     const action = c.remediation?.action;
     if (action === 'provision') needProvision = true;
     else if (action === 'host-pack-refresh') needHostPack = true;
+    else if (action === 'index-rebuild') needIndexRebuild = true;
     else if (action === 'sync') {
       if (c.id === 'T1.1') needWorkflow = true;
       else if (c.id === 'T1.2') needSessions = true;
@@ -266,6 +301,15 @@ function applySafe(root, consumerId, fails, opts) {
   if (needHostPack && (!needProvision || opts.noProvision)) {
     const r = runHostPackRefresh(root, opts.dryRun);
     applied.push({ action: 'host-pack-refresh', checks: ['T0.4'], ...r });
+  }
+
+  if (needIndexRebuild) {
+    const r = rebuildLawIndex(root, opts.dryRun);
+    applied.push({
+      action: 'index-rebuild',
+      checks: fails.filter((f) => f.remediation?.action === 'index-rebuild').map((f) => f.id),
+      ...r,
+    });
   }
 
   if (needWorkflow) {

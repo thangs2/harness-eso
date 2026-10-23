@@ -112,11 +112,96 @@ function globMin(root, pattern, min) {
   };
 }
 
+/**
+ * Is the law index older than the law it indexes? (P-03)
+ *
+ * T2.4 only asked whether `.docgraph/` existed, so all three consumers scored it while their index was
+ * days behind the rule files — `atrievefin` 37/51 files stale, `baplatform` 27 files. The index is a
+ * *cache of the law*, and a cache older than its source silently answers with rules that have been
+ * edited since. Nothing else in the harness could see that, because a stale index is
+ * indistinguishable from an unindexable term at the preflight level (that is P-26, and the two
+ * remedies differ).
+ *
+ * `stale` is reported, never thrown: without an index the answer is "nothing to be stale about", and a
+ * probe that cannot read timestamps must not turn a passing consumer red.
+ */
+const INDEX_STATE_FILES = ['docgraph.json', 'codegraph.json', 'graph.json'];
+
+function newestMtimeMs(dir, exts) {
+    let newest = 0;
+    let stack = [dir];
+    while (stack.length) {
+        const current = stack.pop();
+        let entries;
+        try {
+            entries = fs.readdirSync(current, { withFileTypes: true });
+        } catch {
+            continue;
+        }
+        for (const entry of entries) {
+            const full = path.join(current, entry.name);
+            if (entry.isDirectory()) {
+                if (entry.name !== 'node_modules' && entry.name !== '.git') stack.push(full);
+                continue;
+            }
+            if (exts && !exts.some((e) => entry.name.endsWith(e))) continue;
+            try {
+                const m = fs.statSync(full).mtimeMs;
+                if (m > newest) newest = m;
+            } catch {
+                /* a file that vanished mid-walk is not an answer */
+            }
+        }
+    }
+    return newest;
+}
+
+function indexStaleness(root, indexDir) {
+    const indexAbs = path.join(root, indexDir);
+    if (!fs.existsSync(indexAbs)) return { present: false };
+    const statePaths = INDEX_STATE_FILES.map((f) => path.join(indexAbs, f)).filter((p) => fs.existsSync(p));
+    const indexMtime = statePaths.length
+        ? Math.max(...statePaths.map((p) => fs.statSync(p).mtimeMs))
+        : newestMtimeMs(indexAbs, null);
+    // What "the law" means for staleness: the documents an agent answers from, not build output.
+    const sources = ['.cursor/rules', '.agents/rules', 'documents', 'docs', 'sdlc', 'SDLC', 'AGENTS.md']
+        .map((p) => path.join(root, p))
+        .filter((p) => fs.existsSync(p));
+    let newestSource = 0;
+    for (const p of sources) {
+        const st = fs.statSync(p);
+        const m = st.isDirectory() ? newestMtimeMs(p, ['.md', '.mdc']) : st.mtimeMs;
+        if (m > newestSource) newestSource = m;
+    }
+    return { present: true, indexMtimeMs: indexMtime, newestSourceMs: newestSource, stale: newestSource > indexMtime };
+}
+
+function daysBetween(aMs, bMs) {
+    return Math.round(Math.abs(bMs - aMs) / 86_400_000);
+}
+
 function runProbe(root, probe) {
   const type = probe?.type;
   if (type === 'dir_exists') {
     const ok = exists(root, probe.path, 'dir');
     return { ok, evidence: ok ? `dir ${probe.path}` : `missing dir ${probe.path}` };
+  }
+  /*
+   * `dir_exists` plus "and it is not older than the law" (P-03). Reported as its own probe type so the
+   * maturity profile can ask the question without inheriting a second meaning of `dir_exists`.
+   */
+  if (type === 'index_fresh') {
+    const indexDir = probe.path || '.docgraph';
+    const state = indexStaleness(root, indexDir);
+    if (!state.present) return { ok: false, evidence: `missing dir ${indexDir}` };
+    if (!state.stale) return { ok: true, evidence: `${indexDir} is up to date with the rules` };
+    const days = daysBetween(state.indexMtimeMs, state.newestSourceMs);
+    return {
+      ok: false,
+      evidence:
+        `${indexDir} is ${days} day(s) behind the newest ${probe.sources || 'rule/doc'} — ` +
+        (probe.remedy || `rebuild the index at the consumer root`),
+    };
   }
   if (type === 'file_exists') {
     const ok = exists(root, probe.path, 'file');
