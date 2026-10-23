@@ -1,0 +1,71 @@
+{
+  "ok": true,
+  "at": "2026-10-23T03:35:13Z",
+  "harnessTree": "cursor",
+  "generationId": "5c91d29c-4104-48de-b194-9c97593f77d7",
+  "conversationId": "f003060f-ac7b-4e09-82c6-b0598c1f5684",
+  "userQueryStem": "ghi lại giúp tao log audit-diagnostic này vào repo harness-eso/comments/artifacts/baplatform tao sẽ để cho upstream harness-eso nghiên cứu và xử lý",
+  "fingerprint": "c2a43710b6bf1103",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "default",
+  "contractMissing": false,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0,
+  "mode": "hint",
+  "enforceWrites": "fail_closed",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "pipeline-gate",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "tools"
+  },
+  "metrics": {
+    "latencyMsTotal": 382
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-23T03:35:13Z",
+    "requestId": "5c91d29c-4104-48de-b194-9c97593f77d7",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "pipeline-gate",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "fail_closed",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}

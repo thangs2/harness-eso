@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "at": "2026-10-23T04:07:15Z",
+  "harnessTree": "cursor",
+  "generationId": "f302b7d0-d545-4d9d-96ff-53cb58c52953",
+  "conversationId": "54a306cb-07ab-4f22-9f33-75d72ae1e2aa",
+  "userQueryStem": "[{\"text\": \"The hook re-created the closure file at 04:06:06Z (my post-tool-hint probe reset it). Confirming the real rows survive:\", \"text\": \"text\"}] lỗi format json wrapper",
+  "fingerprint": "47ee3d3b2bdc2630",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "default",
+  "contractMissing": false,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0.18333333333333335,
+  "mode": "hint",
+  "enforceWrites": "fail_closed",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "harness-tooling",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "decision-facade",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "root"
+  },
+  "metrics": {
+    "latencyMsTotal": 340
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-23T04:07:15Z",
+    "requestId": "f302b7d0-d545-4d9d-96ff-53cb58c52953",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0.18333333333333335,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "harness-tooling",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "decision-facade",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "fail_closed",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}

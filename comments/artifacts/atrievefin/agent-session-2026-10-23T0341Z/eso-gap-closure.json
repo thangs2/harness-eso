@@ -1,0 +1,175 @@
+{
+  "ok": true,
+  "at": "2026-10-23T03:45:22Z",
+  "preflightAt": "2026-10-23T03:41:56Z",
+  "requiredGapIds": [
+    "law:harness-tooling",
+    "law:decision-facade",
+    "law:harness-eso",
+    "code:need at least 1 file read(s); have 0"
+  ],
+  "closedGapIds": [],
+  "toolUses": [
+    {
+      "at": "2026-10-23T03:42:42Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:42:49Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:42:49Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:42:54Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:42:55Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:02Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:02Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:08Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:10Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:16Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:27Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:31Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:35Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/atrievefin/.cursor/hooks/guard-write.py"
+    },
+    {
+      "at": "2026-10-23T03:43:43Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:47Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:50Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:43:59Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:44:00Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:44:04Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/harness-eso/verify-consumer.sh"
+    },
+    {
+      "at": "2026-10-23T03:44:07Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:44:14Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:44:15Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:44:44Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:44:44Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:44:50Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:44:55Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:45:00Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:45:04Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:45:08Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:45:13Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:45:17Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:45:22Z",
+      "tool": "Write",
+      "path": "/Users/thangs2net/Workspaces/atrievefin/comments/artifacts/session/turn.jsonl"
+    }
+  ],
+  "allClosed": false
+}

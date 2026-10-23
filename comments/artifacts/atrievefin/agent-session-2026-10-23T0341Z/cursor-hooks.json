@@ -1,0 +1,68 @@
+{
+    "version": 1,
+    "hooks": {
+        "preToolUse": [
+            {
+                "command": ".cursor/hooks/guard-write.py",
+                "matcher": "Write|StrReplace|Delete",
+                "failClosed": true
+            },
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree cursor",
+                "failClosed": false
+            }
+        ],
+        "beforeShellExecution": [
+            {
+                "command": ".cursor/hooks/guard-shell.py",
+                "failClosed": true
+            },
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree cursor",
+                "failClosed": true
+            }
+        ],
+        "beforeSubmitPrompt": [
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook preflight --tree cursor",
+                "failClosed": false
+            },
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree cursor",
+                "failClosed": false
+            }
+        ],
+        "afterFileEdit": [
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree cursor",
+                "failClosed": false
+            }
+        ],
+        "preCompact": [
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree cursor",
+                "failClosed": false
+            }
+        ],
+        "postToolUse": [
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree cursor",
+                "failClosed": false
+            },
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree cursor",
+                "failClosed": false
+            },
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree cursor",
+                "failClosed": false
+            }
+        ],
+        "stop": [
+            {
+                "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree cursor",
+                "failClosed": false
+            }
+        ]
+    }
+}

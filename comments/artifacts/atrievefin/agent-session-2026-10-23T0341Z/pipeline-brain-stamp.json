@@ -1,0 +1,7 @@
+{
+  "at": "2026-10-22T10:31:00Z",
+  "via": "ask_deepseek_pro",
+  "tier": "pro",
+  "scope": "R1.5 vendor tarball pin + scripts/ci/vendor-foundation.ts",
+  "verdict": "verify must prove static integrity only (existence, size cap, sha256, single SHASUMS entry, safe tar paths, dist-only, manifest name/version, root package.json specifier). It must not install, import, or claim contract validity. Residual: reportpack/v1 runtime exercise waits for packrun/v1 (KRN-1.2)."
+}

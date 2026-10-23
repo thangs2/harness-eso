@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "entry": "harness-hook.mjs",
+  "routeHelper": "route-hook.py",
+  "files": {
+    "harness-hook.mjs": "32435c893406f55b7087af537bc7489124b457477bd88a6834b74d5edbe60e1f",
+    "route-hook.py": "f598da42cabbcf829809a34a9c1dfa324347a75902ee358031214363339122aa",
+    "path-policy.default.json": "19a1cb1142b11a466682bc5344edb317af151ca790a61e4f210b952fa5e3acab"
+  },
+  "builtAt": "2026-10-23T03:09:59.345Z"
+}

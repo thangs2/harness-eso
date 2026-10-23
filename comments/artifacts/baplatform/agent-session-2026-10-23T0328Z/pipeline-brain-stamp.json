@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "at": "2026-10-22T04:10:00Z",
+  "via": "ask_deepseek_flash_brain",
+  "brainTier": "flash",
+  "class": "delivery-intake",
+  "mcpInvoked": true,
+  "mcpTool": "ask_deepseek_flash",
+  "mcpServer": "deepseek-direct"
+}

@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "profileIds": [
+        "cursor-superset",
+        "agents-superset"
+    ],
+    "sidecarUrl": "http://127.0.0.1:8795",
+    "appliedAt": "2026-10-23T03:40:35.067Z",
+    "hostPack": {
+        "version": "0.1.0",
+        "ok": true,
+        "failures": []
+    }
+}

@@ -1,0 +1,91 @@
+{
+  "ok": true,
+  "at": "2026-10-23T03:41:56Z",
+  "harnessTree": "cursor",
+  "generationId": "49475a60-e23c-4818-8364-d70a071f8396",
+  "conversationId": "0ecea105-7c03-4a34-af57-6949e5dd8cda",
+  "userQueryStem": "atrievefin tao muốn kiểm tra môi trường harness-eso đang được áp dụng sử dụng cho atrievefin chỉ kiểm tra, không sửa code. audit-diagnostic only, no code. then save log into repo harness-eso/comments/artifacts/atrievefin",
+  "fingerprint": "0107ceb487e943eb",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "tools",
+  "contractMissing": true,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0,
+  "mode": "hint",
+  "enforceWrites": "fail_closed",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "harness-tooling",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "decision-facade",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "harness-eso",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "tools"
+  },
+  "metrics": {
+    "latencyMsTotal": 1147
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-23T03:41:56Z",
+    "requestId": "49475a60-e23c-4818-8364-d70a071f8396",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "harness-tooling",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "decision-facade",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "harness-eso",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "fail_closed",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}

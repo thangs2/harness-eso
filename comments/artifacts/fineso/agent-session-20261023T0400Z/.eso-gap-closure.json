@@ -1,0 +1,174 @@
+{
+  "ok": true,
+  "at": "2026-10-23T04:00:23Z",
+  "preflightAt": "2026-10-23T03:55:51Z",
+  "requiredGapIds": [
+    "law:harness-tooling",
+    "law:decision-facade",
+    "code:need at least 1 file read(s); have 0"
+  ],
+  "closedGapIds": [],
+  "toolUses": [
+    {
+      "at": "2026-10-23T03:58:02Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:02Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:05Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/harness-eso/packages/harness-eso-core/src/adapter-registry.mjs"
+    },
+    {
+      "at": "2026-10-23T03:58:14Z",
+      "tool": "Grep",
+      "path": "/Users/thangs2net/Workspaces/harness-eso/packages/harness-eso-core/src/adapter-registry.mjs"
+    },
+    {
+      "at": "2026-10-23T03:58:16Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:19Z",
+      "tool": "Grep",
+      "path": "/Users/thangs2net/Workspaces/harness-eso/packages/harness-eso-core"
+    },
+    {
+      "at": "2026-10-23T03:58:27Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:29Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:35Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:35Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:42Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:43Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:49Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:50Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:58:56Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:02Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:07Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:13Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:20Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:25Z",
+      "tool": "Grep",
+      "path": "/Users/thangs2net/.local/bin/docgraph"
+    },
+    {
+      "at": "2026-10-23T03:59:26Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:29Z",
+      "tool": "Grep",
+      "path": "/Users/thangs2net/.docgraph/lib/query.ts"
+    },
+    {
+      "at": "2026-10-23T03:59:36Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:36Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:41Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:45Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T03:59:49Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/FinESO/.agents/rules/core.law-gate.mdc"
+    },
+    {
+      "at": "2026-10-23T03:59:51Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T04:00:09Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T04:00:13Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T04:00:17Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-23T04:00:23Z",
+      "tool": "Shell",
+      "path": ""
+    }
+  ],
+  "allClosed": false
+}

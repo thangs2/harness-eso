@@ -1,0 +1,175 @@
+{
+  "ok": true,
+  "at": "2026-10-22T17:42:57Z",
+  "preflightAt": "2026-10-22T17:39:34Z",
+  "requiredGapIds": [
+    "law:harness-tooling",
+    "code:need at least 1 file read(s); have 0"
+  ],
+  "closedGapIds": [
+    "law:harness-tooling"
+  ],
+  "toolUses": [
+    {
+      "at": "2026-10-22T17:40:27Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:40:31Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/x79/.harness/diagnostics.sh"
+    },
+    {
+      "at": "2026-10-22T17:40:33Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:40:39Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:40:40Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:40:44Z",
+      "tool": "Read",
+      "path": "/Users/thangs2net/Workspaces/x79/.harness/diagnostics.sh"
+    },
+    {
+      "at": "2026-10-22T17:40:45Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:40:52Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:40:53Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:40:58Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:00Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:05Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:05Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:10Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:13Z",
+      "tool": "Grep",
+      "path": "/Users/thangs2net/Workspaces/harness-eso/packages/harness-cli/src/capability-probe-cmd.mjs"
+    },
+    {
+      "at": "2026-10-22T17:41:17Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:21Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:25Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:29Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:35Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:42Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:42Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:48Z",
+      "tool": "Grep",
+      "path": "/Users/thangs2net/Workspaces/x79/.cursor/rules/core.harness-tooling.mdc"
+    },
+    {
+      "at": "2026-10-22T17:41:48Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:54Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:41:59Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:42:06Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:42:26Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:42:32Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:42:41Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:42:46Z",
+      "tool": "Shell",
+      "path": ""
+    },
+    {
+      "at": "2026-10-22T17:42:57Z",
+      "tool": "Shell",
+      "path": ""
+    }
+  ],
+  "allClosed": false
+}

@@ -1,0 +1,15 @@
+{
+    "ok": true,
+    "projectId": "x79",
+    "at": "2026-10-22T17:42:57Z",
+    "generationId": "5204e4b7-9555-49ef-bc2e-618e1ade1e39",
+    "level": "partial",
+    "score": 0.55,
+    "allowWrite": false,
+    "enforceWrites": "off",
+    "mode": "hint",
+    "fingerprint": "7b7968c43f841720",
+    "invIds": [],
+    "ttlSec": 600,
+    "mac": "2591f23f52f4595199914a0cfc7994e1a61f6bfac755d22dbb4e6b9cebf76c6e"
+}

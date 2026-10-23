@@ -1,0 +1,63 @@
+{
+    "version": 1,
+    "project": {
+        "id": "atrievefin",
+        "displayName": "AtrieveFin"
+    },
+    "tracking": {
+        "enabled": true,
+        "sentinelPath": ".harness/DISABLED"
+    },
+    "storage": {
+        "driver": "sqlite",
+        "sqlite": {
+            "path": ".harness/harness.db"
+        }
+    },
+    "server": {
+        "host": "127.0.0.1",
+        "port": 8795
+    },
+    "ingest": {
+        "pollMs": 2000,
+        "harnesses": [
+            {
+                "id": "cursor",
+                "tree": ".cursor",
+                "shape": "cursor",
+                "spine": "jsonl-transcript"
+            },
+            {
+                "id": "agents",
+                "tree": ".agents",
+                "shape": "antigravity",
+                "spine": "jsonl-transcript"
+            }
+        ]
+    },
+    "tenancy": {
+        "mode": "isolated",
+        "registry": "~/.harness/tenants.json"
+    },
+    "integrations": {
+        "law": {
+            "adapterId": "docgraph-cli"
+        },
+        "code": {
+            "adapterId": "codegraph-cli"
+        },
+        "memory": {
+            "adapterId": "noop-memory"
+        },
+        "jev": {
+            "adapterId": "off",
+            "mode": "off"
+        },
+        "l3_route": {
+            "adapterId": "off"
+        },
+        "brain": {
+            "adapterId": "deepseek-mcp"
+        }
+    }
+}

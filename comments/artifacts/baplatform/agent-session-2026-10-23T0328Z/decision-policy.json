@@ -1,0 +1,161 @@
+{
+    "version": 1,
+    "profile": "generic-eso",
+    "jev": {
+        "mode": "off",
+        "baseUrl": "https://api.typesafe.ai",
+        "model": "jev-latest",
+        "timeoutMs": 8000,
+        "maxQuestionsPerRequest": 12
+    },
+    "fallback": {
+        "l3_flash": false,
+        "l3_model": "deepseek-flash",
+        "l3_thinking": false
+    },
+    "on_ambiguous": "hil_only",
+    "thresholds": {
+        "choice_auto": 0.9,
+        "choice_confirm": 0.5,
+        "noul_deny": 0.85,
+        "noul_allow": 0.2,
+        "l0_score_gap": 5
+    },
+    "budget": {
+        "maxS1PaidCallsPerTurn": 1,
+        "maxS1PaidCallsPerSession": 200
+    },
+    "privacy": {
+        "maxStateChars": 8000,
+        "denyPathPatterns": [
+            ".env",
+            "credentials",
+            "session/*.json",
+            "typesafe.env"
+        ],
+        "sendTranscript": false
+    },
+    "facade": {
+        "runOnIngest": true
+    },
+    "ledger": {
+        "enabled": true
+    },
+    "eso": {
+        "enabled": true,
+        "mode": "hint",
+        "enforceWrites": "fail_closed",
+        "maxExpandRounds": 2,
+        "thresholds": {
+            "T_low": 0.45,
+            "T_high": 0.72
+        },
+        "preflight": {
+            "enabled": true,
+            "maxMs": 7000,
+            "jevOnPartial": true
+        },
+        "injectBrainBlock": true,
+        "memoryFetch": true,
+        "cognition": {
+            "enforceBrain": "fail_closed",
+            "gapAttestation": true
+        },
+        "skillPacks": {
+            "backend": {
+                "requiredDocTerms": [
+                    "core.ap-platform"
+                ],
+                "minReadPaths": 1,
+                "lawQueries": [
+                    "core.ap-platform",
+                    "00.agent-manifests/01.domains"
+                ],
+                "codeQueries": [
+                    "BAPlatform"
+                ]
+            },
+            "frontend": {
+                "requiredDocTerms": [
+                    "fe-react-hub"
+                ],
+                "minReadPaths": 1,
+                "lawQueries": [
+                    "fe-react-hub",
+                    "00.agent-manifests/01.domains"
+                ],
+                "codeQueries": [
+                    "apps/web"
+                ]
+            },
+            "tools": {
+                "requiredDocTerms": [
+                    "pipeline-gate"
+                ],
+                "minReadPaths": 1,
+                "lawQueries": [
+                    "pipeline-gate"
+                ],
+                "codeQueries": [
+                    "harness"
+                ]
+            },
+            "docs": {
+                "requiredDocTerms": [],
+                "minReadPaths": 0,
+                "lawQueries": [],
+                "codeQueries": []
+            },
+            "general": {
+                "requiredDocTerms": [],
+                "minReadPaths": 0,
+                "lawQueries": [],
+                "codeQueries": []
+            }
+        }
+    },
+    "tokenDiet": {
+        "enabled": true,
+        "maxEagerRules": 7,
+        "maxEagerTokens": 10000
+    },
+    "paths": {
+        "locked": [
+            ".cursor/mcp.json",
+            ".vscode/mcp.json",
+            ".agents/mcp_config.json",
+            ".env",
+            ".env.local",
+            ".env.production",
+            "credentials.json"
+        ],
+        "gated": [
+            "AGENTS.md",
+            ".cursorrules",
+            ".cursor/instructions.md",
+            ".agents/instructions.md",
+            ".cursor/rules/",
+            ".agents/rules/",
+            ".cursor/skills/",
+            ".agents/skills/",
+            ".cursor/agents/",
+            ".agents/agents/",
+            ".cursor/hooks/guard-write.py",
+            ".cursor/hooks/guard-shell.py",
+            ".cursor/hooks/locked-paths.txt",
+            ".agents/hooks/guard-write.py",
+            ".agents/hooks/guard-shell.py",
+            ".agents/hooks/locked-paths.txt",
+            "scripts/ci/",
+            "installation/docgraph/",
+            "docgraph.scope"
+        ],
+        "ask": [],
+        "sot": []
+    },
+    "harnessConsole": {
+        "brain": {
+            "adapterId": "deepseek-mcp"
+        }
+    }
+}

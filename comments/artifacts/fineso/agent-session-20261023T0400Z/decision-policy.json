@@ -1,0 +1,99 @@
+{
+    "version": 1,
+    "profile": "generic-eso",
+    "domain": "financial-accounting",
+    "thresholds": {
+        "evidence_sufficiency_pass": 85,
+        "evidence_sufficiency_auto_approve": 95,
+        "deterministic_reconciliation_min": 100,
+        "source_authenticity_min": 80
+    },
+    "weights": {
+        "source_authenticity": 0.4,
+        "deterministic_reconciliation": 0.3,
+        "period_coverage": 0.2,
+        "data_freshness": 0.1
+    },
+    "invariants": {
+        "enforce_no_evidence_no_claim": true,
+        "enforce_deterministic_math": true,
+        "deny_raw_excel_dump": true
+    },
+    "privacy": {
+        "denyPathPatterns": [
+            ".env*",
+            "data-lake/**/pii_*",
+            "credentials*"
+        ]
+    },
+    "ledger": {
+        "enabled": true,
+        "audit_trail_retention_days": 365
+    },
+    "jev": {
+        "mode": "off",
+        "model": "jev-latest",
+        "thresholds": {
+            "auto_approve": 0.9,
+            "confirm_required": 0.5
+        }
+    },
+    "fallback": {
+        "l3_flash": false
+    },
+    "on_ambiguous": "hil_only",
+    "tokenDiet": {
+        "enabled": true,
+        "maxEagerRules": 7,
+        "maxEagerTokens": 10000
+    },
+    "eso": {
+        "preflight": {
+            "enabled": true
+        },
+        "mode": "hint",
+        "cognition": {
+            "enforceBrain": "fail_closed",
+            "gapAttestation": true
+        }
+    },
+    "paths": {
+        "locked": [
+            ".cursor/mcp.json",
+            ".vscode/mcp.json",
+            ".agents/mcp_config.json",
+            ".env",
+            ".env.local",
+            ".env.production",
+            "credentials.json"
+        ],
+        "gated": [
+            "AGENTS.md",
+            ".cursorrules",
+            ".cursor/instructions.md",
+            ".agents/instructions.md",
+            ".cursor/rules/",
+            ".agents/rules/",
+            ".cursor/skills/",
+            ".agents/skills/",
+            ".cursor/agents/",
+            ".agents/agents/",
+            ".cursor/hooks/guard-write.py",
+            ".cursor/hooks/guard-shell.py",
+            ".cursor/hooks/locked-paths.txt",
+            ".agents/hooks/guard-write.py",
+            ".agents/hooks/guard-shell.py",
+            ".agents/hooks/locked-paths.txt",
+            "scripts/ci/",
+            "installation/docgraph/",
+            "docgraph.scope"
+        ],
+        "ask": [],
+        "sot": []
+    },
+    "harnessConsole": {
+        "brain": {
+            "adapterId": "deepseek-mcp"
+        }
+    }
+}

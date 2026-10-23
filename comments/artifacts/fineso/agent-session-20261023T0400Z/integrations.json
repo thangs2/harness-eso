@@ -1,0 +1,21 @@
+{
+    "law": {
+        "adapterId": "docgraph-cli"
+    },
+    "code": {
+        "adapterId": "codegraph-cli"
+    },
+    "memory": {
+        "adapterId": "noop-memory"
+    },
+    "jev": {
+        "adapterId": "off",
+        "mode": "off"
+    },
+    "l3_route": {
+        "adapterId": "off"
+    },
+    "brain": {
+        "adapterId": "deepseek-mcp"
+    }
+}

@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "at": "2026-10-23T03:55:51Z",
+  "harnessTree": "cursor",
+  "generationId": "54bf2d98-50f8-4e21-aa30-8d912a232f20",
+  "conversationId": "54a306cb-07ab-4f22-9f33-75d72ae1e2aa",
+  "userQueryStem": "fineso tao muốn kiểm tra môi trường harness-eso đang được áp dụng sử dụng cho fineso chỉ kiểm tra, không sửa code. audit-diagnostic only, no code. then save log into (upstream) repo harness-eso/comments/artifacts/fineso",
+  "fingerprint": "ef49858f57469e3e",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "harness",
+  "contractMissing": false,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0.18333333333333335,
+  "mode": "hint",
+  "enforceWrites": "fail_closed",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "harness-tooling",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "decision-facade",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "tools"
+  },
+  "metrics": {
+    "latencyMsTotal": 1458
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-23T03:55:51Z",
+    "requestId": "54bf2d98-50f8-4e21-aa30-8d912a232f20",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0.18333333333333335,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "harness-tooling",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "decision-facade",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "fail_closed",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}

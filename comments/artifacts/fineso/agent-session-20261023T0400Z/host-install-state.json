@@ -1,0 +1,146 @@
+{
+    "version": 1,
+    "hooks": {
+        "cursor": {
+            "flat": {
+                "beforeSubmitPrompt": {
+                    "harness-eso-preflight": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook preflight --tree cursor",
+                        "name": "preflight"
+                    },
+                    "harness-eso-route-trace-prompt": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree cursor",
+                        "name": "route"
+                    }
+                },
+                "beforeShellExecution": {
+                    "harness-eso-guard-shell": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree cursor",
+                        "name": "guard-shell"
+                    }
+                },
+                "afterFileEdit": {
+                    "harness-eso-route-trace-edit": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree cursor",
+                        "name": "route"
+                    }
+                },
+                "preToolUse": {
+                    "harness-eso-guard-brain": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree cursor",
+                        "name": "guard-brain"
+                    }
+                },
+                "preCompact": {
+                    "harness-eso-pre-compact-cost": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree cursor",
+                        "name": "pre-compact"
+                    }
+                },
+                "postToolUse": {
+                    "harness-eso-gap-tracker": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree cursor",
+                        "name": "gap-tracker"
+                    },
+                    "harness-eso-post-tool-hint": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook post-tool-hint --tree cursor",
+                        "name": "post-tool-hint"
+                    },
+                    "harness-eso-route-trace": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree cursor",
+                        "name": "route"
+                    }
+                },
+                "stop": {
+                    "harness-eso-route-trace-stop": {
+                        "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree cursor",
+                        "name": "route"
+                    }
+                }
+            }
+        },
+        "agents": {
+            "blocks": {
+                "harness-eso-preflight": {
+                    "PreInvocation": {
+                        "node .harness/host-pack/harness-hook.mjs --hook preflight --tree agents --event PreInvocation": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook preflight --tree agents --event PreInvocation",
+                            "name": "preflight"
+                        },
+                        "node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree agents --event PreInvocation": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook pre-compact --tree agents --event PreInvocation",
+                            "name": "pre-compact"
+                        }
+                    }
+                },
+                "harness-eso-guard-shell": {
+                    "PreToolUse": {
+                        "node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree agents --event PreToolUse": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook guard-shell --tree agents --event PreToolUse",
+                            "name": "guard-shell"
+                        }
+                    }
+                },
+                "harness-eso-guard-brain": {
+                    "PreToolUse": {
+                        "node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree agents --event PreToolUse": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook guard-brain --tree agents --event PreToolUse",
+                            "name": "guard-brain"
+                        }
+                    }
+                },
+                "harness-eso-observe": {
+                    "PostToolUse": {
+                        "node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree agents --event PostToolUse": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook gap-tracker --tree agents --event PostToolUse",
+                            "name": "gap-tracker"
+                        }
+                    }
+                },
+                "harness-eso-route": {
+                    "PreInvocation": {
+                        "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreInvocation": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreInvocation",
+                            "name": "route"
+                        }
+                    },
+                    "PreToolUse": {
+                        "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreToolUse": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PreToolUse",
+                            "name": "route"
+                        }
+                    },
+                    "PostToolUse": {
+                        "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PostToolUse": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event PostToolUse",
+                            "name": "route"
+                        }
+                    },
+                    "Stop": {
+                        "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event Stop": {
+                            "command": "node .harness/host-pack/harness-hook.mjs --hook route --tree agents --event Stop",
+                            "name": "route"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "docs": {
+        ".harness/WORKFLOW_GUIDE.md": {
+            "sha256": "98d462eff1384c51c22fb668c7e73c78f1a1ecab920540f7aa735d579dabdd14",
+            "syncedAt": null,
+            "adopted": true
+        },
+        ".harness/ONBOARDING.md": {
+            "sha256": "0f01e15c620e222154868d3d0592680d4ab23f126bf582af03d8be9d2a9c4afa",
+            "syncedAt": null,
+            "adopted": true
+        },
+        ".harness/diagnostics.sh": {
+            "sha256": "3a61615c0c8c92112b0df8ffb01b8bc446bc2af020163d9f4e0e9fbe01416c29",
+            "syncedAt": null,
+            "adopted": true
+        }
+    }
+}

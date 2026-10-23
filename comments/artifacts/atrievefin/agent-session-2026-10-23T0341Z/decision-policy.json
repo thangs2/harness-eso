@@ -1,0 +1,68 @@
+{
+    "version": 1,
+    "profile": "generic-eso",
+    "jev": {
+        "mode": "off"
+    },
+    "fallback": {
+        "l3_flash": false
+    },
+    "on_ambiguous": "hil_only",
+    "ledger": {
+        "enabled": true
+    },
+    "tokenDiet": {
+        "enabled": true,
+        "maxEagerRules": 7,
+        "maxEagerTokens": 10000
+    },
+    "eso": {
+        "preflight": {
+            "enabled": true
+        },
+        "mode": "hint",
+        "cognition": {
+            "enforceBrain": "fail_closed",
+            "gapAttestation": true
+        }
+    },
+    "paths": {
+        "locked": [
+            ".cursor/mcp.json",
+            ".vscode/mcp.json",
+            ".agents/mcp_config.json",
+            ".env",
+            ".env.local",
+            ".env.production",
+            "credentials.json"
+        ],
+        "gated": [
+            "AGENTS.md",
+            ".cursorrules",
+            ".cursor/instructions.md",
+            ".agents/instructions.md",
+            ".cursor/rules/",
+            ".agents/rules/",
+            ".cursor/skills/",
+            ".agents/skills/",
+            ".cursor/agents/",
+            ".agents/agents/",
+            ".cursor/hooks/guard-write.py",
+            ".cursor/hooks/guard-shell.py",
+            ".cursor/hooks/locked-paths.txt",
+            ".agents/hooks/guard-write.py",
+            ".agents/hooks/guard-shell.py",
+            ".agents/hooks/locked-paths.txt",
+            "scripts/ci/",
+            "installation/docgraph/",
+            "docgraph.scope"
+        ],
+        "ask": [],
+        "sot": []
+    },
+    "harnessConsole": {
+        "brain": {
+            "adapterId": "deepseek-mcp"
+        }
+    }
+}

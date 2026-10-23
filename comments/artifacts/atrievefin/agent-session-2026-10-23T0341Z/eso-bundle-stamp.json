@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "at": "2026-10-23T03:45:22Z",
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0,
+  "mode": "fail_closed",
+  "enforceWrites": "fail_closed",
+  "preflightAt": "2026-10-23T03:41:56Z",
+  "closure": {
+    "closed": 0,
+    "required": 4,
+    "allClosed": false
+  },
+  "updatedAt": "2026-10-23T03:45:22Z"
+}
