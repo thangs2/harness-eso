@@ -20,6 +20,7 @@ export function buildTurnVerdict(params) {
         waiver = null,
         stem = '',
         blockers = [],
+        targetPath = '',
     } = params;
     /*
      * One resolver, shared with `eso-policy.mjs`.
@@ -113,9 +114,39 @@ export function buildTurnVerdict(params) {
         enforceWritesSource: eso.enforceWritesDeclared === false ? 'default' : 'declared',
         esoMode: eso.mode,
         jevOnPartial: jevOnPartial && level === 'partial',
+        /** `eso.preflight.deferWrite`, verbatim — the guards match it against the write target. */
+        deferWrite: eso.preflight?.deferWrite ?? { paths: [], mode: 'evidence' },
         evidenceBundleRef: null,
         decisionRef: null,
     };
+}
+
+/**
+ * Does `targetPath` fall under a path whose *evidence* is deferred (`eso.preflight.deferWrite`)?
+ *
+ * Prefix, on a normalised relative path, segment-aware: `SDLC` matches `SDLC/08.wbs/README.md` and a
+ * literal `SDLC/` matches the same, but `SDLC` must not match `SDLCX/`. Expressed once here because
+ * three parties read it — the preflight verdict, `guard-write.py`, and `guard-shell.py` — and a guard
+ * that disagrees with the verdict about *which file it is looking at* is the failure A1 exists for.
+ *
+ * Deferral is about **evidence**, never about **protection**: a deferred path still passes the `gated`
+ * tier, the approved-write locks and the Brain stamp.
+ */
+export function isDeferredWritePath(deferWrite, targetPath) {
+    const paths = Array.isArray(deferWrite?.paths) ? deferWrite.paths : [];
+    if (!paths.length) return false;
+    const norm = (p) =>
+        String(p || '')
+            .trim()
+            .replace(/\\/g, '/')
+            .replace(/^\.\//, '');
+    const target = norm(targetPath);
+    if (!target) return false;
+    return paths.some((raw) => {
+        const p = norm(raw).replace(/\/+$/, '');
+        if (!p) return false;
+        return target === p || target.startsWith(`${p}/`);
+    });
 }
 
 function classifyStem(stem) {

@@ -154,6 +154,64 @@ export function computeReceiptMac(doc, secret) {
 }
 
 /**
+ * Records what the repo looked like when the verdict was minted, so a later guard can tell whether the
+ * ground moved since.
+ *
+ * This replaces the age check (G-21). `at` + `ttlSec` measured **time**, which is not a proxy for
+ * "the evidence still describes this tree": a verdict stays true for as long as nothing is written, and
+ * goes stale the moment something is — whether that took five seconds or five hours. An idle agent
+ * was refused, a busy one was not, and neither answer had anything to do with the code.
+ *
+ * `git index mtime` is the cheap, per-write signal (`computeFastFingerprint`); `policyMtime` covers a
+ * tree with no `.git`, which the fingerprint cannot see at all.
+ *
+ * @param {string} [root]
+ * @returns {{ indexMtime: number, policyMtime: number }}
+ */
+export function computeRepoState(root = '') {
+    const statMtime = (p) => {
+        try {
+            return fs.statSync(p).mtimeMs;
+        } catch {
+            return 0;
+        }
+    };
+    if (!root) return { indexMtime: 0, policyMtime: 0 };
+    return {
+        indexMtime: statMtime(path.join(root, '.git', 'index')),
+        policyMtime: Math.max(
+            statMtime(path.join(root, '.harness', 'decision-policy.json')),
+            statMtime(path.join(root, 'harness.config.json')),
+        ),
+    };
+}
+
+/**
+ * Did the working tree change since the receipt was minted?
+ *
+ * Both halves are compared only when both sides carry a value: a receipt minted before this field
+ * existed (or on a tree without `.git`) says nothing, and a guard must not read "unknown" as "changed"
+ * — that would refuse every write in a consumer with no git metadata, which is the defect G-21 is
+ * fixing, not a stricter version of it.
+ *
+ * @param {object} receipt
+ * @param {{ indexMtime: number, policyMtime: number }} current
+ * @returns {boolean}
+ */
+export function repoStateChanged(receipt, current) {
+    const was = receipt?.repoState;
+    if (!was || typeof was !== 'object') return false;
+    for (const key of ['indexMtime', 'policyMtime']) {
+        const before = Number(was[key]);
+        const now = Number(current?.[key]);
+        if (Number.isFinite(before) && before > 0 && Number.isFinite(now) && now > 0 && now !== before) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Record the pack's evidence verdict as a signed Sufficiency Receipt.
  * Called by the preflight hook or gap closer — never by a tool call.
  *
@@ -195,6 +253,32 @@ export function writeEsoAttestation(projectId, input, secret = undefined) {
         unanswerableGaps: Array.isArray(input?.unanswerableGaps)
             ? input.unanswerableGaps.filter((g) => g && typeof g === 'object' && g.id).map((g) => ({ id: String(g.id) }))
             : [],
+        /**
+         * Which paths had their *evidence* deferred this turn (G-20), and whether `partial` publishes
+         * nothing at all here. The guard matches the first against the write target; the second decides
+         * whether "close the remaining gaps" is advice it can follow. Outside the MAC field list, like
+         * the two above: they describe a policy the receipt carries, not a measurement to protect.
+         */
+        deferWrite: {
+            paths: Array.isArray(input?.deferWrite?.paths)
+                ? input.deferWrite.paths.filter((p) => typeof p === 'string' && p.trim()).map((p) => p.trim())
+                : [],
+            mode: input?.deferWrite?.mode === 'evidence' ? 'evidence' : 'evidence',
+        },
+        jevOnPartial: input?.jevOnPartial === true,
+        /**
+         * The tree this verdict describes: git index mtime and the policy files' mtime (G-21). Compared,
+         * not aged — see `repoStateChanged`. Inside the MAC's field list is not necessary (the value is
+         * `stat()` at mint time and cannot be guessed usefully), and keeping it out means a receipt
+         * minted by an older pack stays valid.
+         */
+        repoState:
+            input?.repoState && typeof input.repoState === 'object'
+                ? {
+                      indexMtime: Number(input.repoState.indexMtime) || 0,
+                      policyMtime: Number(input.repoState.policyMtime) || 0,
+                  }
+                : null,
         fingerprint: input?.fingerprint ? String(input.fingerprint) : null,
         invIds,
         ttlSec,
@@ -210,11 +294,17 @@ export function writeEsoAttestation(projectId, input, secret = undefined) {
 
 /**
  * Verify a Sufficiency Receipt on disk in Product State.
- * Checks existence, allowWrite, TTL, fingerprint, and HMAC signature.
+ * Checks existence, allowWrite, HMAC signature, and whether the tree changed since the receipt was
+ * minted (G-21).
+ *
+ * Age is **not** a reason to reject. `ttlSec` stays on the receipt as a diagnostic and stops deciding
+ * anything: a verdict about a tree that has not been written to is still true an hour later, and one
+ * about a tree that has been rewritten is false a second later. `repoState` answers that; the clock
+ * only answered "how long since we last asked", which is a different fact.
  *
  * @param {string} projectId
  * @param {string|null} [currentFingerprint]
- * @param {object} [opts]
+ * @param {object} [opts] — `root` enables the tree-changed check; absent it is skipped, not assumed.
  * @returns {{ valid: boolean, reason?: string, receipt?: object, ageSec?: number, ttlSec?: number }}
  */
 export function verifySufficiencyReceipt(projectId, currentFingerprint = null, opts = {}) {
@@ -238,10 +328,12 @@ export function verifySufficiencyReceipt(projectId, currentFingerprint = null, o
     }
     const ageSec = (nowMs - atMs) / 1000;
     if (ageSec < -120) {
+        // A receipt from the future is a broken clock, not a verdict — still rejected, still named.
         return { valid: false, reason: 'clock_skew', ageSec, ttlSec, receipt: doc };
     }
-    if (ageSec > ttlSec) {
-        return { valid: false, reason: 'expired', ageSec, ttlSec, receipt: doc };
+
+    if (opts.root && repoStateChanged(doc, computeRepoState(opts.root))) {
+        return { valid: false, reason: 'repo_changed', ageSec, ttlSec, receipt: doc };
     }
 
     if (currentFingerprint && doc.fingerprint) {

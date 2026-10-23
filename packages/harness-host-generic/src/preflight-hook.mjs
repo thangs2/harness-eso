@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildPreflightProjection, orchestrateTurn } from '@mu/harness-eso-core';
-import { computeFastFingerprint, findRepoRoot } from '@mu/harness-foundation/pure';
+import { computeFastFingerprint, computeRepoState, findRepoRoot } from '@mu/harness-foundation/pure';
 import { detectShape, emitHook, harnessTree, loadPolicyForCwd, readStdin, sessionDir } from './hook-io.mjs';
 import { mergeGapClosure, readLawMisses, readPreflight, rememberLawMisses, writeBundleStampFromPreflight } from './eso-gap-io.mjs';
 
@@ -233,6 +233,8 @@ export async function run() {
          * the ones this preflight added as `reopenedBy: preflight-refire`.
          */
         mergeGapClosure(projection, root, tree);
+        // Record the tree the verdict describes (G-21): the guard compares it later instead of ageing it.
+        projection.repoState = computeRepoState(root);
         writeBundleStampFromPreflight(projection, esoPolicy, root, tree);
     } catch {
         /* fail-open on session file writes */

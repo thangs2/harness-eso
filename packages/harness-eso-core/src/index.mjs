@@ -9,11 +9,12 @@ export {
 } from './eso-policy.mjs';
 export { loadHarnessProfile } from './profile-load.mjs';
 export { runCollect, detectGaps, scoreSufficiency } from './collect.mjs';
-export { buildTurnVerdict } from './gate.mjs';
+export { buildTurnVerdict, isDeferredWritePath } from './gate.mjs';
 export { createSourceRegistry } from './adapter-registry.mjs';
 export { probeCapabilities, PROBE_KINDS } from './capability-probe.mjs';
 export { applyRecipe, loadRecipe, listRecipes, mergePolicy, validateRecipe, RECIPE_VERSION } from './recipe.mjs';
 export { runHostConformance, CONFORMANCE_TIERS } from './conformance.mjs';
+export { checkGuardFreshness, resolveTemplatesDir } from './guard-freshness.mjs';
 export {
     checkHarnessSurface,
     readHarnessSurface,

@@ -71,6 +71,7 @@ export async function orchestrateTurn(event, options = {}) {
         stem,
         waiver: options.waiver,
         blockers: options.blockers ?? [],
+        targetPath: options.targetPath ?? '',
     });
 
     return {

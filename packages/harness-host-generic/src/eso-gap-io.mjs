@@ -789,6 +789,26 @@ export function writeBundleStampFromPreflight(preflight, policy, root = process.
         unanswerableGaps: Array.isArray(preflight.unanswerableGaps)
             ? preflight.unanswerableGaps.filter((g) => g && typeof g === 'object' && g.id).map((g) => ({ id: String(g.id) }))
             : [],
+        /**
+         * `eso.preflight.deferWrite` (G-20). A path list is a policy fact, not a measurement, but the
+         * guard matches it against the target of the write it is judging — so it has to travel with
+         * the verdict, and be stamped at the same instant as the level the exemption rides on.
+         */
+        deferWrite: {
+            paths: Array.isArray(preflight.deferWrite?.paths) ? preflight.deferWrite.paths.filter((p) => typeof p === 'string' && p.trim()) : [],
+            mode: preflight.deferWrite?.mode === 'evidence' ? 'evidence' : 'evidence',
+        },
+        jevOnPartial: preflight.jevOnPartial === true,
+        /**
+         * The tree this verdict was measured against (G-21). Copied through both the stamp and the
+         * attestation so `guard-write.py` can ask "did anything change?" instead of "is it old?".
+         */
+        repoState: preflight.repoState && typeof preflight.repoState === 'object'
+            ? {
+                  indexMtime: Number(preflight.repoState.indexMtime) || 0,
+                  policyMtime: Number(preflight.repoState.policyMtime) || 0,
+              }
+            : null,
         // Whether this verdict is the initial measurement or one taken as gaps closed (H3). A reader
         // comparing the stamp with the closure file needs to know which instant it describes.
         ...(preflight.closure ? { closure: preflight.closure, updatedAt: preflight.updatedAt ?? null } : {}),
@@ -821,6 +841,9 @@ export function writeBundleStampFromPreflight(preflight, policy, root = process.
                 ttlSec: preflight.ttlSec ?? 600,
                 enforceWritesSource: payload.enforceWritesSource,
                 unanswerableGaps: payload.unanswerableGaps,
+                deferWrite: payload.deferWrite,
+                jevOnPartial: payload.jevOnPartial,
+                repoState: payload.repoState,
             });
         }
     } catch {

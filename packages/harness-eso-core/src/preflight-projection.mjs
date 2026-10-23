@@ -56,6 +56,15 @@ export function buildPreflightProjection(turn, result, opts = {}) {
         enforceWrites: verdict.enforceWrites,
         /** `declared` or `default` — the consumer wrote `enforceWrites`, or the strict default supplied it (G-08). */
         enforceWritesSource: verdict.enforceWritesSource,
+        /**
+         * The paths whose evidence is deferred (`eso.preflight.deferWrite`, G-20) and whether **this**
+         * turn's verdict was relieved by that. Carried so the guard can match the write target and the
+         * message can say why a `gated` path was writable on `partial` — the two facts an operator
+         * needs to tell "the gate let it through" from "the gate was not asked".
+         */
+        deferWrite: verdict.deferWrite ?? { paths: [], mode: 'evidence' },
+        /** This consumer publishes nothing on `partial` (`eso.preflight.jevOnPartial`), so no reading reopens it. */
+        jevOnPartial: verdict.jevOnPartial === true,
         gaps: sufficiency.gaps ?? verdict.gaps ?? [],
         lawMisses,
         /**

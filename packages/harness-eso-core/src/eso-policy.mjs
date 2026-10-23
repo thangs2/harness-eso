@@ -43,6 +43,41 @@ const pathOrObject = (value) =>
 const stringList = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === 'string' && item.trim()) : []);
 
 /**
+ * Terms of `eso.preflight.deferWrite` — paths whose *evidence* is deferred, never their protection.
+ *
+ * `gated` answers "who may write" and `enforceWrites` answers "when is there enough evidence". A repo
+ * that keeps its own planning records behind `gated` wants the first and not the second — the evidence
+ * gate is about *grounding a change in the code it touches*, which a status line does not have. Without
+ * this list the only lever was `enforceWrites: off`, which removes the evidence gate for source files
+ * too: the operator trades a narrow exclusion for a global hole.
+ *
+ * It is **not** an allow-list. The path stays in `locked`-adjacent territory: the guards still deny,
+ * the brain stamp is still required, and the exemption is printed in the verdict every turn it applies.
+ * Only the sufficiency verdict stops holding the write.
+ */
+const DEFER_WRITE_MODES = ['evidence'];
+
+export function normaliseDeferWrite(raw) {
+    const out = { paths: [], mode: 'evidence' };
+    if (!raw || typeof raw !== 'object') return out;
+    out.paths = stringList(raw.paths).map((p) => p.trim());
+    if (raw.mode !== undefined) {
+        if (DEFER_WRITE_MODES.includes(raw.mode)) out.mode = raw.mode;
+        else {
+            const key = `deferWrite.mode:${String(raw.mode)}`;
+            if (!warnedCheckValues.has(key)) {
+                warnedCheckValues.add(key);
+                process.stderr.write(
+                    `harness: eso.preflight.deferWrite.mode = ${JSON.stringify(raw.mode)} is not valid ` +
+                        `(use ${DEFER_WRITE_MODES.map((v) => `"${v}"`).join(' or ')}) — resolving to "evidence".\n`,
+                );
+            }
+        }
+    }
+    return out;
+}
+
+/**
  * Normalise `eso.checks` — the checks a consumer declares so it does not have to pass them to a host
  * shim by hand.
  *
@@ -208,6 +243,7 @@ export function resolveEsoPolicy(policy) {
             enabled: preflightRaw.enabled !== false,
             maxMs: Number(preflightRaw.maxMs ?? DEFAULT_ESO_POLICY.preflight.maxMs) || 8000,
             jevOnPartial: preflightRaw.jevOnPartial === true,
+            deferWrite: normaliseDeferWrite(preflightRaw.deferWrite),
         },
         memoryFetch: raw.memoryFetch !== false,
         checks: normaliseChecks(raw.checks),

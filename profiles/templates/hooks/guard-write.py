@@ -74,38 +74,56 @@ def deny_eso_message() -> str:
     """
     verdict = eso_verdict()
     reasons = verdict.get("reasons") or []
+    level = verdict.get("level") or "unknown"
     label = "attestation (product state)" if verdict.get("source") == "attestation" else "session stamp (legacy)"
     parts = [f"ESO gate (fail-closed): protected write refused. Verdict: {label}."]
+    # Each branch answers the same question — "what would unblock THIS write" — so a branch must not
+    # borrow another's advice. A stale receipt was told to close evidence gaps that describe a turn
+    # already over; that reads as two problems when there is one.
     if "unattributable" in reasons:
         parts.append(
             "The attestation failed its MAC check — it was edited outside product state. "
             "Run preflight again (submit a prompt) so the hook rewrites it."
         )
-    elif "expired" in reasons:
+    elif "repo_changed" in reasons:
         parts.append(
-            "The attestation is older than its TTL. It is rewritten by the next preflight — submit a prompt, then retry the write."
+            "The working tree changed since this verdict was minted (a write landed after preflight measured it), "
+            "so the evidence no longer describes the files on disk. Submit a prompt to re-measure, then retry."
         )
     else:
-        level = verdict.get("level") or "unknown"
-        parts.append(f"Evidence level: {level}; a `partial` publishes only when every reported gap is closed.")
         unanswerable = verdict.get("unanswerable") or []
+        # The rule the gate actually enforces (`gate.mjs`, G-02): on `partial` the gaps that hold the
+        # write are the *closable* ones. "Every reported gap" while the gate had already exempted the
+        # unclosable ones is how atrievefin's reader was sent to look for documents its repo does not
+        # contain — the refusal was right, the instruction was not.
         if unanswerable:
+            parts.append(f"Evidence level: {level}; a `partial` publishes once every closable gap is closed.")
             parts.append(
                 "These gaps cannot be closed by any reading in this repo — they are reported, not required: "
                 + ", ".join(unanswerable)
                 + "."
             )
-        parts.append(
-            "Close the remaining gaps (read the files the preflight lists, then re-run the query it names), or ask "
-            "the operator to change the policy."
-        )
-    if verdict.get("defaulted"):
-        parts.append(
-            "`enforceWrites` was NOT written in .harness/decision-policy.json; the strict default `fail_closed` is in force. "
-            "Setting `eso.mode` does not change this — write `enforceWrites` explicitly if that is not what you want."
-        )
-    else:
-        parts.append("`enforceWrites: fail_closed` was declared in the consumer policy.")
+        else:
+            parts.append(f"Evidence level: {level}; a `partial` publishes only when every reported gap is closed.")
+        if verdict.get("jevOnPartial") and level == "partial":
+            parts.append(
+                "This consumer sets `eso.preflight.jevOnPartial: true`, so a `partial` publishes nothing "
+                "however many closable gaps are closed — only `sufficient` (or a policy change) reopens the write."
+            )
+        else:
+            parts.append(
+                "Close the remaining gaps (read the files the preflight lists, then re-run the query it names), or ask "
+                "the operator to change the policy."
+            )
+        # `enforceWrites` explains *why the gate is on*, which only matters when the level is the reason
+        # it refused. A stale or forged receipt is a different problem with a different fix.
+        if verdict.get("defaulted"):
+            parts.append(
+                "`enforceWrites` was NOT written in .harness/decision-policy.json; the strict default `fail_closed` is in force. "
+                "Setting `eso.mode` does not change this — write `enforceWrites` explicitly if that is not what you want."
+            )
+        else:
+            parts.append("`enforceWrites: fail_closed` was declared in the consumer policy.")
     return " ".join(parts)
 
 DENY_BRAIN = (
@@ -495,6 +513,84 @@ def allow_session_stamp_fallback() -> bool:
     return True
 
 
+def _defer_norm(p) -> str:
+    s = str(p or "").strip().replace("\\", "/")
+    while s.startswith("./"):
+        s = s[2:]
+    return s
+
+
+def deferred_evidence_path(defer_write, rel: str, raw: str) -> bool:
+    """Does this write land under `eso.preflight.deferWrite.paths` (§G-20)?
+
+    Same normalisation and the same segment boundary as `isDeferredWritePath` in `gate.mjs`: the guard
+    and the verdict must not disagree about *which file* a path names. `SDLC` covers `SDLC/x.md` and
+    not `SDLCX/x.md`.
+
+    Deferral replaces **nothing**: the caller still reached this point through the `locked` tier, the
+    secret scan and the Brain stamp, and the same `target_path()` hit means the shell guard will make
+    the same decision for `echo > file`. Only the sufficiency verdict stops holding the write.
+    """
+    if not isinstance(defer_write, dict):
+        return False
+    paths = defer_write.get("paths")
+    if not isinstance(paths, list) or not paths:
+        return False
+    candidates = []
+    for value in (rel, raw):
+        n = _defer_norm(value)
+        if n and n not in candidates:
+            candidates.append(n)
+    for value in candidates:
+        for item in paths:
+            prefix = _defer_norm(item).rstrip("/")
+            if not prefix:
+                continue
+            if value == prefix or value.startswith(prefix + "/"):
+                return True
+    return False
+
+
+def _stat_mtime(p: Path) -> float:
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def current_repo_state() -> dict:
+    """The tree as it is now, in the two facts the receipt recorded (`computeRepoState`)."""
+    return {
+        "indexMtime": _stat_mtime(ROOT / ".git" / "index"),
+        "policyMtime": max(
+            _stat_mtime(ROOT / ".harness" / "decision-policy.json"),
+            _stat_mtime(ROOT / "harness.config.json"),
+        ),
+    }
+
+
+def repo_state_changed(recorded) -> bool:
+    """Has the working tree moved since this receipt was minted? (§G-21)
+
+    Compares only values present on **both** sides: a receipt from an older pack, or a tree with no
+    `.git`, recorded nothing, and reading "unknown" as "changed" would refuse every write in exactly the
+    consumers this check was added for. Tolerance is 2s because `mtime` is a filesystem timestamp and a
+    write in the same second as the mint is the normal case, not a change worth refusing.
+    """
+    if not isinstance(recorded, dict):
+        return False
+    now = current_repo_state()
+    for key in ("indexMtime", "policyMtime"):
+        try:
+            before = float(recorded.get(key) or 0)
+        except (TypeError, ValueError):
+            continue
+        after = float(now.get(key) or 0)
+        if before > 0 and after > 0 and abs(after - before) > 2.0:
+            return True
+    return False
+
+
 def eso_verdict() -> dict:
     """The evidence verdict this write is judged by, and why the gate refused (§G-12/G-08).
 
@@ -504,10 +600,13 @@ def eso_verdict() -> dict:
     close (§G-02). Both are facts in the stamp; neither reached the message. So the reader is split out:
 
       `gate`   — `fail_closed` | `off` | `unknown` (from `mode` / `enforceWrites`)
-      `reasons`— why this write is blocked: `unattributable` (MAC tampered), `expired` (TTL), `level`
+      `reasons`— why this write is blocked: `unattributable` (MAC tampered), `repo_changed` (the tree
+                 moved since the verdict), `level` (evidence)
       `unanswerable` — gap ids the preflight named as closable by nothing
       `source` — `attestation` (product state) or `session` (legacy fallback)
       `defaulted` — `enforceWrites` was supplied by the strict default, not written by the consumer
+      `jevOnPartial` — this consumer publishes nothing on `partial`, however many gaps are closed
+      `deferWrite` — `eso.preflight.deferWrite`: paths whose evidence is deferred, not their protection
 
     Empty dict when no verdict exists at all (a consumer whose pack has not been refreshed).
     """
@@ -536,28 +635,30 @@ def eso_verdict() -> dict:
         # The pack records whether the consumer wrote the key (`enforceWritesSource: default`); an absent
         # field means the stamp predates that disclosure, so nothing is claimed about it.
         "defaulted": data.get("enforceWritesSource") == "default",
+        # On `partial` alone this consumer publishes nothing (`gate.mjs`), so "close the remaining gaps"
+        # would be advice that cannot work. One bool, read from the same verdict the gate read.
+        "jevOnPartial": data.get("jevOnPartial") is True,
+        # `eso.preflight.deferWrite` (G-20): paths whose *evidence* is deferred. Carried even when the
+        # gate is open, because the message may need to say why a `gated` path was writable.
+        "deferWrite": data.get("deferWrite") if isinstance(data.get("deferWrite"), dict) else {},
     }
     if gate != "fail_closed":
         return result
     if data.get("allowWrite") is True:
-        # P2: State Hardening — Verify HMAC and TTL on Product State Receipt
+        # P2: State Hardening — Verify HMAC and did-the-tree-change on Product State Receipt.
+        #
+        # Age is deliberately not checked (G-21). A verdict about a tree nobody has written to is still
+        # true an hour later; one about a tree that has been rewritten is false immediately. `repoState`
+        # (git index mtime, policy mtime) answers the second question; `ttlSec` only answered "how long
+        # since we last asked", and refusing an idle agent was the whole cost of that substitution.
         if data.get("mac"):
             secret = get_attest_secret(project_id())
             if not verify_receipt_mac(data, secret):
                 result["reasons"] = ["unattributable"]
                 return result
-            at_str = data.get("at")
-            if at_str:
-                try:
-                    at_dt = datetime.fromisoformat(str(at_str).replace("Z", "+00:00"))
-                    age = (datetime.now(timezone.utc) - at_dt).total_seconds()
-                    ttl = int(data.get("ttlSec") or 600)
-                    if age > ttl:
-                        result["reasons"] = ["expired"]
-                        return result
-                except Exception:
-                    result["reasons"] = ["expired"]
-                    return result
+            if repo_state_changed(data.get("repoState")):
+                result["reasons"] = ["repo_changed"]
+                return result
         return result
     closure = _read_json(ROOT / SESSION_REL / ".eso-gap-closure.json")
     if closure.get("allClosed") is True and (not data.get("preflightAt") or closure.get("preflightAt") == data.get("preflightAt")):
@@ -816,7 +917,12 @@ def main() -> int:
         return 0
 
     if not hook_exempt(rel) and requires_brain_stamp(rel):
-        if eso_fail_closed_blocks():
+        verdict = eso_verdict()
+        # §G-20: on a `deferWrite` path the sufficiency verdict does not hold the write; every other
+        # condition that got us here (locked, product state, secrets) still did. The Brain stamp below
+        # has never been about evidence and is not exempted — deferring evidence must not also defer
+        # "reason before you write".
+        if eso_fail_closed_blocks() and not deferred_evidence_path(verdict.get("deferWrite"), rel, raw_path):
             deny(deny_eso_message())
             return 0
         if not brain_stamp_valid():
