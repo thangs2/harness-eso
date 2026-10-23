@@ -10,5 +10,7 @@ COPY package.json bun.lock ./
 COPY packages ./packages
 COPY profiles ./profiles
 RUN bun install --production --frozen-lockfile
-EXPOSE 8792
-CMD ["bun", "packages/harness-observe-server/src/server.mjs", "--root", "/data/repo", "--port", "8792"]
+EXPOSE 8790
+# 8790, not the host-port base 8792: this is the in-container port, and it is constant for every
+# project. See `OBSERVE_CONTAINER_PORT` in packages/harness-foundation/src/observe-port.mjs.
+CMD ["bun", "packages/harness-observe-server/src/server.mjs", "--root", "/data/repo", "--port", "8790"]

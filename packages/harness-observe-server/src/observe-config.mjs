@@ -220,9 +220,18 @@ export function loadConfig(startDir = process.cwd()) {
                 process.env.HARNESS_SERVER_HOST ||
                 (config.server && config.server.host) ||
                 '127.0.0.1',
-            port: process.env.HARNESS_SERVER_PORT
-                ? Number.parseInt(process.env.HARNESS_SERVER_PORT, 10)
-                : (config.server && config.server.port) || 8792,
+            /*
+             * Two different questions, two different variables. `HARNESS_OBSERVE_CONTAINER_PORT` is
+             * where this process binds inside its container (one constant for every project);
+             * `HARNESS_OBSERVE_PORT` is the *host* entrance the compose mapping publishes and is
+             * never a bind address. A server that listened on the host port would refuse to start
+             * as soon as the mapping carried it to a different number — which it now does.
+             */
+            port: process.env.HARNESS_OBSERVE_CONTAINER_PORT
+                ? Number.parseInt(process.env.HARNESS_OBSERVE_CONTAINER_PORT, 10)
+                : process.env.HARNESS_SERVER_PORT
+                  ? Number.parseInt(process.env.HARNESS_SERVER_PORT, 10)
+                  : (config.server && config.server.port) || 8792,
         },
         ingest: {
             pollMs: process.env.HARNESS_INGEST_POLL_MS

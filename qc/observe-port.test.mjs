@@ -21,6 +21,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+    OBSERVE_CONTAINER_PORT,
     OBSERVE_PORT_BASE,
     assertPortAvailable,
     assignObservePort,
@@ -345,5 +346,44 @@ test('each profile is probed on its own port, not the first one', async (t) => {
         fs.existsSync(path.join(state, 'projects')),
         false,
         'the legacy per-project folder is folded in and removed',
+    );
+});
+
+/* ── the container port is a constant, and it is not the host-port base ─────────────────────────── */
+
+test('the in-container port is one constant, distinct from the host-port base', () => {
+    /*
+     * Every stack published its own host port (8792, 8793, …) onto the *same* in-container port, and
+     * that port was also `OBSERVE_PORT_BASE`. So `docker ps` read as four running 8792s, which is
+     * precisely the ambiguity a per-project port exists to remove. Two questions, two constants.
+     */
+    assert.notEqual(
+        OBSERVE_CONTAINER_PORT,
+        OBSERVE_PORT_BASE,
+        'a container port equal to the host base is what made every stack look like port 8792',
+    );
+    assert.equal(OBSERVE_CONTAINER_PORT, 8790);
+    assert.ok(
+        OBSERVE_CONTAINER_PORT < OBSERVE_PORT_BASE,
+        'the container port sits below the allocation range, so a host port can never collide with it',
+    );
+});
+
+test('the compose mapping and the image agree on the container port', () => {
+    const compose = fs.readFileSync(path.join(ESO_ROOT, 'compose.harness.yml'), 'utf8');
+    const dockerfile = fs.readFileSync(path.join(ESO_ROOT, 'observatory.Dockerfile'), 'utf8');
+
+    assert.match(
+        compose,
+        new RegExp(`HARNESS_OBSERVE_CONTAINER_PORT:-${OBSERVE_CONTAINER_PORT}\\}`),
+        'the mapping must default the container side to the constant, not to the host base',
+    );
+    assert.match(compose, new RegExp(`127\\.0\\.0\\.1:${OBSERVE_CONTAINER_PORT}/health`), 'the healthcheck probes inside the container');
+    assert.match(dockerfile, new RegExp(`EXPOSE ${OBSERVE_CONTAINER_PORT}`));
+    assert.match(dockerfile, new RegExp(`"--port", "${OBSERVE_CONTAINER_PORT}"`));
+    assert.doesNotMatch(
+        dockerfile,
+        new RegExp(`--port", "${OBSERVE_PORT_BASE}"`),
+        'the image must not start on the host-port base — that is an entrance, not a bind address',
     );
 });

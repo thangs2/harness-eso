@@ -1,5 +1,8 @@
 # Observe plane — một container mỗi project, host port = port trong `~/.harness/workspace.json`
-# (x79 :8792, baplatform :8793, fineso :8794, …). Container luôn bind :8792 bên trong.
+# (x79 :8792, baplatform :8793, fineso :8794, …). Container luôn bind :8790 bên trong, và con số đó
+# cố ý khác base của host port: hai thứ trả lời hai câu hỏi khác nhau ("project này sở hữu cửa vào
+# nào" vs "process lắng nghe ở đâu"), nên dùng chung một số làm `docker ps` trông như mọi stack đều
+# ở 8792. Hằng số ở `packages/harness-foundation/src/observe-port.mjs` (`OBSERVE_CONTAINER_PORT`).
 # Stack identity là project id (`-p harness-observatory-<id>`), KHÔNG phải port — xem
 # `packages/harness-foundation/src/observe-port.mjs`.
 services:
@@ -9,7 +12,7 @@ services:
             dockerfile: observatory.Dockerfile
         image: mu/harness-observe:local
         ports:
-            - "${HARNESS_OBSERVE_PORT:-8792}:8792"
+            - "${HARNESS_OBSERVE_PORT:-8792}:${HARNESS_OBSERVE_CONTAINER_PORT:-8790}"
         environment:
             HARNESS_SERVER_HOST: "0.0.0.0"
             # SQLite + writable observe state (not on consumer bind mount)
@@ -54,7 +57,7 @@ services:
                     "CMD",
                     "bun",
                     "-e",
-                    "const r=await fetch('http://127.0.0.1:8792/health');if(!r.ok)process.exit(1)",
+                    "const r=await fetch('http://127.0.0.1:8790/health');if(!r.ok)process.exit(1)",
                 ]
             interval: 15s
             timeout: 5s

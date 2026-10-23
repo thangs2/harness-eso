@@ -34,6 +34,7 @@ export {
     workspaceFile,
 } from './workspace-store.mjs';
 export {
+    OBSERVE_CONTAINER_PORT,
     OBSERVE_PORT_BASE,
     assertPortAvailable,
     assignObservePort,

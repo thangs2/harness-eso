@@ -67,7 +67,7 @@ packages/
   harness-host-generic/    Cursor/Antigravity hooks → sidecar
   harness-observe-server/  ingest worker, REST, Observatory static
   harness-console/         wizard UI (:8791)
-  harness-observatory/     monitor UI (:8792)
+  harness-observatory/     monitor UI (:8792 host, :8790 in-container)
   harness-cli/             observe, init profile
 profiles/                  generic-eso.json, plugin-catalog, host superset
 qc/                        node:test integration

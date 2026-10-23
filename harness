@@ -58,7 +58,7 @@ case "$cmd" in
         echo "usage:"
         echo "  ./harness init profile <consumer-path>  # sole way to write harness files on consumer (e.g. x79)"
         echo "  ./harness console   # Docker wizard — cổng 8791 (console.sh up)"
-        echo "  ./harness up        # Docker monitor — cổng 8792"
+        echo "  ./harness up        # Docker monitor — host port 8792, container port 8790"
         echo "  ./harness observatory up --project <id>  # same, scoped project"
         echo "  ./harness host-pack status|refresh|add-ide|remove-ide [consumer]  # consumer hook pack"
         ;;

@@ -23,6 +23,20 @@ import path from 'node:path';
 /** First port considered when allocating. Ports below this are never handed out. */
 export const OBSERVE_PORT_BASE = 8792;
 
+/**
+ * The port the Observatory server binds **inside** its container.
+ *
+ * Separate from `OBSERVE_PORT_BASE` on purpose, and the two used to be the same number. A host port
+ * and an in-container port answer different questions — "which entrance does this project own" and
+ * "where does the process listen" — and sharing one value made `docker ps` read as four stacks all
+ * announcing port 8792, which is exactly the confusion a per-project port was supposed to remove.
+ * The container port is a constant for every project: one image, N host ports.
+ *
+ * Changing it is a compose-level change (mapping, healthcheck, the image's own `CMD`), not a consumer
+ * setting — no consumer should ever need to know this number.
+ */
+export const OBSERVE_CONTAINER_PORT = 8790;
+
 /** How far the allocator will search before giving up. */
 const OBSERVE_PORT_SPAN = 200;
 

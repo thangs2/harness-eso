@@ -5,6 +5,7 @@ import path from 'node:path';
 import { applyWorkspaceEnv, ESO_ROOT } from './workspace-env.mjs';
 import { findProject, findProjectByRoot, loadWorkspace, resolveProject } from '@mu/harness-foundation/workspace';
 import {
+    OBSERVE_CONTAINER_PORT,
     OBSERVE_PORT_BASE,
     assertPortAvailable,
     claimObservePort,
@@ -64,6 +65,12 @@ function composeEnv(opts = {}) {
     env.HARNESS_OBSERVE_PORT = String(
         opts.port ?? (projectId ? claimObservePort(workspace, projectId) : OBSERVE_PORT_BASE),
     );
+    /*
+     * The port the process binds inside the container. Never the host port: every stack maps its
+     * own host port onto this one constant, so a container that bound the host port it was published
+     * on would fail to start the moment two projects disagreed.
+     */
+    env.HARNESS_OBSERVE_CONTAINER_PORT = String(OBSERVE_CONTAINER_PORT);
     env.COMPOSE_PROJECT_NAME = projectId
         ? composeProjectName(projectId)
         : env.COMPOSE_PROJECT_NAME || composeProjectName('shared');
@@ -206,8 +213,15 @@ function resolvePort(projectId, workspace, opts) {
     const explicit = normalizePort(opts.port);
     if (explicit !== null) return explicit;
     if (projectId) return claimObservePort(workspace, projectId);
-    const fromEnv = normalizePort(process.env.HARNESS_OBSERVE_PORT);
-    return fromEnv ?? OBSERVE_PORT_BASE;
+    const fromEnv = normalizePort(process.env.HARNESS_OBSERVE_PORT) ?? normalizePort(process.env.HARNESS_OBSERVE_CONTAINER_PORT);
+    /*
+     * Unscoped (no `--project`), so there is no project port to report. The number that answers
+     * "where is it reachable" is then the *container* port — inside the container the publish
+     * mapping is what carries it, and reading the host allocation here would advertise 8792 to
+     * someone standing inside the box. `OBSERVE_PORT_BASE` is the first *host* port the allocator
+     * may hand out, a different question, and conflating them is the defect this constant fixes.
+     */
+    return fromEnv ?? OBSERVE_CONTAINER_PORT;
 }
 
 /**
