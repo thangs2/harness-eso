@@ -15,14 +15,26 @@ import path from 'node:path';
 import { buildPreflightProjection, orchestrateTurn } from '@mu/harness-eso-core';
 import { computeFastFingerprint, findRepoRoot } from '@mu/harness-foundation/pure';
 import { detectShape, emitHook, harnessTree, loadPolicyForCwd, readStdin, sessionDir } from './hook-io.mjs';
-import { readGapClosure, readPreflight, resetGapClosure, writeBundleStampFromPreflight } from './eso-gap-io.mjs';
+import { mergeGapClosure, readPreflight, writeBundleStampFromPreflight } from './eso-gap-io.mjs';
 
+/**
+ * The one-line instruction a hint-mode preflight leaves for the agent.
+ *
+ * P-26: `Gaps: law` alone was not enough to act on, and when the law index was the blocker the gap was
+ * *unclosable* — the agent retried, failed, and eventually told the operator the harness was broken. A
+ * miss is stated as a fact about the index, with the escape hatch, so the turn can move on.
+ */
 function buildEvidencePreflightBlock(pre) {
     if (!pre) return '';
     const parts = [];
     parts.push(`ESO preflight: ${pre.level} (score ${Number(pre.score ?? 0).toFixed(2)}).`);
     if (Array.isArray(pre.gaps) && pre.gaps.length) {
         parts.push(`Gaps: ${pre.gaps.map((g) => g.kind || g.query || 'gap').join(', ')}.`);
+    }
+    if (Array.isArray(pre.lawMisses) && pre.lawMisses.length) {
+        parts.push(
+            `Law index returned nothing for: ${pre.lawMisses.join(', ')} — reading cannot close these; cite the gap in the answer instead of retrying.`,
+        );
     }
     return parts.join(' ');
 }
@@ -167,7 +179,13 @@ export async function run() {
             if (!projection.fingerprint && currentFp) projection.fingerprint = currentFp;
         }
         writePreflightFile(root, tree, projection);
-        resetGapClosure(projection.at, root, tree);
+        /*
+         * Merge, never reset (P-28). `beforeSubmitPrompt` runs on **every** submit, and a reset here
+         * truncated the session's accumulated closure on each new prompt — `fineso` measured 32 closed
+         * rows become 0 at the next refire. The merge keeps every id that is still required and records
+         * the ones this preflight added as `reopenedBy: preflight-refire`.
+         */
+        mergeGapClosure(projection, root, tree);
         writeBundleStampFromPreflight(projection, policy, root, tree);
     } catch {
         /* fail-open on session file writes */

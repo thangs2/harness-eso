@@ -6,6 +6,15 @@ const READ_TOOL_RE = /^(Read|Grep|Glob|CallDynamicTool|view_file|grep_search|fin
 const CODEGRAPH_RE = /codegraph/i;
 const MEMORY_RE = /memory_smart|memory_recall|agentmemory/i;
 const DOCGRAPH_RE = /docgraph/i;
+/**
+ * Tools whose *purpose* is to answer a semantic law query.
+ *
+ * `docgraph --q "<term>"` is the adapter the preflight itself used to raise the gap, so a turn that
+ * runs it has asked the same question the gate asked — even when the index cannot answer it, the
+ * attempt is the evidence the gate is entitled to score. Nothing else may claim that: a term that
+ * happens to appear in some other command's arguments is not a reading of the law (P-01).
+ */
+const LAW_QUERY_TOOL_RE = /^(docgraph|Grep|grep_search)$/i;
 
 export function gapId(gap) {
     const kind = gap?.kind || 'other';
@@ -43,6 +52,60 @@ export function resetGapClosure(preflightAt, root = process.cwd(), tree = harnes
         requiredGapIds: gaps.map(gapId),
         closedGapIds: [],
         toolUses: [],
+    };
+    writeJsonFile(gapClosurePath(root, tree), doc);
+    return doc;
+}
+
+/**
+ * Fold a new preflight into the closure already on disk, without discarding work (P-28).
+ *
+ * `resetGapClosure` used to be called on every preflight, and `beforeSubmitPrompt` runs preflight on
+ * **every** submit — so each new prompt truncated the closure file back to `closedGapIds: []`. The
+ * file lives at a session path but behaved per-generation, and `fineso` measured the damage: 32 real
+ * rows became 0 on the next refire, and a read-only probe was blamed for a wipe the design performs.
+ *
+ * Rules:
+ *   - a gap that is still required keeps its closed state;
+ *   - a gap no longer required is dropped from `closedGapIds`;
+ *   - a **new** gap id is recorded as reopened, so a reader can tell "the preflight found more to do"
+ *     from "the agent made progress".
+ *
+ * A different conversation is a different turn and does reset — that is the one boundary where the
+ * old behaviour was right.
+ *
+ * @param {object} preflight  the projection just written
+ * @param {string} [root]
+ * @param {string} [tree]
+ * @returns {object}
+ */
+export function mergeGapClosure(preflight, root = process.cwd(), tree = harnessTree()) {
+    const previous = readGapClosure(root, tree);
+    const fresh = resetGapClosure(preflight?.at, root, tree);
+    const sameSession =
+        !previous?.conversationId ||
+        !preflight?.conversationId ||
+        previous.conversationId === preflight.conversationId;
+
+    if (!previous || !sameSession || !Array.isArray(previous.toolUses)) {
+        const doc = { ...fresh, conversationId: preflight?.conversationId ?? previous?.conversationId ?? null };
+        writeJsonFile(gapClosurePath(root, tree), doc);
+        return doc;
+    }
+
+    const required = new Set(fresh.requiredGapIds);
+    const previouslyClosed = Array.isArray(previous.closedGapIds) ? previous.closedGapIds : [];
+    const closedGapIds = previouslyClosed.filter((id) => required.has(id));
+    const previouslyRequired = new Set(previous.requiredGapIds || []);
+    const reopenedGapIds = [...required].filter((id) => !previouslyRequired.has(id));
+
+    const doc = {
+        ...fresh,
+        closedGapIds,
+        toolUses: previous.toolUses,
+        conversationId: preflight?.conversationId ?? previous.conversationId ?? null,
+        ...(reopenedGapIds.length ? { reopenedGapIds, reopenedBy: 'preflight-refire' } : {}),
+        allClosed: required.size === 0 || closedGapIds.length >= required.size,
     };
     writeJsonFile(gapClosurePath(root, tree), doc);
     return doc;
@@ -93,6 +156,20 @@ const SOURCE_EXTENSIONS = [
 
 function isNonSourcePath(rel) {
     return rel.split('/').some((seg) => NON_SOURCE_SEGMENTS.includes(seg.toLowerCase()));
+}
+
+/**
+ * Segments that hold harness **state** — the pack's own cache, session files and database.
+ *
+ * Narrower than `NON_SOURCE_SEGMENTS` and used only where the question is "is this an artefact the
+ * agent produced or the harness cached" rather than "is this project source". The docgraph cache is
+ * the case that matters: it contains the query text verbatim, so reading it answers a law question
+ * with the answer the harness itself wrote (P-02).
+ */
+const HARNESS_STATE_SEGMENTS = ['.harness', '.git', 'node_modules', '.round-cost'];
+
+function isHarnessStatePath(rel) {
+    return rel.split('/').some((seg) => HARNESS_STATE_SEGMENTS.includes(seg.toLowerCase()));
 }
 
 function hasSourceExtension(rel) {
@@ -207,9 +284,26 @@ export function closesGap(gap, kinds, toolInput, toolName = '', opts = {}) {
             const cgQuery = toolInput?.query ?? toolInput?.arguments?.query ?? toolInput?.symbol ?? toolInput?.arguments?.symbol;
             if (typeof cgQuery === 'string' && cgQuery.trim().length > 0) return true;
         }
-        return false;
+        /*
+         * (iii) A Shell/Grep call that **touched** a source file: the three shapes a read takes when it
+         * goes through a command instead of the Read tool.
+         *
+         * `fineso` measured the hole this closes: 16 `Read` calls (all `.md`, `.py` under `.cursor`, or
+         * outside root) plus 75 Shell commands inspecting the tree closed zero — a read-only diagnostic
+         * is *structurally* unable to reach `sufficient`, so the score measures tool choice, not
+         * evidence (P-04). A command that opens, lists or greps a source path is the same recon.
+         */
+        return shellTouchedSource(toolInput, opts);
     }
-    const target = String(gap?.query || gap?.path || '').toLowerCase();
+    /*
+     * A gap's target may name the inspection itself — `view_file src/index.ts`, `Read AGENTS.md`. The
+     * tool prefix is the instrument, not the artifact: only the path after it is the document whose
+     * reading closes the gap. Without this strip, the stricter query reading (P-01) also stopped the
+     * legitimate `view_file` closure that the receipt test pins.
+     */
+    const target = String(gap?.query || gap?.path || '')
+        .toLowerCase()
+        .replace(/^[a-z_][a-z0-9_]*[:\s]+(?=[\w./-])/, '');
     if (!target || target === '?') return true;
     return stemMatches(target, toolInput, toolName);
 }
@@ -239,6 +333,50 @@ function stemHaystack(toolInput, toolName) {
     const filePath = extractFilePath(toolInput);
     if (filePath) return foldStem(String(filePath).split(/[\\/]/).pop());
     return foldStem(JSON.stringify(toolInput || {}));
+}
+
+/**
+ * The semantic query a tool call carried, when the tool is one whose purpose is to ask it.
+ *
+ * Two shapes matter, and they are the only two a closure may read from a **no-path** call (P-01):
+ *
+ *   - MCP tools put the argument under `arguments` (`Grep {pattern}`, `CallDynamicTool {name,arguments:{query}}`);
+ *   - Shell carries it inside a command string (`docgraph --q "pipeline-gate"`, `rg -n "pipeline-gate" x.md`).
+ *
+ * Returning `null` — not the whole blob — is the point: everything else in a tool's arguments is
+ * context, not a question. Reading the blob is what let `rg …pipeline-gate` over a comment close the
+ * gap, and what let a `.harness/cache` hit stand in for the law (P-02).
+ *
+ * @param {object} toolInput
+ * @param {string} toolName
+ * @returns {string|null} the query text, un-folded
+ */
+function extractedQuery(toolInput, toolName) {
+    if (!toolInput || typeof toolInput !== 'object') return null;
+    const name = String(toolName || '');
+    const args = toolInput.arguments && typeof toolInput.arguments === 'object' ? toolInput.arguments : {};
+    /*
+     * No `symbol` here on purpose: a symbol name is not a law term, and reading it let a codegraph
+     * lookup close a semantic law gap when the lookup happened to name the right word. `name` is read
+     * only as a selector (`CallDynamicTool {name: 'Grep', arguments: {pattern}}`), never as the query.
+     */
+    const direct = toolInput.query ?? toolInput.pattern ?? args.query ?? args.pattern;
+    if (typeof direct === 'string' && direct.trim()) return direct.trim();
+
+    // Shell: only the argument of the tool that asks a law question, never the whole command.
+    const command = toolInput.command ?? toolInput.cmd ?? toolInput.script;
+    if (typeof command !== 'string' || !command.trim()) return null;
+    /*
+     * `docgraph --q "<term>"` is the semantic question. A `grep`/`rg` argument is a regex over file
+     * text, so it is the question only when `pattern` names it (handled above) — a Shell `grep -n
+     * "pipeline-gate" docgraph.scope` searches a *file*, not the law, and closed the gap on
+     * `baplatform` for exactly that reason (P-01).
+     */
+    if (!LAW_QUERY_TOOL_RE.test(name) && !/\bdocgraph\b/.test(command)) return null;
+    const m = command.match(/--q(?:uery)?[=\s]+(?:"([^"]+)"|'([^']+)'|([^\s;|&]+))/);
+    if (!m) return null;
+    const cleaned = String(m[1] ?? m[2] ?? m[3] ?? '').trim();
+    return cleaned || null;
 }
 
 /**
@@ -274,33 +412,116 @@ function pathStems(filePath) {
 function stemMatches(target, toolInput, toolName) {
     const foldedTarget = foldStem(target);
     if (!foldedTarget) return false;
-    const filePath = extractFilePath(toolInput);
+    /*
+     * Only a path that names a **file** answers "which document is this"; `Grep {path: 'sdlc'}` carries
+     * a directory, and treating it as the document left the pattern unread (it closed nothing, or —
+     * worse — a directory named after the term would close it).
+     */
+    const rawPath = extractFilePath(toolInput);
+    const filePath = rawPath && /[^/\\]\.[A-Za-z0-9]+$/.test(String(rawPath)) ? rawPath : null;
     /*
      * A term can name a document (`AGENTS.md`, `pipeline-gate`, `source`) or ask for a kind of source
      * (`code`). Reading a real file proves the first case; it says nothing about the second, and
      * deciding on the file alone would leave that gap unclosable.
      */
-    let satisfied = false;
     if (filePath) {
+        /*
+         * Harness state is not law (P-02). `.harness/cache/docgraph/<hash>.txt` holds the *text* the
+         * adapter already fetched, including the query string, so a Read of it closed `law:pipeline-gate`
+         * without the rule ever being opened. Only harness-state segments are excluded here, not every
+         * non-source one: a rule under `.cursor/rules/` is law even though it is not project source, and
+         * excluding `.cursor` too would make the H1 case unclosable.
+         */
+        if (isHarnessStatePath(toRel(filePath))) return false;
+        /*
+         * A target may carry a directory (`view_file src/index.ts`), so compare folded paths too: the
+         * a match is the same document whether the gap named it by basename or by path.
+         */
+        const foldedPath = foldStem(filePath);
+        const targetPath = foldStem(target);
+        if (foldedPath === targetPath || foldedPath.endsWith(`-${targetPath}`)) return true;
         const base = String(filePath).split(/[\\/]/).pop();
         const withoutExt = base.replace(/\.[A-Za-z0-9]+$/, '');
-        satisfied =
+        return (
             foldStem(base) === foldedTarget ||
             foldStem(withoutExt) === foldedTarget ||
-            pathStems(filePath).includes(foldedTarget);
+            pathStems(filePath).includes(foldedTarget)
+        );
     }
-    const hay = stemHaystack(toolInput, toolName);
-    if (`-${hay}-`.includes(`-${foldedTarget}-`)) satisfied = true;
+    /*
+     * No path: the only evidence is the **question** the tool asked, and only for the tools that ask
+     * one (P-01). The old branch folded the entire argument blob, so any payload containing the term —
+     * a `rg` over a scope file's comment, a `jq` over harness state, a path in another repo — closed a
+     * semantic law gap. Preflight then emitted `sufficient / 1.00 / allowWrite:true` for a turn that had
+     * read no law at all (baplatform, 2026-10-23).
+     */
+    const asked = extractedQuery(toolInput, toolName);
+    if (!asked) return false;
+    const hay = foldStem(asked);
+    if (`-${hay}-`.includes(`-${foldedTarget}-`)) return true;
     // Slash-separated queries (`backend/mu-`) target a prefix rather than a single token.
-    if (
-        target
-            .split('/')
-            .filter((seg) => seg.length > 3)
-            .some((seg) => `-${hay}-`.includes(`-${foldStem(seg)}-`))
-    ) {
-        satisfied = true;
+    return target
+        .split('/')
+        .filter((seg) => seg.length > 4)
+        .some((seg) => `-${hay}-`.includes(`-${foldStem(seg)}-`));
+}
+
+/** Repo-relative form of a path for segment checks; absolute and `./`-prefixed forms both occur. */
+function toRel(filePath) {
+    return String(filePath || '')
+        .replace(/\\/g, '/')
+        .replace(/^\.\//, '')
+        .replace(/^\/+/, '');
+}
+
+/**
+ * Did a command token that names a source file inside the preflight root appear in this call?
+ *
+ * Deliberately lexical and side-effect free: the pack runs in the IDE's hook process and must not
+ * stat every file the agent mentions. The token has to look like a path with a source extension, so
+ * `rg -n "supports" src/` (directory only) does not count while `sed -n '1,40p' src/server.mjs`
+ * does. A query gap is about *inspection*, not about which tool performed it (P-04).
+ *
+ * @param {object} toolInput
+ * @param {{ root?: string }} [opts]
+ */
+/**
+ * Did this Shell command inspect a source file *in the project*? (P-04)
+ *
+ * Two defects were measured on `fineso`, and both must be excluded here:
+ *
+ *  - **P-31** — a path inside data is not an inspection. `echo '{"path":"src/app.mjs"}' | jq …` and
+ *    `curl -d '{"file":"src/x.ts"}'` name a file the command never opens; counting them let a payload
+ *    pay a read gap.
+ *  - **P-04** — the contrary mistake (counting only `Read` tool calls) left a read-only audit
+ *    unmeasurable, so inspection via `sed`/`rg`/`cat`/`head`/`node -e` must count.
+ *
+ * The rule is therefore: the command must *read* (a reader binary, or shell redirection) and the path
+ * must not be inside a quoted data blob.
+ */
+const READER_BIN_RE = /(?:^|[;|&(]\s*)(?:cat|bat|sed|awk|head|tail|less|more|rg|grep|node|bun|deno|python3?|jq|wc|diff|nl)\b/;
+
+function stripQuotedData(command) {
+    // Drop single/double-quoted spans that look like data (JSON, SQL, HTML) but keep quoted paths.
+    return String(command).replace(/'([^']*)'|"([^"]*)"/g, (whole, a, b) => {
+        const body = String(a ?? b ?? '');
+        return /[{}<>:=]|,\s*"/.test(body) ? ' ' : whole;
+    });
+}
+
+function shellTouchedSource(toolInput, opts = {}) {
+    if (!toolInput || typeof toolInput !== 'object') return false;
+    const command =
+        toolInput.command ?? toolInput.cmd ?? toolInput.script ?? toolInput.arguments?.command ?? toolInput.arguments?.cmd;
+    if (typeof command !== 'string' || !command.trim()) return false;
+    if (!READER_BIN_RE.test(command) && !/[<>]\s*\S+\.[A-Za-z0-9]+/.test(command)) return false;
+    const searchable = stripQuotedData(command);
+    const tokens = searchable.match(/[A-Za-z0-9_./~*-]+\.[A-Za-z0-9]+(?::\d+(?:,\d+)?)?/g) || [];
+    for (const token of tokens) {
+        const clean = token.replace(/:\d+(?:,\d+)?$/, '');
+        if (isProjectSourcePath(clean, opts)) return true;
     }
-    return satisfied;
+    return false;
 }
 
 /**
@@ -316,7 +537,13 @@ export function recordGapToolUse(toolName, toolInput, opts = {}) {
 
     let closure = readGapClosure(root, tree);
     if (!closure || closure.preflightAt !== pre.at) {
-        closure = resetGapClosure(pre.at, root, tree);
+        /*
+         * Do not discard what an earlier generation of this session already closed (P-28). The
+         * preflight re-fires on every prompt submit, so `resetGapClosure` here truncated real progress
+         * on each new message; `mergeGapClosure` keeps the closed ids that are still required and
+         * records the ones the new preflight added.
+         */
+        closure = mergeGapClosure(pre, root, tree);
     }
 
     const kinds = gapKindsForTool(toolName, toolInput);
@@ -344,6 +571,7 @@ export function recordGapToolUse(toolName, toolInput, opts = {}) {
         ok: true,
         at: isoNow(),
         preflightAt: pre.at,
+        conversationId: pre.conversationId ?? closure.conversationId ?? null,
         requiredGapIds: required,
         closedGapIds,
         allClosed: required.length === 0 || closedGapIds.length >= required.length,
@@ -451,7 +679,16 @@ export function shouldBlockBrain(preflight, closure, policy) {
     if (level === 'sufficient') return false;
     const gaps = Array.isArray(preflight.gaps) ? preflight.gaps : [];
     if (!gaps.length) return false;
-    if (!closure || closure.preflightAt !== preflight.at) return true;
+    /*
+     * A closure written for an older generation of the **same** conversation still speaks for this
+     * one (P-28): re-firing preflight must not re-arm a Brain block the agent already satisfied.
+     */
+    const sameSession =
+        closure &&
+        (!closure.conversationId ||
+            !preflight.conversationId ||
+            closure.conversationId === preflight.conversationId);
+    if (!closure || (!sameSession && closure.preflightAt !== preflight.at)) return true;
     if (closure.allClosed === true) return false;
     const required = closure.requiredGapIds || gaps.map(gapId);
     const closed = new Set(closure.closedGapIds || []);

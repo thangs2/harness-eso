@@ -1,5 +1,5 @@
 export { orchestrateTurn, loadEsoPolicy } from './orchestrate-turn.mjs';
-export { buildPreflightProjection, skippedPreflightProjection, extractPinnedInvariants } from './preflight-projection.mjs';
+export { buildPreflightProjection, extractLawMisses, skippedPreflightProjection, extractPinnedInvariants } from './preflight-projection.mjs';
 export {
     ENFORCE_WRITES_VALUES,
     resolveEnforceWrites,

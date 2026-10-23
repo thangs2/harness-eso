@@ -35,6 +35,7 @@ export function buildPreflightProjection(turn, result, opts = {}) {
         : null;
 
     const cognitiveState = level === 'sufficient' ? 'WARM' : (turn.fingerprint ? 'STALE' : 'COLD');
+    const lawMisses = extractLawMisses(result);
 
     return {
         ok: level !== 'insufficient' || verdict.allowPromptSubmit,
@@ -54,6 +55,7 @@ export function buildPreflightProjection(turn, result, opts = {}) {
         mode: verdict.esoMode,
         enforceWrites: verdict.enforceWrites,
         gaps: sufficiency.gaps ?? verdict.gaps ?? [],
+        lawMisses,
         brainTierHint: turn.brainTierHint || 'flash',
         surface,
         metrics: { latencyMsTotal: opts.latencyMs ?? 0 },
@@ -107,7 +109,31 @@ export function extractPinnedInvariants(result, opts = {}) {
     return detected.slice(0, 5);
 }
 
-/** The projection written when ESO is disabled — still a valid document for the other hooks. */
+/**
+ * Law terms the retrieval adapter could not answer.
+ *
+ * `runCollect` already records one trace line per fetched term (`docgraph:ok:<term>`,
+ * `docgraph:miss:<term>`), but the projection dropped it, so the one fact that explains a stuck gate —
+ * *the law index does not contain this term* — never reached the agent. On `fineso` that produced
+ * P-26: a `law:harness-tooling` gap that could not be closed by any reading, retried every turn with
+ * no diagnostic, and the turn ended by blaming the tool instead of the index.
+ *
+ * @param {object} result
+ * @returns {string[]} the terms that returned nothing
+ */
+export function extractLawMisses(result) {
+    const trace = result?.retrieval?.trace || result?.collected?.retrieval?.trace || [];
+    if (!Array.isArray(trace)) return [];
+    const misses = [];
+    for (const line of trace) {
+        const m = typeof line === 'string' ? line.match(/^docgraph:miss:(.+)$/) : null;
+        if (m && m[1] && !misses.includes(m[1])) misses.push(m[1]);
+    }
+    return misses;
+}
+
+/**
+ * The projection written when ESO is disabled — still a valid document for the other hooks. */
 export function skippedPreflightProjection(reason) {
     return { ok: true, skipped: true, reason, at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') };
 }
