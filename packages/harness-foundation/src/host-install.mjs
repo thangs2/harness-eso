@@ -27,45 +27,52 @@ export const HOST_PACK_REL = '.harness/host-pack';
  *
  * Consumers ship a `.harness/.gitignore` that ignores **everything** and re-admits a few files —
  * x79's is exactly `*` + `!.gitignore` + `!README.md` + `!decision-policy.json`. That is a sensible
- * default for runtime junk (databases, caches, session state), but it also ignores the host pack,
- * which breaks the whole standalone model: a fresh clone gets `hooks.json` pointing at
- * `.harness/host-pack/harness-hook.mjs` that **does not exist**, so every hook fails, every guard
- * fails closed, and the consumer's IDE becomes unusable. "Clone and it works" only holds if the
- * pack is actually in the repository.
+ * default for a directory that is regrown by a provision, and this module keeps it.
+ *
+ * The **host pack** is therefore not in a clone, and the consequence is real: `hooks.json` points at
+ * `.harness/host-pack/harness-hook.mjs`, which a fresh clone does not have, so every hook fails and
+ * every guard fails closed until the consumer provisions again. That is the operator's choice — the
+ * pack is build output of a specific release, rewritten by every provision. `verify consumer` reports
+ * a missing pack, and `provision.sh <consumer>` restores it in one command.
  *
  * So provisioning makes sure the rules exist. It is additive and idempotent: operator rules are
  * never removed or reordered, missing re-admissions are appended under a marker, and the runtime
  * exclusions (`harness.db`, its WAL siblings, `cache/`) stay in effect.
  *
- * Two lists, not one, because they answer different questions: what a clone must contain, and what a
- * clone must never contain. Anything not on either list is ignored by the blanket `*`.
+ * `.harness/` is **entirely machine-local**: everything the provision writes there belongs to one
+ * checkout, and the only two files admitted are the ones that describe the rules themselves.
+ *
+ * That is a deliberate reversal. The directory used to advertise a "team contract" — the policy, the
+ * integrations map, the operator docs — but nothing enforced it: the pack, the bootstrap stamp and our
+ * hook ledger were admitted alongside them, every provision rewrote them, and `git status` was dirty
+ * after a clone. Deciding by *kind of machine* instead of *kind of file* is what stops that drift.
+ * A consumer that wants a file in its repository says so with a `!` rule of its own, and
+ * `ensureHarnessGitignore` never removes it.
  */
 const GITIGNORE_MARKER = '# harness-eso: files this tool writes that must be committed';
 const GITIGNORE_ADMIT = [
     '!.gitignore',
     '!README.md',
-    /*
-     * The guide, the checklist and the diagnostic script are as much provisioned content as the host
-     * pack: a consumer's clone that has the hooks but not the "what do I do now" is unusable in the
-     * same way. `diagnostics.sh` also needs its executable bit committed.
-     */
+];
+/*
+ * Rules earlier releases admitted into `.harness/.gitignore`. Nothing merges them by hand, so a consumer
+ * can only still carry them because a provision wrote them — which is what makes them safe to delete on
+ * sight, and deleting them is what lets the allowlist converge. Without this list the old one is
+ * permanent: every rule still looks present, the file is reported "skip", and the host pack stays
+ * committed in a repository that has stopped admitting it.
+ */
+const GITIGNORE_RETIRED = [
+    '!host-bootstrap.json',
+    '!host-install-state.json',
+    '!host-pack/',
+    '!host-pack/**',
     '!decision-policy.json',
     '!integrations.json',
     '!WORKFLOW_GUIDE.md',
     '!ONBOARDING.md',
     '!diagnostics.sh',
-    /*
-     * The example, never the real file. `sidecar.env` carries `HARNESS_TOKEN` — the token a machine
-     * uses to talk to its own sidecar — so admitting it put one developer's secret in the repository
-     * the first time anybody committed. The prose above used to claim the opposite of what the code
-     * did, which is how it survived.
-     */
     '!sidecar.env.example',
     '!eso-coverage.json',
-    '!host-bootstrap.json',
-    '!host-install-state.json',
-    '!host-pack/',
-    '!host-pack/**',
 ];
 
 /*
@@ -89,12 +96,12 @@ const GITIGNORE_RUNTIME_ADMIT = ['!**/session/README.md'];
 const GITIGNORE_RUNTIME_MARKER = '# harness-eso: per-user session state, never commit';
 
 /**
- * Ensure `.harness/.gitignore` says which files a team shares and which belong to one machine.
+ * Ensure `.harness/.gitignore` says what belongs to this checkout — which is everything but the rules
+ * themselves.
  *
- * The directory mixes three kinds of file, and this is the only place that says which is which:
- * install artifacts a clone must carry (the host pack, the policy, the operator docs), per-machine
- * state (the sidecar token, the database, caches), and — through the session rules — the per-turn
- * verdicts each developer's own agent writes.
+ * The directory is regrown by a provision: the installed host pack, the sidecar token, the bootstrap
+ * stamp, our hook ledger, the database and the caches, and — through the session rules — the per-turn
+ * verdicts each developer's own agent writes. All of it describes one machine.
  *
  * Additive and idempotent: operator rules are never removed or reordered. Our runtime block is
  * re-emitted when one of its rules is missing, because a runtime rule that silently disagrees with the
@@ -118,6 +125,12 @@ export function ensureHarnessGitignore(root) {
 
     const runtimeSet = new Set(GITIGNORE_RUNTIME);
     /*
+     * The re-admissions **this tool used to write**. Only these are removable when the product stops
+     * admitting them: distinguishing them from an operator's own rule needs a history, and the product
+     * is the only side that has one. A rule nobody here ever wrote belongs to the consumer and is kept.
+     */
+    const retired = new Set(GITIGNORE_RETIRED);
+    /*
      * `README.md` is admitted by pattern, not by name: the blanket plus the session block would
      * otherwise swallow the session README even though an un-ignore appears above it — gitignore
      * evaluates the *last* matching rule, and the session block comes later. Emitting the exception
@@ -133,11 +146,25 @@ export function ensureHarnessGitignore(root) {
             continue;
         }
         if (inRuntimeBlock) {
-            if (runtimeSet.has(trimmed)) continue;
-            inRuntimeBlock = false;
+            /*
+             * The block used to be scanned by value, so a retired runtime rule ended the block and was
+             * then kept as if the operator had written it. Scan to the next blank line or a foreign
+             * rule instead: membership in `ours` is what decides, not position.
+             */
+            if (!trimmed || (!runtimeSet.has(trimmed) && !unIgnorable.has(trimmed))) inRuntimeBlock = false;
+            else continue;
         }
         if (trimmed === GITIGNORE_MARKER) continue;
         if (unIgnorable.has(trimmed)) continue;
+        /*
+         * A retired re-admission is removed, not preserved. Leaving it made the previous allowlist
+         * permanent: `missing` is computed from rules that were never absent, so the run reported
+         * "skip" and a consumer provisioning after the change kept `.harness/host-pack/` committed.
+         *
+         * Only lines this tool used to write are eligible — a re-admission the consumer added for
+         * itself is theirs and survives.
+         */
+        if (retired.has(trimmed)) continue;
         filteredLines.push(l);
     }
 
@@ -146,35 +173,96 @@ export function ensureHarnessGitignore(root) {
             .map((l) => l.trim())
             .filter(Boolean),
     );
-    const missing = GITIGNORE_ADMIT.filter((rule) => !present.has(rule));
-    const runtimeMissing = GITIGNORE_RUNTIME.filter((rule) => !present.has(rule));
-    const runtimeAdmitMissing = GITIGNORE_RUNTIME_ADMIT.filter((rule) => !present.has(rule));
-
-    if (!isNew && !missing.length && !runtimeMissing.length && !runtimeAdmitMissing.length) {
-        return { relative, action: 'skip' };
-    }
-
+    /*
+     * The output, not the input, decides whether anything changed: comparing the filtered input called
+     * every run a rewrite, because a rewrite always normalises the blank lines a previous run left.
+     */
     let body = filteredLines.join('\n');
-    body = body.endsWith('\n') ? body : body + '\n';
+    body = body.trimEnd() + '\n';
     if (!present.has('*')) {
         body = '*' + '\n' + body;
     }
-    for (const rule of missing) {
-        body += rule + '\n';
-    }
+    const admitMissing = GITIGNORE_ADMIT.filter((rule) => !present.has(rule));
+    const runtimeMissing = GITIGNORE_RUNTIME.filter((rule) => !present.has(rule));
+    const runtimeAdmitMissing = GITIGNORE_RUNTIME_ADMIT.filter((rule) => !present.has(rule));
+    if (admitMissing.length) body += admitMissing.join('\n') + '\n';
     if (runtimeMissing.length || runtimeAdmitMissing.length) {
         body += GITIGNORE_RUNTIME_MARKER + '\n';
-        for (const rule of runtimeMissing) {
-            body += rule + '\n';
-        }
-        for (const rule of runtimeAdmitMissing) {
-            body += rule + '\n';
-        }
+        if (runtimeMissing.length) body += runtimeMissing.join('\n') + '\n';
+        if (runtimeAdmitMissing.length) body += runtimeAdmitMissing.join('\n') + '\n';
     }
+
+    if (!isNew && body === existing) return { relative, action: 'skip' };
 
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, body, 'utf8');
     return { relative, action: 'write' };
+}
+
+/** The paths whose ignore status decides whether a file must leave the index. */
+const TRACKED_PROBE = [
+    '.harness/sidecar.env',
+    '.harness/host-bootstrap.json',
+    '.harness/host-install-state.json',
+];
+
+function gitLines(root, args) {
+    const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    if (r.status !== 0) return null;
+    return r.stdout.split('\0').join('\n').split('\n').map((l) => l.trim()).filter(Boolean);
+}
+
+/**
+ * Release the `.harness/` paths git still tracks although our rules ignore them.
+ *
+ * Git never re-checks the ignore rules for a file that is already in the index, so the ignore block
+ * above cannot save a consumer that committed a machine-local file before the rule existed: the next
+ * provision rewrites it, and `git status` turns dirty for a repo that is supposed to be clean. Every
+ * consumer provisioned before the host pack stopped being admitted is in that state, and the three
+ * records named in `TRACKED_PROBE` are the ones a consumer may have committed by hand.
+ *
+ * The candidate set is every tracked path under `.harness/` — not a hard-coded list, because the list
+ * is what drifted from the rules in the first place. A path is released only when the rules say it is
+ * ignored, so a consumer's own `!` exception (the one file it decided to version) is never removed.
+ *
+ * Two outcomes, because a file can be gone and still be tracked:
+ *
+ *   released — on disk, our rules ignore it, so it leaves the index and stays on disk for the operator
+ *   deleted  — no longer on disk but still in the index; only the index entry can be removed, and
+ *              leaving it is what makes a deleted file show up as a deletion in every teammate's tree
+ *
+ * Staging a removal is not the same as committing one: the operator reviews `git rm --cached` and
+ * decides.
+ *
+ * @param {string} root consumer root
+ * @returns {{ released: string[], deleted: string[] }} empty arrays when there is nothing to do
+ */
+export function untrackIgnoredPaths(root) {
+    const result = { released: [], deleted: [] };
+    const inRepo = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: root, encoding: 'utf8' });
+    if (inRepo.status !== 0 || inRepo.stdout.trim() !== 'true') return result;
+
+    const tracked = gitLines(root, ['ls-files', '-z', '--', '.harness']) ?? [];
+    for (const rel of [...new Set([...tracked, ...TRACKED_PROBE])]) {
+        if (gitLines(root, ['ls-files', '--error-unmatch', '--', rel]) === null) continue;
+        /*
+         * Asked with `--no-index`: once the path is in the index git calls it tracked in that very
+         * answer, so the question comes back "not ignored" for exactly the file this function exists to
+         * release. `--no-index` asks the rules as if the path were untracked — which is the case the
+         * rule has to decide — and keeps a consumer override (`!sidecar.env`) winning when it states one.
+         */
+        const ignored = spawnSync('git', ['check-ignore', '--no-index', '-q', '--', rel], { cwd: root });
+        if (ignored.status !== 0) continue;
+        const present = fs.existsSync(path.join(root, rel));
+        const removed = spawnSync(
+            'git',
+            ['rm', '--cached', '--quiet', ...(present ? [] : ['--ignore-unmatch']), '--', rel],
+            { cwd: root },
+        );
+        if (removed.status !== 0) continue;
+        (present ? result.released : result.deleted).push(rel);
+    }
+    return result;
 }
 
 /**
@@ -792,6 +880,15 @@ export function installHostPack(root) {
     // broken consumer, not a degraded one.
     actions.push(ensureHarnessGitignore(root));
 
+    /*
+     * Writing the rule is half the job: a file committed before the rule existed stays tracked, so the
+     * next `writeSidecarEnv` shows up as a modification of this machine's URLs. The provision is where
+     * the machine-local files are (re)written, so it is where the stale index entries are released.
+     */
+    const git = untrackIgnoredPaths(root);
+    for (const relative of git.released) actions.push({ relative, action: 'untracked' });
+    for (const relative of git.deleted) actions.push({ relative, action: 'untracked-deleted' });
+
     return { actions, manifest };
 }
 
@@ -935,15 +1032,18 @@ export function applyHostProfiles(consumerRoot, profiles, opts = {}) {
 }
 
 /**
- * Write the bootstrap record plus the machine-local file it must never be confused with.
+ * Write the bootstrap record: this machine's stamp of what the provision applied.
  *
- * `host-bootstrap.json` is **committed** (the `.harness/.gitignore` admits it) because it says what was
- * provisioned — profile ids, the pack version. Its `appliedAt` is written once, when the profile
- * changes; re-deriving it on every provision would put a diff in every developer's working tree on
- * every run, and the file's only facts would be buried in noise.
+ * `host-bootstrap.json` is **machine-local** — the blanket ignore rules keep it out of git, like
+ * `sidecar.env`, because everything it records (applied time, the checkout root, the last probe
+ * result) is true of one workstation and misleading on another. It used to be admitted, which is how
+ * a provision turned into a diff for every developer who cloned the repo.
  *
- * The port is the part that is *not* shared state: `sidecar.env` carries `HARNESS_TOKEN` and the stack
- * port for **this** machine, so a second developer cloning the repo must not inherit the first one's.
+ * `appliedAt` is still kept stable across a re-provision of the same profile: the stamp answers "when
+ * did this machine last *change* its profile", not "when did a command last run".
+ *
+ * The port stays out of it entirely: `sidecar.env` carries `HARNESS_TOKEN` and the stack port for
+ * **this** machine, so a second developer cloning the repo must not inherit the first one's.
  * `sidecarUrl` therefore never reaches this file — see the destructure below.
  */
 function writeBootstrapState(root, bootstrap) {
@@ -961,9 +1061,9 @@ function writeBootstrapState(root, bootstrap) {
         previous.profileId === bootstrap.profileId;
     /*
      * `sidecarUrl` is dropped, not merely stabilised. It encodes the port THIS machine's stack listens
-     * on; committing it means the next clone inherits it and a teammate's agent talks to someone
-     * else's Observatory. The port lives in `sidecar.env`, which is ignored, and every caller that
-     * needs it reads `appliedAt`/`profileIds` from here and the URL from there.
+     * on; carrying it means the next clone inherits it and a teammate's agent talks to someone else's
+     * Observatory. The port lives in `sidecar.env`, which is ignored for the same reason, and every
+     * caller that needs it reads the URL from there.
      */
     const { sidecarUrl: _machineLocal, ...shared } = bootstrap;
     void _machineLocal;

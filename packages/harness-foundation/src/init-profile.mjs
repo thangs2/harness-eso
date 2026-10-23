@@ -24,7 +24,8 @@ function isHostInstallRelative(relative) {
         relative.endsWith('sidecar.env') ||
         relative.includes('/hooks/harness-eso/') ||
         relative.startsWith('.harness/host-pack') ||
-        relative === '.harness/host-bootstrap.json'
+        relative === '.harness/host-bootstrap.json' ||
+        relative === '.harness/host-install-state.json'
     );
 }
 

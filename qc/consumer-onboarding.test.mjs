@@ -14,7 +14,12 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { ensureSessionGitignore, ensureHarnessGitignore, ensureConsumerOnboarding } from '../packages/harness-foundation/src/host-install.mjs';
+import {
+    ensureSessionGitignore,
+    ensureHarnessGitignore,
+    ensureConsumerOnboarding,
+    untrackIgnoredPaths,
+} from '../packages/harness-foundation/src/host-install.mjs';
 import { syncConsumerDocs } from '../packages/harness-cli/src/fix-consumer-cmd.mjs';
 import { runCapabilityProbe } from '../packages/harness-cli/src/capability-probe-cmd.mjs';
 
@@ -352,13 +357,19 @@ test('capability probe accepts a positional consumer instead of treating it as t
     assert.equal(report.root, path.resolve(root));
 });
 
-test('the seeded checklist and diagnostic are committed, not trapped by .harness/.gitignore', () => {
+test('the seeded checklist and diagnostic leave the index with the rest of the install', () => {
     const root = tempRoot();
     ensureHarnessGitignore(root);
     const body = fs.readFileSync(path.join(root, '.harness', '.gitignore'), 'utf8');
+    /*
+     * These are written by the provision, so a committed copy is a copy that goes stale in the
+     * repository while the machine runs a newer one. The checklist tells the operator how to recover a
+     * consumer; the recovery command is what has to be current, and `provision.sh` is where they get it.
+     */
     for (const f of ['ONBOARDING.md', 'diagnostics.sh']) {
-        assert.match(body, new RegExp(`^!${f.replace('.', '\\.')}$`, 'm'), `${f} must be admitted`);
+        assert.doesNotMatch(body, new RegExp(`^!${f.replace('.', '\\.')}$`, 'm'), `${f} is provisioned, not reviewed`);
     }
+    assert.match(body, /^!README\.md$/m, 'README is the one file that explains the convention');
 });
 
 /*
@@ -376,11 +387,98 @@ function gitIgnored(root, relPath) {
     return r.status === 0;
 }
 
-test('sidecar.env is per-machine state: ignored, while the example is committed', () => {
+test('everything .harness holds is machine-local except the rules that define it', () => {
+    const root = tempRoot();
+    ensureHarnessGitignore(root);
+    /*
+     * Asserted by file and not by prose. A provision regrows every one of these, so committing any of
+     * them makes `git status` dirty after a clone — the state x79 was in. `.gitignore` and `README.md`
+     * are the two files a newcomer has to be able to read before they provision anything.
+     */
+    for (const rel of [
+        '.harness/host-pack/harness-hook.mjs',
+        '.harness/host-pack/host-pack.json',
+        '.harness/host-bootstrap.json',
+        '.harness/host-install-state.json',
+        '.harness/sidecar.env',
+        '.harness/decision-policy.json',
+        '.harness/integrations.json',
+        '.harness/ONBOARDING.md',
+        '.harness/WORKFLOW_GUIDE.md',
+        '.harness/diagnostics.sh',
+        '.harness/eso-coverage.json',
+    ]) {
+        assert.equal(gitIgnored(root, rel), true, `${rel} belongs to one checkout`);
+    }
+    for (const rel of ['.harness/.gitignore', '.harness/README.md']) {
+        assert.equal(gitIgnored(root, rel), false, `${rel} defines the rules and is committed`);
+    }
+});
+
+test('a consumer can still commit a file it decides to own', () => {
+    const root = tempRoot();
+    ensureHarnessGitignore(root);
+    /*
+     * A re-provision rewrites the file, so an operator exception has to survive being filtered: the rule
+     * is not one of ours, and removing it would silently un-commit the file they chose to version.
+     */
+    fs.appendFileSync(path.join(root, '.harness/.gitignore'), '!my-own-file.json\n');
+    ensureHarnessGitignore(root);
+    ensureHarnessGitignore(root);
+    assert.match(fs.readFileSync(path.join(root, '.harness/.gitignore'), 'utf8'), /^!my-own-file\.json$/m);
+});
+
+test('a rule the product has stopped admitting is removed, not preserved', () => {
+    const root = tempRoot();
+    fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
+    /*
+     * The shape on disk in every consumer provisioned before the pack stopped being admitted. Leaving
+     * these lines in place made the old allowlist permanent: the missing-rule check saw every rule as
+     * present, so the run answered "skip" and the pack stayed committed.
+     */
+    const legacy = [
+        '*',
+        '!sidecar.env',
+        '!decision-policy.json',
+        '!integrations.json',
+        '!WORKFLOW_GUIDE.md',
+        '!ONBOARDING.md',
+        '!diagnostics.sh',
+        '!sidecar.env.example',
+        '!eso-coverage.json',
+        '!host-bootstrap.json',
+        '!host-install-state.json',
+        '!host-pack/',
+        '!host-pack/**',
+        '!.gitignore',
+        '!README.md',
+        '# harness-eso: per-user session state, never commit',
+        'sidecar.env',
+        '*/session/*',
+        '!**/session/README.md',
+        '',
+    ].join('\n');
+    fs.writeFileSync(path.join(root, '.harness/.gitignore'), legacy);
+
+    assert.equal(ensureHarnessGitignore(root).action, 'write');
+    const body = fs.readFileSync(path.join(root, '.harness/.gitignore'), 'utf8');
+    assert.match(body, /^!README\.md$/m);
+    for (const gone of ['!host-pack/', '!host-pack/**', '!host-bootstrap.json', '!decision-policy.json', '!sidecar.env.example']) {
+        assert.ok(!body.split('\n').includes(gone), `${gone} is not ours to admit any more`);
+    }
+    assert.equal(ensureHarnessGitignore(root).action, 'skip', 'and the second run has nothing to do');
+});
+
+test('sidecar.env is machine-local: ignored, and so is the example it was modelled on', () => {
     const root = tempRoot();
     ensureHarnessGitignore(root);
     assert.equal(gitIgnored(root, '.harness/sidecar.env'), true, 'the token file must never be committed');
-    assert.equal(gitIgnored(root, '.harness/sidecar.env.example'), false, 'the example is documentation');
+    /*
+     * The example used to be admitted as documentation. Now that nothing under `.harness/` is committed,
+     * an admitted example would be the single tracked artifact of a provisioned directory — the same
+     * diff-after-provision failure at a smaller scale. The template lives in the product's `templates/`.
+     */
+    assert.equal(gitIgnored(root, '.harness/sidecar.env.example'), true, 'the example is provisioned too');
 });
 
 test('session state is ignored and the session README is not', () => {
@@ -397,8 +495,98 @@ test('session state is ignored and the session README is not', () => {
     assert.equal(gitIgnored(root, '.cursor/session/README.md'), false, 'a directory nobody documents gets deleted');
 });
 
-test('ensureSessionGitignore ignores contents, not the directory, and is idempotent', () => {
+/*
+ * The ignore rule cannot reach a file that was committed before the rule existed: git only consults
+ * `.gitignore` for untracked paths. Every consumer provisioned before the pack stopped being admitted
+ * is in that state, and x79 also carries the hand-committed `sidecar.env`.
+ */
+function git(root, ...args) {
+    const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    assert.equal(r.status, 0, `git ${args.join(' ')} failed: ${r.stderr}`);
+    return r.stdout.replace(/\0$/, '').trim();
+}
+
+/** What `git ls-files` says is tracked under `.harness/`, sorted. */
+function trackedHarness(root) {
+    return git(root, 'ls-files', '-z', '--', '.harness').split('\0').filter(Boolean).sort();
+}
+
+test('a sidecar.env committed before the rule existed is released from the index', () => {
     const root = tempRoot();
+    fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.harness/sidecar.env'), 'HARNESS_SIDECAR_URL=http://127.0.0.1:1\n');
+    ensureHarnessGitignore(root);
+    git(root, 'init', '-q');
+    git(root, 'add', '-f', '.harness/sidecar.env');
+
+    assert.deepEqual(untrackIgnoredPaths(root), { released: ['.harness/sidecar.env'], deleted: [] });
+    assert.deepEqual(trackedHarness(root), [], 'nothing of ours left in the index');
+    assert.ok(fs.existsSync(path.join(root, '.harness/sidecar.env')), 'untracking is not deleting');
+    assert.deepEqual(untrackIgnoredPaths(root), { released: [], deleted: [] }, 'a second provision has nothing left');
+});
+
+test('everything a consumer committed under .harness leaves except the rules themselves', () => {
+    const root = tempRoot();
+    ensureHarnessGitignore(root);
+    git(root, 'init', '-q');
+    /*
+     * Force past the ignore rules, the way a consumer that provisioned under the old allowlist did — the
+     * pack, the policy and the docs were all admitted then. The split asserted below is the whole product
+     * of this function: what describes the rules stays, what a provision regrows leaves.
+     */
+    const committed = [
+        '.harness/README.md',
+        '.harness/decision-policy.json',
+        '.harness/integrations.json',
+        '.harness/WORKFLOW_GUIDE.md',
+        '.harness/ONBOARDING.md',
+        '.harness/diagnostics.sh',
+        '.harness/sidecar.env.example',
+        '.harness/host-pack/harness-hook.mjs',
+        '.harness/host-pack/host-pack.json',
+        '.harness/host-bootstrap.json',
+        '.harness/host-install-state.json',
+        '.harness/sidecar.env',
+    ];
+    for (const rel of committed) {
+        fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+        fs.writeFileSync(path.join(root, rel), 'x\n');
+        git(root, 'add', '-f', rel);
+    }
+
+    const { released, deleted } = untrackIgnoredPaths(root);
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(released.sort(), committed.filter((rel) => rel !== '.harness/README.md').sort());
+    assert.deepEqual(trackedHarness(root), ['.harness/README.md']);
+});
+
+test('a committed file that no longer exists loses only its index entry', () => {
+    const root = tempRoot();
+    ensureHarnessGitignore(root);
+    git(root, 'init', '-q');
+    fs.mkdirSync(path.join(root, '.harness/host-pack'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.harness/host-pack/route-hook.py'), 'x\n');
+    git(root, 'add', '-f', '.harness/host-pack/route-hook.py');
+    fs.rmSync(path.join(root, '.harness/host-pack/route-hook.py'));
+
+    // The file is gone, so `git rm --cached` without `--ignore-unmatch` refuses — and a stale deletion
+    // in the index is exactly what shows up in every teammate's tree.
+    assert.deepEqual(untrackIgnoredPaths(root), { released: [], deleted: ['.harness/host-pack/route-hook.py'] });
+    assert.deepEqual(trackedHarness(root), []);
+});
+
+test('untracking is a no-op outside a git repository', () => {
+    const root = tempRoot();
+    fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.harness/sidecar.env'), 'x\n');
+    assert.deepEqual(
+        untrackIgnoredPaths(root),
+        { released: [], deleted: [] },
+        'provisioning a plain directory must not require git',
+    );
+});
+
+test('ensureSessionGitignore ignores contents, not the directory, and is idempotent', () => {    const root = tempRoot();
     fs.writeFileSync(path.join(root, '.gitignore'), '');
     ensureSessionGitignore(root, 'cursor');
     const first = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');

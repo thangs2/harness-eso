@@ -393,10 +393,10 @@ test('add-ide rejects an unknown profile and names the shipped ones', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Clone survivability: the pack must be committable
+// Clone survivability: what a clone carries, and what only this checkout has
 // ---------------------------------------------------------------------------
 
-test('provision admits the host pack, and still ignores runtime state, in a consumer .harness/.gitignore', () => {
+test('provision keeps the pack and the machine-local records out of a consumer .harness/.gitignore', () => {
     const root = tempConsumer();
     fs.mkdirSync(path.join(root, '.harness'), { recursive: true });
     fs.writeFileSync(
@@ -408,13 +408,17 @@ test('provision admits the host pack, and still ignores runtime state, in a cons
 
     const rules = fs.readFileSync(path.join(root, '.harness/.gitignore'), 'utf8');
     /*
-     * The pack must be *admitted*, not excluded. A clone whose `hooks.json` points at
-     * `.harness/host-pack/harness-hook.mjs` that git never carried has every guard failing closed,
-     * which makes the consumer's IDE unusable — the failure this whole list exists to prevent.
+     * The pack is build output of one release, rewritten on every provision: a teammate cannot review
+     * it, and a clone that carries it would silently disagree with the pack the hooks are supposed to
+     * run. The consumer re-provisions instead — `verify consumer` names a missing pack. The operator's
+     * regression this replaced was the opposite: the pack *was* admitted, and every provision put a
+     * generated blob and a version stamp into the review.
      */
-    assert.match(rules, /^!host-pack\/$/m, 'the pack directory must be committed');
-    assert.match(rules, /^!host-pack\/\*\*$/m, 'and its contents');
-    assert.doesNotMatch(rules, /^!harness\.db$/m, 'runtime state must stay ignored');
+    assert.doesNotMatch(rules, /^!host-pack/m, 'the pack is this checkout\'s install, not the team\'s');
+    assert.doesNotMatch(rules, /^!host-install-state\.json$/m, 'our hook ledger is per machine');
+    assert.doesNotMatch(rules, /^!host-bootstrap\.json$/m, 'the bootstrap stamp names this checkout');
+    assert.doesNotMatch(rules, /^!sidecar\.env$/m, 'the token file must never be admitted by the allowlist');
+    assert.doesNotMatch(rules, /^!integrations\.json$/m, 'the adapter map is provisioned too');
     assert.match(rules, /^\*$/m, 'the blanket ignore must survive');
 });
 
@@ -435,15 +439,16 @@ test('gitignore repair is additive and idempotent', () => {
     assert.equal(fs.readFileSync(ignorePath, 'utf8'), first, 'repeat runs must not grow the file');
 });
 
-test('a consumer with no .harness/.gitignore gets the convention plus our rules', () => {
+test('a consumer with no .harness/.gitignore gets a convention that admits only the rules', () => {
     const root = tempConsumer();
     writeConsumerConfig(root);
     installHostPack(root);
     const rules = fs.readFileSync(path.join(root, '.harness/.gitignore'), 'utf8');
-    assert.match(rules, /^\*$/m, 'runtime state must be ignored by default');
-    assert.match(rules, /^!decision-policy\.json$/m, 'decision-policy must be committed — hooks read it');
-    assert.match(rules, /^!host-pack\/\*\*$/m, 'host-pack must be committed — hooks import it');
-    assert.match(rules, /^!diagnostics\.sh$/m, 'the diagnostic is operator-facing content, not state');
+    assert.match(rules, /^\*$/m, 'everything is machine-local by default');
+    assert.match(rules, /^!README\.md$/m, 'a directory nobody documents is one people delete');
+    assert.doesNotMatch(rules, /^!decision-policy\.json$/m, 'the policy is regenerated per provision');
+    assert.doesNotMatch(rules, /^!host-pack/m, 'the pack is installed per checkout, not cloned');
+    assert.doesNotMatch(rules, /^!diagnostics\.sh$/m, 'the diagnostic is provisioned content, not state');
 });
 
 test('both superset profiles wire the same hook implementations', () => {
