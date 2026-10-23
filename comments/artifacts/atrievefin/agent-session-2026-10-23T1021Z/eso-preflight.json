@@ -1,0 +1,96 @@
+{
+  "ok": true,
+  "at": "2026-10-23T11:21:18Z",
+  "harnessTree": "cursor",
+  "generationId": "5be57c02-30ac-43b5-bf53-2e8a76f87bb0",
+  "conversationId": "8555a188-e3e0-4a0d-bf9a-56b51b6f41e4",
+  "userQueryStem": "errror response wrapper message",
+  "fingerprint": "4fe2b865d78caded",
+  "cognitiveState": "STALE",
+  "pinnedInvariants": [],
+  "domain": "root",
+  "contractMissing": true,
+  "allowWrite": false,
+  "level": "insufficient",
+  "score": 0,
+  "mode": "hint",
+  "enforceWrites": "fail_closed",
+  "gaps": [
+    {
+      "kind": "law",
+      "query": "harness-tooling",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "decision-facade",
+      "priority": 1
+    },
+    {
+      "kind": "law",
+      "query": "harness-eso",
+      "priority": 1
+    },
+    {
+      "kind": "code",
+      "query": "need at least 1 file read(s); have 0",
+      "priority": 2
+    }
+  ],
+  "lawMisses": [
+    "harness-tooling",
+    "decision-facade",
+    "harness-eso"
+  ],
+  "brainTierHint": "flash",
+  "surface": {
+    "bucket": "root"
+  },
+  "metrics": {
+    "latencyMsTotal": 2128
+  },
+  "verdict": {
+    "contractVersion": "1.0.0",
+    "at": "2026-10-23T11:21:18Z",
+    "requestId": "5be57c02-30ac-43b5-bf53-2e8a76f87bb0",
+    "phase": "preflight",
+    "sufficiency": {
+      "level": "insufficient",
+      "score": 0,
+      "gaps": [
+        {
+          "kind": "law",
+          "query": "harness-tooling",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "decision-facade",
+          "priority": 1
+        },
+        {
+          "kind": "law",
+          "query": "harness-eso",
+          "priority": 1
+        },
+        {
+          "kind": "code",
+          "query": "need at least 1 file read(s); have 0",
+          "priority": 2
+        }
+      ]
+    },
+    "allowPromptSubmit": true,
+    "allowProtectedWrite": false,
+    "hardBlockers": [],
+    "consent": {
+      "required": false,
+      "state": "not_required"
+    },
+    "enforceWrites": "fail_closed",
+    "esoMode": "hint",
+    "jevOnPartial": false,
+    "evidenceBundleRef": null,
+    "decisionRef": null
+  }
+}

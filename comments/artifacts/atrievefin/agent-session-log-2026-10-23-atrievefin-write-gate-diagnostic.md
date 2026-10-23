@@ -152,7 +152,7 @@ at `closed: 2, required: 4`. The probe that should have produced them is the `la
 returned zero rows for those queries, and the preflight recorded the **empty result as a required gap**
 instead of as a miss.
 
-This is the mechanism behind F-01/F-02 in the finso log ("`law:*` gap unclosable from a Shell/Markdown
+This is the mechanism behind F-01/F-02 in the `fineso` log ("`law:*` gap unclosable from a Shell/Markdown
 turn"; "both `law:*` queries score 0"). Differently surfaced here: on atrievefin the terms are not merely
 ranked low, they are absent from the corpus, so the gap is unsatisfiable rather than hard to satisfy.
 
@@ -170,8 +170,8 @@ before a full `Read`, `codegraph_explore` before Grep). Measured:
 - `codegraph_explore("decision-facade")` → correct symbols (`FacadeEnv`, `errorEnvelope`, `loadEnv`,
   guard hooks), returned after the denial had already been decided.
 
-So a session can hold the right documents in context — `AGENTS.md`, `ATF-API-001`, `ATF-WBS-002`,
-`market`-grade source — and still be scored `0.6333` on bookkeeping it cannot influence. The evidence
+So a session can hold the right documents in context — `AGENTS.md`, `ATF-API-001`, `ATF-WBS-002` and the
+matching source files — and still be scored `0.6333` on bookkeeping it cannot influence. The evidence
 layer here measures **query-string overlap**, and reports it as sufficiency.
 
 ---

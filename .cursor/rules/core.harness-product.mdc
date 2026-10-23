@@ -39,3 +39,10 @@ Docker (operator): **`docker/observatory.ps1`** (Windows) or **`docker/observato
 Chain: **`core.law-gate`** → Read **`AGENTS.md`** → isolation → agents pipeline (this file). Skills **only** `.cursor/skills/harness-*`. MCP: **`.cursor/mcp.json`** (`docs/03.cursor-mcp.md`).
 
 Codegraph MCP indexes **this** repo. Consumer ingest/transcripts → `codegraph_explore` `projectPath` **x79** (read-only).
+
+## Before changing gate behaviour
+
+Read `documents/05.development/09.gate-defect-register.md` — **§3 "Do not re-bug"** and **§5 rulings**, then
+the row(s) for the symbol you touch. A change that appears in §3 restores a bug that already shipped to a
+consumer; the register names the invariant each row broke and the test that proves a fix (G2: the test must
+go red when the fix is reverted).
