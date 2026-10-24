@@ -81,6 +81,20 @@ export function buildPreflightProjection(turn, result, opts = {}) {
          * own `.eso-preflight.json` because the document did not say which terms were being demanded.
          */
         pack: result.pack ? { bucket: result.pack.bucket, requiredDocTerms: result.pack.requiredDocTerms ?? [] } : null,
+        /**
+         * Which provider answered each source kind, and how it was chosen (`native` · `id:<adapter>` ·
+         * `none` · `exhausted` · `disabled`).
+         *
+         * Recorded because the registry already computed it and every caller discarded it, which made
+         * two very different turns look identical afterwards: *this consumer elected the host's native
+         * harness* and *eso looked and found nothing*. The first is a configuration decision working as
+         * intended; the second is a gate that will keep failing. Only the election says which.
+         *
+         * Kept as `{reason, providerId}` rather than a single string: `native` names a capability class
+         * the policy asked for, `id:docgraph-cli` names a provider. Collapsing them loses the difference
+         * between "the host answered" and "an external tool answered".
+         */
+        elections: result.retrieval?.elections ?? result.collected?.retrieval?.elections ?? null,
         brainTierHint: turn.brainTierHint || 'flash',
         surface,
         metrics: { latencyMsTotal: opts.latencyMs ?? 0 },

@@ -93,6 +93,29 @@ export function createSourceRegistry(policy, extra = [], options = {}) {
         },
 
         /**
+         * Every kind's election in one object: `{ law: {reason, providerId}, ... }`.
+         *
+         * `resolveWithReason` answers for one kind and is easy to call and then discard — which is
+         * exactly what happened: the registry knew which provider answered and every caller threw it
+         * away, so "the consumer elected native" was indistinguishable from "nothing was found".
+         * A whole-policy snapshot is what a turn records, so the callers that record have one thing to
+         * call and no reason to reach for the lossy one.
+         *
+         * @param {string[]} [kinds]
+         */
+        elections(kinds = ['law', 'code', 'memory']) {
+            const out = {};
+            for (const kind of kinds) {
+                const { adapter, reason } = this.resolveWithReason(kind);
+                // `providerId` is what the provider calls itself; `reason` says how it was chosen.
+                // Both are kept because `id:docgraph-cli` and `native` are different claims: one names
+                // a provider, the other names a *capability class* the policy asked for.
+                out[kind] = { reason, providerId: adapter?.id ?? null };
+            }
+            return out;
+        },
+
+        /**
          * The same answer plus WHY, so a trace can say `native`, `id:docgraph-cli`, `none` or
          * `exhausted` instead of leaving an absent provider unexplained.
          */

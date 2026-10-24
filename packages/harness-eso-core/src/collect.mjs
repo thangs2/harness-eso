@@ -180,6 +180,14 @@ export async function runCollect(input, ctx) {
     const trace = [];
     const lawMisses = [];
 
+    /*
+     * Which provider answered, per kind — recorded before any fetch so an exception or an empty
+     * answer cannot lose it. This is the evidence that "the consumer elected native", and it is what
+     * made the old behaviour a defect: the registry computed this and every caller discarded it, so an
+     * elected-native turn and an "eso found nothing" turn were identical to an operator.
+     */
+    const elections = typeof registry.elections === 'function' ? registry.elections() : null;
+
     const lawAdapter = registry.resolve('law');
     if (lawAdapter) {
         /*
@@ -226,6 +234,7 @@ export async function runCollect(input, ctx) {
     const retrieval = {
         snippets,
         trace,
+        elections,
         reads: ctx.reads || { readCount: 0, paths: [] },
     };
     const stem = ctx.stem ?? input?.userQueryStem ?? '';
