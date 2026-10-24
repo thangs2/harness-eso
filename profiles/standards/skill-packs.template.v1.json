@@ -1,0 +1,71 @@
+{
+    "version": 1,
+    "$comment": [
+        "TEMPLATE — copy to <your-repo>/.harness/skill-packs.json and edit.",
+        "",
+        "A pack answers one question for one kind of work: to be competent at a `backend` change",
+        "in THIS repo, which law must the agent have read, and which code must it have looked at?",
+        "The answer is a property of your repository, so you write it here. The product ships",
+        "none of it and will never guess — an undeclared bucket demands nothing.",
+        "",
+        "`keys` are the kinds of work the router can detect (surface `bucket`): `backend`,",
+        "`frontend`, `tools`, `docs`, `root`, `general`. Any other key is legal — it is reachable",
+        "by naming it in `packName`, which is how one bucket splits into finer packs.",
+        "",
+        "Fields, all optional:",
+        "  requiredDocTerms  document names that must appear in retrieved law. A term that no",
+        "                    document can answer becomes a gap nothing can close, so name only",
+        "                    documents that actually exist in your law index.",
+        "  minReadPaths      how many files the agent must have read before it may write.",
+        "  lawQueries        what to ask the law adapter for. Must cover requiredDocTerms.",
+        "  codeQueries       what to ask the code adapter for.",
+        "  description       operator-facing only; never used for a decision.",
+        "",
+        "This file is read by COLLECT on every turn, so keep it small.",
+        "Delete this `$comment` block after copying — it is here to be read once."
+    ],
+    "packs": {
+        "backend": {
+            "description": "EXAMPLE — replace with your backend law",
+            "requiredDocTerms": ["technical-standards"],
+            "minReadPaths": 1,
+            "lawQueries": ["technical-standards"],
+            "codeQueries": ["backend/"]
+        },
+        "frontend": {
+            "description": "EXAMPLE — replace with your frontend law",
+            "requiredDocTerms": [],
+            "minReadPaths": 1,
+            "lawQueries": [],
+            "codeQueries": ["frontend/"]
+        },
+        "tools": {
+            "description": "EXAMPLE — replace with your tooling law",
+            "requiredDocTerms": [],
+            "minReadPaths": 0,
+            "lawQueries": [],
+            "codeQueries": ["tools/"]
+        },
+        "docs": {
+            "description": "EXAMPLE — prose only, no code evidence required",
+            "requiredDocTerms": [],
+            "minReadPaths": 0,
+            "lawQueries": [],
+            "codeQueries": []
+        },
+        "root": {
+            "description": "EXAMPLE — repo-wide work; demanding nothing is the safe default",
+            "requiredDocTerms": [],
+            "minReadPaths": 0,
+            "lawQueries": [],
+            "codeQueries": []
+        },
+        "general": {
+            "description": "EXAMPLE — fallback when no kind of work was recognised",
+            "requiredDocTerms": [],
+            "minReadPaths": 0,
+            "lawQueries": [],
+            "codeQueries": []
+        }
+    }
+}

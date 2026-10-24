@@ -62,6 +62,28 @@ function tempConsumer(policyOverrides = {}) {
         path.join(root, '.harness', 'decision-policy.json'),
         JSON.stringify(policy, null, 2),
     );
+    /*
+     * The packs this fixture needs, declared the way a real consumer declares them.
+     *
+     * These used to come from a built-in table inside eso-core, which meant every consumer inherited
+     * one repository's law terms whether or not those documents existed there (G-01). The table is
+     * gone, so a fixture that wants a strict `tools` pack has to say so — which is also the only way a
+     * test can prove the manifest is actually read.
+     */
+    fs.writeFileSync(
+        path.join(root, '.harness', 'skill-packs.json'),
+        JSON.stringify({
+            version: 1,
+            packs: {
+                tools: {
+                    description: 'harness tooling work',
+                    requiredDocTerms: ['harness-tooling', 'decision-facade'],
+                    minReadPaths: 1,
+                    lawQueries: ['harness-tooling'],
+                },
+            },
+        }, null, 2),
+    );
     return root;
 }
 
@@ -313,9 +335,10 @@ test('Preflight Hook: a root prompt with sources off needs no evidence at all (G
 });
 
 test('Preflight Hook: a prompt that names code still gets the COLD gap directive', () => {
-    // `packages/harness-…` routes to the `tools` pack, which demands a read and three law documents —
-    // the strict case this repo owns. The fixture has no law index, so the directive must appear and
-    // must name the terms nothing can answer (G-02).
+    // `packages/harness-…` routes to the `tools` bucket, whose pack this fixture **declares** in
+    // `.harness/skill-packs.json` (the product no longer ships one). It demands a read and two law
+    // documents. The fixture has no law index, so the directive must appear and must name the terms
+    // nothing can answer (G-02).
     const root = tempConsumer();
     fs.mkdirSync(path.join(root, '.cursor', 'session'), { recursive: true });
 

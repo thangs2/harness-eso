@@ -19,6 +19,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { buildTurnVerdict, buildPreflightProjection, resolveSkillPack, runCollect, declaredSources, resolveEsoPolicy } from '@mu/harness-eso-core';
+import { normalisePack, parseSkillPacks } from '@mu/harness-foundation/pure';
 import { denyReasonFor } from './preflight-hook.mjs';
 import { readLawMisses, rememberLawMisses, shouldBlockBrain } from './eso-gap-io.mjs';
 
@@ -34,23 +35,77 @@ const registry = { resolve: (kind) => (kind === 'law' ? emptyLaw : null) };
 
 const ESO = { thresholds: { T_low: 0.45, T_high: 0.72 }, mode: 'hint', enforceWrites: 'fail_closed' };
 
-test('G-01: bucket `root` resolves to the root pack, not to the tools pack', () => {
-    const pack = resolveSkillPack({ bucket: 'root' });
-    assert.equal(pack.bucket, 'root');
-    assert.deepEqual(pack.requiredDocTerms, []);
-    assert.deepEqual(pack.lawQueries, []);
+test('G-01: no bucket ships built-in terms — an undeclared pack is empty', () => {
+    /*
+     * The original fix gave `root` its own pack and kept `tools` carrying `harness-tooling`. That still
+     * left the product shipping one consumer's domain terms to every consumer, which is the disease
+     * G-01 describes; the table has since been deleted. What must hold now: **every** bucket, named or
+     * invented, resolves to an empty undeclared pack until the consumer declares one.
+     */
+    for (const bucket of ['root', 'tools', 'backend', 'frontend', 'docs', 'general', 'never-heard-of-it']) {
+        const pack = resolveSkillPack({ bucket });
+        assert.equal(pack.bucket, bucket);
+        assert.equal(pack.declared, false, `${bucket} must be undeclared, not silently populated`);
+        assert.deepEqual(pack.requiredDocTerms, [], `${bucket} must demand no terms`);
+        assert.deepEqual(pack.lawQueries, []);
+        assert.deepEqual(pack.codeQueries, []);
+        assert.equal(pack.minReadPaths, 0);
+    }
 
-    // The tools pack keeps its own terms: this fix must not disarm `harness-eso` itself.
-    const tools = resolveSkillPack({ bucket: 'tools' });
-    assert.equal(tools.bucket, 'tools');
-    assert.ok(tools.requiredDocTerms.includes('harness-tooling'));
+    // A bucket is not invented by the product either: an unknown one is reported as itself.
+    assert.equal(resolveSkillPack({}).bucket, 'general');
 
-    // A consumer that *names* the terms still gets them (`skillPacks` in its own policy).
+    // A consumer that *names* the terms still gets them (`skillPacks` in its own policy — legacy path).
     const declared = resolveSkillPack(
         { bucket: 'root' },
         { skillPacks: { root: { requiredDocTerms: ['their-law'], minReadPaths: 1 } } },
     );
     assert.deepEqual(declared.requiredDocTerms, ['their-law']);
+});
+
+test('G-01: the consumer manifest is the pack source, and wins over the legacy policy map', () => {
+    const manifest = parseSkillPacks({
+        version: 1,
+        packs: { backend: { requiredDocTerms: ['mu-bible'], minReadPaths: 1, codeQueries: ['backend/mu-'] } },
+    });
+
+    const fromManifest = resolveSkillPack({ bucket: 'backend' }, {}, manifest);
+    assert.equal(fromManifest.declared, true);
+    assert.deepEqual(fromManifest.requiredDocTerms, ['mu-bible']);
+    assert.equal(fromManifest.minReadPaths, 1);
+
+    // Policy and manifest for the same bucket: the manifest's fields win, the rest is inherited.
+    const merged = resolveSkillPack(
+        { bucket: 'backend' },
+        { skillPacks: { backend: { requiredDocTerms: ['old'], lawQueries: ['legacy-law'] } } },
+        manifest,
+    );
+    assert.deepEqual(merged.requiredDocTerms, ['mu-bible'], 'manifest wins for the field it declares');
+    assert.deepEqual(merged.lawQueries, ['legacy-law'], 'policy still supplies the field manifest omits');
+
+    // `packName` lets one bucket route to a different declared pack — the "work kind" lever.
+    const named = resolveSkillPack({ bucket: 'backend', packName: 'messaging' }, {}, parseSkillPacks({
+        messaging: { requiredDocTerms: ['rabbitmq-topology'] },
+    }));
+    assert.equal(named.bucket, 'messaging');
+    assert.deepEqual(named.requiredDocTerms, ['rabbitmq-topology']);
+});
+
+test('G-01: a hand-written manifest may omit the version/packs wrapper', () => {
+    const bare = parseSkillPacks({ backend: { requiredDocTerms: ['x'] } });
+    assert.deepEqual(Object.keys(bare), ['backend']);
+    assert.deepEqual(bare.backend.requiredDocTerms, ['x']);
+
+    // Junk in, nothing out — never a throw, never a guess.
+    assert.deepEqual(parseSkillPacks(null), {});
+    assert.deepEqual(parseSkillPacks('nope'), {});
+    assert.deepEqual(parseSkillPacks({ version: 1 }), {});
+    // Unknown keys are dropped, so a typo cannot become live data — and an omitted field is *absent*,
+    // not defaulted, so it cannot overwrite a legacy policy value during the merge.
+    assert.deepEqual(normalisePack({ requiredDocTerm: ['typo'] }), {});
+    assert.deepEqual(Object.keys(normalisePack({})), []);
+    assert.deepEqual(normalisePack({ lawQueries: ['a', '', 3] }), { lawQueries: ['a'] });
+    assert.deepEqual(normalisePack({ minReadPaths: -1 }), { minReadPaths: 0 });
 });
 
 test('G-01: an undeclared source is off; a declared one is kept', () => {

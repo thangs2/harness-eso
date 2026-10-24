@@ -18,7 +18,8 @@ export {
     harnessDir,
     sessionDir,
 } from './paths.mjs';
-export { DEFAULT_POLICY, loadDecisionPolicy, loadDecisionPolicyForCwd } from './policy-load.mjs';
+export { DEFAULT_POLICY, loadDecisionPolicy, loadDecisionPolicyForCwd, loadSkillPacks, SKILL_PACKS_NAME } from './policy-load.mjs';
+export { EMPTY_PACK, normalisePack, parseSkillPacks } from './skill-packs.mjs';
 /*
  * Shell write detection. Lives here, not in the observe server, because the **host pack** needs it
  * too: the pack's `shell-targets` hook is what the consumer's shell guard calls to find out which

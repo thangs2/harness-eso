@@ -45,6 +45,12 @@ test('GATE fail_closed blocks protected write when insufficient', async () => {
                     enforceWrites: 'fail_closed',
                     thresholds: { T_low: 0.45, T_high: 0.72 },
                     cognition: { insufficientPromptGate: 'consent' },
+                    /*
+                     * Declared here because the product no longer ships a `tools` pack (G-01). Without
+                     * a pack nothing is required, `gaps` is empty and the write is allowed — which would
+                     * make this test assert the opposite of what it is named for.
+                     */
+                    skillPacks: { tools: { requiredDocTerms: ['harness-tooling'], minReadPaths: 1 } },
                 },
             },
             injectSnippets: [],

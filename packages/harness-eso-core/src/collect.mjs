@@ -1,3 +1,5 @@
+import { loadSkillPacks, parseSkillPacks } from '@mu/harness-foundation/pure';
+
 import { createSourceRegistry } from './adapter-registry.mjs';
 import { resolveSkillPack } from './skill-pack.mjs';
 
@@ -164,7 +166,15 @@ export function lawTermsFor(pack) {
  * @param {{ policy: object, eso: object, surface: object, stem: string, root?: string, reads?: object, registry?: object, injectSnippets?: object[] }} ctx
  */
 export async function runCollect(input, ctx) {
-    const pack = resolveSkillPack(ctx.surface, ctx.policy || ctx.eso);
+    /*
+     * The consumer's `.harness/skill-packs.json` is the pack source; the policy's `skillPacks` map is a
+     * legacy fallback. Loaded here (not by the caller) so every path into COLLECT — hook, sidecar,
+     * HTTP projection, DSH plugin — reads the same file and cannot disagree about what a bucket needs.
+     * `ctx.skillPacks` is an explicit override, which is how a test or a host shim supplies packs
+     * without touching disk.
+     */
+    const manifestPacks = ctx.skillPacks ?? (ctx.root ? loadSkillPacks({ root: ctx.root }).packs : parseSkillPacks(undefined));
+    const pack = resolveSkillPack(ctx.surface, ctx.policy || ctx.eso, manifestPacks);
     const registry = ctx.registry || createSourceRegistry(ctx.policy);
     const snippets = [...(ctx.injectSnippets || [])];
     const trace = [];
