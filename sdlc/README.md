@@ -47,6 +47,7 @@ Bỏ trống có chủ ý (thêm khi có nội dung thật, không tạo folder 
 | Thứ | SoT | Ghi chú |
 |---|---|---|
 | Vision · mission · goals · objectives | [`01.inception/01.vision/01.vision-mission-goals.md`](./01.inception/01.vision/01.vision-mission-goals.md) | hợp nhất vision+mission+goals+objectives trong **một** file để không lệch nhau |
+| **Vì sao sản phẩm tồn tại** (5 pain point) | [`01.inception/00.problem.md`](./01.inception/00.problem.md) | nguồn gốc; vision lệch file này thì vision sai |
 | Quyết định sản phẩm (đã chốt / còn treo) | [`01.inception/02.decision-log/00.index.md`](./01.inception/02.decision-log/00.index.md) | `D-nn` chốt · `Q-nn` treo, **bắt buộc** có tiêu chí chốt |
 | Mô hình bề mặt (Console/Observatory, tầng đọc) | [`04.architecture/02.product-surfaces.md`](./04.architecture/02.product-surfaces.md) | thiết kế mức cao; trang/component là tầng thấp, chưa chốt |
 | WBS | [`08.wbs/00.index.md`](./08.wbs/00.index.md) | **chỉ ở đây**. Không tạo WBS thứ hai |
