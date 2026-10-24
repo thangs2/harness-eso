@@ -24,10 +24,11 @@ tượng ta đang xây. Việc của consumer thuộc SDLC của chính consumer
 ```text
 00.governance      luật của tree này: cái gì là SoT, cái gì được cite
  → 01.inception    vision · mission · goals · objectives — vì sao tồn tại, đi đâu
- → 02.requirements  sản phẩm phải LÀM được gì (phát biểu kiểm chứng được)
- → 04.architecture  mô hình: trục sản phẩm, seam, provider, graph
- → 08.wbs           WBS duy nhất — Feature → Epic → Story → Task
- → 10.test          phép thử nói lên "done" nghĩa là gì
+ → 02.landscape     bối cảnh: sản phẩm đứng ở đâu, ai cho gì, chỗ ta không chơi
+ → 02.requirements   sản phẩm phải LÀM được gì (phát biểu kiểm chứng được)
+ → 04.architecture   mô hình: trục sản phẩm, bề mặt, seam, provider, graph
+ → 08.wbs            WBS duy nhất — Feature → Epic → Story → Task
+ → 10.test           phép thử nói lên "done" nghĩa là gì
 ```
 
 Bỏ trống có chủ ý (thêm khi có nội dung thật, không tạo folder rỗng): `03.analysis`, `06.data-design`,
@@ -47,6 +48,7 @@ Bỏ trống có chủ ý (thêm khi có nội dung thật, không tạo folder 
 |---|---|---|
 | Vision · mission · goals · objectives | [`01.inception/01.vision/01.vision-mission-goals.md`](./01.inception/01.vision/01.vision-mission-goals.md) | hợp nhất vision+mission+goals+objectives trong **một** file để không lệch nhau |
 | Quyết định sản phẩm (đã chốt / còn treo) | [`01.inception/02.decision-log/00.index.md`](./01.inception/02.decision-log/00.index.md) | `D-nn` chốt · `Q-nn` treo, **bắt buộc** có tiêu chí chốt |
+| Mô hình bề mặt (Console/Observatory, tầng đọc) | [`04.architecture/02.product-surfaces.md`](./04.architecture/02.product-surfaces.md) | thiết kế mức cao; trang/component là tầng thấp, chưa chốt |
 | WBS | [`08.wbs/00.index.md`](./08.wbs/00.index.md) | **chỉ ở đây**. Không tạo WBS thứ hai |
 | Sản phẩm là gì / chạy thế nào | `documents/` | reference, không phải direction |
 | Đang hỏng gì | [`documents/05.development/03.open-issues.md`](../documents/05.development/03.open-issues.md) | issue là *hiện trạng*, không phải *kế hoạch* |
