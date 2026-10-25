@@ -21,3 +21,8 @@ __pycache__/
 
 # Docker CLI state (DOCKER_CONFIG) the deploy scripts point here: registry seed, buildx cache.
 .docker-config/
+
+# Local secrets — Jira API token and anything else machine-bound. `.env.example` is the committed
+# template; every other variant is a real credential file and never enters git.
+.env*
+!.env.example
