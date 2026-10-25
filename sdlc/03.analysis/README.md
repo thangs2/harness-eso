@@ -7,6 +7,11 @@
 >
 > Folder này phát biểu câu hỏi đó — theo thứ tự: **ai → làm gì → để làm được thì phải thoả gì**.
 
+## Bắt đầu từ đây
+
+[`00.pain-point-trace.md`](./00.pain-point-trace.md) — **P1–P6 → REQ → UC → US → AC**, và **tài liệu đầu tiên** mỗi nỗi đau
+cần. Đọc cái này trước để biết chỗ nào trống.
+
 ## 1. Cấu trúc
 
 ```text
