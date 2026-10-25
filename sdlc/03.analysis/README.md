@@ -16,7 +16,7 @@
   03.business-rules.md  ✅ luật xuyên use case (BR-01…BR-12)
 02.user-stories/        ✅ US-* sinh từ UC · README + US-SUF-01 + US-SUF-02
 03.acceptance-criteria/ ✅ định dạng + **9 AC** cho US-SUF-01/02
-04.quality-control/     ⬜ scenario matrix (sau khi có AC)
+04.quality-control/     ✅ 01.scenario-matrix.md — 11 SCN · **cổng Stage 3 CHƯA ĐẠT**
 ```
 
 ⬜ = **chưa tạo**, vì chưa có nội dung thật. Repo này không tạo folder rỗng.
