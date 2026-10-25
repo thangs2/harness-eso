@@ -1,3 +1,11 @@
+---
+description: Operator entrypoints are four scripts — never replace a consumer step with raw node/bun/docker
+layer: core
+alwaysApply: true
+version: "1.0.0"
+canonical: AGENTS.md
+---
+
 # Entrypoint discipline — the operator surface is four scripts
 
 **Prerequisite:** `core.law-gate.mdc` (`AGENTS.md` Read this session). This rule narrows *how* an
