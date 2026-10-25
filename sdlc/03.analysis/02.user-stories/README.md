@@ -41,6 +41,8 @@ Thân bài:
 | [`US-IAM-04`](./08.us-iam-04-flows.md) | bàn giao **bị chặn** nếu thiếu bằng chứng | A-02 | UC-04 | P6 | ✅ 3 AC |
 | [`US-IAM-05`](./09.us-iam-05-accept.md) | **accept** nợ có người + hạn | A-01 | UC-11 | P6 | ✅ 4 AC |
 | [`US-IAM-06`](./10.us-iam-06-config.md) | đổi config: **preview** · một lần · **revert** | A-01 | UC-05 | P3 | ✅ 4 AC |
+| [`US-CFG-01`](./11.us-cfg-01-config-page.md) | **một page config**: SDLC · đội · tool · project | A-01 | UC-05 | P3 | ✅ 4 AC |
+| [`US-SDLC-01`](./12.us-sdlc-01-setup.md) | **thiết lập SDLC** vào project: init · check · upgrade | A-01 | UC-05 | P3 | ✅ 5 AC |
 
 ⬜ = AC **chưa viết**; đây là bước kế tiếp của Stage 2, không được coi là Ready.
 

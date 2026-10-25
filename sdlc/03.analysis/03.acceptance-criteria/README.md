@@ -46,8 +46,10 @@ postcondition: phán quyết có được ghi, `basis` có được giữ, `unkn
 | `US-IAM-04` | `AC-IAM-04-01`…`03` | [`08.iam-us-04-flows.md`](./08.iam-us-04-flows.md) | ✅ |
 | `US-IAM-05` | `AC-IAM-05-01`…`04` | [`09.iam-us-05-accept.md`](./09.iam-us-05-accept.md) | ✅ |
 | `US-IAM-06` | `AC-IAM-06-01`…`04` | [`10.iam-us-06-config.md`](./10.iam-us-06-config.md) | ✅ |
+| `US-CFG-01` | `AC-CFG-01-01`…`04` | [`11.cfg-us-01-config-page.md`](./11.cfg-us-01-config-page.md) | ✅ |
+| `US-SDLC-01` | `AC-SDLC-01-01`…`05` | [`12.sdlc-us-01-setup.md`](./12.sdlc-us-01-setup.md) | ✅ |
 
-**Tổng: 15 + 22 = 37 AC.** IAM đóng góp **22**.
+**Tổng: 37 + 9 = 46 AC.** IAM **22** · config/SDLC **9**.
 
 **37 AC.** Mỗi file có ba phần bắt buộc ngoài bảng: **điều kiện sau** (ghi gì), **test sẽ chứng minh** (tên test cụ thể), và
 **AC này KHÔNG kiểm** (ranh giới — để không phình).
