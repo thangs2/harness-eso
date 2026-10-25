@@ -14,8 +14,8 @@
   01.actors.md          ✅ ai — và ai có QUYỀN gì
   02.use-cases.md       ✅ làm gì — UC-* với điều kiện trước/sau
   03.business-rules.md  ⬜ luật đúng ở MỌI use case
-02.user-stories/        ⬜ US-* sinh từ UC, mỗi cái một mẩu giá trị
-03.acceptance-criteria/ ⬜ AC-* bảng 8 cột, truy về US
+02.user-stories/        ✅ US-* sinh từ UC · README + US-SUF-01 + US-SUF-02
+03.acceptance-criteria/ ✅ định dạng AC 8 cột + danh sách id đã giữ chỗ · ⬜ file AC (bước kế tiếp)
 04.quality-control/     ⬜ scenario matrix (sau khi có AC)
 ```
 
