@@ -31,8 +31,8 @@ Thân bài:
 
 | ID | Story | Actor | UC | P | AC |
 |---|---|---|---|---|---|
-| [`US-SUF-01`](./01.us-suf-01-agent.md) | agent biết **phải bổ sung gì** trước khi giao việc | A-02 | UC-01 | P4 | ⬜ 5 AC |
-| [`US-SUF-02`](./02.us-suf-02-operator.md) | người biết **agent có đủ không** trước khi yêu cầu | A-01 | UC-01 | P4 | ⬜ 4 AC |
+| [`US-SUF-01`](./01.us-suf-01-agent.md) | agent biết **phải bổ sung gì** trước khi giao việc | A-02 | UC-01 | P4 | ✅ 5 AC |
+| [`US-SUF-02`](./02.us-suf-02-operator.md) | người biết **agent có đủ không** trước khi yêu cầu | A-01 | UC-01 | P4 | ✅ 4 AC |
 
 ⬜ = AC **chưa viết**; đây là bước kế tiếp của Stage 2, không được coi là Ready.
 

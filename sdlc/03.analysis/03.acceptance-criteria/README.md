@@ -34,13 +34,15 @@ postcondition: phán quyết có được ghi, `basis` có được giữ, `unkn
 
 ## 4. Danh sách AC theo US
 
-| US | AC dự kiến | Trạng thái |
-|---|---|---|
-| `US-SUF-01` | `AC-SUF-01-01`…`05` | ⬜ chưa viết |
-| `US-SUF-02` | `AC-SUF-02-01`…`04` | ⬜ chưa viết |
+| US | AC | File | Trạng thái |
+|---|---|---|---|
+| `US-SUF-01` | `AC-SUF-01-01`…`05` | [`01.suf-us-01-agent.md`](./01.suf-us-01-agent.md) | ✅ |
+| `US-SUF-02` | `AC-SUF-02-01`…`04` | [`02.suf-us-02-operator.md`](./02.suf-us-02-operator.md) | ✅ |
 
-Danh sách id **đã giữ chỗ** trong US tương ứng ([`../02.user-stories/`](../02.user-stories/)). Viết AC là bước kế tiếp, và
-mỗi AC sẽ nằm trong file riêng: `{NN}.{ac-id}.md`.
+**9 AC.** Mỗi file có ba phần bắt buộc ngoài bảng: **điều kiện sau** (ghi gì), **test sẽ chứng minh** (tên test cụ thể), và
+**AC này KHÔNG kiểm** (ranh giới — để không phình).
+
+Danh sách id **đã giữ chỗ** trong US tương ứng ([`../02.user-stories/`](../02.user-stories/)). Mỗi file AC chứa **tất cả AC của một US** — vì AC chỉ có nghĩa trong ngữ cảnh US của nó.
 
 ## 5. Truy vết bắt buộc
 
