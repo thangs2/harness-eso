@@ -41,6 +41,7 @@ Chưa có file nào ngoài `eso-core` — tạo dần, **chỉ khi** miền đó
 | Miền | Trách nhiệm | Trạng thái |
 |---|---|---|
 | [`eso-core`](./01.domains/eso-core.spec.md) | phán quyết: sufficiency · level · mode · requirement | ✅ mẫu |
+| [`02.capabilities/`](./02.capabilities/00.index.md) | **spec theo chức năng** (`< 300 tokens`, `human_sot` trỏ về HUMAN) | ✅ IAM |
 | `eso-knowledge` | ba thế giới · pool/shared/project · promotion | chưa tạo |
 | `eso-graph` | mô hình kiến trúc · nguồn · completeness | chưa tạo |
 | `eso-evidence` | record · risk · provenance · revert | chưa tạo |
