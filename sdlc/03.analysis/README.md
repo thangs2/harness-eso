@@ -19,10 +19,10 @@ cần. Đọc cái này trước để biết chỗ nào trống.
   01.actors.md          ✅ ai — và ai có QUYỀN gì
   02.use-cases.md       ✅ làm gì — UC-* với điều kiện trước/sau
   03.business-rules.md  ✅ luật xuyên use case (BR-01…BR-13)
-  05.iam-functions.md   ✅ kế hoạch 6 chức năng IAM — đã đủ: 6 US + 22 AC
+  05.iam-functions.md   ✅ kế hoạch 6 chức năng IAM — đã đủ: 6 US + 23 AC
   06.eso-features.md    ✅ **danh mục 18 chức năng của harness-eso** + trạng thái (6 ✅ · 1 🟡 · 11 ❌)
 02.user-stories/        ✅ **22 US**: SUF-01…04 · AGENT-01 · KB-01…03 · EV-01/02 · IAM-01…06 · CFG-01 · SDLC-01 · LEARN-01 · HOST-01 · ARCH-01 · TICKET-01
-03.acceptance-criteria/ ✅ **82 AC**
+03.acceptance-criteria/ ✅ **83 AC**
 04.quality-control/     ✅ 01 (11 SCN) · 02.iam-scenario-matrix (**24 SCN**) · **03.iam-rtm** (RTM 4 mắt) · 0 executed
 ```
 
