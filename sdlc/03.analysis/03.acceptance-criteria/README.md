@@ -48,8 +48,18 @@ postcondition: phán quyết có được ghi, `basis` có được giữ, `unkn
 | `US-IAM-06` | `AC-IAM-06-01`…`04` | [`10.iam-us-06-config.md`](./10.iam-us-06-config.md) | ✅ |
 | `US-CFG-01` | `AC-CFG-01-01`…`04` | [`11.cfg-us-01-config-page.md`](./11.cfg-us-01-config-page.md) | ✅ |
 | `US-SDLC-01` | `AC-SDLC-01-01`…`05` | [`12.sdlc-us-01-setup.md`](./12.sdlc-us-01-setup.md) | ✅ |
+| `US-SUF-03` | `AC-SUF-03-01`…`3` | [`13.suf-us-03-proactive.md`](./13.suf-us-03-proactive.md) | ✅ |
+| `US-SUF-04` | `AC-SUF-04-01`…`3` | [`14.suf-us-04-why.md`](./14.suf-us-04-why.md) | ✅ |
+| `US-EV-01` | `AC-EV-01-01`…`4` | [`15.ev-us-01-record.md`](./15.ev-us-01-record.md) | ✅ |
+| `US-EV-02` | `AC-EV-02-01`…`3` | [`16.ev-us-02-revert-mark.md`](./16.ev-us-02-revert-mark.md) | ✅ |
+| `US-KB-02` | `AC-KB-02-01`…`4` | [`17.kb-us-02-select.md`](./17.kb-us-02-select.md) | ✅ |
+| `US-KB-03` | `AC-KB-03-01`…`4` | [`18.kb-us-03-shared-upgrade.md`](./18.kb-us-03-shared-upgrade.md) | ✅ |
+| `US-LEARN-01` | `AC-LEARN-01-01`…`3` | [`19.learn-us-01-propose.md`](./19.learn-us-01-propose.md) | ✅ |
+| `US-HOST-01` | `AC-HOST-01-01`…`4` | [`20.host-us-01-election.md`](./20.host-us-01-election.md) | ✅ |
+| `US-ARCH-01` | `AC-ARCH-01-01`…`4` | [`21.arch-us-01-graph.md`](./21.arch-us-01-graph.md) | ✅ |
+| `US-TICKET-01` | `AC-TICKET-01-01`…`4` | [`22.ticket-us-01-integration.md`](./22.ticket-us-01-integration.md) | ✅ |
 
-**Tổng: 37 + 9 = 46 AC.** IAM **22** · config/SDLC **9**.
+**Tổng: 46 + 36 = 82 AC.**
 
 **37 AC.** Mỗi file có ba phần bắt buộc ngoài bảng: **điều kiện sau** (ghi gì), **test sẽ chứng minh** (tên test cụ thể), và
 **AC này KHÔNG kiểm** (ranh giới — để không phình).
