@@ -33,6 +33,8 @@ Thân bài:
 |---|---|---|---|---|---|
 | [`US-SUF-01`](./01.us-suf-01-agent.md) | agent biết **phải bổ sung gì** trước khi giao việc | A-02 | UC-01 | P4 | ✅ 5 AC |
 | [`US-SUF-02`](./02.us-suf-02-operator.md) | người biết **agent có đủ không** trước khi yêu cầu | A-01 | UC-01 | P4 | ✅ 4 AC |
+| [`US-AGENT-01`](./03.us-agent-01-scope.md) | **vượt phạm vi** bị từ chối và ghi lại | A-01 | UC-04 | P6 | ✅ 3 AC |
+| [`US-KB-01`](./04.us-kb-01-isolation.md) | project mới **không thấy** tri thức project khác | A-01 | UC-05 | P3 | ✅ 3 AC |
 
 ⬜ = AC **chưa viết**; đây là bước kế tiếp của Stage 2, không được coi là Ready.
 
