@@ -22,22 +22,27 @@
 
 **Luật:** AC có hành vi âm (`failure`/`edge`) **phải** có ít nhất một test thuộc loại đó — không được chỉ test `happy`.
 
-## 2. AC phải nêu **điều kiện sau**, không chỉ kết quả
+## 2. AC thuộc **đúng một US**
+
+AC mà cần dùng một US khác để kiểm thì **không độc lập** và không test được một mình. Thuộc tính đúng **xuyên** use case là
+**luật nghiệp vụ** ([`../01.business-analysis/03.business-rules.md`](../01.business-analysis/03.business-rules.md)), không phải AC.
+
+## 3. AC phải nêu **điều kiện sau**, không chỉ kết quả
 
 Một AC chỉ nói *"trả về …"* là chưa đủ, vì nó không nói **cái gì đã được ghi lại**. Ở hệ này, phần lớn giá trị nằm ở
 postcondition: phán quyết có được ghi, `basis` có được giữ, `unknowns[]` có được nêu.
 
-## 3. Danh sách AC theo US
+## 4. Danh sách AC theo US
 
 | US | AC dự kiến | Trạng thái |
 |---|---|---|
 | `US-SUF-01` | `AC-SUF-01-01`…`05` | ⬜ chưa viết |
-| `US-SUF-02` | `AC-SUF-02-01`…`05` | ⬜ chưa viết |
+| `US-SUF-02` | `AC-SUF-02-01`…`04` | ⬜ chưa viết |
 
 Danh sách id **đã giữ chỗ** trong US tương ứng ([`../02.user-stories/`](../02.user-stories/)). Viết AC là bước kế tiếp, và
 mỗi AC sẽ nằm trong file riêng: `{NN}.{ac-id}.md`.
 
-## 4. Truy vết bắt buộc
+## 5. Truy vết bắt buộc
 
 ```text
 P1..P6  ←  UC-nn  ←  US-…  ←  AC-…  ←  test
@@ -45,7 +50,7 @@ P1..P6  ←  UC-nn  ←  US-…  ←  AC-…  ←  test
 
 Thiếu mắt nào cũng là lỗi: AC không truy được về P là AC **bịa**; AC không có test là AC **trang trí**.
 
-## 5. Ba câu phải trả lời được cho mỗi AC
+## 6. Ba câu phải trả lời được cho mỗi AC
 
 1. Test nào chứng minh nó? (nếu không chỉ ra được test ⇒ AC chưa xong)
 2. Nếu nó **sai** thì ai phát hiện, và khi nào? (nếu không ai phát hiện ⇒ AC không có giá trị)

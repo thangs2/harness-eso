@@ -13,9 +13,9 @@
 01.business-analysis/
   01.actors.md          ✅ ai — và ai có QUYỀN gì
   02.use-cases.md       ✅ làm gì — UC-* với điều kiện trước/sau
-  03.business-rules.md  ⬜ luật đúng ở MỌI use case
+  03.business-rules.md  ✅ luật xuyên use case (BR-01…BR-12)
 02.user-stories/        ✅ US-* sinh từ UC · README + US-SUF-01 + US-SUF-02
-03.acceptance-criteria/ ✅ định dạng AC 8 cột + danh sách id đã giữ chỗ · ⬜ file AC (bước kế tiếp)
+03.acceptance-criteria/ ✅ định dạng AC 8 cột · ⬜ file AC (bước kế tiếp)
 04.quality-control/     ⬜ scenario matrix (sau khi có AC)
 ```
 
@@ -28,6 +28,7 @@
 | **UC không nhắc tới công nghệ** | nếu UC nói "Postgres" thì nó là thiết kế, không phải phân tích |
 | **Mỗi UC có điều kiện trước/sau** | không có "sau" thì không biết đã xong chưa |
 | **AC phải test được bằng một test** | luật của [Stages](../00.governance/02.sdlc-workflow.md) §1 |
+| **AC thuộc ĐÚNG một US** | AC dùng US khác thì không test được một mình; luật xuyên suốt là **BR**, không phải AC |
 | **US truy về P1–P6** | không truy được thì nó là ý thích, không phải yêu cầu |
 | **Không chép lại `04.architecture`** | analysis nói *cái gì*, architecture nói *thế nào* |
 
