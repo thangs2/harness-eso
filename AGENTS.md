@@ -22,6 +22,27 @@ Repo này **ship** sản phẩm Harness ESO (`@mu/harness-*`). Agent làm việc
 
 ---
 
+## Năng lực host — đọc trước khi làm bước recon
+
+Repo này được dùng bởi **nhiều host**, và chúng **không cùng năng lực**. Bảng dưới đây là **đo thật** (2026-10-25),
+không phải mô tả thiết kế. Chi tiết + hệ quả: `sdlc/02.landscape/03.working-environment.md`.
+
+| Năng lực | Cursor | DeepSeek Harness (DSH) |
+|---|---|---|
+| `AGENTS.md` bơm vào context | ✅ | ✅ (workspace instructions) |
+| `.cursor/rules/*.mdc` (13) tự nạp | ✅ | ❌ **không nạp** |
+| `.agents/skills/*/SKILL.md` | ✅ | ✅ (qua skill catalog) |
+| MCP `codegraph` · `docgraph` CLI · `agentmemory-mcp` · `deepseek-direct` | ✅ | ❌ **không có trong toolset** |
+| `.docgraph/` · `.codegraph/` trên đĩa | ✅ truy vấn được | ⚠ có tệp, **không có công cụ truy vấn** |
+| file tools · shell · `bun test` · subagent | ✅ | ✅ |
+
+**Luật suy ra:** quy trình recon dưới đây là **quy trình của Cursor**. Trên host không có MCP, bước recon **thay bằng**
+`grep`/`glob` + `read` có kiểm soát, và phải **nói rõ** khi một kết luận dựa trên suy đoán thay vì tra cứu — vì thiếu tra
+cứu làm tăng khẳng định sai (đã xảy ra 3 lần trong một phiên).
+
+**Luật này áp cho mọi agent, không chỉ người viết nó:** gặp host chưa có trong bảng ⇒ **đo rồi bổ sung bảng**, không giả
+định năng lực.
+
 ## Công cụ được dùng (bắt buộc khi cần)
 
 Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, doc, memory, hoặc cần reasoning nặng:
