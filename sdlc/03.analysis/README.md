@@ -18,7 +18,8 @@ cần. Đọc cái này trước để biết chỗ nào trống.
 01.business-analysis/
   01.actors.md          ✅ ai — và ai có QUYỀN gì
   02.use-cases.md       ✅ làm gì — UC-* với điều kiện trước/sau
-  03.business-rules.md  ✅ luật xuyên use case (BR-01…BR-12)
+  03.business-rules.md  ✅ luật xuyên use case (BR-01…BR-13)
+  05.iam-functions.md   ✅ **kế hoạch phân tích 6 chức năng IAM** (workers · roles · policies · flows · accept · config)
 02.user-stories/        ✅ US-* sinh từ UC · README + US-SUF-01 + US-SUF-02
 03.acceptance-criteria/ ✅ định dạng + **9 AC** cho US-SUF-01/02
 04.quality-control/     ✅ 01.scenario-matrix.md — 11 SCN · **cổng Stage 3 CHƯA ĐẠT**
