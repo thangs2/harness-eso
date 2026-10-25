@@ -27,13 +27,16 @@ tượng ta đang xây. Việc của consumer thuộc SDLC của chính consumer
  → 02.landscape     bối cảnh: sản phẩm đứng ở đâu, ai cho gì, chỗ ta không chơi
  → 02.requirements   sản phẩm phải LÀM được gì (phát biểu kiểm chứng được)
  → 03.analysis      PHÂN TÍCH: actor · use case · user story · AC — *ai, làm gì*
+ → 06.data-design   DỮ LIỆU: entity · quan hệ · schema Postgres · RLS
+ → 07.interface-design  HỢP ĐỒNG: endpoint C1↔C2 · bề mặt cho A-01/A-08
  → 04.architecture   mô hình: trục sản phẩm, bề mặt, seam, provider, graph
  → 08.wbs            WBS duy nhất — Feature → Epic → Story → Task
  → 10.test           phép thử nói lên "done" nghĩa là gì
 ```
 
-Bỏ trống có chủ ý (thêm khi có nội dung thật, không tạo folder rỗng): `06.data-design`, `07.interface-design`,
-`09.change`, `11.delivery`, `12.operations`.
+Đã mở: `06.data-design` (entity · schema) · `07.interface-design` (hợp đồng · bề mặt).
+
+Bỏ trống có chủ ý (thêm khi có nội dung thật, không tạo folder rỗng): `09.change`, `11.delivery`, `12.operations`.
 
 ## Quy ước
 
