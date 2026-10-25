@@ -1,0 +1,43 @@
+# 03 — Analysis
+
+**Trạng thái:** `DRAFT` · 2026-10-25 · **Giai đoạn:** discovery → planning ([`D-40`](../01.inception/02.decision-log/00.index.md))
+
+> **Vì sao folder này tồn tại.** `04.architecture/` có 17 file mô tả **cách hệ thống chạy**, nhưng chưa có một dòng nào
+> mô tả **ai dùng nó để làm gì**. Kiến trúc đang trả lời câu hỏi **chưa được phát biểu**.
+>
+> Folder này phát biểu câu hỏi đó — theo thứ tự: **ai → làm gì → để làm được thì phải thoả gì**.
+
+## 1. Cấu trúc
+
+```text
+01.business-analysis/
+  01.actors.md          ✅ ai — và ai có QUYỀN gì
+  02.use-cases.md       ✅ làm gì — UC-* với điều kiện trước/sau
+  03.business-rules.md  ⬜ luật đúng ở MỌI use case
+02.user-stories/        ⬜ US-* sinh từ UC, mỗi cái một mẩu giá trị
+03.acceptance-criteria/ ⬜ AC-* bảng 8 cột, truy về US
+04.quality-control/     ⬜ scenario matrix (sau khi có AC)
+```
+
+⬜ = **chưa tạo**, vì chưa có nội dung thật. Repo này không tạo folder rỗng.
+
+## 2. Luật của folder này
+
+| Luật | Vì sao |
+|---|---|
+| **UC không nhắc tới công nghệ** | nếu UC nói "Postgres" thì nó là thiết kế, không phải phân tích |
+| **Mỗi UC có điều kiện trước/sau** | không có "sau" thì không biết đã xong chưa |
+| **AC phải test được bằng một test** | luật của [Stages](../00.governance/02.sdlc-workflow.md) §1 |
+| **US truy về P1–P6** | không truy được thì nó là ý thích, không phải yêu cầu |
+| **Không chép lại `04.architecture`** | analysis nói *cái gì*, architecture nói *thế nào* |
+
+## 3. Thứ tự đọc
+
+```text
+01.inception/00.problem.md      (P1–P6 — nỗi đau)
+  → 03.analysis/01.*            (ai, làm gì)
+    → 03.analysis/02–03         (US, AC)
+      → 04.architecture/        (thế nào)
+```
+
+Đọc ngược lại là đọc **giải pháp trước vấn đề** — đúng thứ tự tôi đã làm sai trong phiên này.

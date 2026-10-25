@@ -26,13 +26,14 @@ tượng ta đang xây. Việc của consumer thuộc SDLC của chính consumer
  → 01.inception    vision · mission · goals · objectives — vì sao tồn tại, đi đâu
  → 02.landscape     bối cảnh: sản phẩm đứng ở đâu, ai cho gì, chỗ ta không chơi
  → 02.requirements   sản phẩm phải LÀM được gì (phát biểu kiểm chứng được)
+ → 03.analysis      PHÂN TÍCH: actor · use case · user story · AC — *ai, làm gì*
  → 04.architecture   mô hình: trục sản phẩm, bề mặt, seam, provider, graph
  → 08.wbs            WBS duy nhất — Feature → Epic → Story → Task
  → 10.test           phép thử nói lên "done" nghĩa là gì
 ```
 
-Bỏ trống có chủ ý (thêm khi có nội dung thật, không tạo folder rỗng): `03.analysis`, `06.data-design`,
-`07.interface-design`, `09.change`, `11.delivery`, `12.operations`.
+Bỏ trống có chủ ý (thêm khi có nội dung thật, không tạo folder rỗng): `06.data-design`, `07.interface-design`,
+`09.change`, `11.delivery`, `12.operations`.
 
 ## Quy ước
 
