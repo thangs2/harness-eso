@@ -19,10 +19,10 @@ cần. Đọc cái này trước để biết chỗ nào trống.
   01.actors.md          ✅ ai — và ai có QUYỀN gì
   02.use-cases.md       ✅ làm gì — UC-* với điều kiện trước/sau
   03.business-rules.md  ✅ luật xuyên use case (BR-01…BR-13)
-  05.iam-functions.md   ✅ **kế hoạch phân tích 6 chức năng IAM** (workers · roles · policies · flows · accept · config)
-02.user-stories/        ✅ US-* sinh từ UC · README + US-SUF-01 + US-SUF-02
-03.acceptance-criteria/ ✅ định dạng + **9 AC** cho US-SUF-01/02
-04.quality-control/     ✅ 01.scenario-matrix.md — 11 SCN · **cổng Stage 3 CHƯA ĐẠT**
+  05.iam-functions.md   ✅ kế hoạch 6 chức năng IAM — **đã thực hiện đủ**: 6 US + 22 AC
+02.user-stories/        ✅ **10 US**: SUF-01/02 · AGENT-01 · KB-01 · IAM-01…06
+03.acceptance-criteria/ ✅ **37 AC** (9 SUF + 6 AGENT/KB + 22 IAM)
+04.quality-control/     ✅ 01 (11 SCN) + **02.iam-scenario-matrix (23 SCN)** · cổng cấu trúc ĐẠT, 0 executed
 ```
 
 ⬜ = **chưa tạo**, vì chưa có nội dung thật. Repo này không tạo folder rỗng.

@@ -35,6 +35,12 @@ Thân bài:
 | [`US-SUF-02`](./02.us-suf-02-operator.md) | người biết **agent có đủ không** trước khi yêu cầu | A-01 | UC-01 | P4 | ✅ 4 AC |
 | [`US-AGENT-01`](./03.us-agent-01-scope.md) | **vượt phạm vi** bị từ chối và ghi lại | A-01 | UC-04 | P6 | ✅ 3 AC |
 | [`US-KB-01`](./04.us-kb-01-isolation.md) | project mới **không thấy** tri thức project khác | A-01 | UC-05 | P3 | ✅ 3 AC |
+| [`US-IAM-01`](./05.us-iam-01-workers.md) | thêm/bớt worker, **việc dở đi đâu** | A-01 | UC-04 | P6 | ✅ 3 AC |
+| [`US-IAM-02`](./06.us-iam-02-roles.md) | role mang **`scope`** + **`bar`** | A-01 | UC-04 | P6 | ✅ 4 AC |
+| [`US-IAM-03`](./07.us-iam-03-policies.md) | policy theo **thuộc tính**, chỉ người sửa | A-01 | UC-04 | P6 | ✅ 4 AC |
+| [`US-IAM-04`](./08.us-iam-04-flows.md) | bàn giao **bị chặn** nếu thiếu bằng chứng | A-02 | UC-04 | P6 | ✅ 3 AC |
+| [`US-IAM-05`](./09.us-iam-05-accept.md) | **accept** nợ có người + hạn | A-01 | UC-11 | P6 | ✅ 4 AC |
+| [`US-IAM-06`](./10.us-iam-06-config.md) | đổi config: **preview** · một lần · **revert** | A-01 | UC-05 | P3 | ✅ 4 AC |
 
 ⬜ = AC **chưa viết**; đây là bước kế tiếp của Stage 2, không được coi là Ready.
 
