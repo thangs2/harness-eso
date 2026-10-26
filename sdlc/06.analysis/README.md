@@ -2,14 +2,14 @@
 
 **Trạng thái:** `DRAFT` · 2026-10-25 · **Giai đoạn:** discovery → planning ([`D-40`](../03.inception/02.decision-log/00.index.md))
 
-> **Vì sao folder này tồn tại.** `07.architecture/` có 17 file mô tả **cách hệ thống chạy**, nhưng chưa có một dòng nào
+> **Vì sao folder này tồn tại.** `07.technical/01.architecture/` có 17 file mô tả **cách hệ thống chạy**, nhưng chưa có một dòng nào
 > mô tả **ai dùng nó để làm gì**. Kiến trúc đang trả lời câu hỏi **chưa được phát biểu**.
 >
 > Folder này phát biểu câu hỏi đó — theo thứ tự: **ai → làm gì → để làm được thì phải thoả gì**.
 
 ## Bắt đầu từ đây
 
-[`00.pain-point-trace.md`](./00.pain-point-trace.md) — **P1–P6 → REQ → UC → US → AC**, và **tài liệu đầu tiên** mỗi nỗi đau
+[`00.pain-point-trace.md`](00.pain-point-trace.md) — **P1–P6 → REQ → UC → US → AC**, và **tài liệu đầu tiên** mỗi nỗi đau
 cần. Đọc cái này trước để biết chỗ nào trống.
 
 ## 1. Cấu trúc
@@ -37,7 +37,7 @@ cần. Đọc cái này trước để biết chỗ nào trống.
 | **AC phải test được bằng một test** | luật của [Stages](../02.governance/02.sdlc-workflow.md) §1 |
 | **AC thuộc ĐÚNG một US** | AC dùng US khác thì không test được một mình; luật xuyên suốt là **BR**, không phải AC |
 | **US truy về P1–P6** | không truy được thì nó là ý thích, không phải yêu cầu |
-| **Không chép lại `07.architecture`** | analysis nói *cái gì*, architecture nói *thế nào* |
+| **Không chép lại `07.technical/01.architecture`** | analysis nói *cái gì*, architecture nói *thế nào* |
 
 ## 3. Thứ tự đọc
 
@@ -45,7 +45,7 @@ cần. Đọc cái này trước để biết chỗ nào trống.
 03.inception/00.problem.md      (P1–P6 — nỗi đau)
   → 06.analysis/01.*            (ai, làm gì)
     → 06.analysis/02–03         (US, AC)
-      → 07.architecture/        (thế nào)
+      → 07.technical/01.architecture/        (thế nào)
 ```
 
 Đọc ngược lại là đọc **giải pháp trước vấn đề** — đúng thứ tự tôi đã làm sai trong phiên này.

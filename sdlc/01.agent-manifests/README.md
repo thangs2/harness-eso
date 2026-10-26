@@ -17,7 +17,7 @@ type: capability-index
 | Is | Is not |
 |---|---|
 | a **contract**: what may change here · what must hold · what proves it | an architecture document — it **points at** architecture, never replaces it |
-| **short**: readable in ≤ 1 minute | a copy of `sdlc/07.architecture/` |
+| **short**: readable in ≤ 1 minute | a copy of `sdlc/07.technical/01.architecture/` |
 | **falsifiable**: each rule has its test | a manifesto |
 
 **The rule that matters:** a spec longer than a minute of reading is **wrongly designed** — the peer skips it and crawls again,
@@ -38,11 +38,11 @@ Body: **what it owns** · **rules** · **wire** (endpoints/tables) · **refs** (
 
 | Domain | Responsibility | Status |
 |---|---|---|
-| [`eso-core`](./01.domains/eso-core.spec.md) | judgement: sufficiency · level · mode · requirement | ✅ sample |
+| [`eso-core`](01.domains/eso-core.spec.md) | judgement: sufficiency · level · mode · requirement | ✅ sample |
 | `eso-knowledge` · `eso-graph` · `eso-evidence` · `eso-control-plane` · `eso-adapters` | see the manifest table | not created |
 
 **Creation rule:** a domain gets a spec only when a **real story** points at it. A spec before a story documents what does not exist.
 
 ## 4. Capability specs
 
-Nine, one per analysis item: [`02.capabilities/`](./02.capabilities/00.index.md).
+Nine, one per analysis item: [`02.capabilities/`](02.capabilities/00.index.md).

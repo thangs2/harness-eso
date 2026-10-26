@@ -17,8 +17,8 @@ forbidden:
 verify:
   - "bun test qc/eso-core-*"
 design_refs:
-  - "sdlc/07.architecture/07.sufficiency.md"
-  - "sdlc/07.architecture/05.turn-execution.md"
+  - "sdlc/07.technical/01.architecture/07.sufficiency.md"
+  - "sdlc/07.technical/01.architecture/05.turn-execution.md"
 invariants:
   - INV-ESO-01
   - INV-ESO-02
@@ -33,7 +33,7 @@ invariants:
 
 | Owns | Does not own |
 |---|---|
-| deriving **requirements** ([07](../../07.architecture/07.sufficiency.md) §1) | knowledge content (`eso-knowledge`) |
+| deriving **requirements** ([07](../../07.technical/01.architecture/07.sufficiency.md) §1) | knowledge content (`eso-knowledge`) |
 | computing `level` · `basis` · `exists` in aggregate | graph completeness measurement (`eso-graph`) |
 | choosing `mode` from `level × permission × escalation` | writing records (`eso-evidence`) |
 | **explanation**: why this verdict, with sources | the interface (`eso-control-plane`) |
