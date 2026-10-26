@@ -25,7 +25,7 @@ Repo này **ship** sản phẩm Harness ESO (`@mu/harness-*`). Agent làm việc
 ## Năng lực host — đọc trước khi làm bước recon
 
 Repo này được dùng bởi **nhiều host**, và chúng **không cùng năng lực**. Bảng dưới đây là **đo thật** (2026-10-25),
-không phải mô tả thiết kế. Chi tiết + hệ quả: `sdlc/02.landscape/03.working-environment.md`.
+không phải mô tả thiết kế. Chi tiết + hệ quả: `sdlc/04.landscape/03.working-environment.md`.
 
 | Năng lực | Cursor | DeepSeek Harness (DSH) |
 |---|---|---|
