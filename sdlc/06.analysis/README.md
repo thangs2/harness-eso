@@ -22,8 +22,8 @@ cần. Đọc cái này trước để biết chỗ nào trống.
   05.iam-functions.md   ✅ kế hoạch 6 chức năng IAM — đã đủ: 6 US + 23 AC
   06.eso-features.md    ✅ **danh mục 18 chức năng của harness-eso** + trạng thái (6 ✅ · 1 🟡 · 11 ❌)
 02.user-stories/        ✅ **22 US**: SUF-01…04 · AGENT-01 · KB-01…03 · EV-01/02 · IAM-01…06 · CFG-01 · SDLC-01 · LEARN-01 · HOST-01 · ARCH-01 · TICKET-01
-03.acceptance-criteria/ ✅ **296 AC**
-04.quality-control/     ✅ **10 matrix · 301 dòng SCN · 296/296 AC phủ** · 03.iam-rtm · 0 executed
+03.acceptance-criteria/ ✅ **309 AC**
+04.quality-control/     ✅ **10 matrix · 314 dòng SCN · 309/309 AC phủ** · 03.iam-rtm · 0 executed
 ```
 
 ⬜ = **chưa tạo**, vì chưa có nội dung thật. Repo này không tạo folder rỗng.
