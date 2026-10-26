@@ -59,7 +59,7 @@ postcondition: phán quyết có được ghi, `basis` có được giữ, `unkn
 | `US-ARCH-01` | `AC-ARCH-01-01`…`4` | [`21.arch-us-01-graph.md`](21.arch-us-01-graph.md) | ✅ |
 | `US-TICKET-01` | `AC-TICKET-01-01`…`4` | [`22.ticket-us-01-integration.md`](22.ticket-us-01-integration.md) | ✅ |
 
-**Tổng: 272 AC** (đếm bằng id, không bằng ước lượng).
+**Tổng: 284 AC** (đếm bằng id, không bằng ước lượng).
 
 **37 AC.** Mỗi file có ba phần bắt buộc ngoài bảng: **điều kiện sau** (ghi gì), **test sẽ chứng minh** (tên test cụ thể), và
 **AC này KHÔNG kiểm** (ranh giới — để không phình).
