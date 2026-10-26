@@ -1,52 +1,48 @@
+---
+sot_doc_version: "0.1.0"
+source_of_truth: "sdlc/03.analysis/README.md"
+status: DRAFT
+phase: 2
+id: MANIFEST-README
+type: capability-index
+---
+
 # 00 — Agent manifests
 
-**Trạng thái:** `DRAFT` · 2026-10-25 · **Greenfield:** tạo mới, chưa từng có
+> **Why.** A peer receives an execution pack and must **not crawl** `sdlc/`. A pack cannot hold the repo, so it points at **one**
+> spec here. baplatform calls it *"Agent Manifest Domain Spec"*; ESO keeps the concept, changes the content.
 
-> **Vì sao có folder này.** Trong SLP, peer nhận một **Execution Pack** đủ để làm việc và **không được crawl**
-> `sdlc/`. Nhưng pack không thể chứa cả repo — nên nó trỏ tới **một spec miền** (domain spec) nằm ở đây.
->
-> Baplatform gọi khái niệm này là *"Agent Manifest Domain Spec"* (`sdlc/00.agent-manifests/01.domains/*.spec.md`). Ta giữ
-> **cùng khái niệm**, đổi nội dung: baplatform có miền **nghiệp vụ** (backend, web, aggregate); harness-eso có miền **sản
-> phẩm** (judgement, knowledge, evidence, graph, control plane).
+## 1. A spec **is** / **is not**
 
-## 1. Spec miền là gì — và **không** là gì
-
-| Là | Không là |
+| Is | Is not |
 |---|---|
-| **hợp đồng** giữa Lead và peer: *"phần này thì được sửa gì, phải giữ gì, chạy gì để biết đúng"* | tài liệu kiến trúc — nó **trỏ** tới kiến trúc, không thay |
-| **nhỏ**: đọc trong ≤ 1 phút | không phải chỗ chép lại `sdlc/04.architecture/` |
-| **có thể sai được**: mỗi luật kèm phép thử | không phải tuyên ngôn |
+| a **contract**: what may change here · what must hold · what proves it | an architecture document — it **points at** architecture, never replaces it |
+| **short**: readable in ≤ 1 minute | a copy of `sdlc/04.architecture/` |
+| **falsifiable**: each rule has its test | a manifesto |
 
-**Luật quan trọng nhất:** spec miền mà **dài hơn 1 phút đọc** là spec miền **sai thiết kế** — vì peer sẽ bỏ qua nó và
-quay lại crawl, đúng thứ SLP muốn tránh.
+**The rule that matters:** a spec longer than a minute of reading is **wrongly designed** — the peer skips it and crawls again,
+which is what SLP exists to prevent.
 
-## 2. Cấu trúc một spec
+## 2. Shape
 
 ```yaml
----
-domain: <id>                 # khớp `applies_when` của skill/rule (D-19)
-owner_role: <role>           # ai chịu trách nhiệm chính
-allowed_files: [...]         # glob — peer NGOÀI phạm vi này = BLOCKED_SCOPE
-forbidden: [...]             # điều cấm cụ thể của miền
-verify: [...]                # lệnh chạy để biết còn đúng
-design_refs: [...]           # trỏ tới sdlc/ — KHÔNG chép nội dung
-invariants: [...]            # bất biến kèm mã (INV-…)
----
+human_sot: "sdlc/…"        # the HUMAN document this distils
+id: <ID>-SPEC
+type: capability-spec
 ```
 
-## 3. Danh sách miền của harness-eso (v2)
+Body: **what it owns** · **rules** · **wire** (endpoints/tables) · **refs** (AC/SCN paths).
+**Budget:** `wc -l` ≤ 150 · `wc -c` ≤ 4 000 ([standard](../00.governance/03.sdlc-standard/03.artifacts.md) §1.3).
 
-Chưa có file nào ngoài `eso-core` — tạo dần, **chỉ khi** miền đó có việc thật. Không tạo trước cho đẹp.
+## 3. Domains (v2) — one exists, on purpose
 
-| Miền | Trách nhiệm | Trạng thái |
+| Domain | Responsibility | Status |
 |---|---|---|
-| [`eso-core`](./01.domains/eso-core.spec.md) | phán quyết: sufficiency · level · mode · requirement | ✅ mẫu |
-| [`02.capabilities/`](./02.capabilities/00.index.md) | **spec theo chức năng** (`< 300 tokens`, `human_sot` trỏ về HUMAN) | ✅ IAM |
-| `eso-knowledge` | ba thế giới · pool/shared/project · promotion | chưa tạo |
-| `eso-graph` | mô hình kiến trúc · nguồn · completeness | chưa tạo |
-| `eso-evidence` | record · risk · provenance · revert | chưa tạo |
-| `eso-control-plane` | API · DB · sync · UI | chưa tạo |
-| `eso-adapters` | hook/plugin cho từng host | chưa tạo |
+| [`eso-core`](./01.domains/eso-core.spec.md) | judgement: sufficiency · level · mode · requirement | ✅ sample |
+| `eso-knowledge` · `eso-graph` · `eso-evidence` · `eso-control-plane` · `eso-adapters` | see the manifest table | not created |
 
-**Quy tắc tạo:** một miền chỉ được tạo spec khi có **story thật** trỏ vào nó. Spec trước story là tài liệu hoá thứ chưa
-tồn tại — đúng thứ repo này cấm.
+**Creation rule:** a domain gets a spec only when a **real story** points at it. A spec before a story documents what does not exist.
+
+## 4. Capability specs
+
+Nine, one per analysis item: [`02.capabilities/`](./02.capabilities/00.index.md).

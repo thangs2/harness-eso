@@ -1,62 +1,66 @@
 ---
+sot_doc_version: "0.1.0"
+human_sot: "sdlc/00.agent-manifests/README.md"
+status: DRAFT
+phase: 6
+id: ESO-CORE-DOMAIN
+type: domain-spec
 domain: eso-core
 owner_role: build
 allowed_files:
   - "packages/eso-core/**"
   - "qc/eso-*.test.mjs"
 forbidden:
-  - "sdlc/**"                      # spec này KHÔNG được sửa bởi peer; chỉ Lead/người
-  - "packages/harness-*"           # code v1 — prior art, không sửa trong story v2
+  - "sdlc/**"                      # a peer must NOT edit this spec; Lead or human only
+  - "packages/harness-*"           # v1 code — prior art, untouched by v2 stories
   - "documents/**"
 verify:
   - "bun test qc/eso-core-*"
-  - "bun run doc:links"            # sẽ có; nếu chưa có thì bỏ dòng này chứ không giả vờ
 design_refs:
-  - "../../04.architecture/07.sufficiency.md"
-  - "../../04.architecture/05.turn-execution.md"
-  - "../../04.architecture/03.v2-high-level-design.md#2-sản-phẩm-bán-một-thứ-phán-quyết-không-phải-cổng"
+  - "sdlc/04.architecture/07.sufficiency.md"
+  - "sdlc/04.architecture/05.turn-execution.md"
 invariants:
   - INV-ESO-01
   - INV-ESO-02
   - INV-ESO-03
 ---
 
-# eso-core — phán quyết
+# eso-core — judgement
 
-## 1. Miền này sở hữu gì
+## 1. What this domain owns
 
-**Một** thứ: biến *(actor, task, bằng chứng)* thành **một phán quyết có thể giải thích**.
+**One** thing: turning *(actor, task, evidence)* into **one explainable verdict**.
 
-| Sở hữu | Không sở hữu |
+| Owns | Does not own |
 |---|---|
-| dẫn xuất **requirement** ([07](../../04.architecture/07.sufficiency.md) §1) | nội dung tri thức (miền `eso-knowledge`) |
-| tính `level` · `basis` · `exists` ở dạng tổng hợp | cách đo completeness của graph (`eso-graph`) |
-| chọn `mode` từ `level × permission × escalation` | ghi record (`eso-evidence`) |
-| **giải thích**: vì sao ra kết luận đó, dẫn nguồn | giao diện (`eso-control-plane`) |
+| deriving **requirements** ([07](../../04.architecture/07.sufficiency.md) §1) | knowledge content (`eso-knowledge`) |
+| computing `level` · `basis` · `exists` in aggregate | graph completeness measurement (`eso-graph`) |
+| choosing `mode` from `level × permission × escalation` | writing records (`eso-evidence`) |
+| **explanation**: why this verdict, with sources | the interface (`eso-control-plane`) |
 
-## 2. Bất biến
+## 2. Invariants
 
-| Mã | Bất biến | Kiểm bằng |
+| ID | Invariant | Checked by |
 |---|---|---|
-| **INV-ESO-01** | **Không kết luận `sufficient` khi thiếu `basis`.** `sufficient` thiếu `basis` là khẳng định không nguồn | test: đầu ra thiếu `basis` ⇒ phải ném lỗi, không mặc định `retrieved` |
-| **INV-ESO-02** | **`cannot-judge` không bao giờ tự thành `permitted`.** Không mô hình ⇒ chỉ `ask`/`block`; muốn làm phải `bypassed` | test: `cannot-judge` + escalation `allow` vẫn ra `ask` |
-| **INV-ESO-03** | **Requirement phải truy được nguồn** (`bar` · `work` · `blast` · `declared`). Requirement không rõ nguồn là requirement bịa | test: mọi phần tử `requirements[]` có `source` hợp lệ |
+| **INV-ESO-01** | **Never conclude `sufficient` without `basis`.** A `sufficient` with no basis is a claim with no source | test: output missing `basis` ⇒ must throw, never default to `retrieved` |
+| **INV-ESO-02** | **`cannot-judge` never becomes `permitted` on its own.** No model ⇒ only `ask`/`block`; proceeding requires `bypassed` | test: `cannot-judge` + escalation `allow` still yields `ask` |
+| **INV-ESO-03** | **Every requirement must name its source** (`bar` · `work` · `blast` · `declared`). A requirement with no source is invented | test: every `requirements[]` element has a valid `source` |
 
-## 3. Cấm cụ thể
+## 3. Specific prohibitions
 
-1. **Không tự định nghĩa lại "đủ" ở tầng khác.** Một chỗ duy nhất tính `level`; nơi khác chỉ đọc.
-2. **Không đọc file của miền khác để suy ra dữ liệu** — dùng interface. Peer `eso-core` không grep `eso-graph`.
-3. **Không đổi ngưỡng trong code** — ngưỡng là dữ liệu ([D-11](../../01.inception/02.decision-log/00.index.md)).
-4. **Không "đoán cho xong"** khi thiếu dữ liệu: trả `cannot-judge` + `unknowns[]`, không trả số 0.
+1. **Do not redefine "sufficient" elsewhere.** One place computes `level`; everything else reads it.
+2. **Do not read another domain's files to infer data** — use the interface. A `eso-core` peer does not grep `eso-graph`.
+3. **Do not change thresholds in code** — thresholds are data ([D-11](../../01.inception/02.decision-log/00.index.md)).
+4. **Do not "guess to finish"** when data is missing: return `cannot-judge` + `unknowns[]`, never a zero.
 
-## 4. Cách tự kiểm trước khi báo DONE
+## 4. Self-check before reporting DONE
 
 ```bash
-bun test qc/eso-core-*          # phải xanh
+bun test qc/eso-core-*          # must be green
 ```
 
-Rồi tự trả lời ba câu, ghi vào output của peer:
+Then answer three questions in the peer output:
 
-1. Có chỗ nào tôi **mặc định** một giá trị mà đáng lẽ phải `unknown` không?
-2. Có kết luận nào **không dẫn được nguồn** trong record không?
-3. Nếu ngưỡng bị đổi, kết quả có đổi **theo hướng tôi không kiểm soát** không?
+1. Did I **default** any value that should have been `unknown`?
+2. Does any conclusion lack a **source** in the record?
+3. If a threshold changed, would the result move in a direction I do not control?
