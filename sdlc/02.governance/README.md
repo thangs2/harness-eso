@@ -19,7 +19,7 @@ says nothing about a file number. Mixing them (`01.file` · `02.file` · `03.fol
 
 | # | Folder | Role |
 |---|---|---|
-| 01 | [`01.standard/`](01.standard/00.index.md) | **the normative rules**: `01` gates & marks · `02` shape of **18** document kinds · `03` BIP/FIP packets |
+| 01 | [`01.standard/`](01.standard/00.index.md) | **the normative rules**: `01` gates & marks · `02` shape of **20** document kinds · `03` BIP/FIP packets |
 | 02 | [`02.quality-gate/`](02.quality-gate/00.index.md) | **the instruments**: `01` lifecycle standard · `02` pre-flight · `03` go/no-go · `04` artifact flow |
 
 ### Files
