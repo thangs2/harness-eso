@@ -23,7 +23,7 @@ cần. Đọc cái này trước để biết chỗ nào trống.
   06.eso-features.md    ✅ **danh mục 18 chức năng của harness-eso** + trạng thái (6 ✅ · 1 🟡 · 11 ❌)
 02.user-stories/        ✅ **22 US**: SUF-01…04 · AGENT-01 · KB-01…03 · EV-01/02 · IAM-01…06 · CFG-01 · SDLC-01 · LEARN-01 · HOST-01 · ARCH-01 · TICKET-01
 03.acceptance-criteria/ ✅ **85 AC**
-04.quality-control/     ✅ 7 matrix · **78 dòng SCN** · 03.iam-rtm · 0 executed
+04.quality-control/     ✅ 8 matrix · **82 dòng SCN** · 03.iam-rtm · 0 executed
 ```
 
 ⬜ = **chưa tạo**, vì chưa có nội dung thật. Repo này không tạo folder rỗng.
