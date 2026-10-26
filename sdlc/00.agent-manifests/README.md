@@ -32,7 +32,7 @@ type: capability-spec
 ```
 
 Body: **what it owns** · **rules** · **wire** (endpoints/tables) · **refs** (AC/SCN paths).
-**Budget:** `wc -l` ≤ 150 · `wc -c` ≤ 4 000 ([standard](../00.governance/03.standard/02.artifacts.md) §1.3).
+**Budget:** `wc -l` ≤ 150 · `wc -c` ≤ 4 000 ([standard](../00.governance/01.standard/02.artifacts.md) §1.3).
 
 ## 3. Domains (v2) — one exists, on purpose
 
