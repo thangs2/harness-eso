@@ -11,6 +11,7 @@ export {
     decisionPolicyFile,
     harnessDbFile,
     harnessDir,
+    SESSION_DIR_ENV,
     sessionDir,
 } from './paths.mjs';
 export {

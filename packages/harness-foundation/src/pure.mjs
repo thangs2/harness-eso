@@ -16,6 +16,7 @@ export {
     decisionPolicyFile,
     harnessDbFile,
     harnessDir,
+    SESSION_DIR_ENV,
     sessionDir,
 } from './paths.mjs';
 export { DEFAULT_POLICY, loadDecisionPolicy, loadDecisionPolicyForCwd, loadSkillPacks, SKILL_PACKS_NAME } from './policy-load.mjs';
@@ -28,7 +29,7 @@ export { EMPTY_PACK, normalisePack, parseSkillPacks } from './skill-packs.mjs';
  *
  * Pure string work — no filesystem, no child process — so it is safe on the pack's hot path.
  */
-export { shellCommandOf, shellHasWriteIntent, shellWriteTargets } from './shell-writes.mjs';
+export { shellCommandOf, shellHasRedirect, shellHasWriteIntent, shellWriteTargets } from './shell-writes.mjs';
 export {
     DEFAULT_PATH_POLICY,
     isSotPath,

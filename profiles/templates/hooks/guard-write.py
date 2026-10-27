@@ -22,12 +22,36 @@ LOCK_FILE = Path(__file__).resolve().parent / "locked-paths.txt"
 # never satisfy its own gate and `.agents/session/.pipeline-brain-stamp.json`
 # was written but never read.
 HARNESS_DIR = Path(__file__).resolve().parents[1].name
-SESSION_REL = f"{HARNESS_DIR}/session"
+# Session dir for this tree. The default stays derived, so Cursor and Antigravity keep the exact
+# paths they already had. A third host that keeps sessions outside the repo — DSH writes
+# `~/.dsh/sessions` — sets `HARNESS_SESSION_DIR` to an ABSOLUTE path. That is the same shape as
+# `product_state_dir()`: one env override, otherwise derived, so no host needs its own fork of this
+# file and the two in-repo copies stay byte-identical. What sets it is the tree's own hook config.
+_SESSION_OVERRIDE = os.environ.get("HARNESS_SESSION_DIR", "").strip()
+SESSION_REL = _SESSION_OVERRIDE or f"{HARNESS_DIR}/session"
 
-STAMP_REL = f"{SESSION_REL}/.pipeline-brain-stamp.json"
+
+def session_path(name: str) -> Path:
+    """A file inside this tree's session dir.
+
+    With an absolute `HARNESS_SESSION_DIR`, `ROOT / SESSION_REL` silently discards `ROOT`. It works,
+    but only as an accident of `pathlib` rather than as a stated rule, and the next person to join a
+    path by hand would get the in-repo answer. One resolver, so there is one rule.
+    """
+    base = Path(SESSION_REL)
+    return (base if base.is_absolute() else ROOT / base) / name
+
+
+STAMP_NAME = ".pipeline-brain-stamp.json"
+STAMP_REL = f"{SESSION_REL}/{STAMP_NAME}"
+STAMP_PATH = session_path(STAMP_NAME)
 ESO_STAMP_NAME = ".eso-bundle-stamp.json"
-BRAIN_UNAVAILABLE_REL = f"{SESSION_REL}/.brain-unavailable.json"
-DIRECT_MODE_REL = f"{SESSION_REL}/.direct-mode"
+BRAIN_UNAVAILABLE_NAME = ".brain-unavailable.json"
+BRAIN_UNAVAILABLE_REL = f"{SESSION_REL}/{BRAIN_UNAVAILABLE_NAME}"
+BRAIN_UNAVAILABLE_PATH = session_path(BRAIN_UNAVAILABLE_NAME)
+DIRECT_MODE_NAME = ".direct-mode"
+DIRECT_MODE_REL = f"{SESSION_REL}/{DIRECT_MODE_NAME}"
+DIRECT_MODE_PATH = session_path(DIRECT_MODE_NAME)
 STAMP_MAX_AGE_SECONDS = 30 * 60
 BRAIN_VIA = frozenset({
     "ask_deepseek_pro",
@@ -41,6 +65,18 @@ HOOK_EXEMPT_PREFIXES = (
     ".agents/session/",
     ".claude/session/",
 )
+
+# An out-of-repo session dir is never reachable as a repo-relative path, so it needs no entry here:
+# the exemption tuple is matched against paths the agent writes *inside* the repo. Do not append
+# `.dsh` or a wildcard — an in-repo session dir would be forgeable, which is why the override is
+# refused rather than merely ignored.
+if Path(SESSION_REL).is_absolute():
+    _session_abs = Path(SESSION_REL).resolve()
+    if _session_abs == ROOT or ROOT in _session_abs.parents:
+        raise SystemExit(
+            "HARNESS_SESSION_DIR must lie outside the repo: an in-repo session dir is reachable as a "
+            f"gated path and its exemption would be forgeable (got {SESSION_REL}, root {ROOT})"
+        )
 
 SECRET_NAMES = {
     ".env",
@@ -134,6 +170,61 @@ DENY_BRAIN = (
     f"{BRAIN_UNAVAILABLE_REL} "
     "and tell the user BRAIN_UNAVAILABLE — do not bypass silently."
 )
+
+
+def ledger_path() -> Path:
+    """The DeepSeek usage ledger — the Brain gate's primary evidence. Same rule as `brain_attested`."""
+    override = os.environ.get("DEEPSEEK_USAGE_LEDGER", "").strip()
+    return Path(override) if override else (product_state_dir() / "deepseek-usage.jsonl")
+
+
+def deny_brain_message() -> str:
+    """`DENY_BRAIN`, split by actual cause.
+
+    "ledger missing" and "stamp missing" used to collapse into one sentence, and that sentence told the
+    reader to write a stamp. On a tree whose session dir the hook does not read — DSH, until this patch —
+    the advice was not just useless: it made an agent under a fail-closed gate do the wrong thing, write
+    a file nobody reads, and report success. So the message names the ledger first, because it is the
+    primary path, and says when a stamp cannot help.
+    """
+    if brain_from_attestation().get("ok") or brain_attested().get("ok"):
+        return DENY_BRAIN
+    ledger = ledger_path()
+    try:
+        ledger_size = ledger.stat().st_size
+    except OSError:
+        ledger_size = -1
+    attest_src = (eso_attestation() or {}).get("source")
+    ledger_text = (
+        "unreadable (absent, or the sandbox denied the hook)"
+        if ledger_size < 0
+        else f"{ledger_size} bytes"
+    )
+    if attest_src and attest_src != "pack":
+        # This host records the call itself. Telling the reader about the ledger here would send it to a
+        # file its own sandbox prevents anyone from writing — a dead end dressed as a remedy.
+        return " ".join(
+            [
+                "Brain gate (fail-closed): protected path requires DeepSeek Brain first.",
+                f"This host attests Brain calls through the host plugin ({attest_src}); nothing has been "
+                "recorded for this session in the last 30 minutes.",
+                "Call a Brain-tier tool (ask_deepseek_pro, or ask_deepseek_flash_brain through ask_deepseek) "
+                "and retry — a call that returned successfully is recorded automatically, so there is no "
+                "stamp to write.",
+                f"The ledger route is not used on this host (it reads {ledger} — {ledger_text}), and writing "
+                "the session stamp will not help: the gate never read it here.",
+            ]
+        )
+    parts = [
+        "Brain gate (fail-closed): protected path requires DeepSeek Brain first.",
+        f"ledger: {ledger} — {ledger_text}; no Brain record within 30m.",
+        f"session stamp: {STAMP_PATH}",
+        "If the ledger is empty, the MCP server could not write it: check that the harness sandbox lets the "
+        "MCP child process reach product state, or set DEEPSEEK_USAGE_LEDGER to a path it can write.",
+        "Writing the session stamp will not help — this hook reads the ledger first and has never read a stamp "
+        "from this tree.",
+    ]
+    return " ".join(parts)
 
 _OUTPUT_SHAPE = "cursor"
 
@@ -455,6 +546,69 @@ def asks_human(rel: str) -> bool:
     return path_mode(rel) == "ask"
 
 
+# Cached because a hook process is short-lived but this is called on every gated write.
+_STAMP_EXEMPT_CACHE = None
+
+
+def stamp_write_exempt(rel: str) -> bool:
+    """May the agent write the Brain stamp without an approval prompt? Opt-in, off by default.
+
+    The stamp is in the session dir, which `hook_exempt()` already exempts — so the gate never asked about
+    it. What the agent still hit was the **host's own** permission prompt (Cursor / Antigravity ask before
+    a Write lands on a dotfile they did not see it create). This switch does not change the gate; it marks
+    the file as "the harness owns this, do not prompt", and a consumer that sets it is saying so out loud.
+
+    Why opt-in rather than on by default: the stamp is the *legacy* Brain evidence, and `brain_attested_legacy`
+    believes it. An agent that can write it unattended can satisfy the fallback path with no model call —
+    exactly the incident §6.3 records, where an agent overwrote `allowWrite` in a neighbouring stamp. On a
+    tree whose guard reads the DeepSeek ledger first (Cursor, Antigravity, and DSH once
+    `HARNESS_SESSION_DIR` is set) this costs nothing, because the ledger still decides. On a tree that
+    relies on the stamp, it is a real relaxation — which is why it is a declaration in
+    `.harness/decision-policy.json` and not a default:
+
+        "eso": { "cognition": { "stampWrites": "exempt" } }
+
+    Env `HARNESS_STAMP_WRITES=exempt` overrides for one session. Any other value keeps the prompt.
+    """
+    global _STAMP_EXEMPT_CACHE
+    if _STAMP_EXEMPT_CACHE is not None:
+        return _STAMP_EXEMPT_CACHE
+    norm = str(rel or "").replace("\\", "/")
+    while norm.startswith("./"):
+        norm = norm[2:]
+    if norm not in (STAMP_REL, BRAIN_UNAVAILABLE_REL, STAMP_NAME, BRAIN_UNAVAILABLE_NAME):
+        if not norm.endswith("/" + STAMP_NAME) and not norm.endswith("/" + BRAIN_UNAVAILABLE_NAME):
+            _STAMP_EXEMPT_CACHE = False
+            return False
+
+    env_val = os.environ.get("HARNESS_STAMP_WRITES", "").strip().lower()
+    if env_val:
+        _STAMP_EXEMPT_CACHE = env_val in ("exempt", "allow", "1", "true", "yes", "on")
+        return _STAMP_EXEMPT_CACHE
+    try:
+        raw = json.loads((ROOT / ".harness" / "decision-policy.json").read_text(encoding="utf-8"))
+        cog = (raw.get("eso") or {}).get("cognition") if isinstance(raw.get("eso"), dict) else None
+        value = str((cog or {}).get("stampWrites") or "").strip().lower()
+        _STAMP_EXEMPT_CACHE = value in ("exempt", "allow")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        _STAMP_EXEMPT_CACHE = False
+    return _STAMP_EXEMPT_CACHE
+
+
+def stamp_write_marker(rel: str) -> None:
+    """Say "the harness owns this file" when the consumer opted in, then allow.
+
+    Cursor's `PreToolUse` contract accepts `permission: "allow"`, and an explicit allow is how a hook tells
+    the host not to prompt for a file it is responsible for. Without the opt-in this prints the same allow
+    the guard would print anyway, so the host's prompt behaviour is unchanged for every other consumer —
+    including for the stamp, which was already exempt from the gate and only ever prompted at the host.
+    """
+    if stamp_write_exempt(rel):
+        allow()
+        return
+    allow()
+
+
 def parse_stamp_at(raw: str) -> datetime | None:
     if not raw:
         return None
@@ -660,7 +814,7 @@ def eso_verdict() -> dict:
                 result["reasons"] = ["repo_changed"]
                 return result
         return result
-    closure = _read_json(ROOT / SESSION_REL / ".eso-gap-closure.json")
+    closure = _read_json(session_path(".eso-gap-closure.json"))
     if closure.get("allClosed") is True and (not data.get("preflightAt") or closure.get("preflightAt") == data.get("preflightAt")):
         return result
     if level in ("insufficient", "partial"):
@@ -722,8 +876,8 @@ def verify_receipt_mac(doc: dict, secret: str) -> bool:
 
 
 def direct_mode_on() -> bool:
-    """True when .{SESSION_REL}/.direct-mode exists and is enabled (ON)."""
-    sentinel_path = ROOT / DIRECT_MODE_REL
+    """True when {DIRECT_MODE_REL} exists and is enabled (ON)."""
+    sentinel_path = DIRECT_MODE_PATH
     if not sentinel_path.is_file():
         return False
     try:
@@ -765,7 +919,7 @@ def eso_attestation() -> dict:
 
 def session_stamp() -> dict:
     """The legacy session-dir stamp. Kept as the fallback path — see `eso_attestation`."""
-    return _read_json(ROOT / SESSION_REL / ESO_STAMP_NAME)
+    return _read_json(session_path(ESO_STAMP_NAME))
 
 
 def brain_attested() -> dict:
@@ -821,7 +975,7 @@ def brain_attested() -> dict:
 
 def brain_session_stamp() -> dict:
     """The pipeline-brain stamp recording recent model/direct calls."""
-    return _read_json(ROOT / STAMP_REL)
+    return _read_json(STAMP_PATH)
 
 
 def brain_attested_legacy() -> bool:
@@ -851,8 +1005,42 @@ def brain_attested_legacy() -> bool:
     return True
 
 
+def brain_from_attestation() -> dict:
+    """Brain evidence a host recorded by witnessing the model call, if any.
+
+    A host with no command-hook mechanism (DSH) runs this gate from a plugin, and its sandbox gives the
+    MCP child no way to write the usage ledger — so on that host the ledger path is dead by construction,
+    and pointing it somewhere the child *can* write would put forgeable evidence in the agent's reach.
+
+    Such a host records the call itself instead: `brain` in the product-state attestation, written from a
+    host pipeline listener (`tools/post-execute`) that fires only for a non-error result. Same file the
+    evidence gate already reads, so there is no second document to keep in step.
+    """
+    data = eso_attestation()
+    brain = data.get("brain") if isinstance(data, dict) else None
+    if not isinstance(brain, dict) or not brain.get("ok") or not brain.get("at"):
+        return {}
+    try:
+        at = datetime.fromisoformat(str(brain.get("at")).replace("Z", "+00:00"))
+    except ValueError:
+        return {}
+    age = (datetime.now(timezone.utc) - at).total_seconds()
+    # Same window and same future-timestamp refusal as the ledger: two sources for one gate must not
+    # disagree about what "recent" means.
+    if age < -120 or age > STAMP_MAX_AGE_SECONDS:
+        return {}
+    return {"ok": True, "at": at.isoformat(), "via": str(brain.get("via") or "attestation")}
+
+
 def brain_stamp_valid() -> bool:
-    """Brain gate: the ledger first, the session stamp only as a fallback if enabled."""
+    """Brain gate: host-witnessed call first, then the ledger, then the stamp if the consumer allows it.
+
+    Order matters and is not alphabetical: an attestation is a *this-session* observation, the ledger is
+    machine-wide, and the stamp is agent-writable. Preferring the tightest source means a stale ledger row
+    from another project can no longer satisfy a gate here.
+    """
+    if brain_from_attestation().get("ok"):
+        return True
     if brain_attested().get("ok"):
         return True
     if allow_session_stamp_fallback():
@@ -926,7 +1114,7 @@ def main() -> int:
             deny(deny_eso_message())
             return 0
         if not brain_stamp_valid():
-            deny(DENY_BRAIN)
+            deny(deny_brain_message())
             return 0
 
     # `ask` — a human decision, recorded outside the repo. Checked after the evidence gates: satisfying
@@ -939,7 +1127,7 @@ def main() -> int:
         )
         return 0
 
-    allow()
+    stamp_write_marker(rel)
     return 0
 
 

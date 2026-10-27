@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadDecisionPolicy } from '@mu/harness-foundation/pure';
+import { loadDecisionPolicy, sessionDir as foundationSessionDir } from '@mu/harness-foundation/pure';
 
 const SHELL_TOOL_RE = /shell|terminal|bash|run_command|run_terminal|execute/i;
 
@@ -20,10 +20,16 @@ export function harnessTree() {
     return 'cursor';
 }
 
+/**
+ * Session dir for this tree — one answer, shared with `guard-write.py`.
+ *
+ * Delegates to `@mu/harness-foundation`'s `sessionDir` rather than repeating the derivation. This file
+ * used to have its own copy, which is how a second answer gets born: the guard would honour
+ * `HARNESS_SESSION_DIR` while the pack kept writing `.cursor/session`, so on DSH the stamp landed
+ * where nothing reads it and the write was denied anyway.
+ */
 export function sessionDir(root = process.cwd(), tree = harnessTree()) {
-    if (tree === 'agents') return path.join(root, '.agents', 'session');
-    if (tree === 'claude') return path.join(root, '.claude', 'session');
-    return path.join(root, '.cursor', 'session');
+    return foundationSessionDir(root, tree);
 }
 
 export function detectShape(data) {
