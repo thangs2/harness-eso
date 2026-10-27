@@ -129,8 +129,17 @@ test('X8: packets present carry their required sections', () => {
             const kind = /^type:\s*(bip|fip)$/m.exec(text)?.[1];
             if (!kind) continue;
             if (kind === 'bip') {
-                const missing = sections.bip.filter((h) => !text.includes(`## ${h}`));
-                if (missing.length) bad.push(`${name} → ${missing.join(', ')}`);
+                // A BIP that records OUT has nothing to decide in §3, §6 or §7 (standard §1.1), so
+                // it must instead carry a reason and what proves the slice done. Demanding nine
+                // sections of an OUT BIP is what produces invented content.
+                const isOut = /\|\s*\*\*status\*\*\s*\|\s*\*\*`OUT`\*\*/i.test(text);
+                if (isOut) {
+                    if (!/\*\*Lý do `OUT`\*\*|Lý do `OUT`/.test(text)) bad.push(`${name} → OUT without a stated reason`);
+                    if (!/Chứng minh bằng lệnh/.test(text)) bad.push(`${name} → OUT without what proves it`);
+                } else {
+                    const missing = sections.bip.filter((h) => !text.includes(`## ${h}`));
+                    if (missing.length) bad.push(`${name} → ${missing.join(', ')}`);
+                }
             }
             if (kind === 'fip' && !/OUT/.test(text)) bad.push(`${name} → a FIP must say OUT when it has no surface`);
         }
@@ -187,11 +196,19 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
         for (const name of names) {
             if (!name.endsWith('.md')) continue;
             const text = readFileSync(join(abs, name), 'utf8');
-            const code = /^id: (?:BIP|FIP)-(\d+[._]\d+)/m.exec(text)?.[1]?.replace('_', '.');
-            if (!code) continue;
-            if (!leaves.has(code)) unknownLeaf.push(`${dir}/${name} → ${code}`);
-            if (claimed.has(code)) claimed.set(code, `${claimed.get(code)} + ${dir}/${name}`);
-            else claimed.set(code, `${dir}/${name}`);
+            // A slice-level OUT record (id: BIP-1-OUT) claims every leaf of that deliverable:
+            // one file answers for six slices that share one reason (standard §1.1).
+            const whole = /^id: (?:BIP|FIP)-(\d)-OUT/m.exec(text);
+            const codes = whole
+                ? [...leaves].filter((l) => l.startsWith(`${whole[1]}.`))
+                : [(_ = /^id: (?:BIP|FIP)-(\d+[._]\d+)/m.exec(text)) => _?.[1]?.replace('_', '.')]
+                      .map((f) => f())
+                      .filter(Boolean);
+            for (const code of codes) {
+                if (!leaves.has(code)) unknownLeaf.push(`${dir}/${name} → ${code}`);
+                if (claimed.has(code)) claimed.set(code, `${claimed.get(code)} + ${dir}/${name}`);
+                else claimed.set(code, `${dir}/${name}`);
+            }
         }
     }
 
@@ -203,10 +220,52 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
     // match the recorded debt. Writing the count here means the test fails the moment a packet is
     // added without updating the register, and fails again if the register is updated without a
     // packet. A test that only asserted "no unknown leaf" would pass with fifty-one missing.
-    const ALLOWED_MISSING = 51;
+    const ALLOWED_MISSING = 45;
     assert.equal(
         missing.length,
         ALLOWED_MISSING,
         `packets missing for ${missing.length} leaves (recorded debt is ${ALLOWED_MISSING}): ${missing.slice(0, 6).join(', ')}…`,
+    );
+});
+
+// §1.1 of the packet standard: a slice may record OUT only if the WBS assigns it no criteria.
+// A slice that owns criteria and claims OUT is hiding work behind a legal word.
+test('X8: a slice may be OUT only when it owns no criterion', () => {
+    const D = join(WBS_DIR, '..');
+    const read = (p) => readFileSync(join(D, p), 'utf8');
+
+    // criteria per leaf, from the dictionaries
+    const acByLeaf = new Map();
+    for (const name of readdirSync(WBS_DIR)) {
+        if (!/^\d+\.dictionary-w\d+\.md$/.test(name)) continue;
+        const text = readdirSync(WBS_DIR).includes(name) ? read(join('09.wbs', name)) : '';
+        for (const blk of text.split(/\n### /).slice(1)) {
+            const m = /^`(\d+\.\d+)`/.exec(blk);
+            if (!m) continue;
+            const acs = new Set(blk.match(/AC-[A-Z]+-\d+-\d\d/g) ?? []);
+            acByLeaf.set(m[1], acs.size);
+        }
+    }
+
+    // slices that record OUT
+    const outSlices = [];
+    for (const dir of ['01.packets/01.bip', '01.packets/02.fip']) {
+        let names = [];
+        try { names = readdirSync(join(WBS_DIR, dir)); } catch { continue; }
+        for (const name of names) {
+            if (!name.endsWith('.md')) continue;
+            const text = read(join('09.wbs', dir, name));
+            if (!/^type: (bip|fip)/m.test(text)) continue;
+            const code = /^id: (?:BIP|FIP)-(\d+)[._](\d+)/m.exec(text);
+            if (!code) continue;
+            const isOut = /status\s*\|[^\n]*`OUT`/.test(text) || /^# .*`OUT`/m.test(text);
+            if (isOut) outSlices.push([`${code[1]}.${code[2]}`, dir]);
+        }
+    }
+
+    const hiding = outSlices.filter(([leaf]) => (acByLeaf.get(leaf) ?? 0) > 0);
+    assert.deepEqual(
+        hiding.map(([leaf, dir]) => `${dir} → ${leaf} owns criteria but claims OUT`),
+        [],
     );
 });
