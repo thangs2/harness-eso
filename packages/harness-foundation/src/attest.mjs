@@ -250,6 +250,38 @@ export function writeEsoAttestation(projectId, input, secret = undefined) {
          * `computeReceiptMac`), so a receipt minted by an older pack stays valid and simply says nothing.
          */
         enforceWritesSource: input?.enforceWritesSource === 'default' ? 'default' : 'declared',
+        /**
+         * Who minted this receipt. `pack` (the default, and what every existing receipt means) is a
+         * docgraph/codegraph measurement; `dsh-plugin-checks` is a smaller claim — the consumer's declared
+         * checks found no blocker — which the DSH plugin can honestly make and a reader must not mistake
+         * for a score. Outside the MAC's field list like the two above, so an older receipt that omits it
+         * stays valid and reads as `pack`.
+         *
+         * It also decides who may rewrite the file: a host plugin must never overwrite a measured receipt
+         * with a weaker check-only one.
+         */
+        source: typeof input?.source === 'string' && input.source.trim() ? input.source.trim() : 'pack',
+        /**
+         * Brain-tier evidence recorded by a host that witnesses the model call itself.
+         *
+         * On Cursor/Antigravity the Brain evidence is the DeepSeek ledger, written by the MCP server. A
+         * host whose sandbox stops that child from reaching product state cannot produce a ledger row at
+         * all, and pointing the ledger somewhere the child can write would put forgeable evidence inside
+         * the agent's reach. So the DSH plugin records `{ ok, at, via, brainTier }` here instead, from its
+         * own `tools/post-execute` listener — a process the agent cannot drive.
+         *
+         * Read by `guard-write.py` before it falls back to the ledger. Outside the MAC's field list, like
+         * `source` and `enforceWritesSource`, so a receipt minted by an older pack stays valid.
+         */
+        brain:
+            input?.brain && typeof input.brain === 'object' && input.brain.ok === true && input.brain.at
+                ? {
+                      ok: true,
+                      at: String(input.brain.at),
+                      via: input.brain.via ? String(input.brain.via) : 'unknown',
+                      brainTier: input.brain.brainTier ? String(input.brain.brainTier) : null,
+                  }
+                : null,
         unanswerableGaps: Array.isArray(input?.unanswerableGaps)
             ? input.unanswerableGaps.filter((g) => g && typeof g === 'object' && g.id).map((g) => ({ id: String(g.id) }))
             : [],

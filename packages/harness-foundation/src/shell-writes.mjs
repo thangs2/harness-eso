@@ -58,7 +58,7 @@ const NOT_A_FILE = new Set(['/dev/null', '/dev/stdout', '/dev/stderr', '&1', '&2
  * The placeholder is a **letter**, not a space: a blanked-out token still has to look like a token, or
  * `cat > "my file.md"` loses its redirect entirely and the write goes undetected.
  */
-function maskQuoted(command) {
+export function maskQuoted(command) {
     const src = String(command);
     const chars = src.split('');
     let quote = null;
@@ -223,6 +223,28 @@ export function shellWriteTargets(command) {
         }
     }
     return out;
+}
+
+/**
+ * Does the command use a shell **operator** that can write -- a redirect or `tee`?
+ *
+ * Exported because two gates ask this and only one of them had it right. `guards.mjs` (the DSH plugin)
+ * carried its own copy, which scanned the raw command text. A `>` inside a quoted argument is text, not
+ * a redirect, so a `find` whose `-path` exclusion names a glob was read as a write whose target could not
+ * be resolved -- and a read-only command was denied. That is the spurious refusal this module's header
+ * warns about, made by the copy that did not mask quotes.
+ *
+ * Every caller must now come through here, where `maskQuoted` is applied.
+ *
+ * @param {string} command
+ * @returns {boolean}
+ */
+export function shellHasRedirect(command) {
+    const masked = maskQuoted(stripHeredocs(String(command || '')));
+    /* A redirect operator is `>`/`>>` that is not part of `=>`, `->`, `<>` or an fd dup like `2>&1`. */
+    if (/(?<![=<>0-9-])>>?\s*[^\s&|]/.test(masked)) return true;
+    /* `tee` counts only as a command, not as a word inside a message. */
+    return /\|\s*tee\b/.test(masked) || /(?:^|[;&]\s*)tee\b/.test(masked);
 }
 
 /**

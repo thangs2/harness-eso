@@ -19,6 +19,7 @@ import {
     pathMode,
     projectIdFrom,
     resolvePathPolicy,
+    shellHasRedirect,
     shellHasWriteIntent,
     shellWriteTargets,
     toRepoRelative,
@@ -62,19 +63,13 @@ export function findConsumerRoot(start) {
     return null;
 }
 
-/**
- * A shell redirect, or `tee` used as a command.
- *
- * Two false positives this rule already paid for: the word `tee` inside a commit message was read as a
- * command, and `=>` inside a `node -e` snippet was read as `>`. A redirect operator is `>`/`>>` that is
- * not part of `=>`, `->`, `<>` or `2>&1`.
+/*
+ * `hasShellRedirect` used to live here, scanning the raw command text. A `>` inside a quoted argument is
+ * text, not a redirect, so a read-only `find` whose `-path` exclusion names a glob was read as a write
+ * with an unresolvable target — and denied. `shell-writes.mjs` already had `maskQuoted` and did not export
+ * it, which is exactly how two implementations of one rule drift: this is now a single exported function
+ * that both gates call.
  */
-function hasShellRedirect(command) {
-    const text = String(command || '');
-    const redirect = /(?<![=<>-])>>?\s*[^\s&|]/.test(text);
-    const tee = /\|\s*tee\b/.test(text) || /(?:^|[;&]\s*)tee\b/.test(text);
-    return redirect || tee;
-}
 
 /** Repo-relative path literals a script names, e.g. `open('AGENTS.md','w')`. */
 const REL_LITERAL_RE =
@@ -204,8 +199,8 @@ export function decideToolCall({ root = null, configRoot = null, sessionRoot = n
          * signal, this plugin does not. A redirect whose target is a variable (`> $OUT`) therefore counts
          * as write intent here, and with no resolvable target it is denied below rather than ignored.
          */
-        if (!shellHasWriteIntent(command) && !hasShellRedirect(command)) return null;
-        if (!hasShellRedirect(command)) {
+        if (!shellHasWriteIntent(command) && !shellHasRedirect(command)) return null;
+        if (!shellHasRedirect(command)) {
             for (const rel of relativeLiterals(command)) targets.push(path.join(consumer, rel));
             if (!targets.length) return null; // a script that names no path is nothing this gate can judge
         } else {

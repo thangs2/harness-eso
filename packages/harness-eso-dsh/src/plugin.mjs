@@ -15,7 +15,7 @@
  * must not be allowed to break the user's turn; the deny path is the only place that intentionally
  * stops something, and only when the consumer's policy says so.
  */
-import { loadDecisionPolicy } from '@mu/harness-foundation/pure';
+import { loadDecisionPolicy, readEsoAttestation, writeEsoAttestation } from '@mu/harness-foundation/pure';
 
 /*
  * Imported by path, not through the core barrel: the barrel re-exports the ledger and the decision
@@ -25,6 +25,8 @@ import { loadDecisionPolicy } from '@mu/harness-foundation/pure';
 import { appendBlockerRecord, createBlockerRecorder } from '../../harness-eso-core/src/blocker-log.mjs';
 import { loadCheckInputs, hardBlockersFromChecks } from '../../harness-eso-core/src/hard-blockers.mjs';
 import { resolveEsoPolicy } from '../../harness-eso-core/src/eso-policy.mjs';
+import { receiptMatchesVerdict, writeDshAttestation } from './attestation.mjs';
+import { isCompletedBrainCall, recordBrainCall } from './brain-attestation.mjs';
 import { decideToolCall, findConsumerRoot } from './guards.mjs';
 
 /** Last user-authored text in the step, bounded — what the trail records as the trigger. */
@@ -86,6 +88,15 @@ export function createEsoDshPlugin(defaults = {}) {
             /* Every deny is recorded by default; a consumer that wants a quiet trail can turn it off. */
             const recordToolDecisions = config.recordToolDecisions !== false && defaults.recordToolDecisions !== false;
             const onDecision = typeof defaults.onDecision === 'function' ? defaults.onDecision : null;
+
+            /**
+             * Whether the "no eso.checks + fail_closed" deadlock has already been reported.
+             *
+             * Per plugin instance, which is per session in practice. The condition is a standing
+             * configuration fact, so repeating it on every entering step would train an operator to
+             * ignore the one line that explains why their writes are refused.
+             */
+            let noChecksWarned = false;
 
             /** The session's effective directory, or null when the service or session is absent. */
             const sessionDirOf = (agent) => {
@@ -170,6 +181,44 @@ export function createEsoDshPlugin(defaults = {}) {
             if (typeof offTool === 'function') disposers.push(offTool);
 
             /*
+             * The Brain gate's evidence on DSH.
+             *
+             * `guard-write.py` normally reads the DeepSeek usage ledger for this, which works on Cursor and
+             * Antigravity because the MCP server writes it from a process the agent cannot reach. DSH's
+             * sandbox gives that child no write access to product state, so the ledger never gains the row
+             * and the guard reports "no Brain call" for calls that completed. Moving the ledger somewhere
+             * writable would put forgeable evidence inside the agent's reach, which is worse than the
+             * problem. So the plugin witnesses the call itself: this listener fires in the host's tool
+             * pipeline, not on any path the agent can drive.
+             */
+            const offBrain = ctx.on('tools/post-execute', async (exec, result, next) => {
+                try {
+                    if (isCompletedBrainCall(exec, result)) {
+                        const root = findConsumerRoot(configRoot || sessionDirOf(exec?.agent) || process.cwd());
+                        if (root) {
+                            const wrote = recordBrainCall({
+                                root,
+                                tool: exec?.name,
+                                writeEsoAttestation,
+                                readEsoAttestation,
+                            });
+                            if (!wrote.written) log(`brain: attestation not written — ${wrote.reason}`);
+                            else log(`brain: recorded ${exec?.name}`);
+                        }
+                    }
+                } catch (err) {
+                    /*
+                     * A witness that throws would turn a successful model call into a failed tool call.
+                     * The gate's behaviour without this record is the well-defined one it had before:
+                     * the ledger, then the stamp, then a deny.
+                     */
+                    log(`brain: post-execute error — ${err?.message ?? err}`);
+                }
+                return next();
+            });
+            if (typeof offBrain === 'function') disposers.push(offBrain);
+
+            /*
              * The prompt gate. It refuses a step only for a **named** finding from the checks the
              * consumer declared in `eso.checks` — never for a score, and never because evidence is thin.
              * The rejection is written to the product-state trail first, because the host's `reject`
@@ -184,11 +233,65 @@ export function createEsoDshPlugin(defaults = {}) {
                     if (!root) return decision;
 
                     const policy = loadDecisionPolicy({ root }).policy ?? {};
-                    const checks = declaredChecks ?? resolveEsoPolicy(policy).checks;
-                    if (!checks) return decision;
+                    const eso = resolveEsoPolicy(policy);
+                    const checks = declaredChecks ?? eso.checks;
+                    if (!checks) {
+                        /*
+                         * A consumer that declares `enforceWrites: fail_closed` but no `eso.checks` cannot
+                         * reach `allowWrite: true` on this host, and the failure is silent. Measured on
+                         * BA Platform: the attestation on disk said `allowWrite: false` from an earlier
+                         * run, this handler returned here, and `guard-write.py` — which checks the ESO gate
+                         * *before* the Brain gate — denied every protected write with `DENY_ESO`. An agent
+                         * reading that denial goes looking for a Brain problem, makes a Brain call, the
+                         * witness records it correctly, and the write is still refused. The deadlock is not
+                         * obvious from any single message, so it is named here instead.
+                         *
+                         * Logged once per session, not once per step: this is a standing configuration
+                         * fact, and a line per step would be noise an operator learns to skip.
+                         */
+                        if (!noChecksWarned && eso.enforceWrites === 'fail_closed') {
+                            noChecksWarned = true;
+                            log(
+                                'pre-step: no eso.checks declared for this consumer, and eso.enforceWrites is ' +
+                                    'fail_closed. The evidence attestation will not be written, so ' +
+                                    'guard-write.py keeps whatever allowWrite the attestation already holds — ' +
+                                    'protected writes will be denied with "ESO gate" even after a successful ' +
+                                    'Brain call. Declare eso.checks in .harness/decision-policy.json, or raise ' +
+                                    'eso.enforceWrites, or accept that this host does not do gated writes.',
+                            );
+                        }
+                        return decision;
+                    }
 
                     const loaded = loadCheckInputs(root, checks);
                     const { blockers } = hardBlockersFromChecks(loaded);
+
+                    /*
+                     * The evidence gate's input. `guard-write.py` prefers
+                     * `<product-state>/attest/<pid>.json` over the session stamp, and until this existed
+                     * nothing on DSH wrote it — so with `enforceWrites: fail_closed` every protected write
+                     * was refused for "no evidence" before the Brain gate was even consulted. Written
+                     * here, not by a tool call, which is the same trust status the pack's preflight hook
+                     * has on the other hosts.
+                     *
+                     * One write per **verdict change**, not one per step: a rewrite on every step appends
+                     * to product state forever and makes "when did the verdict change" unanswerable. The
+                     * comparison is on what this step measured, not on whether a file exists — checking
+                     * "is there a receipt saying allow" skipped the write exactly when a check had just
+                     * started failing, leaving the guard reading the previous allow and admitting the very
+                     * write this step blocked.
+                     */
+                    try {
+                        const verdict = { allowWrite: blockers.length === 0 && loaded.errors.length === 0 };
+                        if (!receiptMatchesVerdict(root, verdict)) {
+                            const wrote = writeDshAttestation({ root, policy, blockers, errors: loaded.errors });
+                            if (!wrote.written) log(`pre-step: attestation not written — ${wrote.reason}`);
+                        }
+                    } catch (err) {
+                        /* Evidence must never be the reason a step fails; the guard denies without it. */
+                        log(`pre-step: attestation error — ${err?.message ?? err}`);
+                    }
+
                     if (!blockers.length) {
                         if (loaded.errors.length) log(`pre-step: ${loaded.errors.length} unreadable check input(s), no blocker`);
                         return decision;

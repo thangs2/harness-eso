@@ -16,6 +16,7 @@ import { runCapabilityProbe } from './capability-probe-cmd.mjs';
 import { runVerifyHost } from './verify-host-cmd.mjs';
 import { runDshBridge } from './dsh-bridge-cmd.mjs';
 import { runDoctorDsh } from './doctor-dsh-cmd.mjs';
+import { runCheckBrain } from './check-brain-cmd.mjs';
 import { runCheckContract } from './check-contract-cmd.mjs';
 import { runCheckIsolation } from './check-isolation-cmd.mjs';
 import { runCheckMigration } from './check-migration-cmd.mjs';
@@ -42,6 +43,7 @@ function usage() {
   harnessctl check contract <before.json> <after.json> [--direction response|request] [--json]
   harnessctl check project <file...> --tables <table,table> [--json]
   harnessctl check migration <file...> [--json]
+  harnessctl check brain [--consumer <path>] [--json]   (is the Brain gate's evidence path alive and fresh?)
   harnessctl configure list | harnessctl configure use <id>
   harnessctl observatory up|down|restart|status|health|logs|build|smoke [--project <id>]
   harnessctl console up|down|restart|status|health|logs|build
@@ -102,6 +104,11 @@ async function main() {
 
     if (cmd === 'check' && argv[1] === 'contract') {
         runCheckContract(argv.slice(2));
+        return;
+    }
+
+    if (cmd === 'check' && argv[1] === 'brain') {
+        runCheckBrain(argv.slice(2));
         return;
     }
 

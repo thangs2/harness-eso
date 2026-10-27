@@ -56,10 +56,16 @@ test('the plugin object is the shape DSH loads, and injects only the directory s
     assert.equal(typeof pluginDefault.apply, 'function');
 });
 
-test('it registers the tool gate and the pre-step seam, and unwinds', () => {
+test('it registers the three seams it needs, and unwinds', () => {
+    /*
+     * `tools/pre-execute` stops a call, `agent/pre-step` refuses a step on a named finding, and
+     * `tools/post-execute` **witnesses** a completed Brain call — the only evidence a host whose sandbox
+     * blocks the usage ledger can produce. The exact set is asserted so a seam that silently stops being
+     * registered (the failure that leaves a gate looking installed and doing nothing) fails a test.
+     */
     const ctx = fakeCtx();
     const dispose = createEsoDshPlugin().apply(ctx);
-    assert.deepEqual([...ctx.listeners.keys()].sort(), ['agent/pre-step', 'tools/pre-execute']);
+    assert.deepEqual([...ctx.listeners.keys()].sort(), ['agent/pre-step', 'tools/post-execute', 'tools/pre-execute']);
     dispose();
     assert.equal(ctx.listeners.size, 0);
 });
@@ -432,4 +438,52 @@ test('the trail names the consumer even when no session directory is available',
         assert.equal(out.kind, 'deny');
     });
     assert.equal(readBlockerRecords(log)[0].projectId, 'opt');
+});
+
+/*
+ * A read-only command denied as "write intent with an unresolvable target".
+ *
+ * Captured from a live DSH session on 2026-10-27: the operator asked to list a directory and the gate
+ * refused it, because a `find` whose `-path` exclusion is a glob looked like a redirect into a file whose
+ * target could not be resolved. The cause was a second implementation of "is this a redirect?", written
+ * in `guards.mjs` and scanning the raw text: the `>` inside a quoted `-path` pattern read as a redirect.
+ * `shell-writes.mjs` already masked quotes; it simply was not exported, so the plugin grew its own copy.
+ *
+ * These cases are the regression guard. The positive half matters as much as the negative one — a fix
+ * that stopped detecting redirects altogether would pass the first two and quietly open the shell channel.
+ */
+const READ_ONLY_COMMANDS = [
+    'ls -la SDLC 2>/dev/null | head -40; echo "---"; find . -maxdepth 3 -iname "*v2*" -not -path "*/node_modules/*" -not -path "*/.git/*" | head -50',
+    'grep -rn "a > b" src',
+    'ls 2>/dev/null | head -40',
+    'bun test 2>&1 | tail -25',
+];
+
+const WRITE_COMMANDS = [
+    'cat > sdlc/x.md <<EOF\nhi\nEOF',
+    'echo x >> sdlc/notes.md',
+    'node build.mjs > sdlc/out.log 2>&1',
+    'echo hi | tee sdlc/log.txt',
+];
+
+test('a read-only command whose quoted argument contains > is not a write', () => {
+    const root = consumer();
+    for (const command of READ_ONLY_COMMANDS) {
+        const decision = decideToolCall({ root, name: 'bash', args: { command }, askMode: 'deny' });
+        assert.equal(decision, null, `denied a read-only command: ${command}`);
+    }
+});
+
+test('real redirects are still seen, and still gated', () => {
+    const root = consumer({ paths: { locked: [], gated: ['sdlc/'], ask: [], sot: [] } });
+    for (const command of WRITE_COMMANDS) {
+        const decision = decideToolCall({ root, name: 'bash', args: { command }, askMode: 'deny' });
+        assert.notEqual(decision, null, `missed a real write: ${command}`);
+        assert.equal(decision.kind, 'deny');
+    }
+    /*
+     * And a redirect to a path nobody protects is still allowed: the gate is about *which* file, not about
+     * redirects as such. A fix that denied every `>` would pass the loop above and be useless.
+     */
+    assert.equal(decideToolCall({ root, name: 'bash', args: { command: 'node build.mjs > out.log 2>&1' }, askMode: 'deny' }), null);
 });
