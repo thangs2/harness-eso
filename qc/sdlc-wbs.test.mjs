@@ -119,7 +119,7 @@ test('X8: packets present carry their required sections', () => {
               '5. Data & persistence', '6. Invariants', '7. Test plan', '8. `OPEN` register', '9. Decision'],
     };
     const bad = [];
-    for (const dir of ['13.packets']) {
+    for (const dir of ['01.packets/01.bip', '01.packets/02.fip']) {
         const abs = join(WBS_DIR, dir);
         let names = [];
         try { names = readdirSync(abs); } catch { continue; }
@@ -139,11 +139,11 @@ test('X8: packets present carry their required sections', () => {
 });
 
 test('X8: a wave with no interface criteria carries FIP = OUT', () => {
-    const packets = join(WBS_DIR, '13.packets');
+    const fipDir = join(WBS_DIR, '01.packets/02.fip');
     let names = [];
-    try { names = readdirSync(packets); } catch { return; }
+    try { names = readdirSync(fipDir); } catch { return; }
     // Packets are named by code of account: 02.0.fip-out.md, 02.1.bip.md, ...
-    const fips = names.filter((n) => /\.fip-out\.md$/.test(n)).map((n) => readFileSync(join(packets, n), 'utf8'));
+    const fips = names.filter((n) => n.endsWith('.md')).map((n) => readFileSync(join(fipDir, n), 'utf8'));
     if (fips.length === 0) return;
     assert.ok(fips.some((t) => /\bOUT\b/.test(t)), 'a back-end-only wave must record FIP = OUT with a reason');
 });
@@ -151,13 +151,13 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
 // A packet may only be READY when nothing in its open register is still open. A READY packet with
 // live questions is how "ready" stops meaning anything.
 test('X8: a READY packet has no open items left', () => {
-    const packets = join(WBS_DIR, '13.packets');
+    const bipDir = join(WBS_DIR, '01.packets/01.bip');
     let names = [];
-    try { names = readdirSync(packets); } catch { return; }
+    try { names = readdirSync(bipDir); } catch { return; }
     const bad = [];
     for (const name of names) {
         if (!name.endsWith('.md')) continue;
-        const text = readFileSync(join(packets, name), 'utf8');
+        const text = readFileSync(join(bipDir, name), 'utf8');
         if (!/^type:\s*bip$/m.test(text)) continue;
         const ready = /\| \*\*status\*\* \| `READY` \|/.test(text) || /status \| `READY`/.test(text);
         if (!ready) continue;
