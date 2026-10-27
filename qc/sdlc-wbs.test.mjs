@@ -142,3 +142,25 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
     if (fips.length === 0) return;
     assert.ok(fips.some((t) => /\bOUT\b/.test(t)), 'a back-end-only wave must record FIP = OUT with a reason');
 });
+
+// A packet may only be READY when nothing in its open register is still open. A READY packet with
+// live questions is how "ready" stops meaning anything.
+test('X8: a READY packet has no open items left', () => {
+    const packets = join(WBS_DIR, '09.packets');
+    let names = [];
+    try { names = readdirSync(packets); } catch { return; }
+    const bad = [];
+    for (const name of names) {
+        if (!name.endsWith('.md')) continue;
+        const text = readFileSync(join(packets, name), 'utf8');
+        if (!/^type:\s*bip$/m.test(text)) continue;
+        const ready = /\| \*\*status\*\* \| `READY` \|/.test(text) || /status \| `READY`/.test(text);
+        if (!ready) continue;
+        // rows that are not struck through and still look like an open item
+        const live = text
+            .split('\n')
+            .filter((l) => /^\| `OPEN-\d+` \|/.test(l));
+        if (live.length) bad.push(`${name} → ${live.length} open item(s)`);
+    }
+    assert.deepEqual(bad, []);
+});
