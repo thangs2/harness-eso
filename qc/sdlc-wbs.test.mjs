@@ -221,8 +221,15 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
             const text = readFileSync(join(abs, name), 'utf8');
             // A slice-level OUT record (id: BIP-1-OUT) claims every leaf of that deliverable:
             // one file answers for six slices that share one reason (standard §1.1).
+            // Two kinds of OUT record: a leaf-level one (BIP-6_1-OUT) answers for one leaf, and a
+            // deliverable-level one (BIP-1-OUT) answers for all its leaves because they share one
+            // reason. Reading both as deliverable-level lets one OUT record cover eight slices that
+            // each own criteria — the exact hole this check exists to close.
+            const one = /^id: (?:BIP|FIP)-(\d+)_(\d+)-OUT/m.exec(text);
             const whole = /^id: (?:BIP|FIP)-(\d)-OUT/m.exec(text);
-            const codes = whole
+            const codes = one
+                ? [`${one[1]}.${one[2]}`]
+                : whole
                 ? [...leaves].filter((l) => l.startsWith(`${whole[1]}.`))
                 : [(_ = /^id: (?:BIP|FIP)-(\d+[._]\d+)/m.exec(text)) => _?.[1]?.replace('_', '.')]
                       .map((f) => f())
@@ -243,7 +250,7 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
     // match the recorded debt. Writing the count here means the test fails the moment a packet is
     // added without updating the register, and fails again if the register is updated without a
     // packet. A test that only asserted "no unknown leaf" would pass with fifty-one missing.
-    const ALLOWED_MISSING = 23;
+    const ALLOWED_MISSING = 21;
     assert.equal(
         missing.length,
         ALLOWED_MISSING,
