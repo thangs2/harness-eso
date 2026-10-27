@@ -15,7 +15,9 @@ const FIELDS = ['Việc', 'Input', 'Output', 'Phụ thuộc', 'Ước lượng',
 
 function dictionaries() {
     return readdirSync(WBS_DIR)
-        .filter((n) => /^0\d\.dictionary.*\.md$/.test(n))
+        // One file per wave: NN.dictionary-wN.md. Match the kind, not a fixed prefix, so renumbering
+        // the folder does not silently empty this test.
+        .filter((n) => /^\d+\.dictionary-w\d+\.md$/.test(n))
         .map((n) => readFileSync(join(WBS_DIR, n), 'utf8'));
 }
 
