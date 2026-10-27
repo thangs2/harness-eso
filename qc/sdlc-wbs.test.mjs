@@ -34,8 +34,10 @@ function claimedAcs(text) {
     const claimed = [];
     for (const line of block.split('\n')) {
         if (!line.startsWith('|')) continue;
-        const first = line.split('|')[1] ?? '';
-        for (const m of first.matchAll(/AC-[A-Z]+-\d+-\d\d/g)) claimed.push(m[0]);
+        if (line.includes('không thuộc `AC`')) continue;
+        // Any cell may hold the criterion — one surface packet puts it in the last column, and
+        // reading only the first made a whole surface look unowned.
+        for (const m of line.matchAll(/AC-[A-Z]+-\d+-\d\d/g)) claimed.push(m[0]);
     }
     return [...new Set(claimed)];
 }
@@ -250,7 +252,7 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
     // match the recorded debt. Writing the count here means the test fails the moment a packet is
     // added without updating the register, and fails again if the register is updated without a
     // packet. A test that only asserted "no unknown leaf" would pass with fifty-one missing.
-    const ALLOWED_MISSING = 14;
+    const ALLOWED_MISSING = 0;
     assert.equal(
         missing.length,
         ALLOWED_MISSING,
@@ -320,4 +322,30 @@ test('X3b: every gate in the tree has a scenario (X3 cannot see this)', () => {
         gateScenarios.length >= 1,
         'a gate scenario row must exist (the pattern is: | `SCN-...` | **cổng `Wn`** | gate | ...)',
     );
+});
+
+// A code used in a packet but absent from the registry does not exist, by the registry's own law —
+// so a packet that names one is describing an error the system cannot return. This is the check
+// that law never had.
+test('X9b: every error code a packet names is registered', () => {
+    const D = join(WBS_DIR, '..');
+    const reg = readFileSync(join(D, '07.technical', '03.api', '00.index.md'), 'utf8');
+    const registered = new Set([...reg.matchAll(/^\|\s*`([A-Z][A-Z_]{3,})`\s*\|/gm)].map((m) => m[1]));
+    assert.ok(registered.size > 20, `registry parsed ${registered.size} codes; the table may have moved`);
+
+    const named = new Set();
+    for (const dir of ['01.packets/01.bip', '01.packets/02.fip']) {
+        for (const name of readdirSync(join(WBS_DIR, dir))) {
+            if (!name.endsWith('.md')) continue;
+            const text = readFileSync(join(WBS_DIR, dir, name), 'utf8');
+            for (const m of text.matchAll(/`([A-Z][A-Z_]{4,})`/g)) {
+                if (/_(FORBIDDEN|REQUIRED|FAILED|CONFLICT|MISSING|CLOSED|REVERTIBLE|NOT_FOUND|UNREADABLE|INCOMPLETE|UNPLANNED|TAMPERED|UNAVAILABLE|NONE|SOURCE)$/.test(m[1])) {
+                    named.add(m[1]);
+                }
+            }
+        }
+    }
+
+    const unregistered = [...named].filter((c) => !registered.has(c)).sort();
+    assert.deepEqual(unregistered, [], `codes named but not registered: ${unregistered.join(', ')}`);
 });
