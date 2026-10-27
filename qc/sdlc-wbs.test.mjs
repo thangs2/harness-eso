@@ -28,7 +28,16 @@ function claimedAcs(text) {
     const i = text.indexOf('## 7. Test plan');
     if (i < 0) return [];
     const block = text.slice(i).split(/\n## \d/)[0];
-    return [...new Set(block.match(/AC-[A-Z]+-\d+-\d\d/g) ?? [])];
+    // Only the FIRST column of a row claims. A packet legitimately cites a neighbour's criterion
+    // in a later column ("this belongs to US-SUF-01, not here") — counting those makes two slices
+    // look like they own the same criterion, which is how the check would go blind.
+    const claimed = [];
+    for (const line of block.split('\n')) {
+        if (!line.startsWith('|')) continue;
+        const first = line.split('|')[1] ?? '';
+        for (const m of first.matchAll(/AC-[A-Z]+-\d+-\d\d/g)) claimed.push(m[0]);
+    }
+    return [...new Set(claimed)];
 }
 
 function tasks(text) {
@@ -234,7 +243,7 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
     // match the recorded debt. Writing the count here means the test fails the moment a packet is
     // added without updating the register, and fails again if the register is updated without a
     // packet. A test that only asserted "no unknown leaf" would pass with fifty-one missing.
-    const ALLOWED_MISSING = 39;
+    const ALLOWED_MISSING = 33;
     assert.equal(
         missing.length,
         ALLOWED_MISSING,

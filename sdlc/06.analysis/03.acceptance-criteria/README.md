@@ -36,8 +36,8 @@ postcondition: phán quyết có được ghi, `basis` có được giữ, `unkn
 
 | US | AC | File | Trạng thái |
 |---|---|---|---|
-| `US-SUF-01` | `AC-SUF-01-01`…`05` | [`01.suf-us-01-agent.md`](01.suf-us-01-agent.md) | ✅ |
-| `US-SUF-02` | `AC-SUF-02-01`…`04` | [`02.suf-us-02-operator.md`](02.suf-us-02-operator.md) | ✅ |
+| `US-SUF-01` | `AC-SUF-01-01`…`07` | [`01.suf-us-01-agent.md`](01.suf-us-01-agent.md) | ✅ |
+| `US-SUF-02` | `AC-SUF-02-01`…`06` | [`02.suf-us-02-operator.md`](02.suf-us-02-operator.md) | ✅ |
 | `US-AGENT-01` | `AC-AGENT-01-01`…`03` | [`03.agent-us-01-scope.md`](03.agent-us-01-scope.md) | ✅ |
 | `US-KB-01` | `AC-KB-01-01`…`03` | [`04.kb-us-01-isolation.md`](04.kb-us-01-isolation.md) | ✅ |
 | `US-IAM-01` | `AC-IAM-01-01`…`03` | [`05.iam-us-01-workers.md`](05.iam-us-01-workers.md) | ✅ |
