@@ -119,7 +119,7 @@ test('X8: packets present carry their required sections', () => {
               '5. Data & persistence', '6. Invariants', '7. Test plan', '8. `OPEN` register', '9. Decision'],
     };
     const bad = [];
-    for (const dir of ['09.packets']) {
+    for (const dir of ['13.packets']) {
         const abs = join(WBS_DIR, dir);
         let names = [];
         try { names = readdirSync(abs); } catch { continue; }
@@ -139,10 +139,11 @@ test('X8: packets present carry their required sections', () => {
 });
 
 test('X8: a wave with no interface criteria carries FIP = OUT', () => {
-    const packets = join(WBS_DIR, '09.packets');
+    const packets = join(WBS_DIR, '13.packets');
     let names = [];
     try { names = readdirSync(packets); } catch { return; }
-    const fips = names.filter((n) => n.startsWith('02.fip')).map((n) => readFileSync(join(packets, n), 'utf8'));
+    // Packets are named by code of account: 02.0.fip-out.md, 02.1.bip.md, ...
+    const fips = names.filter((n) => /\.fip-out\.md$/.test(n)).map((n) => readFileSync(join(packets, n), 'utf8'));
     if (fips.length === 0) return;
     assert.ok(fips.some((t) => /\bOUT\b/.test(t)), 'a back-end-only wave must record FIP = OUT with a reason');
 });
@@ -150,7 +151,7 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
 // A packet may only be READY when nothing in its open register is still open. A READY packet with
 // live questions is how "ready" stops meaning anything.
 test('X8: a READY packet has no open items left', () => {
-    const packets = join(WBS_DIR, '09.packets');
+    const packets = join(WBS_DIR, '13.packets');
     let names = [];
     try { names = readdirSync(packets); } catch { return; }
     const bad = [];
