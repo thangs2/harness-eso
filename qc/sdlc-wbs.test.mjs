@@ -243,7 +243,7 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
     // match the recorded debt. Writing the count here means the test fails the moment a packet is
     // added without updating the register, and fails again if the register is updated without a
     // packet. A test that only asserted "no unknown leaf" would pass with fifty-one missing.
-    const ALLOWED_MISSING = 33;
+    const ALLOWED_MISSING = 29;
     assert.equal(
         missing.length,
         ALLOWED_MISSING,
