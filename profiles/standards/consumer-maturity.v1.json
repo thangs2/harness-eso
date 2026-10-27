@@ -371,6 +371,38 @@
           }
         },
         {
+          "id": "T4.6",
+          "title": "Antigravity tree carries no .mdc (dual-harness INV-05)",
+          "severity": "INFO",
+          "probe": {
+            "type": "path_absent",
+            "glob": ".agents/rules/*.mdc",
+            "reason": "Antigravity rules MUST end with .md, found .mdc"
+          },
+          "remediation": {
+            "action": "host-pack-refresh",
+            "hint": "harnessctl host-pack refresh <consumer> writes .md into .agents/rules — delete any .mdc left by an older pack",
+            "autoSafe": true
+          }
+        },
+        {
+          "id": "T4.7",
+          "title": "Antigravity pipeline-gate rule is a real .md rule, not a renamed .mdc",
+          "severity": "INFO",
+          "probe": {
+            "type": "rule_not_mechanism_copy",
+            "path": ".agents/rules/core.pipeline-gate.md",
+            "mechanism": "profiles/templates/rules/core.pipeline-gate.mdc",
+            "ide": "Antigravity",
+            "forbidGlobs": true
+          },
+          "remediation": {
+            "action": "docs",
+            "hint": "Author .agents/rules/core.pipeline-gate.md as an Antigravity rule (no Cursor globs); a renamed .mdc is a mechanism template under the wrong name",
+            "autoSafe": false
+          }
+        },
+        {
           "id": "T4.3",
           "title": "Engineering skill (*engineering*) present (Cursor)",
           "severity": "INFO",

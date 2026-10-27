@@ -1,0 +1,31 @@
+---
+description: Supreme gate — rules load first; agent MUST Read AGENTS.md before work
+layer: core
+alwaysApply: true
+version: "1.0.0"
+canonical: AGENTS.md
+ide: antigravity
+---
+
+# Law gate (forced)
+
+**IDE injects rules → this rule runs first.** Rules do **not** replace law; they route the agent to it.
+
+## Mandatory (every Agent session)
+
+1. **`Read` repository root `AGENTS.md`** (full file) before planning, MCP recon, or any **Write** / **StrReplace**.
+2. Treat **`AGENTS.md` as supreme law** for this repo. Rules and skills **summarize** it only.
+3. On conflict: **`AGENTS.md` > any rule > any skill > chat guesswork**.
+
+## After `AGENTS.md` is loaded
+
+Apply always-on rules (pointers only — details live in `AGENTS.md`):
+1. `core.pipeline-gate`
+2. `core.conversation-hygiene`
+3. `core.scope-fallback`
+
+Then glob-matched rules and skills **only if** they do not contradict `AGENTS.md`.
+
+## Same session
+
+If the user changes scope, **re-read `AGENTS.md`** when its sections become relevant — do not rely on rule memory alone.

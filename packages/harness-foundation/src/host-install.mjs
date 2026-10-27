@@ -527,9 +527,24 @@ export function syncConsumerGuards(root, opts = {}) {
 }
 
 /**
+ * Rule file extension for a host tree. `.cursor/` is the only tree that reads `.mdc`; every other
+ * tree (`.agents/` = Antigravity, `.claude/` = Claude Code) reads plain Markdown.
+ *
+ * Writing `.mdc` outside `.cursor/` violates the dual-harness split (a consumer's INV-05 gate fails
+ * on any `.mdc` under `.agents/rules/`), so the extension is derived here and never hard-coded.
+ *
+ * @param {string} treeKey `cursor` | `agents` | `claude`
+ * @returns {'.mdc'|'.md'}
+ */
+export function ruleExtensionForTree(treeKey) {
+    return treeKey === 'cursor' ? '.mdc' : '.md';
+}
+
+/**
  * Ensure baseline token-diet compliant micro-rules exist in target IDE tree.
- * Creates .<treeKey>/rules/core.conversation-hygiene.mdc, core.pipeline-gate.mdc,
- * and core.scope-fallback.mdc only if missing on disk.
+ * Creates `.<treeKey>/rules/<rule><ext>` only if missing on disk, where `ext` is `.mdc` for the
+ * cursor tree and `.md` for every other tree. The `.md` and `.mdc` templates are separate files
+ * with separate frontmatter — a renamed copy of the other format is not a valid rule.
  */
 export function ensureConsumerRules(root, treeKey) {
     const baseProfiles = process.env.HARNESS_PROFILES_DIR || PROFILES_DIR_DEFAULT;
@@ -539,35 +554,38 @@ export function ensureConsumerRules(root, treeKey) {
     const actions = [];
     const targetRulesDir = path.join(root, `.${treeKey}`, 'rules');
     fs.mkdirSync(targetRulesDir, { recursive: true });
+    const ext = ruleExtensionForTree(treeKey);
 
     // Eager core.* (token-diet) + scoped workflow/delivery (alwaysApply:false in templates).
-    const ruleNames = [
-        'core.law-gate.mdc',
-        'core.conversation-hygiene.mdc',
-        'core.pipeline-gate.mdc',
-        'core.scope-fallback.mdc',
-        'workflow.agentic-factory.mdc',
-        'workflow.qc-runtime.mdc',
-        'delivery.workflow.mdc',
+    // Stems only: the extension is a property of the tree, not of the rule.
+    const ruleStems = [
+        'core.law-gate',
+        'core.conversation-hygiene',
+        'core.pipeline-gate',
+        'core.scope-fallback',
+        'workflow.agentic-factory',
+        'workflow.qc-runtime',
+        'delivery.workflow',
     ];
 
-    for (const name of ruleNames) {
-        const dest = path.join(targetRulesDir, name);
-        const altDest = (treeKey === 'agents' || treeKey === 'claude') ? path.join(targetRulesDir, name.replace(/\.mdc$/, '.md')) : null;
-        if (!fs.existsSync(dest)) {
-            const src = path.join(templatesDir, name);
-            if (fs.existsSync(src)) {
-                fs.copyFileSync(src, dest);
-                actions.push({ relative: `.${treeKey}/rules/${name}`, action: 'created' });
-            }
+    for (const stem of ruleStems) {
+        const targetName = `${stem}${ext}`;
+        const dest = path.join(targetRulesDir, targetName);
+        if (fs.existsSync(dest)) continue;
+
+        // Never fall back to the other format: shipping `.mdc` bytes under a `.md` name is exactly
+        // the defect this guards against. A missing template is reported, not silently substituted.
+        const src = path.join(templatesDir, targetName);
+        if (!fs.existsSync(src)) {
+            actions.push({
+                relative: `.${treeKey}/rules/${targetName}`,
+                action: 'skipped',
+                reason: `no ${targetName} template in ${path.relative(baseProfiles, templatesDir)}`,
+            });
+            continue;
         }
-        if (altDest && !fs.existsSync(altDest)) {
-            const src = path.join(templatesDir, name);
-            if (fs.existsSync(src)) {
-                fs.copyFileSync(src, altDest);
-                actions.push({ relative: `.${treeKey}/rules/${path.basename(altDest)}`, action: 'created' });
-            }
-        }
+        fs.copyFileSync(src, dest);
+        actions.push({ relative: `.${treeKey}/rules/${targetName}`, action: 'created' });
     }
 
     // Seed instructions.md in .cursor/ or .agents/ if missing

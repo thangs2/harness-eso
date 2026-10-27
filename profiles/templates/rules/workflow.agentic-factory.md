@@ -1,0 +1,53 @@
+---
+description: Runtime factory — Eng-Lead implement/fix loop; HIR after verify+audit; never agent Done
+layer: workflow
+ide: antigravity
+alwaysApply: false
+globs: "packages/**/*,scripts/**/*,sdlc/08.wbs/**/*,SDLC/08.wbs/**/*,.cursor/agents/**,.agents/agents/**"
+version: "1.0.0-mechanism"
+canonical: AGENTS.md
+---
+
+# Agentic runtime factory (mechanism)
+
+**When:** Implementing/fixing code on a Ready Eng slice — AC, INV ids, `allowed_files`, verify command present.  
+**Plane:** Engineering only. Product/domain Owner questions → consumer domain skill (not this rule).  
+**Procedure:** skill `brain-dispatch` · consumer `*-engineering-team`.  
+**Pairs:** `workflow.qc-runtime` · dual-harness INV · optional `delivery.workflow`.
+
+## 1. Handoff boundary
+
+```text
+Plane A (delivery)     Plane B (factory)              Plane C (human)
+WBS / Ticket Ready →   IP → build/verify/audit     →  HIR → Done (human)
+                       optional qc after qualified DEV
+```
+
+| Gate | Who |
+|---|---|
+| → In Progress | Eng-Lead / pod |
+| → Human In Review | Agent after verify PASS + audit ≥85 |
+| → Done | Human Supervisor-Eng / PO only |
+| → Merge | Human |
+
+## 2. Factory loop
+
+1. **Scout** — memory → docgraph → codegraph; Zero-SDLC-Crawl on Enriched tickets.
+2. **Plan** — minimal diff; disjoint `allowed_files`.
+3. **Build** — RED then GREEN; Brain via `brain-dispatch` when gated.
+4. **Validate** — deterministic project tests · dual-harness when harness touched · Task verify cmd.
+5. **Defect loop** — verbatim log → fix → full re-validate; stop after 3 identical root errors.
+6. **Audit** — `audit-runtime` ≥85, 0 CRITICAL.
+7. **Handoff** — `READY_FOR_HUMAN_REVIEW` report. No agent Done.
+
+## 3. Forbidden (AF-*)
+
+| ID | Forbidden |
+|---|---|
+| AF-01 | Agent Jira/Story **Done** / Closed |
+| AF-02 | Handoff without green verify evidence |
+| AF-03 | Skip defect loop while claiming complete |
+| AF-04 | Merge PR without explicit user request |
+| AF-05 | Overlapping `allowed_files` / missing slice bound |
+| AF-06 | Invent contracts; copy another consumer's domain rules (ABP/SaaS/INV) |
+| AF-07 | One-sided dual-harness write (`.cursor` XOR `.agents`) |

@@ -39,10 +39,15 @@ test('initProfile seeds micro-rules and returns tokenDiet audit report', () => {
         assert(fs.existsSync(path.join(consumerRepo, '.cursor/rules/core.pipeline-gate.mdc')));
         assert(fs.existsSync(path.join(consumerRepo, '.cursor/rules/core.scope-fallback.mdc')));
 
-        // Verify seeded micro-rules exist in .agents/rules
-        assert(fs.existsSync(path.join(consumerRepo, '.agents/rules/core.conversation-hygiene.mdc')));
-        assert(fs.existsSync(path.join(consumerRepo, '.agents/rules/core.pipeline-gate.mdc')));
-        assert(fs.existsSync(path.join(consumerRepo, '.agents/rules/core.scope-fallback.mdc')));
+        // Verify seeded micro-rules exist in .agents/rules — Antigravity reads .md, never .mdc.
+        assert(fs.existsSync(path.join(consumerRepo, '.agents/rules/core.conversation-hygiene.md')));
+        assert(fs.existsSync(path.join(consumerRepo, '.agents/rules/core.pipeline-gate.md')));
+        assert(fs.existsSync(path.join(consumerRepo, '.agents/rules/core.scope-fallback.md')));
+        assert.deepEqual(
+            fs.readdirSync(path.join(consumerRepo, '.agents/rules')).filter((f) => f.endsWith('.mdc')),
+            [],
+            'INV-05: no .mdc may be written into the Antigravity tree'
+        );
 
         // Verify seeded workflow guide & instructions
         assert(fs.existsSync(path.join(consumerRepo, '.harness/WORKFLOW_GUIDE.md')));

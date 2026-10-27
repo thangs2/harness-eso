@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkspace } from '@mu/harness-foundation/workspace';
+import { parseFrontmatter } from '@mu/harness-foundation/token-diet';
 import { ESO_ROOT } from './workspace-env.mjs';
 
 const STANDARD_REL = path.join('profiles', 'standards', 'consumer-maturity.v1.json');
@@ -110,6 +111,31 @@ function globMin(root, pattern, min) {
     count: names.length,
     evidence: `${names.length} match(es) under ${path.relative(root, dir) || '.'} (need ≥${min})`,
   };
+}
+
+/**
+ * Minimal single-star glob (`dir/prefix*suffix`) → matching relative paths.
+ *
+ * Same matching scope as `globMin`; used by `path_absent` to name exactly which files violate, so
+ * the report says *what* is wrong rather than only that something is.
+ *
+ * @param {string} root
+ * @param {string} pattern
+ * @returns {string[]}
+ */
+function globMatches(root, pattern) {
+  const absPattern = path.join(root, pattern);
+  const dir = path.dirname(absPattern);
+  const base = path.basename(absPattern);
+  const star = base.indexOf('*');
+  if (star < 0 || !fs.existsSync(dir)) return [];
+  const prefix = base.slice(0, star);
+  const suffix = base.slice(star + 1);
+  const relDir = path.relative(root, dir);
+  return fs
+    .readdirSync(dir)
+    .filter((n) => n.startsWith(prefix) && n.endsWith(suffix))
+    .map((n) => path.join(relDir, n));
 }
 
 /**
@@ -235,6 +261,24 @@ function runProbe(root, probe) {
   if (type === 'glob_min') {
     return globMin(root, probe.glob, probe.min ?? 1);
   }
+  /**
+   * A tree's contract is defined as much by what it must NOT contain as by what it must.
+   *
+   * `ensureConsumerRules` wrote `.mdc` into `.agents/rules/`, and no check here could see it: every
+   * rule probe named `.cursor/`. `verify consumer` therefore reported a clean tree while the
+   * consumer's own INV-05 gate failed on 7 files (fineso 2026-10-24). A check that provisions a tree
+   * must check that tree.
+   */
+  if (type === 'path_absent') {
+    const present = (probe.paths || []).filter((p) => exists(root, p, probe.as || 'any'));
+    const found = [...present, ...(probe.glob ? globMatches(root, probe.glob) : [])];
+    return {
+      ok: found.length === 0,
+      evidence: found.length
+        ? `${probe.reason || 'forbidden path present'}: ${found.join(', ')}`
+        : `${probe.reason || 'no forbidden path'} (0 found)`,
+    };
+  }
   if (type === 'file_contains_any') {
     const rel = probe.path || '';
     const full = path.join(root, rel);
@@ -307,6 +351,41 @@ function runProbe(root, probe) {
       ok,
       evidence: `${probe.path} ${probe.key} = ${JSON.stringify(actual)}${ok ? '' : ` (expected ${JSON.stringify(probe.equals)})`}`,
     };
+  }
+  if (type === 'rule_not_mechanism_copy') {
+    const rel = probe.path || '';
+    const full = path.join(root, rel);
+    const mechanismRel = probe.mechanism || '';
+    if (!fs.existsSync(full) || !fs.statSync(full).isFile()) {
+      return { ok: false, evidence: `missing file ${rel}` };
+    }
+    const text = fs.readFileSync(full, 'utf8');
+    /*
+     * The mechanism template lives in the ESO install, not in the consumer, so `mechanism` resolves
+     * against ESO_ROOT — resolving it against the consumer root silently found nothing and the check
+     * passed everything. `mechanismFromRoot: 'consumer'` opts out for a consumer-authored twin.
+     */
+    const mechanismPath = !mechanismRel
+      ? ''
+      : probe.mechanismFromRoot === 'consumer'
+        ? path.join(root, mechanismRel)
+        : path.join(ESO_ROOT, mechanismRel);
+    if (!mechanismPath || !fs.existsSync(mechanismPath)) {
+      // No mechanism twin to compare against: the extension contract alone is what can be judged.
+      return { ok: true, evidence: `${rel} (no ${mechanismRel || 'mechanism'} copy to compare)` };
+    }
+    if (text === fs.readFileSync(mechanismPath, 'utf8')) {
+      return {
+        ok: false,
+        evidence: `${rel} is a byte copy of ${mechanismRel} — a renamed mechanism rule, not a ${probe.ide || 'this IDE'} rule`,
+      };
+    }
+    const fm = parseFrontmatter(text);
+    // A Cursor rule carries globs for its own matcher; `.agents/` rules are plain Markdown.
+    if (fm.globs && probe.forbidGlobs) {
+      return { ok: false, evidence: `${rel} carries Cursor globs: ${fm.globs}` };
+    }
+    return { ok: true, evidence: `${rel} differs from ${mechanismRel} and declares ${fm.ide ? `ide: ${fm.ide}` : 'its own frontmatter'}` };
   }
   return { ok: false, evidence: `unknown probe type: ${type}` };
 }
