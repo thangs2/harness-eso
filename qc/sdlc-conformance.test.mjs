@@ -32,7 +32,12 @@ function parse(file) {
     if (fm) {
         for (const line of fm[1].split('\n')) {
             const m = /^([a-z_]+):\s*(.*)$/.exec(line);
-            if (m) keys[m[1]] = m[2].trim().replace(/^"|"$/g, '');
+            if (m) {
+                const value = m[2].trim().replace(/^"|"$/g, '');
+                // A key whose value is a block list (`- item` lines) parses as an empty string;
+                // record it so "declares allowed_files" is not confused with "has no entries".
+                keys[m[1]] = value === '' ? '[]' : value;
+            }
         }
     }
     return { text, type: keys.type, keys, body: fm ? text.slice(fm[0].length) : text };
@@ -65,7 +70,7 @@ const RULES = {
 // Types whose required sections are prose judgements, not headings. Listed so the omission is visible.
 const JUDGEMENT = new Set([
     'standard', 'requirement', 'actor-catalog', 'use-case', 'business-rule', 'c4',
-    'data-model', 'api-contract', 'ui-design', 'query-spec', 'wbs', 'bip', 'fip',
+    'data-model', 'api-contract', 'ui-design', 'query-spec', 'wbs', 'bip', 'fip', 'architecture-doc',
     'decision-log', 'feature-catalog', 'traceability-matrix', 'domain-spec', 'capability-spec', 'capability-index',
 ]);
 
@@ -73,15 +78,20 @@ const hasAll = (text, names) => names.every((n) => SECTION[n].some((re) => re.te
 
 test('X7: every document declares a type the standard knows', () => {
     const unknown = [];
+    const untyped = [];
     let n = 0;
     for (const f of walk(SDLC)) {
         if (f.endsWith('README.md')) continue;
         const { type } = parse(f);
-        if (!type) continue;
+        // A document with no type is not "not applicable" — it is a document the check cannot
+        // judge. Skipping it silently would let an untyped file pass forever, which is how the
+        // six c4 files went unnoticed.
+        if (!type) { untyped.push(relative(ROOT, f)); continue; }
         n += 1;
         if (!(type in RULES) && !JUDGEMENT.has(type)) unknown.push(`${relative(ROOT, f)} → ${type}`);
     }
     assert.ok(n > 150, `expected the tree to be large, saw ${n} typed documents`);
+    assert.deepEqual(untyped, [], 'documents with no type — no rule can be applied to them');
     assert.deepEqual(unknown, [], 'a document declares a type that has no rule in the standard');
 });
 
@@ -144,6 +154,36 @@ test('X7: every non-README document has frontmatter with a source and a status',
             if (!keys.source_of_truth) missing.push('source_of_truth');
         }
         if (missing.length) bad.push(`${relative(ROOT, f)} → ${missing.join(', ')}`);
+    }
+    assert.deepEqual(bad, []);
+});
+
+test('X7: no document carries two names for one header field', () => {
+    // doc_kind/standard_version/stage were the older spellings. Keeping them beside the current
+    // ones gives every reader two sources of truth and gives every check one it does not read.
+    const RETIRED = { doc_kind: 'type', standard_version: 'sot_doc_version', stage: 'phase' };
+    const bad = [];
+    for (const f of walk(SDLC)) {
+        const { keys } = parse(f);
+        for (const [old, current] of Object.entries(RETIRED)) {
+            if (keys[old] !== undefined) {
+                bad.push(`${relative(ROOT, f)} → ${old} (use ${current})`);
+            }
+        }
+    }
+    assert.deepEqual(bad, []);
+});
+
+test('X7: c4 declares its level, domain-spec declares its write boundary', () => {
+    const bad = [];
+    for (const f of walk(SDLC)) {
+        const { keys } = parse(f);
+        if (keys.type === 'c4' && !keys.level) bad.push(`${relative(ROOT, f)} → c4 without level`);
+        if (keys.type === 'domain-spec') {
+            const need = ['domain', 'owner_role', 'allowed_files', 'forbidden', 'human_sot'];
+            const missing = need.filter((k) => !keys[k]);
+            if (missing.length) bad.push(`${relative(ROOT, f)} → ${missing.join(', ')}`);
+        }
     }
     assert.deepEqual(bad, []);
 });
