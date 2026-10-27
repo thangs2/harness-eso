@@ -21,6 +21,16 @@ function dictionaries() {
         .map((n) => readFileSync(join(WBS_DIR, n), 'utf8'));
 }
 
+// Ownership is claimed by a §7 row (`| AC-x | type | …`), not by any mention anywhere in the file.
+// A packet cites a neighbour's criterion in prose all the time ("this is W1's rule, not mine"), and
+// counting those as claims makes two slices appear to own the same criterion.
+function claimedAcs(text) {
+    const i = text.indexOf('## 7. Test plan');
+    if (i < 0) return [];
+    const block = text.slice(i).split(/\n## \d/)[0];
+    return [...new Set(block.match(/AC-[A-Z]+-\d+-\d\d/g) ?? [])];
+}
+
 function tasks(text) {
     const out = new Map();
     const parts = text.split(/\n### /).slice(1);
@@ -33,7 +43,11 @@ function tasks(text) {
         // follows the tasks also contains criterion ids; counting those would double-count every
         // criterion once per table row.
         const block = part.split(/\n## /)[0];
-        const acs = [...new Set(block.match(/AC-[A-Z]+-\d+-\d\d/g) ?? [])];
+        // A dictionary claims through its DoD line; a packet claims through §7 rows. Both are
+        // "the criteria this slice owns", and both must be read from the field, not from prose.
+        const acs = text.includes('## 7. Test plan')
+            ? claimedAcs(block)
+            : [...new Set(block.match(/AC-[A-Z]+-\d+-\d\d/g) ?? [])];
         out.set(id[1], { acs, out: /\bOUT\b/.test(block) });
     }
     return out;
@@ -220,7 +234,7 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
     // match the recorded debt. Writing the count here means the test fails the moment a packet is
     // added without updating the register, and fails again if the register is updated without a
     // packet. A test that only asserted "no unknown leaf" would pass with fifty-one missing.
-    const ALLOWED_MISSING = 45;
+    const ALLOWED_MISSING = 39;
     assert.equal(
         missing.length,
         ALLOWED_MISSING,
@@ -267,5 +281,27 @@ test('X8: a slice may be OUT only when it owns no criterion', () => {
     assert.deepEqual(
         hiding.map(([leaf, dir]) => `${dir} → ${leaf} owns criteria but claims OUT`),
         [],
+    );
+});
+
+// A deliverable's gate is a definition of done, not a criterion, so AC<->SCN coverage (X3) cannot
+// see it. The W2 gate had none until this test existed: five criteria could be green while the
+// thing the deliverable is for was never exercised. Every gate named in the tree must have a
+// scenario row marked as a gate.
+test('X3b: every gate in the tree has a scenario (X3 cannot see this)', () => {
+    const tree = readFileSync(join(WBS_DIR, '02.wbs-tree.md'), 'utf8');
+    // the gate column carries the deliverable's definition of done; deliveries are numbered 1..8
+    const gateRows = [...tree.matchAll(/^\| \*\*(\d)\*\* \|.+?\|$/gm)].length;
+    assert.equal(gateRows, 8, `expected 8 deliverable rows, saw ${gateRows}`);
+
+    const matrices = readdirSync(join(WBS_DIR, '..', '06.analysis', '04.quality-control'))
+        .filter((n) => n.includes('scenario-matrix'))
+        .map((n) => readFileSync(join(WBS_DIR, '..', '06.analysis', '04.quality-control', n), 'utf8'))
+        .join('\n');
+
+    const gateScenarios = [...matrices.matchAll(/^\| `(SCN-[A-Z]+-\d+)` \| \*\*cổng/gm)].map((m) => m[1]);
+    assert.ok(
+        gateScenarios.length >= 1,
+        'a gate scenario row must exist (the pattern is: | `SCN-...` | **cổng `Wn`** | gate | ...)',
     );
 });
