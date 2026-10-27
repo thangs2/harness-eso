@@ -105,3 +105,40 @@ test('WBS: criteria of a covered wave are all claimed by a task', () => {
     assert.deepEqual(inScope, [], 'criteria in a written-up wave with no owning task');
     assert.equal(claimed.size, all.size, 'every criterion must be claimed by a task');
 });
+
+// X8: a slice is implementable only if it has a packet, or says why it has none. The first packet
+// is a sample, so this test checks the property rather than counting packets: any packet present
+// must carry its required sections, and a [be]-only wave must carry an explicit FIP = OUT.
+test('X8: packets present carry their required sections', () => {
+    const sections = {
+        bip: ['1. Slice identity', '2. Sources', '3. Business binding', '4. Contract & transaction',
+              '5. Data & persistence', '6. Invariants', '7. Test plan', '8. `OPEN` register', '9. Decision'],
+    };
+    const bad = [];
+    for (const dir of ['09.packets']) {
+        const abs = join(WBS_DIR, dir);
+        let names = [];
+        try { names = readdirSync(abs); } catch { continue; }
+        for (const name of names) {
+            if (!name.endsWith('.md')) continue;
+            const text = readFileSync(join(abs, name), 'utf8');
+            const kind = /^type:\s*(bip|fip)$/m.exec(text)?.[1];
+            if (!kind) continue;
+            if (kind === 'bip') {
+                const missing = sections.bip.filter((h) => !text.includes(`## ${h}`));
+                if (missing.length) bad.push(`${name} → ${missing.join(', ')}`);
+            }
+            if (kind === 'fip' && !/OUT/.test(text)) bad.push(`${name} → a FIP must say OUT when it has no surface`);
+        }
+    }
+    assert.deepEqual(bad, []);
+});
+
+test('X8: a wave with no interface criteria carries FIP = OUT', () => {
+    const packets = join(WBS_DIR, '09.packets');
+    let names = [];
+    try { names = readdirSync(packets); } catch { return; }
+    const fips = names.filter((n) => n.startsWith('02.fip')).map((n) => readFileSync(join(packets, n), 'utf8'));
+    if (fips.length === 0) return;
+    assert.ok(fips.some((t) => /\bOUT\b/.test(t)), 'a back-end-only wave must record FIP = OUT with a reason');
+});
