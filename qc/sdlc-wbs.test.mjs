@@ -25,7 +25,9 @@ function tasks(text) {
     const out = new Map();
     const parts = text.split(/\n### /).slice(1);
     for (const part of parts) {
-        const id = /^(W\d-\d+)/.exec(part);
+        // Work packages carry a WBS code of account (2.3); older text used W2-3. Accept both so the
+        // check survives a renumbering, and keep the code as the identity.
+        const id = /^`(\d+\.\d+)`/.exec(part) ?? /^(W\d-\d+)/.exec(part);
         if (!id) continue;
         // The block ends at the next heading of the same or higher level. The coverage table that
         // follows the tasks also contains criterion ids; counting those would double-count every
