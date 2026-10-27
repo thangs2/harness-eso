@@ -169,3 +169,44 @@ test('X8: a READY packet has no open items left', () => {
     }
     assert.deepEqual(bad, []);
 });
+
+// X8 says every slice has a packet. It never said how many slices there are, so five packets
+// against fifty-six leaves passed. This counts both sides: every leaf of the tree must be claimed
+// by exactly one BIP or one FIP, and a packet may not name a leaf that does not exist.
+test('X8: packet coverage is counted against the leaves, not sampled', () => {
+    const tree = readFileSync(join(WBS_DIR, '02.wbs-tree.md'), 'utf8');
+    // leaves are the rows of the per-deliverable breakdown tables: | **2.3** | title | task |
+    const leaves = new Set([...tree.matchAll(/^\| \*\*(\d+\.\d+)\*\* \|/gm)].map((m) => m[1]));
+
+    const claimed = new Map(); // leaf -> file
+    const unknownLeaf = [];
+    for (const dir of ['01.packets/01.bip', '01.packets/02.fip']) {
+        const abs = join(WBS_DIR, dir);
+        let names = [];
+        try { names = readdirSync(abs); } catch { continue; }
+        for (const name of names) {
+            if (!name.endsWith('.md')) continue;
+            const text = readFileSync(join(abs, name), 'utf8');
+            const code = /^id: (?:BIP|FIP)-(\d+[._]\d+)/m.exec(text)?.[1]?.replace('_', '.');
+            if (!code) continue;
+            if (!leaves.has(code)) unknownLeaf.push(`${dir}/${name} → ${code}`);
+            if (claimed.has(code)) claimed.set(code, `${claimed.get(code)} + ${dir}/${name}`);
+            else claimed.set(code, `${dir}/${name}`);
+        }
+    }
+
+    assert.deepEqual(unknownLeaf, [], 'a packet names a leaf the tree does not contain');
+    const missing = [...leaves].filter((l) => !claimed.has(l)).sort();
+    assert.equal(leaves.size, 56, `tree should have 56 leaves, saw ${leaves.size}`);
+
+    // The gap is real, so it is asserted as an allowance rather than ignored: the number must
+    // match the recorded debt. Writing the count here means the test fails the moment a packet is
+    // added without updating the register, and fails again if the register is updated without a
+    // packet. A test that only asserted "no unknown leaf" would pass with fifty-one missing.
+    const ALLOWED_MISSING = 51;
+    assert.equal(
+        missing.length,
+        ALLOWED_MISSING,
+        `packets missing for ${missing.length} leaves (recorded debt is ${ALLOWED_MISSING}): ${missing.slice(0, 6).join(', ')}…`,
+    );
+});
