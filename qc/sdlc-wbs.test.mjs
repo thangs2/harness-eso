@@ -97,8 +97,11 @@ test('WBS: criteria of a covered wave are all claimed by a task', () => {
     // Waves W1, W2 and W3 are written up; every criterion they own must have an owning task.
     // ARCH-05/06 belong to W5 (tenancy, permissions) and are not written up yet, so they are out
     // of scope here rather than silently passing.
+    // W1, W2, W3, W4 and W6 are written up. ARCH-05/06 (W5), KB only in W4, and nothing from W7
+    // are in scope yet.
     const inScope = uncovered.filter(
-        (a) => /^AC-(EV|AGENT|SUF)-/.test(a) || /^AC-ARCH-0[1-4]-/.test(a),
+        (a) =>
+            /^AC-(EV|AGENT|SUF|KB|LEARN|UI|HOST-05)-/.test(a) || /^AC-ARCH-0[1-4]-/.test(a),
     );
     assert.deepEqual(inScope, [], 'criteria in a written-up wave with no owning task');
     assert.ok(claimed.size > 50, `expected a substantial claim set, saw ${claimed.size}`);
