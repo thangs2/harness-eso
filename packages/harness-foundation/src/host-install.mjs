@@ -819,13 +819,21 @@ export function applyHostTree(root, treeKey, treeSpec, profileId) {
         }
     } else if (treeKey === 'agents') {
         /*
-         * Portable form: no `bash`, so Windows can run it, and no `cd ..` guard because the Antigravity
-         * tree is spawned with the consumer root as cwd. `python3` stays — `pre-tool-use.py` is a Python
-         * file by design (it runs guard-write and guard-shell from one stdin read), and a command
-         * literal cannot resolve a different interpreter name. Windows needs `python` on PATH or a
-         * `python3` shim; that is a documented prerequisite, not something this string can fix.
+         * Portable form: no `bash`, so Windows can run it, and the path is written **relative to the
+         * tree dir**, because Antigravity spawns command hooks with cwd set to `.agents/` — measured,
+         * not assumed: `command_hook_executor.go` resolves `.agents/hooks/pre-tool-use.py` against
+         * `.agents/` and the child sees `<repo>/.agents` (2026-10-28, IDE log
+         * `~/.gemini/antigravity/log/cli-*.log`). The old `bash -lc '[ -f harness.config.json ] || cd …'`
+         * wrapper hid this; deleting it for Windows portability left every Antigravity hook resolving a
+         * doubled path (`<repo>/.agents/.agents/…`) and exiting 1, which the host reads as a blocked
+         * tool call. Regression probe: `qc/hook-cwd-antigravity.test.mjs`.
+         *
+         * `python3` stays — `pre-tool-use.py` is a Python file by design (it runs guard-write and
+         * guard-shell from one stdin read), and a command literal cannot resolve a different
+         * interpreter name. Windows needs `python` on PATH or a `python3` shim; that is a documented
+         * prerequisite, not something this string can fix.
          */
-        const tracerCmd = 'python3 .agents/hooks/pre-tool-use.py';
+        const tracerCmd = 'python3 hooks/pre-tool-use.py';
         if (!hooksDoc['harness-tracer'] && !hooksDoc['consumer-guards']) {
             hooksDoc['harness-tracer'] = {
                 PreToolUse: [
