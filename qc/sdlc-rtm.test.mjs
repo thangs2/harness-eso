@@ -10,8 +10,8 @@ import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const AC_DIR = join(ROOT, 'sdlc/06.analysis/03.acceptance-criteria');
-const MATRIX = join(ROOT, 'sdlc/06.analysis/04.quality-control/02.iam-scenario-matrix.md');
-const RTM = join(ROOT, 'sdlc/06.analysis/04.quality-control/03.iam-rtm.md');
+const MATRIX = join(ROOT, 'sdlc/06.analysis/04.quality-control/02.iam.md');
+const RTM = join(ROOT, 'sdlc/06.analysis/04.quality-control/11.iam-rtm.md');
 
 function iamCriteria() {
     const out = new Map();

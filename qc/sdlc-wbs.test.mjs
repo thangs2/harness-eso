@@ -312,9 +312,13 @@ test('X3b: every gate in the tree has a scenario (X3 cannot see this)', () => {
     const gateRows = [...tree.matchAll(/^\| \*\*(\d)\*\* \|.+?\|$/gm)].length;
     assert.equal(gateRows, 8, `expected 8 deliverable rows, saw ${gateRows}`);
 
-    const matrices = readdirSync(join(WBS_DIR, '..', '06.analysis', '04.quality-control'))
-        .filter((n) => n.includes('scenario-matrix'))
-        .map((n) => readFileSync(join(WBS_DIR, '..', '06.analysis', '04.quality-control', n), 'utf8'))
+    // Discover by declared type, not by filename: a file's name is a label, its `type` is a contract. Filtering on
+    // the name made this test silently vacuous the moment the files were renamed to drop the redundant suffix.
+    const QC_DIR = join(WBS_DIR, '..', '06.analysis', '04.quality-control');
+    const matrices = readdirSync(QC_DIR)
+        .filter((n) => n.endsWith('.md'))
+        .map((n) => readFileSync(join(QC_DIR, n), 'utf8'))
+        .filter((t) => /^type: scenario-matrix$/m.test(t))
         .join('\n');
 
     const gateScenarios = [...matrices.matchAll(/^\| `(SCN-[A-Z]+-\d+)` \| \*\*cổng/gm)].map((m) => m[1]);
