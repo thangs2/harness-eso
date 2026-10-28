@@ -11,10 +11,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, basename } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const SDLC = join(ROOT, 'sdlc');
+const read = (p) => readFileSync(p, 'utf8');
 
 function walk(dir, out = []) {
     for (const name of readdirSync(dir)) {
@@ -189,4 +190,58 @@ test('X7: c4 declares its level, domain-spec declares its write boundary', () =>
         }
     }
     assert.deepEqual(bad, []);
+});
+
+test('X22: every OPEN in a packet section 8 is classified in the mapping register', () => {
+    // This check exists because the number 175 circulated for weeks. It was produced by counting every `OPEN-<n>`
+    // string inside section 8 — including the ones repeated in the explanatory tables under it. Counting strings is
+    // not counting rows: the real figure was 106. A register that is not checked against the source drifts back.
+    const map = read(join(SDLC, '06.analysis', '04.quality-control', '13.open-mapping.md'));
+    const classified = new Set(
+        [...map.matchAll(/^\| `([0-9a-z.-]+)` \| `(OPEN-\d+)` \|/gm)].map((m) => `${m[1]}|${m[2]}`),
+    );
+    assert.ok(classified.size > 0, 'the mapping register lists no rows');
+
+    const live = [];
+    for (const f of walk(join(SDLC, '09.wbs', '01.packets'))) {
+        const packet = basename(f, '.md');
+        const text = read(f);
+        const start = text.search(/^##\s*8\./m);
+        if (start === -1) continue;
+        const rest = text.slice(start);
+        const end = rest.slice(1).search(/^##\s/m);
+        const section = end === -1 ? rest : rest.slice(0, end + 1);
+        for (const m of section.matchAll(/^\|\s*\*\*`(OPEN-\d+)`\*\*\s*\|/gm)) {
+            live.push(`${packet}|${m[1]}`);
+        }
+    }
+    const unclassified = live.filter((k) => !classified.has(k));
+    assert.deepEqual(unclassified, [], 'OPEN rows missing from the mapping register');
+});
+
+test('X23: every open packet item belongs to exactly one proposed decision', () => {
+    // D-63 groups the 70 remaining OPENs into 14 decisions. Two lists now describe the same set from opposite sides:
+    // 07.open-mapping §2 says what each OPEN waits for, D-63 §4 says which decision settles it. If they disagree, one
+    // of them is lying — and the failure mode is an OPEN that nobody notices is unassigned.
+    const section = (text, heading) => {
+        const start = text.search(new RegExp(`^## ${heading}\\.`, 'm'));
+        if (start === -1) return '';
+        const rest = text.slice(start + 1);
+        const end = rest.search(/^## /m);
+        return end === -1 ? rest : rest.slice(0, end);
+    };
+    const row = /^\| `([0-9a-z.-]+)` \| `(OPEN-\d+)` \|/gm;
+    const keys = (text) => [...text.matchAll(row)].map((m) => `${m[1]}|${m[2]}`).sort();
+
+    const mapping = read(join(SDLC, '06.analysis', '04.quality-control', '13.open-mapping.md'));
+    const decision = read(join(SDLC, '03.inception', '02.decision-log', '01.open-decisions.md'));
+
+    const waits = keys(section(mapping, 2));
+    const assigned = keys(section(decision, 4));
+
+    // An empty §2 is the goal, not a failure: when every packet item is closed the waiting list is empty and both
+    // sides must be empty together. The check still catches the real failure — one side listing something the other
+    // does not.
+    assert.deepEqual(waits.filter((k) => !assigned.includes(k)), [], 'OPENs with no proposed decision');
+    assert.deepEqual(assigned.filter((k) => !waits.includes(k)), [], 'decisions naming an OPEN that is already closed');
 });
