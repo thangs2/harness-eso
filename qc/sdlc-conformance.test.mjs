@@ -73,6 +73,7 @@ const JUDGEMENT = new Set([
     'data-model', 'api-contract', 'ui-design', 'query-spec', 'wbs', 'bip', 'fip', 'architecture-doc',
     'decision-log', 'feature-catalog', 'traceability-matrix', 'domain-spec', 'capability-spec', 'capability-index',
     'brd',  // a business narrative: judged by whether it tells one true story, not by a fixed heading list
+    'prd', 'frd', 'srs',  // stage-1 specification family: judged by whether every claim binds to a shard, not by headings
 
 ]);
 
