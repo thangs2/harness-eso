@@ -140,10 +140,9 @@ test('X18: every function has exactly one FRD file, and each file is a real spec
     }
     assert.deepEqual(thin, [], 'FRD files that are not specifications');
 
-    // A namespace with no FRD is a whole group of behaviour with no functional spec. Today exactly one is
-    // uncovered — the 61 criteria behind the five surfaces — and that gap is recorded as OPEN-FRD-01. It is
-    // asserted as an allowance rather than ignored: a second uncovered group must be a deliberate edit here,
-    // not a silent arrival.
+    // A namespace with no FRD is a whole group of behaviour with no functional spec. The allowance used to be
+    // ['UI'] — the 61 criteria behind the five surfaces, recorded as OPEN-FRD-01. Those now have five FRD files,
+    // so the allowance is empty: any uncovered namespace from here is a new gap, not a known one.
     const declared = new Set();
     for (const f of content('frd')) {
         const header = read(f).split('\n').find((l) => l.includes('**Nhóm `AC`:**')) ?? '';
@@ -154,7 +153,7 @@ test('X18: every function has exactly one FRD file, and each file is a real spec
         for (const m of read(f).matchAll(/\bAC-([A-Z]+)-\d\d-\d\d\b/g)) used.add(m[1]);
     }
     const uncovered = [...used].filter((p) => !declared.has(p)).sort();
-    assert.deepEqual(uncovered, ['UI'], 'AC namespaces with no FRD file (allowance = the 5 surfaces, OPEN-FRD-01)');
+    assert.deepEqual(uncovered, [], 'AC namespaces with no FRD file');
 });
 
 test('X19: the SRS carries NFRs that can be measured, and covers every REQ', () => {
