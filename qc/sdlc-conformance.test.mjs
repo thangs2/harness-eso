@@ -72,6 +72,8 @@ const JUDGEMENT = new Set([
     'standard', 'requirement', 'actor-catalog', 'use-case', 'business-rule', 'c4',
     'data-model', 'api-contract', 'ui-design', 'query-spec', 'wbs', 'bip', 'fip', 'architecture-doc',
     'decision-log', 'feature-catalog', 'traceability-matrix', 'domain-spec', 'capability-spec', 'capability-index',
+    'brd',  // a business narrative: judged by whether it tells one true story, not by a fixed heading list
+
 ]);
 
 const hasAll = (text, names) => names.every((n) => SECTION[n].some((re) => re.test(text)));
