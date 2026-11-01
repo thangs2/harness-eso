@@ -146,3 +146,24 @@ test('X25: the boundary catalogue and the endpoint catalogue never share a name'
     assert.deepEqual(edges, ['ED1', 'ED2', 'ED3', 'ED4', 'ED5', 'ED6', 'ED7', 'ED8', 'ED9', 'ED10'],
         'the boundary catalogue is a closed list of ten');
 });
+
+test('X26: every table block has a header and a delimiter row', () => {
+    // A markdown table is only a table if its second line is the `|---|---|` delimiter. Rows that follow a blank line
+    // or an inserted paragraph become a *new* block with no delimiter — and then they render as text with pipes, which
+    // looks like a table to the author and like noise to the reader. Fourteen blocks were in that state, including the
+    // cross-check register itself, where six rows had quietly dropped out of the table.
+    const DELIMITER = /^\|[\s:|-]+\|$/;
+    const broken = [];
+    for (const f of walk(SDLC)) {
+        const lines = read(f).split('\n');
+        let i = 0;
+        while (i < lines.length) {
+            if (!lines[i].startsWith('|')) { i += 1; continue; }
+            let j = i;
+            while (j < lines.length && lines[j].startsWith('|')) j += 1;
+            if (j - i >= 2 && !DELIMITER.test(lines[i + 1])) broken.push(`${rel(f)}:${i + 1}`);
+            i = j;
+        }
+    }
+    assert.deepEqual(broken, [], 'table blocks with no delimiter row — they do not render as tables');
+});
