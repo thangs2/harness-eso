@@ -71,6 +71,23 @@ export function parseScope(scopeText) {
     };
 }
 
+/**
+ * A `path:` line the strict directive pattern rejects is dropped **silently**: `path:docs   # note` matches nothing, so the
+ * root disappears, coverage shrinks, and the freshness check happily reports `current` — it compares the index to the scope,
+ * and a scope that covers nothing agrees with an index that holds nothing. Ask the scope whether it points at anything real.
+ */
+export function scopeProblems(root, scopeText, scope) {
+    const malformed = [];
+    for (const raw of scopeText.split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('#')) continue;
+        if (!/^(ext|path|exclude):/.test(line)) continue;
+        if (!/^(ext|path|exclude):\S+$/.test(line)) malformed.push(line);
+    }
+    const dead = scope.roots.filter((r) => !fs.existsSync(path.join(root, r.replace(/\/$/, ''))));
+    return { malformed, dead };
+}
+
 /** Minimal glob for the exclude forms the scope actually uses: `**` spans directories, `*` does not. */
 function globToRegExp(glob) {
     let out = '';
@@ -117,7 +134,19 @@ export function checkDocgraphFreshness(root, opts = {}) {
     if (!fs.existsSync(scopePath)) {
         return { status: 'absent', detail: `no ${SCOPE_FILE} at ${root} — docgraph is not configured here` };
     }
-    const scope = opts.scope ?? parseScope(fs.readFileSync(scopePath, 'utf8'));
+    const scopeText = fs.readFileSync(scopePath, 'utf8');
+    const scope = opts.scope ?? parseScope(scopeText);
+    /* Malformed directives are checked before "no roots": a scope whose every `path:` line is malformed does declare roots,
+       it just declares them unreadably, and reporting that as "nothing is configured" hides the typo. */
+    const malformedEarly = scopeProblems(root, scopeText, scope).malformed;
+    if (malformedEarly.length) {
+        return {
+            status: 'misconfigured',
+            detail: `${malformedEarly.length} directive(s) match nothing: ${malformedEarly.join(' · ')}`,
+            malformed: malformedEarly,
+            dead: [],
+        };
+    }
     if (!scope.roots.length) {
         return { status: 'absent', detail: `${SCOPE_FILE} declares no \`path:\` roots — nothing is covered` };
     }
@@ -132,6 +161,20 @@ export function checkDocgraphFreshness(root, opts = {}) {
     const generatedAt = Date.parse(index.generatedAt);
     if (!Number.isFinite(generatedAt)) {
         return { status: 'absent', detail: `${INDEX_FILE} has no parseable generated_at: ${index.generatedAt}` };
+    }
+
+    /* Before anything is compared: does the scope point at things that exist? A dead root is not a stale index — it is a
+       scope that stopped describing this repo, and every answer built on it is about the wrong corpus. */
+    const problems = scopeProblems(root, scopeText, scope);
+    if (problems.malformed.length || problems.dead.length) {
+        return {
+            status: 'misconfigured',
+            detail: [
+                problems.malformed.length ? `${problems.malformed.length} directive(s) match nothing: ${problems.malformed.join(' · ')}` : '',
+                problems.dead.length ? `declared root(s) do not exist: ${problems.dead.join(' · ')}` : '',
+            ].filter(Boolean).join('; '),
+            ...problems,
+        };
     }
 
     const newer = [];
@@ -202,6 +245,8 @@ function main(argv) {
                     newer: report.newer ?? [],
                     missing: report.missing ?? [],
                     extra: report.extra ?? [],
+                    malformed: report.malformed ?? [],
+                    dead: report.dead ?? [],
                 },
                 null,
                 2,
@@ -215,6 +260,8 @@ function main(argv) {
             ['newer', report.newer],
             ['missing', report.missing],
             ['extra', report.extra],
+            ['malformed', report.malformed],
+            ['dead', report.dead],
         ];
         for (const [label, list] of lines) {
             const shown = (list ?? []).slice(0, 8);
@@ -224,10 +271,11 @@ function main(argv) {
             }
         }
         if (report.status === 'stale' || report.status === 'out-of-step') console.log('  fix       docgraph build');
+        if (report.status === 'misconfigured') console.log(`  fix       correct ${SCOPE_FILE} — a root that names nothing shrinks the corpus silently`);
     }
 
-    if (report.status === 'stale' || (strict && report.status !== 'current')) {
-        console.error(`\ndocgraph index is ${report.status}; run: docgraph build`);
+    if (report.status === 'stale' || report.status === 'misconfigured' || (strict && report.status !== 'current')) {
+        console.error(`\ndocgraph is ${report.status}; ${report.status === 'misconfigured' ? `fix ${SCOPE_FILE}` : 'run: docgraph build'}`);
         process.exitCode = 1;
     }
 }

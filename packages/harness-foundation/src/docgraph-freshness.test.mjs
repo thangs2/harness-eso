@@ -11,7 +11,7 @@ const { checkDocgraphFreshness, isCovered, parseScope } = await import(
     path.join(REPO, 'scripts', 'check-docgraph.mjs')
 );
 
-function repo({ scope = 'ext:.md\next:.mdc\npath:documents\nexclude:docs/archive/**\n', files = {}, index } = {}) {
+function repo({ scope = 'ext:.md\next:.mdc\npath:docs\nexclude:docs/archive/**\n', files = {}, index } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'docgraph-freshness-'));
     fs.writeFileSync(path.join(root, 'docgraph.scope'), scope);
     for (const [rel, body] of Object.entries(files)) {
@@ -70,7 +70,7 @@ test('G-20: the scope is an allowlist, so files outside its `path:` roots are no
 });
 
 test('G-20: `exclude:` patterns keep a directory out of the comparison', () => {
-    const scope = parseScope('ext:.md\npath:documents\nexclude:docs/archive/**\n');
+    const scope = parseScope('ext:.md\npath:docs\nexclude:docs/archive/**\n');
     assert.equal(isCovered('docs/a.md', scope), true);
     assert.equal(isCovered('docs/archive/old.md', scope), false);
     assert.equal(isCovered('docs/a.txt', scope), false, 'an extension outside `ext:` is not covered');
@@ -122,4 +122,34 @@ test('the CLI exits non-zero on a stale index so a pre-commit hook can use it', 
         code = err.status;
     }
     assert.equal(code, 1);
+});
+
+test('G-20: a scope root that names nothing is misconfigured, not current', () => {
+    /*
+     * The incident this guard exists for. `documents/` was renamed to `docs/`; `docgraph.scope` kept `path:documents`.
+     * The root matched nothing, so the walk covered nothing, so the index — which also held nothing from the pack — agreed
+     * with it perfectly and the checker said `current`. 110 documents were invisible to every query and nothing complained.
+     */
+    const root = repo({
+        scope: 'ext:.md\npath:documents\n',
+        files: { 'docs/a.md': '# a' },
+        index: indexAt('2030-01-01T00:00:00Z', ['docs/a.md']),
+    });
+    const report = checkDocgraphFreshness(root);
+    assert.equal(report.status, 'misconfigured');
+    assert.deepEqual(report.dead, ['documents']);
+    assert.match(report.detail, /do not exist/);
+});
+
+test('G-20: a `path:` line with a trailing comment is dropped silently — unless the scope is read back', () => {
+    /* `path:docs   # renamed` does not match the directive pattern, so the root vanishes. Nothing else notices. */
+    const root = repo({
+        scope: 'ext:.md\npath:docs   # renamed from documents\n',
+        files: { 'docs/a.md': '# a' },
+        index: indexAt('2030-01-01T00:00:00Z', ['docs/a.md']),
+    });
+    const report = checkDocgraphFreshness(root);
+    assert.equal(report.status, 'misconfigured');
+    assert.equal(report.malformed.length, 1);
+    assert.match(report.malformed[0], /^path:docs\s+#/);
 });

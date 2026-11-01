@@ -106,7 +106,8 @@ Adapter id trong policy (tham chiếu khi sửa core): `docgraph-cli`, `codegrap
 
 ```bash
 bun install
-bun test                              # spine + qc
+bun test                              # qc/ only — bunfig sets [test] root="./qc"
+bun run test                          # everything: qc + every packages/*/src suite
 bun run test:observatory              # Vitest observatory
 bun run build:observatory             # trước khi bundle UI trong observe-server
 node packages/harness-observe-server/src/server.mjs --root ../x79   # integration
