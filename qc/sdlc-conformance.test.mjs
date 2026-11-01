@@ -349,3 +349,91 @@ test('X15: every UI criterion is reachable from a flow', () => {
     const unreachable = [...defined].filter((id) => !flows.includes(id)).sort();
     assert.deepEqual(unreachable, [], 'criteria that no flow step can reach — behaviour nothing walks through');
 });
+
+test('X2: every document declares where it came from, its status, and when it belongs', () => {
+    // Two zones, two rules. AI-zone documents point at the human document that governs them (`human_sot`) because that is the
+    // direction a reader travels; human documents carry the four provenance keys because that is what the gates read.
+    const AI = join(SDLC, '01.agent-manifests');
+    const need = (f) => (f.startsWith(AI)
+        ? ['sot_doc_version', 'human_sot']
+        : ['sot_doc_version', 'source_of_truth', 'status', 'phase']);
+    const bad = [];
+    for (const f of walk(SDLC)) {
+        if (f.endsWith('README.md')) continue;                 // navigation, not an artifact
+        const m = /^---\n([\s\S]*?)\n---/.exec(read(f));
+        if (!m) { bad.push(`${relative(SDLC, f)} — no frontmatter`); continue; }
+        const missing = need(f).filter((k) => !new RegExp(`^${k}:`, 'm').test(m[1]));
+        if (missing.length) bad.push(`${relative(SDLC, f)} — ${missing.join(', ')}`);
+    }
+    assert.ok(walk(SDLC).length > 200, 'the walk found almost nothing');
+    assert.deepEqual(bad.sort(), [], 'documents that cannot say where they came from or when they belong');
+});
+
+test('X4: a story traces up to a use case and to a requirement', () => {
+    const dir = join(SDLC, '06.analysis', '02.user-stories');
+    const bad = [];
+    for (const f of walk(dir)) {
+        if (f.endsWith('README.md')) continue;
+        const text = read(f);
+        const missing = [];
+        if (!/UC-\d+/.test(text)) missing.push('UC');
+        if (!/REQ-[A-Z]+-\d+/.test(text)) missing.push('REQ');
+        if (missing.length) bad.push(`${relative(SDLC, f)} — no ${missing.join(' · no ')}`);
+    }
+    assert.deepEqual(bad.sort(), [], 'stories traced to nothing — invented requirements, or orphans');
+});
+
+test('X5: an agent spec stays inside the budget it will be read under', () => {
+    const specs = walk(join(SDLC, '01.agent-manifests')).filter((f) => f.endsWith('.spec.md'));
+    assert.ok(specs.length > 0, 'no agent spec exists — X5 would pass vacuously');
+    const over = [];
+    for (const f of specs) {
+        const text = read(f);
+        const lines = text.split('\n').length;
+        if (lines > 150 || text.length > 4000) over.push(`${relative(SDLC, f)} — ${lines} dòng · ${text.length} ký tự`);
+    }
+    assert.deepEqual(over, [], 'specs over 150 lines or 4 000 chars — an agent will skip them');
+});
+
+test('X11: every use case is served by a story and rules a business document', () => {
+    const catalogue = read(join(SDLC, '06.analysis', '01.business-analysis', '02.use-cases.md'));
+    const ucs = [...new Set([...catalogue.matchAll(/UC-\d+/g)].map((m) => m[0]))].sort();
+    assert.ok(ucs.length > 0, 'the use-case catalogue declares nothing');
+
+    const stories = walk(join(SDLC, '06.analysis', '02.user-stories')).map(read).join('\n');
+    const brd = walk(join(SDLC, '05.requirements', '01.specification', '02.brd')).map(read).join('\n');
+    const bad = [];
+    for (const uc of ucs) {
+        if (!stories.includes(uc)) bad.push(`${uc} — no story serves it`);
+        if (!brd.includes(uc)) bad.push(`${uc} — no business document names it`);
+    }
+    assert.deepEqual(bad.sort(), [], 'use cases nobody serves, or that no business rule mentions');
+});
+
+test('X13: every story meets at least two boundaries of the catalogue', () => {
+    // Counted through the criteria: a story cites its boundaries in its AC rows, not in its own text. And counted against
+    // **every** story — a story with no boundary criteria at all is the case this check exists for, so it must be in the
+    // denominator, not silently absent from it.
+    const AC = join(SDLC, '06.analysis', '03.acceptance-criteria');
+    const edges = new Map();
+    for (const f of walk(AC)) {
+        for (const line of read(f).split('\n')) {
+            const m = /^\| `(AC-[A-Z0-9]+-\d+)-\d+`/.exec(line);
+            if (!m) continue;
+            const story = `US-${m[1].slice(3)}`;
+            for (const e of line.matchAll(/\*\*(ED\d+)\*\*/g)) {
+                if (!edges.has(story)) edges.set(story, new Set());
+                edges.get(story).add(e[1]);
+            }
+        }
+    }
+    const stories = walk(join(SDLC, '06.analysis', '02.user-stories'))
+        .filter((f) => !f.endsWith('README.md'))
+        .map((f) => (/^id:\s*(US-\S+)/m.exec(read(f)) ?? [])[1])
+        .filter(Boolean);
+    assert.ok(stories.length > 40, `found only ${stories.length} stories`);
+
+    const thin = stories.filter((s) => (edges.get(s)?.size ?? 0) < 2)
+        .map((s) => `${s} — ${edges.get(s)?.size ?? 0} edge(s)`).sort();
+    assert.deepEqual(thin, [], 'stories whose only boundary is the happy path');
+});
