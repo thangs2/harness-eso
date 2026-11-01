@@ -273,3 +273,79 @@ test('X27: every document type in the tree is signed by someone', () => {
     const report = [...unsigned].map(([k, n]) => `${k} (${n} file) — nobody signs it`).sort();
     assert.deepEqual(report, [], 'document types with no owner in the standard');
 });
+
+test('X6: no criterion or scenario id is defined twice', () => {
+    // The register said "no AC/SCN id defined in two files". Two files was too narrow in both directions: an id defined
+    // twice in the *same* matrix is just as ambiguous, and a two-column "why this matters" table repeats ids on purpose.
+    // A definition row is the wide one — six or more columns.
+    const NAMES = [
+        [join(SDLC, '06.analysis', '03.acceptance-criteria'), /^\| `(AC-[A-Z0-9-]+)`/],
+        [join(SDLC, '06.analysis', '04.quality-control'), /^\| `(SCN-[A-Z0-9-]+)`/],
+    ];
+    const seen = new Map();
+    for (const [dir, pattern] of NAMES) {
+        for (const f of walk(dir)) {
+            for (const line of read(f).split('\n')) {
+                const m = pattern.exec(line);
+                if (!m) continue;
+                const cells = line.split('|').slice(1, -1);
+                if (cells.length < 6) continue;                       // the rationale table, not a definition
+                const where = relative(SDLC, f);
+                seen.set(m[1], [...(seen.get(m[1]) ?? []), where]);
+            }
+        }
+    }
+    const twice = [...seen].filter(([, files]) => files.length > 1)
+        .map(([id, files]) => `${id} → ${files.join(' + ')}`).sort();
+    assert.ok(seen.size > 300, `found only ${seen.size} definitions — the scan is not reading the matrices`);
+    assert.deepEqual(twice, [], 'ids defined more than once');
+});
+
+test('X12: every alternate flow carries an id, and an AC names it', () => {
+    const BA = join(SDLC, '06.analysis', '01.business-analysis');
+    const AC = join(SDLC, '06.analysis', '03.acceptance-criteria');
+    const flows = new Set();
+    for (const f of walk(BA)) for (const m of read(f).matchAll(/UC-\d+\.\d+[a-z]?/g)) flows.add(m[0]);
+    assert.ok(flows.size > 0, 'no alternate flow carries an id at all — they cannot be tested');
+
+    const named = walk(AC).map(read).join('\n');
+    const untested = [...flows].filter((id) => !named.includes(id)).sort();
+    assert.deepEqual(untested, [], 'alternate flows no criterion ever tests — a branch that was designed and never checked');
+});
+
+test('X14: a surface is designed only when it is prototyped', () => {
+    const UI = join(SDLC, '08.ui-design');
+    const surfaces = [...read(join(UI, '01.surfaces.md')).matchAll(/^\| \*\*(S\d)\*\*/gm)].map((m) => m[1]);
+    assert.ok(surfaces.length > 0, 'the surface catalogue declares nothing');
+
+    const wireframes = read(join(UI, '02.wireframes.md'));
+    const states = read(join(UI, '03.states.md'));
+    const flowFiles = walk(join(UI, '04.flows'));
+    const bad = [];
+    for (const s of surfaces) {
+        if (!wireframes.includes(s)) bad.push(`${s}: no wireframe`);
+        const section = new RegExp(`## [\\d.]* ?Ma trận ${s}\\n([\\s\\S]*?)(?=\\n## |$)`, 'g').exec(states);
+        if (!section) { bad.push(`${s}: no state matrix`); continue; }
+        const missing = [1, 2, 3, 4, 5, 6].filter((i) => !section[1].includes(`ST${i}`));
+        if (missing.length) bad.push(`${s}: missing ${missing.map((i) => `ST${i}`).join(' ')}`);
+        const flow = flowFiles.find((f) => f.includes(`s${s.slice(1)}-`));
+        if (!flow || !read(flow).includes('AC-')) bad.push(`${s}: no flow that names a criterion`);
+    }
+    assert.deepEqual(bad.sort(), [], 'surfaces described by name but not designed');
+});
+
+test('X15: every UI criterion is reachable from a flow', () => {
+    const AC = join(SDLC, '06.analysis', '03.acceptance-criteria');
+    const defined = new Set();
+    for (const f of walk(AC)) {
+        for (const line of read(f).split('\n')) {
+            const m = /^\| `(AC-UI-[A-Z0-9-]+)`/.exec(line);
+            if (m) defined.add(m[1]);
+        }
+    }
+    assert.ok(defined.size > 0, 'no UI criterion exists — X15 would pass vacuously');
+
+    const flows = walk(join(SDLC, '08.ui-design', '04.flows')).map(read).join('\n');
+    const unreachable = [...defined].filter((id) => !flows.includes(id)).sort();
+    assert.deepEqual(unreachable, [], 'criteria that no flow step can reach — behaviour nothing walks through');
+});
