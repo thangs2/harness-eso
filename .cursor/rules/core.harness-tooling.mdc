@@ -3,7 +3,7 @@ description: harness-eso MCP — codegraph + agentmemory-mcp (.cursor/mcp.json)
 layer: core
 alwaysApply: false
 version: "1.1.0"
-canonical: docs/03.cursor-mcp.md
+canonical: documents/01.overview/03.cursor-mcp.md
 globs: packages/harness-eso-core/**,packages/harness-host-generic/**,.cursor/mcp.json
 ---
 

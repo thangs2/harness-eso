@@ -239,7 +239,7 @@ harnessctl token-diet .            # xem cái gì đang eager và tốn bao nhi�
 
 **Kiểm:** `./.harness/diagnostics.sh L6` · `tail -n 20 ~/.harness/eso-blockers.jsonl`
 
-**Sai thì:** thêm server `deepseek` vào MCP config theo `docs/03.cursor-mcp.md` của harness-eso.
+**Sai thì:** thêm server `deepseek` vào MCP config theo `documents/01.overview/03.cursor-mcp.md` của harness-eso.
 
 > `mcp.json` giờ là path **`locked`**: agent không ghi được nó kể cả khi đủ bằng chứng. Nếu bạn cần
 > sửa, sửa bằng tay — đó là chủ ý, không phải bug.

@@ -12,7 +12,7 @@ writes on evidence, attributes every action to a turn, and serves a read-only mo
 | **Complete User & Operator Guide** | [`documents/01.overview/05.user-and-operator-guide.md`](documents/01.overview/05.user-and-operator-guide.md) — step-by-step setup, policy, daily IDE workflows & Observatory |
 | **Documentation Index (read first)** | [`documents/00.README.md`](documents/00.README.md) — what the system is and how it works |
 | **Invariants** | [`documents/05.development/02.invariants.md`](documents/05.development/02.invariants.md) — **read before changing how data flows** |
-| **Defect log** | [`docs/04.standalone-revamp-wbs.md`](docs/04.standalone-revamp-wbs.md) — measured history, every `F<n>` |
+| **Defect log** | [`documents/05.development/04.standalone-revamp-wbs.md`](documents/05.development/04.standalone-revamp-wbs.md) — measured history, every `F<n>` |
 | **Operator runbooks** | `docs/00`–`docs/07` · Docker: [`documents/04.operations/02.docker-deploy.md`](documents/04.operations/02.docker-deploy.md) |
 | **Operator config** | `~/.harness/workspace.json` (machine-wide product state) |
 

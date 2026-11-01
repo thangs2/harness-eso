@@ -36,6 +36,6 @@ Docker (operator): **`docker/observatory.ps1`** (Windows) or **`docker/observato
 
 ## Agent
 
-Chain: **`core.law-gate`** → Read **`AGENTS.md`** → isolation → agents pipeline (this file). Skills **only** `.cursor/skills/harness-*`. MCP: **`.cursor/mcp.json`** (`docs/03.cursor-mcp.md`).
+Chain: **`core.law-gate`** → Read **`AGENTS.md`** → isolation → agents pipeline (this file). Skills **only** `.cursor/skills/harness-*`. MCP: **`.cursor/mcp.json`** (`documents/01.overview/03.cursor-mcp.md`).
 
 Codegraph MCP indexes **this** repo. Consumer ingest/transcripts → `codegraph_explore` `projectPath` **x79** (read-only).

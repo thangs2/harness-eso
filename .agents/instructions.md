@@ -19,6 +19,6 @@ IDE Agent session
 | Law | **`AGENTS.md`** (repo root) |
 | Rules | `.cursor/rules/README.md` |
 | Skills | `.cursor/skills/SOT-MAP.md` |
-| MCP | `.cursor/mcp.json` · `docs/03.cursor-mcp.md` |
+| MCP | `.cursor/mcp.json` · `documents/01.overview/03.cursor-mcp.md` |
 
 **x79:** separate Cursor window — own rules/skills/MCP; no `stack.mu.*` here.

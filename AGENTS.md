@@ -4,11 +4,11 @@ Repo này **ship** sản phẩm Harness ESO (`@mu/harness-*`). Agent làm việc
 
 **Consumer đầy đủ:** repo **x79** (sibling `../x79`) — observe, hooks, `decision-policy.json`. Thiết kế ban đầu: `x79/document/harness/02.harness-eso/` — **đã out of date, không dùng làm law**; nguồn hiện hành là code repo này + gói `documents/`.
 
-**Cursor Windows:** mở **folder gốc = harness-eso**; xem `docs/02.cursor-windows.md`. Docker: `./deploy.sh <consumer>` · `./console.sh up`.
+**Cursor Windows:** mở **folder gốc = harness-eso**; xem `documents/01.overview/02.cursor-windows.md`. Docker: `./deploy.sh <consumer>` · `./console.sh up`.
 
 **Operator entrypoints (forced):** hành động trên consumer **chỉ** qua `./deploy.sh`, `./provision.sh`, `./verify-consumer.sh`, `./console.sh` (Windows: `harness.ps1 <command>`). Không gọi `node`/`bun`/`docker` trực tiếp để thay một bước của script — chi tiết `.cursor/rules/core.entrypoints.mdc`.
 
-**Cursor agent (forced):** IDE loads `.cursor/rules/` → **`core.law-gate.mdc`** bắt buộc **Read file này (`AGENTS.md`)** mỗi phiên trước khi làm việc; rule khác chỉ bổ sung, không thay law. Catalog: `.cursor/instructions.md` · MCP `.cursor/mcp.json` (`docs/03.cursor-mcp.md`).
+**Cursor agent (forced):** IDE loads `.cursor/rules/` → **`core.law-gate.mdc`** bắt buộc **Read file này (`AGENTS.md`)** mỗi phiên trước khi làm việc; rule khác chỉ bổ sung, không thay law. Catalog: `.cursor/instructions.md` · MCP `.cursor/mcp.json` (`documents/01.overview/03.cursor-mcp.md`).
 
 **Documentation pack (đọc trước khi sửa luồng dữ liệu):** `documents/00.README.md` — mô tả sản phẩm là gì, chạy thế nào, và **`documents/05.development/02.invariants.md`** liệt kê các bất biến kèm defect đã sinh ra chúng. Đây là gói bàn giao độc lập: không cần đọc repo consumer để hiểu sản phẩm.
 
@@ -95,7 +95,7 @@ standard/                  SDLC standard (kinds · gates · BIP/FIP · workflow)
 qc/                        node:test integration
 console.sh                 deploy / lifecycle Console :8791 (root, cạnh deploy.sh)
 *.Dockerfile               observe + console images (root)
-docs/                      operator getting started
+documents/                 handover pack + operator guides (the only human-docs root; there is no docs/)
 ```
 
 Adapter id trong policy (tham chiếu khi sửa core): `docgraph-cli`, `codegraph-cli`, `agentmemory-mcp`, brain `deepseek-mcp`.
