@@ -247,3 +247,29 @@ test('X23: every open packet item belongs to exactly one proposed decision', () 
     assert.deepEqual(waits.filter((k) => !assigned.includes(k)), [], 'OPENs with no proposed decision');
     assert.deepEqual(assigned.filter((k) => !waits.includes(k)), [], 'decisions naming an OPEN that is already closed');
 });
+
+test('X27: every document type in the tree is signed by someone', () => {
+    // The owner table answers one question: if this artifact is wrong, who gets asked? Without it, "wrong" has no address —
+    // and an artifact with no address is one nobody fixes. The table is also the only place that gives `kt-state: approved`
+    // a meaning: only the owner of a kind may approve knowledge of that kind.
+    //
+    // A row is `| `kind` | ROLE |` — exactly two cells, unlike the type table next to it.
+    const OWNER_ROW = /^\|\s*`([a-z0-9-]+)`\s*\|\s*([A-Za-z/]+)\s*\|$/;
+    const standard = read(join(SDLC, '02.governance', '01.standard', '02.artifacts.md'));
+    const owners = new Map();
+    for (const line of standard.split('\n')) {
+        const m = OWNER_ROW.exec(line);
+        if (m) owners.set(m[1], m[2]);
+    }
+    assert.ok(owners.size > 20, `the owner table declares only ${owners.size} kinds — it is not being read`);
+
+    const unsigned = new Map();
+    for (const f of walk(SDLC)) {
+        const m = /^type:\s*(\S+)$/m.exec(read(f));
+        if (!m) continue;
+        const type = m[1].replace(/["']/g, '');   // `type: "brd"` and `type: brd` name one kind, not two
+        if (!owners.has(type)) unsigned.set(type, (unsigned.get(type) ?? 0) + 1);
+    }
+    const report = [...unsigned].map(([k, n]) => `${k} (${n} file) — nobody signs it`).sort();
+    assert.deepEqual(report, [], 'document types with no owner in the standard');
+});
