@@ -41,7 +41,7 @@ function keys(file) {
     return out;
 }
 
-const TYPE_DIR = { prd: '01.prd', brd: '02.brd', frd: '03.frd', srs: '04.srs' };
+const TYPE_DIR = { prd: '01.prd', brd: '02.brd', frd: '03.frd', srs: '04.srs', 'nfr-spec': '05.nfr-spec' };
 const ofType = (type) => {
     const dir = join(SPEC, TYPE_DIR[type]);
     return existsSync(dir) ? walk(dir) : [];
@@ -157,9 +157,9 @@ test('X18: every function has exactly one FRD file, and each file is a real spec
 });
 
 test('X19: the SRS carries NFRs that can be measured, and covers every REQ', () => {
-    const srs = content('srs');
+    const nfrSpec = content('nfr-spec');
     const nfr = [];
-    for (const f of srs) {
+    for (const f of nfrSpec) {
         for (const line of read(f).split('\n')) {
             if (!/^\|\s*`NFR-\d+`/.test(line)) continue;
             const cells = line.split('|').slice(1, -1).map((c) => c.trim());
@@ -169,7 +169,7 @@ test('X19: the SRS carries NFRs that can be measured, and covers every REQ', () 
             nfr.push({ id: cells[0].replace(/`/g, ''), how: cells[2], threshold: cells[3], file: rel(f) });
         }
     }
-    assert.ok(nfr.length > 0, 'the SRS has no NFR at all — a functional-only spec is not an SRS');
+    assert.ok(nfr.length > 0, 'the SRS has no NFR at all — a non-functional spec with no measurable NFR is not an nfr-spec');
 
     const bad = nfr
         .filter((n) => !n.how || n.how === '—' || !n.threshold || n.threshold === '—')
