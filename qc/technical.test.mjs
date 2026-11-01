@@ -111,7 +111,7 @@ test('X21: numbering is gapless and names are kebab-case', () => {
 test('X24: the status register states the counts the tree actually has', () => {
     // The register drifted twice in one day: it said "22 endpoints / 17 tables" after the tree had 27 and 19.
     // A number written by hand into a status table is a claim, and an unchecked claim is a guess with a tick.
-    const register = read(join(SDLC, '02.governance', '03.document-status.md'));
+    const register = read(join(SDLC, '02.governance', '01.document-status.md'));
 
     const tables = new Set();
     for (const f of walk(join(TECH, '02.data-design'))) {
@@ -141,7 +141,7 @@ test('X25: the boundary catalogue and the endpoint catalogue never share a name'
     const bareEndpoint = corpus.match(/`E\d{1,2}`/g) ?? [];
     assert.equal(bareEndpoint.length, 0, `an endpoint still written \`E<n>\` — use \`API-<n>\`: ${bareEndpoint.slice(0, 5).join(', ')}`);
 
-    const artifacts = read(join(SDLC, '02.governance', '01.standard', '02.artifacts.md'));
+    const artifacts = read(join(ROOT, 'standard', '02.artifacts.md'));
     const edges = [...artifacts.matchAll(/^\| \*\*(ED\d{1,2})\*\* \|/gm)].map((m) => m[1]);
     assert.deepEqual(edges, ['ED1', 'ED2', 'ED3', 'ED4', 'ED5', 'ED6', 'ED7', 'ED8', 'ED9', 'ED10'],
         'the boundary catalogue is a closed list of ten');
