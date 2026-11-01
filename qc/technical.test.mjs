@@ -109,7 +109,7 @@ test('X24: the status register states the counts the tree actually has', () => {
         for (const m of read(f).matchAll(/CREATE TABLE (?:IF NOT EXISTS )?([a-z_]+)/g)) tables.add(m[1]);
     }
     const api = walk(join(TECH, '03.api')).map(read).join('\n');
-    const endpoints = new Set([...api.matchAll(/^\| `(E\d+)` \|/gm)].map((m) => m[1]));
+    const endpoints = new Set([...api.matchAll(/^\| `(API-\d+)` \|/gm)].map((m) => m[1]));
 
     const claim = (label) => {
         const m = new RegExp(`\\*\\*?(\\d+)\\*?\\*? ?${label}`).exec(register);
@@ -117,4 +117,23 @@ test('X24: the status register states the counts the tree actually has', () => {
     };
     assert.equal(claim('endpoint'), endpoints.size, 'the register disagrees with the endpoint catalogue');
     assert.equal(claim('bảng có DDL'), tables.size, 'the register disagrees with the schema');
+});
+
+test('X25: the boundary catalogue and the endpoint catalogue never share a name', () => {
+    // Both used to be `E<n>`: `E6` meant "duplicate / replay" in an acceptance criterion and `GET /v1/health` in a
+    // contract. Two closed lists with one alphabet is not ambiguity a careful reader can resolve — it is a defect
+    // that survives every reader. Boundaries are now `ED<n>`, endpoints `API-<n>`; this check stops the old form
+    // coming back one file at a time.
+    const corpus = walk(SDLC).map(read).join('\n');
+
+    const bareEdge = corpus.match(/\*\*E\d{1,2}\*\*/g) ?? [];
+    assert.equal(bareEdge.length, 0, `a boundary still written **E<n>** — use **ED<n>**: ${bareEdge.slice(0, 5).join(', ')}`);
+
+    const bareEndpoint = corpus.match(/`E\d{1,2}`/g) ?? [];
+    assert.equal(bareEndpoint.length, 0, `an endpoint still written \`E<n>\` — use \`API-<n>\`: ${bareEndpoint.slice(0, 5).join(', ')}`);
+
+    const artifacts = read(join(SDLC, '02.governance', '01.standard', '02.artifacts.md'));
+    const edges = [...artifacts.matchAll(/^\| \*\*(ED\d{1,2})\*\* \|/gm)].map((m) => m[1]);
+    assert.deepEqual(edges, ['ED1', 'ED2', 'ED3', 'ED4', 'ED5', 'ED6', 'ED7', 'ED8', 'ED9', 'ED10'],
+        'the boundary catalogue is a closed list of ten');
 });
