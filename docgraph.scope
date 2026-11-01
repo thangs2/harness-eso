@@ -9,7 +9,7 @@ ext:.mdc
 ext:.json
 
 # --- Documentation pack & operator runbooks ---------------------------------
-path:documents
+# tên cũ documents/ — đổi 2026-11-02
 path:docs
 path:README.md
 
