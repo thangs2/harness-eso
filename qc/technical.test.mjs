@@ -38,20 +38,29 @@ test('X9: every table has a path from an endpoint, or a recorded OUT', () => {
     }
     assert.ok(ddl.size >= 16, `expected the schema to declare its tables, saw ${ddl.size}`);
 
-    const api = walk(join(TECH, '03.api')).map(read).join('\n');
-    const unreachable = [...ddl].filter((t) => !new RegExp(`\\b${t}\\b`).test(api)).sort();
+    // The binding source is `02.roundtrip` §1 — one row per endpoint saying which tables it reads or writes. Scanning
+    // every api file for a table name was too loose: a sentence that says "this table has no path" counted as a path.
+    const roundtrip = read(join(TECH, '03.api', '02.roundtrip.md'));
+    const at = roundtrip.search(/^## 1\./m);
+    assert.notEqual(at, -1, '02.roundtrip must have a §1 binding table');
+    const rest = roundtrip.slice(at + 1);
+    const end = rest.search(/^## /m);
+    const section = end === -1 ? rest : rest.slice(0, end);
+    const named = new Set([...section.matchAll(/`([a-z][a-z0-9_]+)`/g)].map((m) => m[1]));
+    const unreachable = [...ddl].filter((t) => !named.has(t)).sort();
 
-    // `manifest_entry` is build output: it is written by the coverage builder, never through an API, so no endpoint
-    // should reach it. It needs an `OUT` with that reason (OPEN-SCHEMA-02) rather than an invented route.
     assert.deepEqual(unreachable, ['manifest_entry'],
         'tables nothing can reach — each needs a path from an endpoint or an OUT with a reason');
 
-    // The other direction: an endpoint naming a table nobody defined.
-    const invented = [...api.matchAll(/`([a-z][a-z0-9_]{2,})`/g)]
-        .map((m) => m[1])
-        .filter((t) => /_/.test(t) && !ddl.has(t) && !t.includes('project') && !t.includes('role_') === false);
-    assert.deepEqual([...new Set(invented)].filter((t) => t.startsWith('evidence_') || t.endsWith('_pack') || t === 'config_event' || t === 'sdlc_profile').filter((t) => !ddl.has(t)),
-        [], 'table names an endpoint relies on that the schema does not define');
+    // The inverse direction cannot be read out of the binding cells — they mix tables, projections and output shapes
+    // (`impact`), and the old version carried a hardcoded allow of `evidence_*` / `*_pack` names, which is the mark of
+    // a check that never worked. The machine-readable invariant is the hub index instead: `02.schema` §2 lists one row
+    // per table, and that list and the DDL must agree. This is exactly the failure `memory_fact` represented — a name
+    // that lived in every list except the schema, and then in the schema but nowhere real.
+    const hub = read(join(TECH, '02.data-design', '02.schema.md'));
+    const hubTables = new Set([...hub.matchAll(/^\| \d+ \| `([a-z_]+)` \|/gm)].map((m) => m[1]));
+    assert.deepEqual([...hubTables].sort(), [...ddl].sort(),
+        'the schema hub index and the CREATE TABLE statements disagree');
 });
 
 test('X10: every technical document states what change makes it wrong', () => {
