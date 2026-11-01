@@ -88,6 +88,10 @@ test('X28: every docs/ path named anywhere resolves', () => {
             // A path the line declares as an *output* is allowed not to exist yet — but it must say so where it is read.
             if (line.includes('x28-allow')) continue;
             for (const m of line.matchAll(PATH_TOKEN)) {
+                // `<consumer>/docs/...` belongs to a provisioned project, not to this repo. Two repos with a folder of the
+                // same name is exactly how `docs/` came to mean two different things; naming the owner is the fix.
+                const before = line.slice(0, m.index);
+                if (before.endsWith('<consumer>/') || /[a-z-]+:\s*$/.test(before)) continue;
                 if (!existsSync(join(ROOT, m[0]))) missing.push(`${relative(ROOT, file)} → ${m[0]}`);
             }
         }
