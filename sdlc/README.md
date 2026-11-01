@@ -1,15 +1,15 @@
 # SDLC — harness-eso
 
 **`sdlc/` là working tree của sản phẩm.** Người và agent đọc và ghi ở đây. Nó **không** thay
-`documents/`.
+`docs/`.
 
 ```text
-documents/     sản phẩm LÀ gì, và chạy thế nào (reference — mô tả trạng thái code)
+docs/     sản phẩm LÀ gì, và chạy thế nào (reference — mô tả trạng thái code)
 sdlc/          sản phẩm ĐANG ĐI ĐÂU, và vì sao (direction — định hướng, quyết định, WBS)
 ```
 
-Hai trục. `documents/` mô tả **hiện tại**; `sdlc/` nói **kế tiếp**. Một câu ở đây mô tả code phải cite
-được file trong `packages/`; nếu chỉ là mong muốn thì nó thuộc `03.inception/`, không thuộc `documents/`.
+Hai trục. `docs/` mô tả **hiện tại**; `sdlc/` nói **kế tiếp**. Một câu ở đây mô tả code phải cite
+được file trong `packages/`; nếu chỉ là mong muốn thì nó thuộc `03.inception/`, không thuộc `docs/`.
 
 ## Đối tượng độc giả
 

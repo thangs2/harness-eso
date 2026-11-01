@@ -15,7 +15,7 @@
  *
  * An ownership claim that lives only in a document is the exact defect class this repo keeps hitting
  * (G-16: "the operator guide contradicts the shipped guard"). The table below is therefore closed: every
- * entry must name a `documents/` path that exists, and `qc/ownership-claims.test.mjs` enforces that plus
+ * entry must name a `docs/` path that exists, and `qc/ownership-claims.test.mjs` enforces that plus
  * coverage of every policy subtree the shipped profile defines. Adding a subtree to `profiles/
  * generic-eso.json` without deciding its owner fails the test — silence is not an owner.
  */
@@ -38,91 +38,91 @@ export const OWNERSHIP_CLAIMS = [
         owner: 'product',
         writtenBy: 'provision',
         question: 'which shipped baseline was this consumer created from?',
-        declaredIn: 'documents/02.runtime/08.provisioning-consumers.md',
+        declaredIn: 'docs/02.runtime/08.provisioning-consumers.md',
     },
     {
         path: 'eso',
         owner: 'product',
         writtenBy: 'provision (merged)',
         question: 'is the engine on, and at which posture (mode, enforceWrites, sources)?',
-        declaredIn: 'documents/05.development/10.feature-and-classification-map.md',
+        declaredIn: 'docs/05.development/10.feature-and-classification-map.md',
     },
     {
         path: 'paths',
         owner: 'consumer',
         writtenBy: 'provision seeds a default list; the consumer owns the values',
         question: 'which paths are locked / gated / ask / sot?',
-        declaredIn: 'documents/02.runtime/08.provisioning-consumers.md',
+        declaredIn: 'docs/02.runtime/08.provisioning-consumers.md',
     },
     {
         path: 'sot',
         owner: 'consumer',
         writtenBy: 'nothing — survives every provision',
         question: 'what does this project consider its source of truth?',
-        declaredIn: 'documents/02.runtime/08.provisioning-consumers.md',
+        declaredIn: 'docs/02.runtime/08.provisioning-consumers.md',
     },
     {
         path: 'jev',
         owner: 'consumer',
         writtenBy: 'provision seeds off; enabling is the consumer’s decision',
         question: 'does this consumer have a Jev (L2) instance, and in which mode?',
-        declaredIn: 'documents/02.runtime/08.provisioning-consumers.md',
+        declaredIn: 'docs/02.runtime/08.provisioning-consumers.md',
     },
     {
         path: 'fallback',
         owner: 'consumer',
         writtenBy: 'provision seeds the baseline; L3 flash is opt-in',
         question: 'what happens when a higher tier is unreachable?',
-        declaredIn: 'documents/02.runtime/05.decision-facade.md',
+        declaredIn: 'docs/02.runtime/05.decision-facade.md',
     },
     {
         path: 'on_ambiguous',
         owner: 'consumer',
         writtenBy: 'provision seeds a default',
         question: 'on an ambiguous verdict, ask a human or proceed?',
-        declaredIn: 'documents/02.runtime/05.decision-facade.md',
+        declaredIn: 'docs/02.runtime/05.decision-facade.md',
     },
     {
         path: 'ledger',
         owner: 'product',
         writtenBy: 'provision',
         question: 'is the evidence ledger recording?',
-        declaredIn: 'documents/03.state-and-contracts/02.data-model.md',
+        declaredIn: 'docs/03.state-and-contracts/02.data-model.md',
     },
     {
         path: 'tokenDiet',
         owner: 'product',
         writtenBy: 'provision',
         question: 'what is the per-turn reply budget for eager rules?',
-        declaredIn: 'documents/05.development/10.feature-and-classification-map.md',
+        declaredIn: 'docs/05.development/10.feature-and-classification-map.md',
     },
     {
         path: 'harnessConsole',
         owner: 'consumer',
         writtenBy: 'provision seeds the adapter from the project document',
         question: 'which Brain adapter does the Console call, with which key?',
-        declaredIn: 'documents/02.runtime/08.provisioning-consumers.md',
+        declaredIn: 'docs/02.runtime/08.provisioning-consumers.md',
     },
     {
         path: 'guard-write.py',
         owner: 'product',
         writtenBy: 'provision copies it once (`create-if-missing`); drift is reported by guard-freshness',
         question: 'is the consumer running this build’s gate?',
-        declaredIn: 'documents/03.state-and-contracts/04.host-pack-contract.md',
+        declaredIn: 'docs/03.state-and-contracts/04.host-pack-contract.md',
     },
     {
         path: '.cursor/rules/*',
         owner: 'consumer',
         writtenBy: 'nothing after bootstrap — operator-owned',
         question: 'what rules does the agent see in this project?',
-        declaredIn: 'documents/02.runtime/08.provisioning-consumers.md',
+        declaredIn: 'docs/02.runtime/08.provisioning-consumers.md',
     },
     {
         path: 'SDLC/',
         owner: 'consumer',
         writtenBy: 'nothing — the product never writes domain documents',
         question: 'what is the project’s WBS / spec tree?',
-        declaredIn: 'documents/02.runtime/08.provisioning-consumers.md',
+        declaredIn: 'docs/02.runtime/08.provisioning-consumers.md',
     },
 ];
 

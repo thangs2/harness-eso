@@ -67,7 +67,7 @@ test('builds root, areas, notes, skills, tools, runs and harness apps from the o
         id: 'c1:2',
         conversation: 'c1',
         boundary: 2,
-        query: `${root}/documents/00.README.md`,
+        query: `${root}/docs/00.README.md`,
         startedAt: '2026-10-01T11:00:00Z',
     });
     // A second run touching the same file must not create a second note.

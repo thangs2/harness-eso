@@ -17,13 +17,13 @@ const ESO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const CLI = path.join(ESO_ROOT, 'packages/harness-cli/src/cli.mjs');
 
 test('ownership: every claim cites a file that exists', () => {
-    // `profile` is the one claim about a shipped file's *content*, not a documents/ page; it is asserted
+    // `profile` is the one claim about a shipped file's *content*, not a docs/ page; it is asserted
     // here so a renamed profile fails this test instead of becoming a dangling citation.
     assert.ok(fs.existsSync(path.join(ESO_ROOT, 'profiles/generic-eso.json')));
     const claim = OWNERSHIP_CLAIMS.find((c) => c.path === 'profile').declaredIn;
     assert.ok(fs.existsSync(path.join(ESO_ROOT, claim)), claim);
     const missing = OWNERSHIP_CLAIMS.map((c) => c.declaredIn)
-        .filter((p) => p.startsWith('documents/'))
+        .filter((p) => p.startsWith('docs/'))
         .filter((p) => !fs.existsSync(path.join(ESO_ROOT, p)));
     assert.deepEqual(missing, [], `declaredIn paths that do not exist:\n${missing.join('\n')}`);
 });

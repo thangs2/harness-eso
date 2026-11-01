@@ -5,7 +5,7 @@
  * `.docgraph/` is gitignored build output — the same convention as `.codegraph/` — and unlike
  * codegraph it has **no daemon**. Codegraph auto-syncs on every MCP call; docgraph is rebuilt only
  * when a human remembers to type `docgraph build`. Nothing compared the two, so the index sat at
- * `2026-10-14` while `documents/` gained `06.concept-mission-vision.md`,
+ * `2026-10-14` while `docs/` gained `06.concept-mission-vision.md`,
  * `09.gate-defect-register.md` and `10.feature-and-classification-map.md` — nine days of the exact
  * files `AGENTS.md` tells the agent to find with docgraph *first*. Every query in those turns hit a
  * corpus that did not contain them, fell through to grep, and the "docgraph first" rule was
@@ -54,7 +54,7 @@ function findRepoRoot(start) {
  *
  * The scope is an **allowlist** (`path:` roots) filtered by `ext:` and `exclude:` — not "every file
  * with these extensions". Walking the whole repo and comparing would report `comments/artifacts/`,
- * `packages/**` and `documents/08.archive/` as missing on a perfectly healthy index, so the roots
+ * `packages/**` and `docs/08.archive/` as missing on a perfectly healthy index, so the roots
  * are honoured literally: a path is covered when it is a root or lives under one.
  *
  * Directive names are read from the file rather than assumed, so a scope that gains `exclude:` or a

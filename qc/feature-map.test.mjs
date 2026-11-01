@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 /**
- * `documents/05.development/10.feature-and-classification-map.md` is a **table set**, not prose: its
+ * `docs/05.development/10.feature-and-classification-map.md` is a **table set**, not prose: its
  * whole value is that a reader can trust a row without opening the code. That trust is only worth
  * anything if the rows cannot drift.
  *
@@ -19,9 +19,9 @@ import { fileURLToPath } from 'node:url';
  * that and nothing about the prose — a lint that tries to judge wording becomes the thing it lints.
  */
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DOC = 'documents/05.development/10.feature-and-classification-map.md';
-const REGISTER = 'documents/05.development/09.gate-defect-register.md';
-const MATURITY = 'documents/04.operations/08.consumer-maturity-checklist.md';
+const DOC = 'docs/05.development/10.feature-and-classification-map.md';
+const REGISTER = 'docs/05.development/09.gate-defect-register.md';
+const MATURITY = 'docs/04.operations/08.consumer-maturity-checklist.md';
 
 const doc = fs.readFileSync(path.join(REPO, DOC), 'utf8');
 const rows = doc

@@ -115,7 +115,7 @@ harnessctl host-pack refresh .    # merge-safe: hook của bạn được giữ 
 | `AGENTS.md` | tồn tại ở root | law gate bắt buộc Read file này mỗi phiên |
 | `.<tree>/rules/*.mdc` | mỗi tree đã nối có ít nhất một rule | rule là bề mặt luật cho agent |
 | `docgraph.scope` | **mọi** dòng `path:` trỏ tới path có thật | T3.4 fail nếu khai một Agent Zone không tồn tại |
-| law index | `.docgraph/` hoặc `documents/document/` | không có index thì tra law trả rỗng |
+| law index | `.docgraph/` hoặc `docs/document/` | không có index thì tra law trả rỗng |
 
 **Kiểm:** `./.harness/diagnostics.sh L2`
 
@@ -239,7 +239,7 @@ harnessctl token-diet .            # xem cái gì đang eager và tốn bao nhi�
 
 **Kiểm:** `./.harness/diagnostics.sh L6` · `tail -n 20 ~/.harness/eso-blockers.jsonl`
 
-**Sai thì:** thêm server `deepseek` vào MCP config theo `documents/01.overview/03.cursor-mcp.md` của harness-eso.
+**Sai thì:** thêm server `deepseek` vào MCP config theo `docs/01.overview/03.cursor-mcp.md` của harness-eso.
 
 > `mcp.json` giờ là path **`locked`**: agent không ghi được nó kể cả khi đủ bằng chứng. Nếu bạn cần
 > sửa, sửa bằng tay — đó là chủ ý, không phải bug.

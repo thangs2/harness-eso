@@ -17,7 +17,8 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const SKIP_DIRS = new Set(['node_modules', '.git', '.docgraph', '.codegraph', 'dist', 'build']);
 // `comments/` holds dated records of past work. A record must keep saying what it said, so its links are not rewritten and
 // therefore not checked. That is a rule, not an exception list.
-const SKIP_PATHS = ['comments/'];
+// Dated records are not rewritten, so their references are not checked either: `comments/` and the archive.
+const SKIP_PATHS = ['comments/', 'docs/08.archive/'];
 
 const walk = (dir, out = []) => {
     for (const name of readdirSync(dir)) {
@@ -53,4 +54,43 @@ test('X1: every link resolves to a file that exists', () => {
         }
     }
     assert.deepEqual(broken.sort(), [], 'references to files that do not exist');
+});
+
+// X28 — every repository path written in prose or in code points at something that exists.
+//
+// X1 only sees markdown syntax. But this repo names file paths in places markdown never reaches: `declaredIn` values in the
+// ownership table, `docs/...` references in `.mdc` rules, docker comments, shell scripts, `docgraph.json` scope. Those are
+// exactly the places a folder rename breaks silently — the code still runs, the reference still reads fine, and the only way to
+// find out is to open the file and notice it is not there.
+//
+// This is the check that would have caught `docs/02.cursor-windows.md` in `AGENTS.md` before a human did.
+test('X28: every docs/ path named anywhere resolves', () => {
+    const TEXT = /\.(md|mdc|mjs|json|yml|yaml|sh|toml|Dockerfile)$/;
+    const PATH_TOKEN = /\b(?:docs|documents)\/[A-Za-z0-9._/-]+\.(?:md|mdc|json|yml|yaml|png|svg)/g;
+    const files = [];
+    const collect = (dir) => {
+        for (const name of readdirSync(dir)) {
+            if (SKIP_DIRS.has(name)) continue;
+            const full = join(dir, name);
+            const rel = relative(ROOT, full);
+            if (SKIP_PATHS.some((p) => rel === p.replace(/\/$/, '') || rel.startsWith(p))) continue;
+            if (statSync(full).isDirectory()) collect(full);
+            else if (TEXT.test(name) && !name.endsWith('.test.mjs')) files.push(full);   // test fixtures build fake trees
+        }
+    };
+    collect(ROOT);
+    assert.ok(files.length > 100, `walked only ${files.length} files — the scan is not covering the repo`);
+
+    const missing = [];
+    for (const file of files) {
+        const text = readFileSync(file, 'utf8');
+        for (const line of text.split('\n')) {
+            // A path the line declares as an *output* is allowed not to exist yet — but it must say so where it is read.
+            if (line.includes('x28-allow')) continue;
+            for (const m of line.matchAll(PATH_TOKEN)) {
+                if (!existsSync(join(ROOT, m[0]))) missing.push(`${relative(ROOT, file)} → ${m[0]}`);
+            }
+        }
+    }
+    assert.deepEqual([...new Set(missing)].sort(), [], 'paths named in text or code that do not exist');
 });

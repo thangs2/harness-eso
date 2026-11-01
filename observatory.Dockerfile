@@ -1,4 +1,4 @@
-# Harness Observatory image — API + pre-bundled SPA (see documents/04.operations/02.docker-deploy.md).
+# Harness Observatory image — API + pre-bundled SPA (see docs/04.operations/02.docker-deploy.md).
 FROM oven/bun:1.3.14 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production

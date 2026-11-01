@@ -8,15 +8,15 @@ writes on evidence, attributes every action to a turn, and serves a read-only mo
 | | |
 |---|---|
 | **Git** | [github.com/thangs2/harness-eso](https://github.com/thangs2/harness-eso) |
-| **Deep Product Intro & Who It's For** | [`documents/01.overview/04.introduction-and-audience.md`](documents/01.overview/04.introduction-and-audience.md) — philosophy, architecture pillars, target audience |
-| **Complete User & Operator Guide** | [`documents/01.overview/05.user-and-operator-guide.md`](documents/01.overview/05.user-and-operator-guide.md) — step-by-step setup, policy, daily IDE workflows & Observatory |
-| **Documentation Index (read first)** | [`documents/00.README.md`](documents/00.README.md) — what the system is and how it works |
-| **Invariants** | [`documents/05.development/02.invariants.md`](documents/05.development/02.invariants.md) — **read before changing how data flows** |
-| **Defect log** | [`documents/05.development/04.standalone-revamp-wbs.md`](documents/05.development/04.standalone-revamp-wbs.md) — measured history, every `F<n>` |
-| **Operator runbooks** | `docs/00`–`docs/07` · Docker: [`documents/04.operations/02.docker-deploy.md`](documents/04.operations/02.docker-deploy.md) |
+| **Deep Product Intro & Who It's For** | [`docs/01.overview/04.introduction-and-audience.md`](docs/01.overview/04.introduction-and-audience.md) — philosophy, architecture pillars, target audience |
+| **Complete User & Operator Guide** | [`docs/01.overview/05.user-and-operator-guide.md`](docs/01.overview/05.user-and-operator-guide.md) — step-by-step setup, policy, daily IDE workflows & Observatory |
+| **Documentation Index (read first)** | [`docs/00.README.md`](docs/00.README.md) — what the system is and how it works |
+| **Invariants** | [`docs/05.development/02.invariants.md`](docs/05.development/02.invariants.md) — **read before changing how data flows** |
+| **Defect log** | [`docs/05.development/04.standalone-revamp-wbs.md`](docs/05.development/04.standalone-revamp-wbs.md) — measured history, every `F<n>` |
+| **Operator runbooks** | `docs/00`–`docs/07` · Docker: [`docs/04.operations/02.docker-deploy.md`](docs/04.operations/02.docker-deploy.md) |
 | **Operator config** | `~/.harness/workspace.json` (machine-wide product state) |
 
-> **Picking this project up cold?** Read `documents/00.README.md`, then the invariants. Each invariant
+> **Picking this project up cold?** Read `docs/00.README.md`, then the invariants. Each invariant
 > names the production defect that produced it, so they are not style preferences.
 
 This repository **ships** the product. It is not a consumer of it: do not run the ESO pipeline on
@@ -51,7 +51,7 @@ cd harness-eso
 ```
 
 → **http://127.0.0.1:8792** — Projects tab to add a consumer. See
-[`documents/04.operations/01.install-and-provision.md`](documents/04.operations/01.install-and-provision.md).
+[`docs/04.operations/01.install-and-provision.md`](docs/04.operations/01.install-and-provision.md).
 
 ## Provision a consumer
 
@@ -67,7 +67,7 @@ harnessctl host-pack status /path/to/consumer               # expect integrity o
 ```
 
 `./harness init profile …` is the same command. Full flag reference:
-[`documents/04.operations/03.cli-reference.md`](documents/04.operations/03.cli-reference.md).
+[`docs/04.operations/03.cli-reference.md`](docs/04.operations/03.cli-reference.md).
 
 ## Layout
 
@@ -92,7 +92,7 @@ compose.harness.yml         observe stack — one container per project id
 compose.console.yml         console stack (:8791)
 console.sh                  console deploy / lifecycle (symmetry with deploy.sh)
 qc/                         integration tests
-documents/                  what the system is (this pack)
+docs/                  what the system is (this pack)
 docs/                       defect log + operator runbooks
 ```
 
@@ -133,10 +133,10 @@ stack).
 
 | Need | Read |
 |---|---|
-| what it is, vocabulary, architecture | `documents/01.overview/` |
-| how it behaves during a turn | `documents/02.runtime/` |
-| on-disk layout, schema, API, hook contract | `documents/03.state-and-contracts/` |
-| install, Docker, CLI, diagnosing a failure | `documents/04.operations/` |
-| conventions, invariants, open issues | `documents/05.development/` |
-| **the whole system as 20 pictures** | [`documents/06.diagrams/01.diagrams-mermaid.md`](documents/06.diagrams/01.diagrams-mermaid.md) |
+| what it is, vocabulary, architecture | `docs/01.overview/` |
+| how it behaves during a turn | `docs/02.runtime/` |
+| on-disk layout, schema, API, hook contract | `docs/03.state-and-contracts/` |
+| install, Docker, CLI, diagnosing a failure | `docs/04.operations/` |
+| conventions, invariants, open issues | `docs/05.development/` |
+| **the whole system as 20 pictures** | [`docs/06.diagrams/01.diagrams-mermaid.md`](docs/06.diagrams/01.diagrams-mermaid.md) |
 | why a specific rule exists | `docs/04` (search the `F<n>` number) |

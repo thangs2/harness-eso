@@ -230,13 +230,13 @@ l2() {
     fi
 
     local law_n
-    for law_n in .docgraph documents/document; do
+    for law_n in .docgraph docs/document; do
         if [ -d "$(rel "$law_n")" ]; then
             _record L2 INFO "L2:law-index" PASS "$law_n present" ""
             return
         fi
     done
-    _record L2 WARN "L2:law-index" FAIL "no .docgraph or documents/document" \
+    _record L2 WARN "L2:law-index" FAIL "no .docgraph or docs/document" \
         "docgraph build — law lookups resolve to nothing without an index"
 }
 
@@ -396,7 +396,7 @@ l6() {
                 _record L6 INFO "L6:brain-mcp:$tree" PASS "deepseek server configured" ""
             else
                 _record L6 WARN "L6:brain-mcp:$tree" FAIL "no deepseek server — guard-brain has no tier to allow" \
-                    "add the deepseek MCP server to $cfg (see harness-eso docs/03.cursor-mcp.md)"
+                    "add the deepseek MCP server to $cfg (see harness-eso docs/01.overview/03.cursor-mcp.md)"
             fi
         done
     done

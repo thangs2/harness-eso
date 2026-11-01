@@ -25,7 +25,7 @@ export HARNESS_REPO_ROOT="../x79"   # consumer có harness.config.json
 ./docker/observatory.sh smoke
 ```
 
-Windows: `docker/observatory.ps1` (xem `documents/01.overview/02.cursor-windows.md`).
+Windows: `docker/observatory.ps1` (xem `docs/01.overview/02.cursor-windows.md`).
 
 UI: http://127.0.0.1:8792
 

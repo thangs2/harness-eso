@@ -11,14 +11,14 @@
  *
  * Usage
  *   node scripts/pilot-reset.mjs --a /tmp/pilot-A --b /tmp/pilot-B
- *   node scripts/pilot-reset.mjs --a /tmp/pilot-A --b /tmp/pilot-B --output docs/PILOT-CHECK.md
+ *   node scripts/pilot-reset.mjs --a /tmp/pilot-A --b /tmp/pilot-B --output <file>            (default: docs/PILOT-CHECK.md — x28-allow: output destination)
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
 function parseArgs(argv) {
-    const out = { a: null, b: null, output: 'docs/PILOT-CHECK.md', quiet: false };
+    const out = { a: null, b: null, output: 'docs/PILOT-CHECK.md', quiet: false };  // x28-allow: output destination, created by the run
     for (let i = 2; i < argv.length; i += 1) {
         const a = argv[i];
         const v = () => argv[++i];
@@ -83,7 +83,7 @@ function resetEso(dir, output) {
 function main() {
     const opts = parseArgs(process.argv);
     if (opts.help || !opts.a || !opts.b) {
-        console.log('usage: node scripts/pilot-reset.mjs --a <native-dir> --b <eso-dir> [--output docs/PILOT-CHECK.md]');
+        console.log('usage: node scripts/pilot-reset.mjs --a <native-dir> --b <eso-dir> [--output <file>]');
         return;
     }
     requireDir(opts.a, 'A');

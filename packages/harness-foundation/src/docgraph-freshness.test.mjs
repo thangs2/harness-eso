@@ -11,7 +11,7 @@ const { checkDocgraphFreshness, isCovered, parseScope } = await import(
     path.join(REPO, 'scripts', 'check-docgraph.mjs')
 );
 
-function repo({ scope = 'ext:.md\next:.mdc\npath:documents\nexclude:documents/archive/**\n', files = {}, index } = {}) {
+function repo({ scope = 'ext:.md\next:.mdc\npath:documents\nexclude:docs/archive/**\n', files = {}, index } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'docgraph-freshness-'));
     fs.writeFileSync(path.join(root, 'docgraph.scope'), scope);
     for (const [rel, body] of Object.entries(files)) {
@@ -41,17 +41,17 @@ test('G-20: a covered document written after the index was built makes it stale'
      * searched a corpus that did not contain them, and the "docgraph first" rule was silently
      * false. Nothing failed — this is the probe that makes that state visible.
      */
-    const root = repo({ files: { 'documents/new.md': '# new' }, index: indexAt('2026-10-14T00:00:00Z', []) });
+    const root = repo({ files: { 'docs/new.md': '# new' }, index: indexAt('2026-10-14T00:00:00Z', []) });
     const report = checkDocgraphFreshness(root);
     assert.equal(report.status, 'stale');
-    assert.deepEqual(report.newer, ['documents/new.md']);
+    assert.deepEqual(report.newer, ['docs/new.md']);
     assert.match(report.detail, /built 2026-10-14/);
 });
 
 test('G-20: an index newer than everything it covers is current', () => {
     const root = repo({
-        files: { 'documents/a.md': '# a', 'documents/b.mdc': '# b' },
-        index: indexAt('2030-01-01T00:00:00Z', ['documents/a.md', 'documents/b.mdc']),
+        files: { 'docs/a.md': '# a', 'docs/b.mdc': '# b' },
+        index: indexAt('2030-01-01T00:00:00Z', ['docs/a.md', 'docs/b.mdc']),
     });
     const report = checkDocgraphFreshness(root);
     assert.equal(report.status, 'current');
@@ -62,34 +62,34 @@ test('G-20: an index newer than everything it covers is current', () => {
 test('G-20: the scope is an allowlist, so files outside its `path:` roots are not missing', () => {
     /* `comments/artifacts/**` is .md and on disk, but not in scope — reporting it would be noise. */
     const root = repo({
-        files: { 'documents/a.md': '# a', 'comments/artifacts/note.md': '# note', 'outside.md': '# x' },
-        index: indexAt('2030-01-01T00:00:00Z', ['documents/a.md']),
+        files: { 'docs/a.md': '# a', 'comments/artifacts/note.md': '# note', 'outside.md': '# x' },
+        index: indexAt('2030-01-01T00:00:00Z', ['docs/a.md']),
     });
     const report = checkDocgraphFreshness(root);
     assert.equal(report.status, 'current');
 });
 
 test('G-20: `exclude:` patterns keep a directory out of the comparison', () => {
-    const scope = parseScope('ext:.md\npath:documents\nexclude:documents/archive/**\n');
-    assert.equal(isCovered('documents/a.md', scope), true);
-    assert.equal(isCovered('documents/archive/old.md', scope), false);
-    assert.equal(isCovered('documents/a.txt', scope), false, 'an extension outside `ext:` is not covered');
+    const scope = parseScope('ext:.md\npath:documents\nexclude:docs/archive/**\n');
+    assert.equal(isCovered('docs/a.md', scope), true);
+    assert.equal(isCovered('docs/archive/old.md', scope), false);
+    assert.equal(isCovered('docs/a.txt', scope), false, 'an extension outside `ext:` is not covered');
     assert.equal(isCovered('outside/a.md', scope), false, 'an entry needs a `path:` root');
 });
 
 test('G-20: an index that disagrees with the scope in either direction is reported as out-of-step', () => {
     const root = repo({
-        files: { 'documents/a.md': '# a' },
-        index: indexAt('2030-01-01T00:00:00Z', ['documents/a.md', 'documents/deleted.md']),
+        files: { 'docs/a.md': '# a' },
+        index: indexAt('2030-01-01T00:00:00Z', ['docs/a.md', 'docs/deleted.md']),
     });
     const report = checkDocgraphFreshness(root);
     assert.equal(report.status, 'out-of-step');
-    assert.deepEqual(report.extra, ['documents/deleted.md']);
+    assert.deepEqual(report.extra, ['docs/deleted.md']);
     assert.deepEqual(report.missing, []);
 });
 
 test('G-20: a missing or unreadable index is `absent`, not `current`', () => {
-    assert.equal(checkDocgraphFreshness(repo({ files: { 'documents/a.md': '# a' } })).status, 'absent');
+    assert.equal(checkDocgraphFreshness(repo({ files: { 'docs/a.md': '# a' } })).status, 'absent');
     assert.equal(checkDocgraphFreshness(repo({ index: 'not json' })).status, 'absent');
     assert.equal(checkDocgraphFreshness(repo({ index: { schema_version: 1, entries: [] } })).status, 'absent');
 });
@@ -111,7 +111,7 @@ test('G-20: the repo this product ships has a current docgraph index', () => {
 });
 
 test('the CLI exits non-zero on a stale index so a pre-commit hook can use it', () => {
-    const root = repo({ files: { 'documents/new.md': '# new' }, index: indexAt('2026-10-14T00:00:00Z', []) });
+    const root = repo({ files: { 'docs/new.md': '# new' }, index: indexAt('2026-10-14T00:00:00Z', []) });
     let code = 0;
     try {
         execFileSync(process.execPath, [path.join(REPO, 'scripts', 'check-docgraph.mjs'), '--json'], {

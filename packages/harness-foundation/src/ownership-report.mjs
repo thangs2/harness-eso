@@ -93,7 +93,7 @@ const DEFAULT_POLICY_RELATIVE = '.harness/decision-policy.json';
  * document that makes the claim; nothing here is inferred from the value.
  */
 const OWNER_DECLARED = {
-    'paths.locked': 'documents/02.runtime/08.provisioning-consumers.md §8 — "nguồn Truth của consumer"',
+    'paths.locked': 'docs/02.runtime/08.provisioning-consumers.md §8 — "nguồn Truth của consumer"',
     'paths.gated': 'same as paths.locked',
     'paths.ask': 'same as paths.locked',
     'paths.sot': 'same as paths.locked',

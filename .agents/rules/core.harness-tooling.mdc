@@ -3,7 +3,7 @@ description: harness-eso MCP — codegraph + agentmemory-mcp (.cursor/mcp.json)
 layer: core
 alwaysApply: false
 version: "1.1.0"
-canonical: documents/01.overview/03.cursor-mcp.md
+canonical: docs/01.overview/03.cursor-mcp.md
 globs: packages/harness-eso-core/**,packages/harness-host-generic/**,.cursor/mcp.json
 ---
 
@@ -21,7 +21,7 @@ Adapter id (COLLECT): `docgraph-cli`, `codegraph-cli`, `agentmemory-mcp`, `deeps
 | `agentmemory-mcp` | `memory_smart_search`, `memory_save` | `:3111` |
 | `deepseek-direct` | `ask_deepseek_flash`, `ask_deepseek_pro` | `x79/installation/deepseek` |
 
-Setup: `documents/01.overview/03.cursor-mcp.md` · mẫu: `mcp.example.json` (docgraph chạy CLI `docgraph --q`).
+Setup: `docs/01.overview/03.cursor-mcp.md` · mẫu: `mcp.example.json` (docgraph chạy CLI `docgraph --q`).
 
 ## Khi nào gọi gì
 

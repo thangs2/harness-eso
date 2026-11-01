@@ -1,7 +1,7 @@
 /**
  * Brain graph — the workspace panorama behind the Observatory "Brain" page.
  *
- * Contract (see documents/03.state-and-contracts/03.observe-api.md):
+ * Contract (see docs/03.state-and-contracts/03.observe-api.md):
  *   GET /api/brain/graph.json -> { version, nodes, links, legend, meta }
  *
  * Why this file owns its own source list: the graph must be built from artifacts this product
@@ -10,7 +10,7 @@
  * package. If a static route/rule graph is needed later it gets its own product-owned spec and
  * its own builder — not an import of somebody's file.
  *
- * Two rules from documents/05.development/02.invariants.md drive the whole shape:
+ * Two rules from docs/05.development/02.invariants.md drive the whole shape:
  *   A2 / D3 / D4 — an absent layer is *reported* (`meta.omitted`), never rendered as empty or zero.
  *   D5 — no invented numbers: every count comes from a row, and any cap is reported in
  *        `meta.truncated` with both `shown` and `total`.

@@ -1,7 +1,7 @@
 name: harness-eso-ci
 
 # The OS matrix is the point of this file, not an extra. Issue #12 in
-# `documents/05.development/03.open-issues.md` records three cross-platform breakages that survived a
+# `docs/05.development/03.open-issues.md` records three cross-platform breakages that survived a
 # fully green suite because the suite only ever ran on macOS: hook commands that called `bash -lc`,
 # operator scripts that re-exec'd `/bin/bash`, and a route helper that spawned `python3`. Each was
 # invisible on one OS and fatal on another.

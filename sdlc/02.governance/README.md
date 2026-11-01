@@ -31,6 +31,6 @@ about a file number. Mixing them (`01.file` · `02.file` · `03.folder`) is forb
 **Ba tầng, ba vai.** `standard/` nói điều gì phải **đúng**; `sdlc/` ghi điều **đang là**; `qc/` là **máy kiểm** đối chiếu hai
 cái đó. Không luật nào bị chép vào bản ghi, và không bản ghi nào tự phát minh luật.
 
-`documents/` là luật của **trạng thái hiện tại** (invariants, defect register, feature map). `sdlc/` được viết, nhưng không được
-mâu thuẫn với `documents/`. Khi xung đột: `documents/` mô tả code đang làm gì, nên `sdlc/` phải đổi — hoặc mở một `D` để đổi
+`docs/` là luật của **trạng thái hiện tại** (invariants, defect register, feature map). `sdlc/` được viết, nhưng không được
+mâu thuẫn với `docs/`. Khi xung đột: `docs/` mô tả code đang làm gì, nên `sdlc/` phải đổi — hoặc mở một `D` để đổi
 trạng thái hiện tại.

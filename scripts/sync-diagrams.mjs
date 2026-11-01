@@ -3,7 +3,7 @@
  * Keep the diagram compilation in sync with the diagrams the product actually renders.
  *
  * Four diagrams live in `packages/harness-console/src/diagrams/pipeline-diagrams.ts` and are rendered by the
- * Console wizard. They are also copied into `documents/06.diagrams/01.diagrams-mermaid.md` so that one file
+ * Console wizard. They are also copied into `docs/06.diagrams/01.diagrams-mermaid.md` so that one file
  * holds every diagram — that copy is the point of the compilation, but a copy drifts.
  *
  * So the copy is **checked**, not trusted:
@@ -32,7 +32,7 @@ export const SOURCE_FILE = path.join(
     REPO,
     'packages/harness-console/src/diagrams/pipeline-diagrams.ts',
 );
-export const DOC_FILE = path.join(REPO, 'documents/06.diagrams/01.diagrams-mermaid.md');
+export const DOC_FILE = path.join(REPO, 'docs/06.diagrams/01.diagrams-mermaid.md');
 
 /**
  * The `mermaid:` template literals in the source, keyed by diagram id.

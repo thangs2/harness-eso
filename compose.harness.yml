@@ -53,7 +53,7 @@ services:
             # container-only filesystem the host server cannot see.
             - ${HARNESS_PRODUCT_STATE_HOST:-${HOME}/.harness}:/data/product-state
             - ${HARNESS_AGENT_ROOT}:/agent-repos
-            # Agent transcripts (REQUEST spine) — read-only; see documents/04.operations/02.docker-deploy.md
+            # Agent transcripts (REQUEST spine) — read-only; see docs/04.operations/02.docker-deploy.md
             - ${HARNESS_CURSOR_HOME:-${HOME}/.cursor}:/host-cursor:ro
             - ${HARNESS_GEMINI_HOME:-${HOME}/.gemini}:/host-gemini:ro
             - ${HARNESS_CLAUDE_HOME:-${HOME}/.claude/projects}:/host-claude-projects:ro

@@ -3,7 +3,7 @@
  *
  * Each test states the failure it prevents, because a test that names the bug is the only kind a
  * reader can trust when it goes green. The four consumer sessions are in `comments/artifacts/`; the
- * analysis is `documents/03.state-and-contracts/06.evidence-sufficiency-defects.md`.
+ * analysis is `docs/03.state-and-contracts/06.evidence-sufficiency-defects.md`.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

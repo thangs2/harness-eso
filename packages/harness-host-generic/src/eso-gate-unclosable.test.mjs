@@ -10,7 +10,7 @@
  *
  * These tests pin the three decisions separately, so a later change to one cannot silently restore
  * another: the pack mapping (G-01), the naming of an unanswerable gap (G-02), and the write condition
- * under `fail_closed` (G-03). Register: `documents/05.development/09.gate-defect-register.md`.
+ * under `fail_closed` (G-03). Register: `docs/05.development/09.gate-defect-register.md`.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

@@ -1,19 +1,19 @@
 ---
-description: Mermaid standard for documents/** and product diagram sources — read/write plane, Catppuccin roles, render-verified
+description: Mermaid standard for docs/** and product diagram sources — read/write plane, Catppuccin roles, render-verified
 layer: doc
 alwaysApply: false
 version: "1.0.0-ESO"
 canonical: .cursor/rules/README.md
-globs: documents/**,packages/harness-console/src/diagrams/**
+globs: docs/**,packages/harness-console/src/diagrams/**
 ---
 
 # Harness-ESO Mermaid standard
 
-**Authority:** `documents/06.diagrams/01.diagrams-mermaid.md` (conventions + §V1–§V24) và
-`documents/07.how-it-works/` (bộ hiện hành, 21 diagram). Rule này chỉ **chốt luật** cho hai chỗ đó —
+**Authority:** `docs/06.diagrams/01.diagrams-mermaid.md` (conventions + §V1–§V24) và
+`docs/07.how-it-works/` (bộ hiện hành, 21 diagram). Rule này chỉ **chốt luật** cho hai chỗ đó —
 khi rule và tài liệu lệch nhau, sửa tài liệu trước rồi sửa rule.
 
-**Khi áp dụng:** tạo/sửa fence ` ```mermaid ` trong `documents/**`, hoặc sửa
+**Khi áp dụng:** tạo/sửa fence ` ```mermaid ` trong `docs/**`, hoặc sửa
 `packages/harness-console/src/diagrams/pipeline-diagrams.ts` (nguồn của §V26–§V29).
 
 ---
@@ -69,7 +69,7 @@ Biến thể trong fence **chỉ** khi diagram cần phân biệt chi tiết hơ
 Subgraph: id ngắn, title ngắn (`subgraph W ["W write plane"]`), không HTML. Data store:
 `DB[(harness.db)]:::shared` — dùng `shared` cho dữ liệu, `stop` cho trail/blockers.
 
-Theme init (dòng đầu fence) — bắt buộc cho mọi fence trong `documents/07.how-it-works/`, nơi cả bộ phải
+Theme init (dòng đầu fence) — bắt buộc cho mọi fence trong `docs/07.how-it-works/`, nơi cả bộ phải
 render được khi copy một fence ra ngoài doc (GitHub, PR comment). Fence khác dùng được nếu chỉ render trong
 repo, nhưng copy ra ngoài sẽ mất palette:
 
@@ -126,8 +126,8 @@ flowchart LR
 
 | Chủ đề | Nơi **duy nhất** được vẽ |
 |:---|:---|
-| Hai plane, topology package, turn lifecycle, guard, ingest, data model | `documents/06.diagrams/01.diagrams-mermaid.md` (§V1–§V24) |
-| Landscape / workflow / pipeline thời DSH-plugin | `documents/07.how-it-works/*.md` |
+| Hai plane, topology package, turn lifecycle, guard, ingest, data model | `docs/06.diagrams/01.diagrams-mermaid.md` (§V1–§V24) |
+| Landscape / workflow / pipeline thời DSH-plugin | `docs/07.how-it-works/*.md` |
 | Bốn diagram wizard (`v1-coordinates`, `v2-abcd`, `v3-layers`, `taxonomy-bridge`) | **nguồn**: `packages/harness-console/src/diagrams/pipeline-diagrams.ts`; bản copy trong §V26–§V29 |
 
 Sửa diagram sản phẩm thì sửa **nguồn `.ts` trước**, rồi:

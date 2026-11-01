@@ -13,7 +13,7 @@ allowed_files:
 forbidden:
   - "sdlc/**"                      # a peer must NOT edit this spec; Lead or human only
   - "packages/harness-*"           # v1 code — prior art, untouched by v2 stories
-  - "documents/**"
+  - "docs/**"
 verify:
   - "bun test qc/eso-core-*"
 design_refs:
