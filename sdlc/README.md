@@ -22,12 +22,13 @@ tượng ta đang xây. Việc của consumer thuộc SDLC của chính consumer
 ## Cấu trúc — **hai không gian tên độc lập**
 
 **Folder** đánh số `01…` **chỉ trong folder**; **file** đánh số `01…` **chỉ trong file**
-([naming law](../standard/02.artifacts.md) §4.1). Ở cấp `sdlc/` chỉ có folder, nên đây là **một** dãy — liền
+([naming law](02.governance/01.standard/02.artifacts.md) §4.1). Ở cấp `sdlc/` chỉ có folder, nên đây là **một** dãy — liền
 mạch, **không trùng số**, và **không mang nghĩa "stage"**.
 
-> **Luật không nằm trong `sdlc/`.** Chuẩn SDLC (kind · cổng · BIP/FIP · workflow) sống ở [`standard/`](../standard/00.index.md) —
-> nó là **sản phẩm**, ship cùng harness-eso; consumer **trỏ tới**, không nhận bản sao. `sdlc/` là **instance**: artifact của
-> dự án này, được kiểm bởi chuẩn.
+> **Luật nằm trong `sdlc/`.** Chuẩn SDLC (kind · cổng · BIP/FIP · workflow · 29 phép kiểm) sống ở
+> [`02.governance/01.standard/`](02.governance/01.standard/00.index.md) — cùng cây với các artifact nó mô tả, vì `sdlc/`
+> **không** được ship, **không** được provision, **không** có bản sao ở consumer. Consumer nhận **study sample** để đọc, không
+> phải bản copy để chạy.
 
 ```text
 01.agent-manifests   meta — vùng AI: spec domain + 9 capability (≤150 dòng · ≤4 000 ký tự)

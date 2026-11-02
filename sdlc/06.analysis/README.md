@@ -34,7 +34,7 @@ cần. Đọc cái này trước để biết chỗ nào trống.
 |---|---|
 | **UC không nhắc tới công nghệ** | nếu UC nói "Postgres" thì nó là thiết kế, không phải phân tích |
 | **Mỗi UC có điều kiện trước/sau** | không có "sau" thì không biết đã xong chưa |
-| **AC phải test được bằng một test** | luật của [Stages](../../standard/04.sdlc-workflow.md) §1 |
+| **AC phải test được bằng một test** | luật của [Stages](../02.governance/01.standard/04.sdlc-workflow.md) §1 |
 | **AC thuộc ĐÚNG một US** | AC dùng US khác thì không test được một mình; luật xuyên suốt là **BR**, không phải AC |
 | **US truy về P1–P6** | không truy được thì nó là ý thích, không phải yêu cầu |
 | **Không chép lại `07.technical/01.architecture`** | analysis nói *cái gì*, architecture nói *thế nào* |

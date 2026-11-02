@@ -9,14 +9,14 @@ type: standard
 
 # `02.governance` — bản ghi quản trị của **dự án này**
 
-> **Luật không ở đây nữa.** Chuẩn SDLC đã tách sang [`standard/`](../../standard/00.index.md) — nó là **sản phẩm**, ship cùng
+> **Luật không ở đây nữa.** Chuẩn SDLC đã tách sang [`standard/`](01.standard/00.index.md) — nó là **sản phẩm**, ship cùng
 > harness-eso, và consumer **trỏ tới** chứ không nhận bản sao. Lý do: [`08.folders`](../03.inception/03.artifact-model/08.folders.md).
 >
 > Folder này giữ **bản ghi của chính dự án**: trạng thái tài liệu, mục còn treo, và một phân tích. Đây là **instance**, không
 > phải chuẩn — nó được kiểm, không phải để kiểm người khác.
 
 **Two independent number sequences.** Folders `01…` and files `01…` are numbered **separately** — a folder number says nothing
-about a file number. Mixing them (`01.file` · `02.file` · `03.folder`) is forbidden ([naming law](../../standard/02.artifacts.md) §4).
+about a file number. Mixing them (`01.file` · `02.file` · `03.folder`) is forbidden ([naming law](01.standard/02.artifacts.md) §4).
 
 ## Files
 

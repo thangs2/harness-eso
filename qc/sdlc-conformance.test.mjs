@@ -255,7 +255,7 @@ test('X27: every document type in the tree is signed by someone', () => {
     //
     // A row is `| `kind` | ROLE |` — exactly two cells, unlike the type table next to it.
     const OWNER_ROW = /^\|\s*`([a-z0-9-]+)`\s*\|\s*([A-Za-z/]+)\s*\|$/;
-    const standard = read(join(ROOT, 'standard', '02.artifacts.md'));
+    const standard = read(join(SDLC, '02.governance', '01.standard', '02.artifacts.md'));
     const owners = new Map();
     for (const line of standard.split('\n')) {
         const m = OWNER_ROW.exec(line);

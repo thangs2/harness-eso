@@ -8,19 +8,19 @@
  * It refuses when there is no template. That is not a limitation, it is the rule: with no ruler, every set is "enough", and a
  * report that cannot refuse is a report that always says yes.
  *
- * Usage: node scripts/doc-inventory.mjs [--template standard/templates/library.json]
+ * Usage: node scripts/doc-inventory.mjs [--template sdlc/02.governance/01.standard/templates/library.json]
  */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const SDLC = join(ROOT, 'sdlc');
-const CATALOGUE = join(ROOT, 'standard', '02.artifacts.md');
+const CATALOGUE = join(SDLC, '02.governance', '01.standard', '02.artifacts.md');
 const argOf = (name, fallback) => {
     const i = process.argv.indexOf(name);
     return i === -1 ? fallback : process.argv[i + 1];
 };
-const TEMPLATE = join(ROOT, argOf('--template', 'standard/templates/library.json'));
+const TEMPLATE = join(ROOT, argOf('--template', 'sdlc/02.governance/01.standard/templates/library.json'));
 
 const walk = (dir, out = []) => {
     for (const name of readdirSync(dir)) {
