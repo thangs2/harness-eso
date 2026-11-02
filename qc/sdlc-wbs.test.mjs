@@ -15,9 +15,9 @@ const FIELDS = ['Việc', 'Input', 'Output', 'Phụ thuộc', 'Ước lượng',
 
 function dictionaries() {
     return readdirSync(WBS_DIR)
-        // One file per wave: NN.dictionary-wN.md. Match the kind, not a fixed prefix, so renumbering
+        // One file per deliverable: NN.deliverable-N.md. Match the kind, not a fixed prefix, so renumbering
         // the folder does not silently empty this test.
-        .filter((n) => /^\d+\.dictionary-w\d+\.md$/.test(n))
+        .filter((n) => /^\d+\.deliverable-\d+\.md$/.test(n))
         .map((n) => readFileSync(join(WBS_DIR, n), 'utf8'));
 }
 
@@ -115,7 +115,7 @@ test('WBS: every task cites at least one criterion', () => {
 
 // The map assigns each story to a wave; the dictionaries cover the waves written so far. This test
 // holds the two together so a wave cannot be declared done while its criteria are unclaimed.
-test('X8a: criteria of a covered wave are all claimed by a task', () => {
+test('X8a: criteria of a covered deliverable are all claimed by a task', () => {
     const claimed = new Set();
     for (const text of dictionaries()) {
         for (const [, { acs }] of tasks(text)) for (const ac of acs) claimed.add(ac);
@@ -131,7 +131,7 @@ test('X8a: criteria of a covered wave are all claimed by a task', () => {
     // All eight waves are written up. Any uncovered criterion is now a real gap, not a wave that
     // has not been reached yet.
     const inScope = uncovered;
-    assert.deepEqual(inScope, [], 'criteria in a written-up wave with no owning task');
+    assert.deepEqual(inScope, [], 'criteria in a written-up deliverable with no owning task');
     assert.equal(claimed.size, all.size, 'every criterion must be claimed by a task');
 });
 
@@ -269,7 +269,7 @@ test('X8: a slice may be OUT only when it owns no criterion', () => {
     // criteria per leaf, from the dictionaries
     const acByLeaf = new Map();
     for (const name of readdirSync(WBS_DIR)) {
-        if (!/^\d+\.dictionary-w\d+\.md$/.test(name)) continue;
+        if (!/^\d+\.deliverable-\d+\.md$/.test(name)) continue;
         const text = readdirSync(WBS_DIR).includes(name) ? read(join('09.wbs', name)) : '';
         for (const blk of text.split(/\n### /).slice(1)) {
             const m = /^`(\d+\.\d+)`/.exec(blk);
