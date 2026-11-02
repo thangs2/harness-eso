@@ -10,6 +10,8 @@ Repo này **ship** sản phẩm Harness ESO (`@mu/harness-*`). Agent làm việc
 
 **Cursor agent (forced):** IDE loads `.cursor/rules/` → **`core.law-gate.mdc`** bắt buộc **Read file này (`AGENTS.md`)** mỗi phiên trước khi làm việc; rule khác chỉ bổ sung, không thay law. Catalog: `.cursor/instructions.md` · MCP `.cursor/mcp.json` (`docs/01.overview/03.cursor-mcp.md`).
 
+**Luật làm việc trong `sdlc/` (bắt buộc trước khi đề xuất cấu trúc/tách folder):** [`sdlc/02.governance/04.agent-rules.md`](sdlc/02.governance/04.agent-rules.md) — 10 luật, mỗi luật kèm lỗi đã sinh ra nó. Điểm chết người: **A = `sdlc/` (toàn bộ artifact + luật), B = sản phẩm**; `sdlc/` **không** copy/ship/provision; consumer nhận **study sample**. Không nói "P7 đòi X" khi không trích được câu trong `P7`.
+
 **Documentation pack (đọc trước khi sửa luồng dữ liệu):** `docs/00.README.md` — mô tả sản phẩm là gì, chạy thế nào, và **`docs/05.development/02.invariants.md`** liệt kê các bất biến kèm defect đã sinh ra chúng. Đây là gói bàn giao độc lập: không cần đọc repo consumer để hiểu sản phẩm.
 
 ---
