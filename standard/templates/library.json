@@ -1,0 +1,12 @@
+{
+  "id": "library",
+  "version": 1,
+  "status": "DRAFT",
+  "description": "Repo ship một thư viện/sản phẩm: đủ đặc tả để audit, không có delivery/ops. Đây là đề xuất, chưa phải luật.",
+  "required": [
+    "prd", "brd", "frd", "srs", "nfr-spec",
+    "requirement", "use-case", "user-story", "acceptance-criteria",
+    "scenario-matrix", "data-model", "api-contract", "decision-log"
+  ],
+  "note": "kind ngoài danh sách này vẫn được đếm, nhưng không bắt buộc. Template enterprise sẽ đòi thêm topology/runbook/threat-model."
+}
