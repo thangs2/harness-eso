@@ -8,7 +8,7 @@ type: domain-spec
 domain: eso-core
 owner_role: build
 allowed_files:
-  - "packages/eso-core/**"
+  - "eso/core/**"
   - "qc/eso-*.test.mjs"
 forbidden:
   - "sdlc/**"                      # a peer must NOT edit this spec; Lead or human only
