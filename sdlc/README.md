@@ -29,12 +29,9 @@ mạch, **không trùng số**, và **không mang nghĩa "stage"**.
 > nó là **sản phẩm**, ship cùng harness-eso; consumer **trỏ tới**, không nhận bản sao. `sdlc/` là **instance**: artifact của
 > dự án này, được kiểm bởi chuẩn.
 
-> **Đây là Section B — đặc tả sản phẩm.** Cách repo này tự chạy nằm ở [`project/`](../project/README.md) (Section A),
-> gồm `02.governance` → `project/01.governance`, `09.wbs` → `project/02.wbs`, `10.test` → `project/03.test`. Thiếu ba số đó là
-> **có chủ ý**, không phải mất file.
-
 ```text
 01.agent-manifests   meta — vùng AI: spec domain + 9 capability (≤150 dòng · ≤4 000 ký tự)
+02.governance        meta — bản ghi DỰ ÁN: trạng thái tài liệu · register OPEN · phân tích
 03.inception         vì sao tồn tại · quyết định
 04.landscape         bối cảnh: đứng ở đâu, ai cho gì, chỗ không chơi
 05.requirements      phải LÀM được gì (kiểm chứng được)
@@ -44,6 +41,8 @@ mạch, **không trùng số**, và **không mang nghĩa "stage"**.
     02.data-design     lưu trữ: entity · schema · RLS · định dạng decl.   (giữa)
     03.api             hợp đồng: endpoint · payload · lỗi · idempotency   (thấp)
 08.ui-design         **thiết kế giao diện** — chuẩn riêng (Figma · Penpot · guideline)
+09.wbs               WBS duy nhất — Feature → Epic → Story → Task
+10.test              phép thử nói "done" nghĩa là gì
 ```
 
 **Vì sao `07.technical` là một nhóm, không phải ba folder:** C4 → data → API là **một chuỗi lập luận** — container tồn tại, nó lưu

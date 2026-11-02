@@ -91,7 +91,6 @@ packages/
   harness-observatory/     monitor UI (:8792 host, :8790 in-container)
   harness-cli/             observe, init profile
 profiles/                  generic-eso.json, plugin-catalog, host superset
-project/                   Section A — how THIS repo runs: governance records, WBS, done-criteria
 standard/                  SDLC standard (kinds · gates · BIP/FIP · workflow) — product, shipped, never copied into a consumer
 qc/                        node:test integration
 console.sh                 deploy / lifecycle Console :8791 (root, cạnh deploy.sh)

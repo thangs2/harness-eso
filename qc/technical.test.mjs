@@ -111,7 +111,7 @@ test('X21: numbering is gapless and names are kebab-case', () => {
 test('X24: the status register states the counts the tree actually has', () => {
     // The register drifted twice in one day: it said "22 endpoints / 17 tables" after the tree had 27 and 19.
     // A number written by hand into a status table is a claim, and an unchecked claim is a guess with a tick.
-    const register = read(join(ROOT, 'project', '01.governance', '01.document-status.md'));
+    const register = read(join(SDLC, '02.governance', '01.document-status.md'));
 
     const tables = new Set();
     for (const f of walk(join(TECH, '02.data-design'))) {
