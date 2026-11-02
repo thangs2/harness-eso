@@ -19,12 +19,7 @@ verify:
 design_refs:
   - "sdlc/07.technical/01.architecture/07.sufficiency.md"
   - "sdlc/07.technical/01.architecture/05.turn-execution.md"
-invariants:
-  - INV-ESO-01
-  - INV-ESO-02
-  - INV-ESO-03
 ---
-
 # eso-core — judgement
 
 ## 1. What this domain owns
@@ -33,10 +28,10 @@ invariants:
 
 | Owns | Does not own |
 |---|---|
-| deriving **requirements** ([07](../../07.technical/01.architecture/07.sufficiency.md) §1) | knowledge content (`eso-knowledge`) |
-| computing `level` · `basis` · `exists` in aggregate | graph completeness measurement (`eso-graph`) |
-| choosing `mode` from `level × permission × escalation` | writing records (`eso-evidence`) |
-| **explanation**: why this verdict, with sources | the interface (`eso-control-plane`) |
+| deriving **requirements** ([07](../../07.technical/01.architecture/07.sufficiency.md) §1) | knowledge content (`eso/knowledge`) |
+| computing `level` · `basis` · `exists` in aggregate | graph completeness measurement (`eso/graph`) |
+| choosing `mode` from `level × permission × escalation` | writing records (`eso/evidence`) |
+| **explanation**: why this verdict, with sources | the interface (`eso/control-plane`) |
 
 ## 2. Invariants
 
@@ -49,18 +44,10 @@ invariants:
 ## 3. Specific prohibitions
 
 1. **Do not redefine "sufficient" elsewhere.** One place computes `level`; everything else reads it.
-2. **Do not read another domain's files to infer data** — use the interface. A `eso-core` peer does not grep `eso-graph`.
+2. **Do not read another domain's files to infer data** — use the interface. A `eso-core` peer does not grep `eso/graph`.
 3. **Do not change thresholds in code** — thresholds are data ([D-11](../../03.inception/02.decision-log/00.index.md)).
 4. **Do not "guess to finish"** when data is missing: return `cannot-judge` + `unknowns[]`, never a zero.
 
-## 4. Self-check before reporting DONE
+## 4. Self-check trước khi báo DONE
 
-```bash
-bun test qc/eso-core-*          # must be green
-```
-
-Then answer three questions in the peer output:
-
-1. Did I **default** any value that should have been `unknown`?
-2. Does any conclusion lack a **source** in the record?
-3. If a threshold changed, would the result move in a direction I do not control?
+`bun test qc/eso-core-*` xanh, rồi tự hỏi: có giá trị nào tôi **mặc định** mà đáng lẽ `unknown` · kết luận nào **thiếu nguồn** · ngưỡng đổi thì kết quả có nhảy ngoài tầm kiểm soát?

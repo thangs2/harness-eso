@@ -17,7 +17,7 @@ type: capability-index
 | Is | Is not |
 |---|---|
 | a **contract**: what may change here · what must hold · what proves it | an architecture document — it **points at** architecture, never replaces it |
-| **short**: readable in ≤ 1 minute | a copy of `sdlc/07.technical/01.architecture/` |
+| **short**: **≤ 40 dòng** ([`D-43`](../03.inception/02.decision-log/02.san-pham-va-pham-vi.md)) | a copy of `sdlc/07.technical/01.architecture/` |
 | **falsifiable**: each rule has its test | a manifesto |
 
 **The rule that matters:** a spec longer than a minute of reading is **wrongly designed** — the peer skips it and crawls again,
@@ -46,3 +46,21 @@ Body: **what it owns** · **rules** · **wire** (endpoints/tables) · **refs** (
 ## 4. Capability specs
 
 Nine, one per analysis item: [`02.capabilities/`](02.capabilities/00.index.md).
+
+## Ngân sách dòng — đo 2026-11-03
+
+`D-43` đặt **router ≤ 40 dòng/file**. Đo thật:
+
+| File | Dòng | Ghi chú |
+|---|---:|---|
+| 7 domain spec mới (`eso/knowledge` … `eso/extractors`) | **40** | ✅ vừa khít |
+| `02.capabilities/00.index` · `01`…`09` | 24–38 | ✅ |
+| `03.sufficiency.spec` · `10.surfaces.spec` | **41** · **45** | ⚠ vượt nhẹ |
+| `01.domains/eso-core.spec` | **53** | ⚠ vượt — đã cắt khối `invariants` trùng với §2 |
+| `README.md` (file này) | **48** | ⚠ vượt — là **bản đồ**, không phải router |
+
+**Điều đo được:** ngân sách 40 **đạt được** — bảy spec mới vừa đúng 40 với cùng hình dạng frontmatter. Nên bốn file vượt là **nội dung dư**, không
+phải ngân sách sai.
+
+**Cách trả, theo thứ tự:** cắt phần đã có ở doc mà spec trỏ tới → cắt khối trùng → chỉ khi hết cả hai mới tách file. **Không** nâng ngân sách để
+vừa nội dung: làm thế thì con số chỉ còn là lời chúc.
