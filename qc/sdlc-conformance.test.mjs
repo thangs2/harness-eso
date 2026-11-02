@@ -437,3 +437,24 @@ test('X13: every story meets at least two boundaries of the catalogue', () => {
         .map((s) => `${s} — ${edges.get(s)?.size ?? 0} edge(s)`).sort();
     assert.deepEqual(thin, [], 'stories whose only boundary is the happy path');
 });
+
+// X32 — no folder may hold two files with the same numeric prefix. `03.frd/` carried `19.s1-work` and `19.inventory` at once: a later
+// file took a number an earlier one already owned, and nothing noticed because `X21` only looks inside `07.technical/`. Numbers are keys;
+// two files with one key is the same defect as two names for one field.
+test('X32: no folder holds two files with the same index', () => {
+    const dup = [];
+    const visit = (dir) => {
+        const seen = new Map();
+        for (const name of readdirSync(dir)) {
+            const full = join(dir, name);
+            if (statSync(full).isDirectory()) { visit(full); continue; }
+            const m = /^(\d+)\./.exec(name);
+            if (!m) continue;
+            const key = String(Number(m[1]));
+            if (seen.has(key)) dup.push(`${relative(SDLC, dir)}: ${seen.get(key)} and ${name} both numbered ${m[1]}`);
+            else seen.set(key, name);
+        }
+    };
+    visit(SDLC);
+    assert.deepEqual(dup.sort(), [], 'files sharing an index inside one folder');
+});
