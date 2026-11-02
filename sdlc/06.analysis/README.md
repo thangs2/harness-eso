@@ -42,7 +42,7 @@ cần. Đọc cái này trước để biết chỗ nào trống.
 ## 3. Thứ tự đọc
 
 ```text
-03.inception/00.problem.md      (P1–P6 — nỗi đau)
+03.inception/00.problem/00.index.md      (P1–P6 — nỗi đau)
   → 06.analysis/01.*            (ai, làm gì)
     → 06.analysis/02–03         (US, AC)
       → 07.technical/01.architecture/        (thế nào)
