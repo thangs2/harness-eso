@@ -83,7 +83,7 @@ test('feature map: every maturity tier it cites is defined in the maturity check
     const standard = fs.readFileSync(path.join(REPO, MATURITY), 'utf8');
     const defined = new Set([...standard.matchAll(/### (T\d) —/g)].map((m) => m[1]));
     assert.ok(defined.size >= 6, `maturity parse found ${[...defined].join(',')}`);
-    const cited = new Set([...doc.matchAll(/\b(T[0-5])\b/g)].map((m) => m[1]));
+    const cited = new Set([...doc.matchAll(/\b(T\d)\b/g)].map((m) => m[1]));
     const missing = [...cited].filter((t) => !defined.has(t));
     assert.deepEqual(missing, [], `tiers cited but not in 04.operations/08: ${missing.join(', ')}`);
 });
