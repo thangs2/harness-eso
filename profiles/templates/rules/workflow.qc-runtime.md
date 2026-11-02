@@ -3,7 +3,7 @@ description: QC lane — trigger gates then qc-runtime after qualified DEV; not 
 layer: workflow
 ide: antigravity
 alwaysApply: false
-globs: "sdlc/10.test/**/*,SDLC/10.test/**/*,sdlc/08.wbs/**/*,SDLC/08.wbs/**/*,.cursor/agents/qc-runtime.md,.agents/agents/qc-runtime.md"
+globs: "project/03.test/**/*,SDLC/10.test/**/*,sdlc/08.wbs/**/*,SDLC/08.wbs/**/*,.cursor/agents/qc-runtime.md,.agents/agents/qc-runtime.md"
 version: "1.0.0-mechanism"
 canonical: AGENTS.md
 ---

@@ -1,6 +1,6 @@
 // X16–X20 — the stage-1 specification family: PRD · BRD · FRD · SRS.
 //
-// The rule lives in sdlc/02.governance/01.document-status.md §3. Before these checks existed the four
+// The rule lives in project/01.governance/01.document-status.md §3. Before these checks existed the four
 // documents were judged only by "has frontmatter and a non-empty body", so a whole document type could go
 // missing, a function could ship without a spec, and an NFR could be written with no way to measure it —
 // and nothing turned red. X7 states that limit itself: its verdict on judgement types is evidence, not a gate.

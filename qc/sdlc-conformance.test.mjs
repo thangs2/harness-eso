@@ -1,7 +1,7 @@
 // X7 — document shape conformance for the sdlc/ tree.
 //
-// The rule lives in sdlc/02.governance/01.standard/02.artifacts.md §2: every document kind has required sections.
-// The check was manual twice (see sdlc/02.governance/03.x7-analysis.md); this test makes it a gate.
+// The rule lives in project/01.governance/01.standard/02.artifacts.md §2: every document kind has required sections.
+// The check was manual twice (see project/01.governance/03.x7-analysis.md); this test makes it a gate.
 //
 // It automates only what can be decided mechanically. "Heading equivalence" is encoded below as data so a
 // disagreement becomes a one-line edit rather than an argument. Types whose required sections are prose
@@ -206,7 +206,7 @@ test('X22: every OPEN in a packet section 8 is classified in the mapping registe
     assert.ok(classified.size > 0, 'the mapping register lists no rows');
 
     const live = [];
-    for (const f of walk(join(SDLC, '09.wbs', '01.packets'))) {
+    for (const f of walk(join(ROOT, 'project', '02.wbs', '01.packets'))) {
         const packet = basename(f, '.md');
         const text = read(f);
         const start = text.search(/^##\s*8\./m);

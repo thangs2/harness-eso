@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const AC_DIR = join(ROOT, 'sdlc/06.analysis/03.acceptance-criteria');
-const WBS_DIR = join(ROOT, 'sdlc/09.wbs');
+const WBS_DIR = join(ROOT, 'project/02.wbs');
 const FIELDS = ['Việc', 'Input', 'Output', 'Phụ thuộc', 'Ước lượng', 'DoD', 'Owner'];
 
 function dictionaries() {
@@ -263,14 +263,13 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
 // §1.1 of the packet standard: a slice may record OUT only if the WBS assigns it no criteria.
 // A slice that owns criteria and claims OUT is hiding work behind a legal word.
 test('X8: a slice may be OUT only when it owns no criterion', () => {
-    const D = join(WBS_DIR, '..');
-    const read = (p) => readFileSync(join(D, p), 'utf8');
+    const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
     // criteria per leaf, from the dictionaries
     const acByLeaf = new Map();
     for (const name of readdirSync(WBS_DIR)) {
         if (!/^\d+\.dictionary-w\d+\.md$/.test(name)) continue;
-        const text = readdirSync(WBS_DIR).includes(name) ? read(join('09.wbs', name)) : '';
+        const text = readdirSync(WBS_DIR).includes(name) ? read(join('project', '02.wbs', name)) : '';
         for (const blk of text.split(/\n### /).slice(1)) {
             const m = /^`(\d+\.\d+)`/.exec(blk);
             if (!m) continue;
@@ -286,7 +285,7 @@ test('X8: a slice may be OUT only when it owns no criterion', () => {
         try { names = readdirSync(join(WBS_DIR, dir)); } catch { continue; }
         for (const name of names) {
             if (!name.endsWith('.md')) continue;
-            const text = read(join('09.wbs', dir, name));
+            const text = read(join('project', '02.wbs', dir, name));
             if (!/^type: (bip|fip)/m.test(text)) continue;
             const code = /^id: (?:BIP|FIP)-(\d+)[._](\d+)/m.exec(text);
             if (!code) continue;
@@ -314,7 +313,7 @@ test('X3b: every gate in the tree has a scenario (X3 cannot see this)', () => {
 
     // Discover by declared type, not by filename: a file's name is a label, its `type` is a contract. Filtering on
     // the name made this test silently vacuous the moment the files were renamed to drop the redundant suffix.
-    const QC_DIR = join(WBS_DIR, '..', '06.analysis', '04.quality-control');
+    const QC_DIR = join(ROOT, 'sdlc', '06.analysis', '04.quality-control');
     const matrices = readdirSync(QC_DIR)
         .filter((n) => n.endsWith('.md'))
         .map((n) => readFileSync(join(QC_DIR, n), 'utf8'))
@@ -332,8 +331,7 @@ test('X3b: every gate in the tree has a scenario (X3 cannot see this)', () => {
 // so a packet that names one is describing an error the system cannot return. This is the check
 // that law never had.
 test('X9b: every error code a packet names is registered', () => {
-    const D = join(WBS_DIR, '..');
-    const reg = readFileSync(join(D, '07.technical', '03.api', '00.index.md'), 'utf8');
+    const reg = readFileSync(join(ROOT, 'sdlc', '07.technical', '03.api', '00.index.md'), 'utf8');
     const registered = new Set([...reg.matchAll(/^\|\s*`([A-Z][A-Z_]{3,})`\s*\|/gm)].map((m) => m[1]));
     assert.ok(registered.size > 20, `registry parsed ${registered.size} codes; the table may have moved`);
 
