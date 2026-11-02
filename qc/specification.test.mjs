@@ -75,7 +75,7 @@ test('X16: the four specification documents exist, and nothing hides inside them
 
 test('X17: every vision goal has a metric, and every metric measures something', () => {
     const vision = read(join(SDLC, '03.inception', '01.vision', '01.vision-mission-goals.md'));
-    const goals = new Set([...vision.matchAll(/^### (G-[A-F])\b/gm)].map((m) => m[1]));
+    const goals = new Set([...vision.matchAll(/^### (G-[A-I])\b/gm)].map((m) => m[1]));
     assert.ok(goals.size >= 6, `expected the vision to declare its goals, saw ${goals.size}`);
 
     const metricsFile = join(SPEC, '01.prd', '06.success-metrics.md');
