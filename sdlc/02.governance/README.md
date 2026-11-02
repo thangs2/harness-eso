@@ -25,6 +25,7 @@ about a file number. Mixing them (`01.file` · `02.file` · `03.folder`) is forb
 | 01 | [`01.document-status.md`](01.document-status.md) | **trạng thái tài liệu**: "documented" nghĩa là gì · **28 phép kiểm** · instance đo được |
 | 02 | [`02.open-register.md`](02.open-register.md) | **register `OPEN`**: câu hỏi về hình dạng chưa có đáp án, mỗi câu kèm đề xuất |
 | 03 | [`03.x7-analysis.md`](03.x7-analysis.md) | phân tích `X7` — vì sao kiểm hình dạng theo `type` lại cần |
+| 04 | [`04.instance.md`](04.instance.md) | **chiều 1** — repo này khai gốc cây · template · tài liệu sống · mốc cơ sở |
 
 `README.md` is the only unnumbered file here — it is **navigation**, not an artifact.
 
