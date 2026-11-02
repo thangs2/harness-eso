@@ -24,7 +24,7 @@ cần. Đọc cái này trước để biết chỗ nào trống.
   00.baseline-v2-narrative/ ✅ **14 narrative v2** — 305–543 dòng/bản, 11 mục cố định
 02.user-stories/          ✅ **54 US**
 03.acceptance-criteria/   ✅ **349 AC** · 12 miền · US nào cũng có ≥ 1 AC
-04.quality-control/       ✅ **355 SCN** · 14 matrix · 0 đã chạy
+04.quality-control/       ✅ **356 SCN** · 14 matrix · 0 đã chạy
 ```
 ⬜ = **chưa tạo**, vì chưa có nội dung thật. Repo này không tạo folder rỗng.
 
