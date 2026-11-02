@@ -87,7 +87,7 @@ test('WBS: every dictionary task carries the seven fields', () => {
     assert.deepEqual(bad, []);
 });
 
-test('WBS: no criterion is claimed by two tasks', () => {
+test('X8a: no criterion is claimed by two tasks', () => {
     const claimed = new Map();
     const twice = [];
     for (const text of dictionaries()) {
@@ -115,7 +115,7 @@ test('WBS: every task cites at least one criterion', () => {
 
 // The map assigns each story to a wave; the dictionaries cover the waves written so far. This test
 // holds the two together so a wave cannot be declared done while its criteria are unclaimed.
-test('WBS: criteria of a covered wave are all claimed by a task', () => {
+test('X8a: criteria of a covered wave are all claimed by a task', () => {
     const claimed = new Set();
     for (const text of dictionaries()) {
         for (const [, { acs }] of tasks(text)) for (const ac of acs) claimed.add(ac);

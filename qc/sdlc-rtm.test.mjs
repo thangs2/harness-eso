@@ -48,7 +48,7 @@ function rtmRows() {
     return out;
 }
 
-test('RTM: every IAM criterion appears exactly once', () => {
+test('X3: every IAM criterion appears exactly once', () => {
     const acs = [...iamCriteria().keys()].sort();
     const rows = rtmRows();
     const missing = acs.filter((a) => !rows.has(a));
@@ -58,7 +58,7 @@ test('RTM: every IAM criterion appears exactly once', () => {
     assert.equal(rows.size, acs.length);
 });
 
-test('RTM: the scenario and test named for each criterion match the matrix', () => {
+test('X3: the scenario and test named for each criterion match the matrix', () => {
     const matrix = matrixRows();
     const bad = [];
     for (const [ac, line] of rtmRows()) {
@@ -70,7 +70,7 @@ test('RTM: the scenario and test named for each criterion match the matrix', () 
     assert.deepEqual(bad, []);
 });
 
-test('RTM: the type in the row matches the criterion file', () => {
+test('X3: the type in the row matches the criterion file', () => {
     const types = iamCriteria();
     const bad = [];
     for (const [ac, line] of rtmRows()) {
