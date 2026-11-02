@@ -1,11 +1,11 @@
 ---
 sot_doc_version: "0.1.0"
-human_sot: "sdlc/01.agent-manifests/README.md"
+human_sot: "sdlc/07.technical/01.architecture/07.sufficiency.md"
 status: DRAFT
 phase: 6
-id: ESO-CORE-DOMAIN
+id: ESO_CORE_DOMAIN
 type: domain-spec
-domain: eso-core
+domain: eso/core
 owner_role: build
 allowed_files:
   - "eso/core/**"
