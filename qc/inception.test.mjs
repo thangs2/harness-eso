@@ -74,16 +74,24 @@ test('X30: a count stated in prose equals the thing it counts', () => {
     const goals = [...vision.matchAll(/^### (G-[A-Z]) /gm)].map((m) => m[1]).length;
     const objectives = [...vision.matchAll(/^### (O-\d) /gm)].map((m) => m[1]).length;
 
-    const WORDS = { Một: 1, Hai: 2, Ba: 3, Bốn: 4, Năm: 5, Sáu: 6, Bảy: 7, Tám: 8, Chín: 9, Mười: 10 };
+    // Vietnamese numerals are written as words, sometimes in two ("Mười lăm"). A hardcoded map of single words cannot read them, and
+    // `\w` cannot match them at all — JavaScript's regex word class is ASCII-only.
+    const NUM = (raw) => {
+        const UNITS = { một: 1, hai: 2, ba: 3, bốn: 4, năm: 5, lăm: 5, sáu: 6, bảy: 7, tám: 8, chín: 9 };
+        const parts = raw.trim().toLowerCase().split(/\s+/);
+        if (parts.length === 1) return parts[0] === 'mười' ? 10 : UNITS[parts[0]];
+        if (parts[0] === 'mười' && parts.length === 2) return 10 + (UNITS[parts[1]] ?? NaN);
+        return undefined;
+    };
     const stated = [];
     const ascii = /Goals\s+(\d+) mục/.exec(vision);
     assert.ok(ascii, 'the vision map no longer states a goal count — update this check deliberately');
     stated.push(['ascii map goal count', Number(ascii[1]), goals]);
     // \S+, not \w+: JavaScript\'s \w is ASCII-only and would never match "Mười".
-    const prose = /^(\S+) mục\. Mỗi mục có phép thử/m.exec(vision);
+    const prose = /^([^\n]+?) mục\. Mỗi mục có phép thử/m.exec(vision);
     assert.ok(prose, 'the goals section no longer opens with a count — update this check deliberately');
-    assert.ok(WORDS[prose[1]] !== undefined, `unmapped numeral "${prose[1]}" in the goals opening`);
-    stated.push(['goals opening count', WORDS[prose[1]], goals]);
+    assert.ok(NUM(prose[1]) !== undefined, `unmapped numeral "${prose[1]}" in the goals opening`);
+    stated.push(['goals opening count', NUM(prose[1]), goals]);
 
     // Sections of the status register that number themselves in the heading.
     const status = read(join(INC, '03.artifact-model', '05.status.md'));
@@ -94,6 +102,18 @@ test('X30: a count stated in prose equals the thing it counts', () => {
         const rows = [...body.matchAll(/^\| (?:[a-z]|\d+) \|/gm)].length;
         stated.push([`status heading "${m[0].slice(3, 30)}"`, Number(m[1]), rows]);
     }
+
+    // The decision log counts itself too: §1's heading states how many DQ exist, §2's states how many need the operator. Both were
+    // written when there were fourteen, and adding `DQ-15` left both wrong until this check existed.
+    const open = read(join(INC, '02.decision-log', '01.open-decisions.md'));
+    const dq = [...open.matchAll(/^### `DQ-\d{2}`/gm)].length;
+    const dqHeading = /^## 1\. ([^\n]+?) quyết định$/m.exec(open);
+    assert.ok(dqHeading && NUM(dqHeading[1]) !== undefined, 'the DQ section no longer opens with a numeral');
+    stated.push(['§1 DQ heading', NUM(dqHeading[1]), dq]);
+    const needYou = /^## 2\. [^\n]*\*\*([^*]+)\*\* cái/m.exec(open);
+    assert.ok(needYou && NUM(needYou[1]) !== undefined, 'the "needs you" heading no longer states a numeral');
+    const ticked = [...open.matchAll(/^\| ✅ \| \*\*`DQ-\d{2}`\*\*/gm)].length;
+    stated.push(['§2 needs-you heading', NUM(needYou[1]), ticked]);
 
     // "N phép kiểm" anywhere in sdlc/ must equal the catalogue's row count. Eleven documents carried "29" while the catalogue held 33;
     // the number was copied by hand into prose and nothing compared it to the thing it counted.
