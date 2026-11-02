@@ -206,7 +206,21 @@ test('X20: the BRD carries every business rule and every actor authority', () =>
     assert.deepEqual(noActor, [], 'actors the BRD does not give an authority row');
 
     // A row that states permission but not prohibition is half a rule: see BR-08 (only A-01 sets Done).
-    const rows = authority.split('\n').filter((l) => /\*\*A-\d\d\*\*/.test(l));
-    const halfRule = rows.filter((l) => !/cấm/i.test(l)).map((l) => l.split('|')[2]?.trim() ?? l);
-    assert.deepEqual(halfRule, [], 'actor rows with no "bị cấm" column — permission without a boundary');
+    //
+    // This used to select rows by `**A-01**` while the file writes them as `` `A-01` ``, so the filter matched nothing and
+    // the assertion had never run. It also demanded the literal word "cấm" inside the cell, which no row contains — the word
+    // is in the *header*, the cell holds the boundary itself. Both were wrong in the same direction: the check could not fail.
+    const rows = authority.split('\n').filter((l) => /^\|\s*`A-\d\d`/.test(l));
+    assert.ok(rows.length >= 8, `read only ${rows.length} actor rows — the selector does not match the file`);
+    const halfRule = [];
+    for (const line of rows) {
+        const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+        const who = cells[0].replace(/`/g, '');
+        const forbidden = cells[3] ?? '';
+        // `—` is allowed only when it explains itself: a boundary that says "none" must say why none.
+        if (!forbidden || (forbidden.startsWith('—') && !/\(/.test(forbidden))) {
+            halfRule.push(`${who} — ${forbidden || 'empty'}`);
+        }
+    }
+    assert.deepEqual(halfRule, [], 'actor rows with no boundary — permission without a prohibition');
 });
