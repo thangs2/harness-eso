@@ -76,7 +76,6 @@ const JUDGEMENT = new Set([
     'brd',  // a business narrative: judged by whether it tells one true story, not by a fixed heading list
     'prd', 'frd', 'srs',  // stage-1 specification family: judged by whether every claim binds to a shard, not by headings
     'concept',  // a design concept: judged by whether it separates what is settled from what is open, not by headings
-    'instance',  // chiều 1: what THIS project declares — its roots, template, living set, baseline
     'nfr-spec',  // thresholds and measurement: judged by whether every NFR can be met, not by headings
 
 ]);
