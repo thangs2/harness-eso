@@ -34,6 +34,7 @@ Body: **what it owns** · **rules** · **wire** (endpoints/tables) · **refs** (
 |---|---|---:|
 | [`01.domains/`](01.domains/00.index.md) | **ranh giới ghi** của một miền — `allowed_files` · bất biến · điều cấm | **8** |
 | [`02.capabilities/`](02.capabilities/00.index.md) | **hợp đồng** một năng lực — nó sở hữu gì · nối ở đâu · kiểm bằng gì | **9** |
+  03.capability-wbs.md   ✅ capability ↔ work package (nối bằng chuỗi US → AC → WP, không bằng tay)
 
 ## 4. Capability specs
 
