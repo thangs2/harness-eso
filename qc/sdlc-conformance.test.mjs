@@ -443,6 +443,8 @@ test('X13: every story meets at least two boundaries of the catalogue', () => {
 // two files with one key is the same defect as two names for one field.
 test('X32: no folder holds two files with the same index', () => {
     const dup = [];
+    // Đếm số file đã thấy: nếu bằng 0 thì "không trùng số" là vô nghĩa — mọi kiểm tra kiểu "không có X" đều xanh khi không có gì.
+    let seenFiles = 0;
     const visit = (dir) => {
         const seen = new Map();
         for (const name of readdirSync(dir)) {
@@ -451,10 +453,12 @@ test('X32: no folder holds two files with the same index', () => {
             const m = /^(\d+)\./.exec(name);
             if (!m) continue;
             const key = String(Number(m[1]));
+            seenFiles++;
             if (seen.has(key)) dup.push(`${relative(SDLC, dir)}: ${seen.get(key)} and ${name} both numbered ${m[1]}`);
             else seen.set(key, name);
         }
     };
     visit(SDLC);
+    assert.ok(seenFiles > 0, 'X32: không đọc được file nào — "không trùng số" khi không có file là xanh rỗng');
     assert.deepEqual(dup.sort(), [], 'files sharing an index inside one folder');
 });

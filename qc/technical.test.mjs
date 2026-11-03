@@ -77,6 +77,7 @@ test('X21: numbering is gapless and names are kebab-case', () => {
     const bad = [];
     const check = (dir) => {
         const files = readdirSync(dir).filter((n) => n.endsWith('.md'));
+        assert.ok(files.length > 0, `X21: ${rel(dir)} rỗng — đánh số không kiểm được`);
         const nums = [];
         for (const n of files) {
             if (n === 'README.md') continue;

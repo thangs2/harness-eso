@@ -18,7 +18,7 @@ const AC = /AC-[A-Z]+-\d+-\d+/g;
 // ví dụ "RED: AC-X hỏng"). Cái KHÔNG được phép là slice **sở hữu** một AC mà test plan của nó **không**
 // có dòng nào cho AC đó — tức tiêu chí nằm trên giấy mà không ai định kiểm nó.
 test('X34: mọi AC một slice sở hữu đều có dòng trong §7 của nó', () => {
-    if (!existsSync(WBS)) return;
+    assert.ok(existsSync(WBS), 'X34: không có sdlc/09.wbs — phép kiểm này không được phép bỏ qua');
 
     // 1. Nguồn thứ nhất — dòng `DoD` của mỗi work package
     const fromDict = new Map();

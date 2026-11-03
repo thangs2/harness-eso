@@ -74,6 +74,15 @@ function allCriteria() {
     return ids;
 }
 
+// Thư mục phải TỒN TẠI và có file. Bản cũ dùng `catch { return/continue }` ⇒ mất thư mục là phép kiểm **tự bỏ qua**, và
+// một phép kiểm bỏ qua thì luôn xanh. Cùng bệnh `some` vs `every`: kiểm cái *có* mà không đòi cái phải có.
+function mustReadDir(abs, what) {
+    let names;
+    try { names = readdirSync(abs); } catch { assert.fail(`${what}: không có thư mục ${abs} — phép kiểm này không được phép bỏ qua`); }
+    assert.ok(names.length > 0, `${what}: thư mục ${abs} rỗng — không có gì để kiểm`);
+    return names;
+}
+
 test('WBS: every dictionary task carries the seven fields', () => {
     const bad = [];
     for (const text of dictionaries()) {
@@ -146,8 +155,7 @@ test('X8: packets present carry their required sections', () => {
     const bad = [];
     for (const dir of ['01.packets/01.bip', '01.packets/02.fip']) {
         const abs = join(WBS_DIR, dir);
-        let names = [];
-        try { names = readdirSync(abs); } catch { continue; }
+        const names = mustReadDir(abs, 'X8 sections');
         for (const name of names) {
             if (!name.endsWith('.md')) continue;
             const text = readFileSync(join(abs, name), 'utf8');
@@ -174,11 +182,10 @@ test('X8: packets present carry their required sections', () => {
 
 test('X8: a wave with no interface criteria carries FIP = OUT', () => {
     const fipDir = join(WBS_DIR, '01.packets/02.fip');
-    let names = [];
-    try { names = readdirSync(fipDir); } catch { return; }
+    const names = mustReadDir(fipDir, 'X8 fip coverage');
     // Packets are named by code of account: 02.0.fip-out.md, 02.1.bip.md, ...
     const fips = names.filter((n) => n.endsWith('.md')).map((n) => readFileSync(join(fipDir, n), 'utf8'));
-    if (fips.length === 0) return;
+    assert.ok(fips.length > 0, 'X8: không có FIP nào — luật one-per-leaf không kiểm được');
 
     // PHỔ QUÁT, không tồn tại. Bản cũ chỉ đòi `fips.some(OUT)` — **một** file OUT thoả mãn cho **44 slice**, nên 6 deliverable
     // không có FIP nào mà không ai báo. Luật là "one per leaf": mọi work package phải nằm trong khai báo `slice` của MỘT file FIP.
@@ -199,7 +206,7 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
     for (const dir of ['04.deliverable-1.md', '05.deliverable-2.md', '06.deliverable-3.md', '07.deliverable-4.md',
         '08.deliverable-5.md', '09.deliverable-6.md', '10.deliverable-7.md', '11.deliverable-8.md']) {
         let t = '';
-        try { t = readFileSync(join(WBS_DIR, dir), 'utf8'); } catch { continue; }
+        try { t = readFileSync(join(WBS_DIR, dir), 'utf8'); } catch { assert.fail(`X8: thiếu dictionary ${dir} — không suy được leaf`); }
         for (const m of t.matchAll(/^### `(\d+\.\d+)` · /gm)) leaves.add(m[1]);
     }
 
@@ -211,8 +218,7 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
 // live questions is how "ready" stops meaning anything.
 test('X8: a READY packet has no open items left', () => {
     const bipDir = join(WBS_DIR, '01.packets/01.bip');
-    let names = [];
-    try { names = readdirSync(bipDir); } catch { return; }
+    const names = mustReadDir(bipDir, 'X8 ready packets');
     const bad = [];
     for (const name of names) {
         if (!name.endsWith('.md')) continue;
@@ -241,8 +247,7 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
     const unknownLeaf = [];
     for (const dir of ['01.packets/01.bip', '01.packets/02.fip']) {
         const abs = join(WBS_DIR, dir);
-        let names = [];
-        try { names = readdirSync(abs); } catch { continue; }
+        const names = mustReadDir(abs, 'X8 sections');
         for (const name of names) {
             if (!name.endsWith('.md')) continue;
             const text = readFileSync(join(abs, name), 'utf8');
@@ -307,8 +312,7 @@ test('X8: a slice may be OUT only when it owns no criterion', () => {
     // slices that record OUT
     const outSlices = [];
     for (const dir of ['01.packets/01.bip', '01.packets/02.fip']) {
-        let names = [];
-        try { names = readdirSync(join(WBS_DIR, dir)); } catch { continue; }
+        const names = mustReadDir(join(WBS_DIR, dir), 'X8 OUT ownership');
         for (const name of names) {
             if (!name.endsWith('.md')) continue;
             const text = read(join('09.wbs', dir, name));
