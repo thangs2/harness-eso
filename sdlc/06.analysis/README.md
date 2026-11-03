@@ -21,6 +21,7 @@ cần. Đọc cái này trước để biết chỗ nào trống.
   03.business-rules.md    ✅ 18 luật xuyên use case (BR-01…BR-18)
   05.iam-functions.md     ✅ 6 chức năng IAM — 6 US + 23 AC
   06.eso-features.md      ✅ 23 chức năng (18 v1 + 5 v2) + trạng thái
+  07.us-feature-map.md    ✅ US → feature: một nguồn, epic của story suy từ đây
   00.baseline-v2-narrative/ ✅ **14 narrative v2** — 305–543 dòng/bản, 11 mục cố định
 02.user-stories/          ✅ **54 US**
 03.acceptance-criteria/   ✅ **349 AC** · 12 miền · US nào cũng có ≥ 1 AC
