@@ -179,7 +179,32 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
     // Packets are named by code of account: 02.0.fip-out.md, 02.1.bip.md, ...
     const fips = names.filter((n) => n.endsWith('.md')).map((n) => readFileSync(join(fipDir, n), 'utf8'));
     if (fips.length === 0) return;
-    assert.ok(fips.some((t) => /\bOUT\b/.test(t)), 'a back-end-only wave must record FIP = OUT with a reason');
+
+    // PHỔ QUÁT, không tồn tại. Bản cũ chỉ đòi `fips.some(OUT)` — **một** file OUT thoả mãn cho **44 slice**, nên 6 deliverable
+    // không có FIP nào mà không ai báo. Luật là "one per leaf": mọi work package phải nằm trong khai báo `slice` của MỘT file FIP.
+    const covered = new Set();
+    for (const t of fips) {
+        const row = /^\|\s*slice\s*\|(.+)$/m.exec(t);
+        if (!row) continue;
+        const cell = row[1];
+        for (const id of cell.match(/\d+\.\d+/g) || []) covered.add(id);
+        // dạng khoảng: `2.1` … `2.5`
+        const rng = /(\d+)\.(\d+)[^\d]+…[^\d]*(\d+)\.(\d+)/.exec(cell);
+        if (rng && rng[1] === rng[3]) {
+            for (let n = Number(rng[2]); n <= Number(rng[4]); n++) covered.add(`${rng[1]}.${n}`);
+        }
+    }
+
+    const leaves = new Set();
+    for (const dir of ['04.deliverable-1.md', '05.deliverable-2.md', '06.deliverable-3.md', '07.deliverable-4.md',
+        '08.deliverable-5.md', '09.deliverable-6.md', '10.deliverable-7.md', '11.deliverable-8.md']) {
+        let t = '';
+        try { t = readFileSync(join(WBS_DIR, dir), 'utf8'); } catch { continue; }
+        for (const m of t.matchAll(/^### `(\d+\.\d+)` · /gm)) leaves.add(m[1]);
+    }
+
+    const uncovered = [...leaves].filter((id) => !covered.has(id)).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+    assert.deepEqual(uncovered, [], 'work package không có FIP nào khai báo nó (real hoặc OUT)');
 });
 
 // A packet may only be READY when nothing in its open register is still open. A READY packet with

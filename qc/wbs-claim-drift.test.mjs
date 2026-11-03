@@ -42,7 +42,8 @@ test('X34: mọi AC một slice sở hữu đều có dòng trong §7 của nó'
             const text = readFileSync(join(abs, name), 'utf8');
             const id = /^id: (?:BIP|FIP)-(\d+)_(\d+)/m.exec(text);
             if (!id) continue;
-            const sec = /^## 7\.[^\n]*\n([\s\S]*?)(?=^## 8\.)/m.exec(text);
+            // §7 có thể là mục cuối (không có §8) — cắt tới heading kế tiếp HOẶC hết file.
+            const sec = /^## 7\.[^\n]*\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(text);
             // §7 có hai định dạng: bảng test-plan (AC ở cột 1) và bảng luồng UI (AC ở cột cuối).
             // Cả hai đều là *claim*; nên lấy mọi dòng bảng, không chỉ dòng bắt đầu bằng AC.
             const rows = (sec ? sec[1] : '').split('\n').filter((l) => /^\|/.test(l) && !/^\|\s*-/.test(l));
