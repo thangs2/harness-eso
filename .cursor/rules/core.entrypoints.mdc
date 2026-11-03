@@ -24,6 +24,20 @@ An agent may drive a consumer **only** through the repository's operator scripts
 Reading is not restricted: `git`, `sed`, `rg`, `gh`, `ls` and `Read` are always fine. The rule is
 about **actions**.
 
+## Two surfaces — dev vs consumer
+
+The table above is about the **consumer**. This repo has a second surface, and the two are not
+interchangeable:
+
+| Surface | What it is | How an agent acts |
+|---|---|---|
+| **dev** (this repo) | `packages/*`, `qc/*`, `docs/*`, `.cursor/*` — the product source | `bun test`, `bun run test`, `bun run build:observatory`, editor tools; `git`/`rg`/`sed` to read |
+| **consumer** (x79, fineso, …) | a checkout that has `harness.config.json` | **only** `./deploy.sh` · `./provision.sh` · `./verify-consumer.sh` · `./console.sh` (`harness.ps1` on Windows) |
+
+**`bun test` is a dev command, not an operator step.** It runs inside this repo, so the SLP verify gate
+(`core.slp.mdc` §7) runs it directly and that is not a violation of this rule. What the rule forbids is the
+opposite direction: using `bun`/`node`/`docker` to *perform* a step a consumer script already performs.
+
 ## Why
 
 The scripts exist so that a behaviour has one definition. `provision.sh` resolves the consumer and

@@ -33,6 +33,7 @@ canonical: AGENTS.md
 | `docker/**`, `compose.harness.yml` | `core.harness-product` § Docker |
 | `docs/**` mermaid fence | `core.doc.mermaid.mdc` |
 | `qc/**` | integration tests sau đổi spine |
+| Task chạm **>1 package/tầng** | `core.slp.mdc` + skill `harness-engineering-team` · worker `.cursor/agents/*-runtime.md` |
 | gate / evidence / guard / hook | `docs/05.development/09.gate-defect-register.md` §3 + §5 — trước khi sửa |
 
 ## projectPath / cwd

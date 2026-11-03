@@ -216,6 +216,23 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
 
 // A packet may only be READY when nothing in its open register is still open. A READY packet with
 // live questions is how "ready" stops meaning anything.
+test('X42: plane E records source state, not execution progress (D-81)', () => {
+    // The inversion this catches: a packet that writes "0/356 SCN đã chạy" into its E row turns a
+    // delivery metric into a readiness gate. QC authors SCN before code; execution is tdd-qc, after impl.
+    const dirs = [join(WBS_DIR, '01.packets/01.bip'), join(WBS_DIR, '01.packets/02.fip')];
+    const bad = [];
+    for (const dir of dirs) for (const name of readdirSync(dir).filter((n) => n.endsWith('.md'))) {
+        const text = readFileSync(join(dir, name), 'utf8');
+        for (const line of text.split('\n')) {
+            if (!(line.startsWith('| **E** test') || line.startsWith('| **E · test spec**'))) continue;
+            if (/đã chạy|chưa chạy|mới chạy|executed|`0\/\d+`/.test(line)) bad.push(`${name} → ${line.slice(0, 40)}`);
+            const st = (line.split('|')[2] || '').replace(/[`*]/g, '').replace(/\s+/g, ' ').trim();
+            if (!/^(OK|OPEN|OUT)( — một phần)?$/.test(st)) bad.push(`${name} → E status "${st}" outside OK/OPEN/OUT`);
+        }
+    }
+    assert.deepEqual(bad, [], 'plane E must state SCN/source status; running SCN belongs to tdd-qc');
+});
+
 test('X8: a READY packet has no open items left', () => {
     const bipDir = join(WBS_DIR, '01.packets/01.bip');
     const names = mustReadDir(bipDir, 'X8 ready packets');
@@ -230,7 +247,17 @@ test('X8: a READY packet has no open items left', () => {
         const live = text
             .split('\n')
             .filter((l) => /^\| `OPEN-\d+` \|/.test(l));
-        if (live.length) bad.push(`${name} → ${live.length} open item(s)`);
+        // A READY packet may carry live OPEN rows only when §9 declares them non-blocking.
+        // The standard allows OPEN entries in §8; what it forbids is calling the slice READY while
+        // something still blocks code/AC (D-81).
+        const blockingLine = (text.match(/^\| \*\*blocking\*\* \|(.*)$/m) || [])[1] || '';
+        const declaresNone = /\*\*không\*\*/.test(blockingLine) || /không còn/.test(blockingLine);
+        if (live.length && !declaresNone) bad.push(`${name} → ${live.length} open item(s)`);
+        // D-81: `READY` = plan-ready. A packet that demands *executed* tests is inverting the order
+        // (QC authors SCN before code; execution happens after tdd-impl) and locks itself shut.
+        const blocking = (text.match(/^\| \*\*blocking\*\* \|(.*)\|$/m) || [])[1] || '';
+        if (/E test|đã chạy|chạy được test/.test(blocking))
+            bad.push(`${name} → §9 treats executed tests as a READY gate (D-81)`);
     }
     assert.deepEqual(bad, []);
 });

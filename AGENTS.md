@@ -26,17 +26,18 @@ Repo này **ship** sản phẩm Harness ESO (`@mu/harness-*`). Agent làm việc
 
 ## Năng lực host — đọc trước khi làm bước recon
 
-Repo này được dùng bởi **nhiều host**, và chúng **không cùng năng lực**. Bảng dưới đây là **đo thật** (2026-10-25),
+Repo này được dùng bởi **nhiều host**, và chúng **không cùng năng lực**. Bảng dưới đây là **đo thật** (2026-10-25 / 2026-11-03),
 không phải mô tả thiết kế. Chi tiết + hệ quả: `sdlc/04.landscape/03.working-environment.md`.
 
-| Năng lực | Cursor | DeepSeek Harness (DSH) |
-|---|---|---|
-| `AGENTS.md` bơm vào context | ✅ | ✅ (workspace instructions) |
-| `.cursor/rules/*.mdc` (13) tự nạp | ✅ | ❌ **không nạp** |
-| `.agents/skills/*/SKILL.md` | ✅ | ✅ (qua skill catalog) |
-| MCP `codegraph` · `docgraph` CLI · `agentmemory-mcp` · `deepseek-direct` | ✅ | ❌ **không có trong toolset** |
-| `.docgraph/` · `.codegraph/` trên đĩa | ✅ truy vấn được | ⚠ có tệp, **không có công cụ truy vấn** |
-| file tools · shell · `bun test` · subagent | ✅ | ✅ |
+| Năng lực | Cursor | Antigravity (AGY) | DeepSeek Harness (DSH) |
+|---|---|---|---|
+| `AGENTS.md` bơm vào context | ✅ | ✅ (user_rules) | ✅ (workspace instructions) |
+| `.cursor/rules/*.mdc` (14) tự nạp | ✅ | ⚠ nạp `.agents/rules/*.md` | ❌ **không nạp** |
+| `.cursor/agents/*-runtime.md` — 7 worker SLP | ✅ đọc + spawn | ✅ `.agents/agents/` + `invoke_subagent` | ⚠ đọc được, **không** có role registry ⇒ dùng skill `harness-engineering-team` |
+| `.agents/skills/*/SKILL.md` | ✅ | ✅ (qua skill catalog) | ✅ (qua skill catalog) |
+| MCP `codegraph` · `docgraph` CLI · `agentmemory-mcp` · `deepseek-direct` | ✅ | ✅ (`call_mcp_tool` / eager tools) | ❌ **không có trong toolset** |
+| `.docgraph/` · `.codegraph/` trên đĩa | ✅ truy vấn được | ✅ truy vấn được | ⚠ có tệp, **không có công cụ truy vấn** |
+| file tools · shell · `bun test` · subagent | ✅ | ✅ (`invoke_subagent`, `define_subagent`) | ✅ |
 
 **Luật suy ra:** quy trình recon dưới đây là **quy trình của Cursor**. Trên host không có MCP, bước recon **thay bằng**
 `grep`/`glob` + `read` có kiểm soát, và phải **nói rõ** khi một kết luận dựa trên suy đoán thay vì tra cứu — vì thiếu tra
@@ -77,6 +78,28 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 7. **DeepSeek:** Chỉ gọi `ask_deepseek_flash` / `pro` khi cần suy luận kiến trúc phức tạp hoặc debug lỗi hóc búa — không gọi cho thay đổi 1–2 dòng rõ ràng.
 8. **Distillation & Memory Save (Đóng gói tri thức):** Cuối mỗi turn xử lý logic quan trọng, gọi `memory_save` cô đọng quyết định, trạng thái và bài học. Giúp các turn kế tiếp kế thừa trực tiếp từ memory mà không cần đọc lại hàng loạt file cũ.
 
+
+---
+
+## SLP — chia việc khi task chạm >1 tầng
+
+Request cần sửa nhiều package hoặc nhiều tầng ⇒ chạy **SLP**, không tự làm tuần tự.
+
+| Thành phần | Ở đâu |
+|---|---|
+| Luật | `.cursor/rules/core.slp.mdc` (mirror `.agents/rules/core.slp.md`) |
+| Thứ tự gate | skill **`harness-engineering-team`** — 9 gate đánh số |
+| 7 worker | `.cursor/agents/{scout,plan,build,verify,audit,fixbug,qc}-runtime.md` (Cursor) · `.agents/agents/` (Antigravity) |
+| Bằng chứng | `comments/artifacts/slp/{recon,plan,verify,audit}/` |
+
+**Bốn lớp:** **S** = người (duyệt plan · xử escalation · **ký `Done`** — không bao giờ là agent) · **L** = agent chat chính ·
+**P** = `scout` · `plan` · `build` (mỗi slice) · `fixbug` · **A** = `verify` · `audit` · `qc` (độc lập, không sửa code sản phẩm).
+`allowed_files` của 7 worker **rời nhau từng cặp** — kiểm bằng `qc/slp-conformance.test.mjs`.
+
+**Thứ tự cứng:** build → verify PASS → audit **≥85 & 0 CRITICAL** → `Human In Review`; QC chỉ khi operator yêu cầu (`D-41`).
+Cùng lỗi gốc **3** lần ⇒ dừng, liệt kê `OPEN`, escalate **lên người**. Không `Done`, không commit/push/PR trừ khi user yêu cầu.
+
+Ticket nhỏ (1 file) ⇒ được làm inline, **vẫn** phải verify **và** audit. Luật đầy đủ: `core.slp.mdc` §2–§7.
 
 ---
 

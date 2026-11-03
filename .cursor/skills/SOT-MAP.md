@@ -8,6 +8,7 @@ Procedures live here; **law** lives in `../x79/document/harness/02.harness-eso/`
 |-------|------|-----|
 | `harness-eso-implement` | Feature/fix trong monorepo | `AGENTS.md`, `core.harness-eso-spec`, x79 `02.harness-eso/` |
 | `harness-verify` | Sau đổi observe/docker/hooks | `docs/01.overview/02.cursor-windows.md`, `docker/README.md` |
+| `harness-engineering-team` | Ticket chạm >1 package/tầng — SLP: scout → plan → build×N → verify → audit → qc | `core.slp.mdc` · `.cursor/agents/*-runtime.md` |
 
 **x79-only** (không copy vào repo này): `brain-dispatch`, toàn bộ `mu-*` — mở window x79.
 

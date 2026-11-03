@@ -9,6 +9,7 @@
 | **`core.law-gate.mdc`** | **Always first** — force Read `AGENTS.md`; supremacy |
 | `core.workspace-isolation.mdc` | Always — after law loaded |
 | `core.harness-agents.mdc` | Always — pipeline after law |
+| `core.slp.mdc` | Task chạm **>1 package/tầng** — 7 worker · slice rời nhau · rubric ≥85 |
 | `core.harness-product.mdc` | Always — boundary/commands after law |
 | `core.harness-tooling.mdc` | codegraph · docgraph · agentmemory · deepseek |
 | `core.harness-eso-spec.mdc` | Contract/spec, observe API, docs |

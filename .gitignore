@@ -26,3 +26,6 @@ __pycache__/
 # template; every other variant is a real credential file and never enters git.
 .env*
 !.env.example
+
+# Machine-local MCP config (absolute paths, possibly credentials) — same rule as `.cursor/mcp.json`.
+.agents/mcp_config.json

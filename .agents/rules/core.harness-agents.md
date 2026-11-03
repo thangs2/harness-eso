@@ -32,6 +32,7 @@ canonical: AGENTS.md
 | `harness-observatory/**`, `harness-console/**` | `pkg.observatory-ui.mdc` |
 | `docker/**`, `compose.harness.yml` | `core.harness-product` § Docker |
 | `qc/**` | integration tests sau đổi spine |
+| Task chạm **>1 package/tầng** | `core.slp.mdc` + skill `harness-engineering-team` · worker `.cursor/agents/*-runtime.md` |
 
 ## projectPath / cwd
 

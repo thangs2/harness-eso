@@ -17,6 +17,7 @@ path:README.md
 path:AGENTS.md
 path:README.md
 path:.cursor/rules
+path:.cursor/agents
 path:.cursor/skills
 path:.cursor/instructions.md
 path:.agents/rules

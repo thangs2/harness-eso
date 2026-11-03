@@ -22,7 +22,7 @@ about a file number. Mixing them (`01.file` · `02.file` · `03.folder`) is forb
 
 | # | File | Role |
 |---|---|---|
-| 01 | [`01.document-status.md`](01.document-status.md) | **trạng thái tài liệu**: "documented" nghĩa là gì · **43 phép kiểm** · instance đo được |
+| 01 | [`01.document-status.md`](01.document-status.md) | **trạng thái tài liệu**: "documented" nghĩa là gì · **44 phép kiểm** · instance đo được |
 | 02 | [`02.open-register.md`](02.open-register.md) | **register `OPEN`**: câu hỏi về hình dạng chưa có đáp án, mỗi câu kèm đề xuất |
 | 03 | [`03.x7-analysis.md`](03.x7-analysis.md) | phân tích `X7` — vì sao kiểm hình dạng theo `type` lại cần |
 | 04 | [`04.agent-rules.md`](04.agent-rules.md) | **10 luật cho agent** — mỗi luật kèm lỗi đã sinh ra nó |

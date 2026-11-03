@@ -49,7 +49,7 @@ test('X9: every table has a path from an endpoint, or a recorded OUT', () => {
     const named = new Set([...section.matchAll(/`([a-z][a-z0-9_]+)`/g)].map((m) => m[1]));
     const unreachable = [...ddl].filter((t) => !named.has(t)).sort();
 
-    assert.deepEqual(unreachable, ['manifest_entry'],
+    assert.deepEqual(unreachable, ['manifest_entry'],  // `project` has an explicit OUT row in roundtrip §1 (D-82)
         'tables nothing can reach — each needs a path from an endpoint or an OUT with a reason');
 
     // The inverse direction cannot be read out of the binding cells — they mix tables, projections and output shapes
