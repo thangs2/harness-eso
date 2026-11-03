@@ -10,9 +10,11 @@
 //   node scripts/jira-create.mjs --file payload.json            # dry-run: what would be created
 //   node scripts/jira-create.mjs --file payload.json --apply    # create for real
 //
-// payload.json:
+// payload.json — mỗi issue phải khai **bốn quan hệ** (standard 07 §6):
 //   { "issues": [ { "type": "Epic|Story|Task|Subtask|Bug", "summary": "...", "description": "...",
-//                   "labels": ["..."], "parent": "ESO-12", "sprint": 123 } ] }
+//                   "labels": ["..."], "parent": "ESO-12", "sprint": 123,
+//                   "subtasks": ["..."], "relates": ["ESO-4"], "blocks": ["ESO-9"], "blockedBy": ["ESO-2"],
+//                   "why": "bắt buộc khi một trong bốn mảng rỗng" } ] }
 //
 // Env: JIRA_BASE_URL · JIRA_USER_EMAIL · JIRA_API_TOKEN (required). Reads `.env` at the repo root if present.
 import { readFileSync, existsSync } from 'node:fs';
@@ -69,8 +71,28 @@ async function call(method, path, body) {
     return text.trim() ? JSON.parse(text) : {};
 }
 
+// Luật bốn quan hệ (standard 07 §6) — kiểm TRƯỚC khi in ra bất cứ gì. Không có cờ nào tắt.
+const REQUIRED = ['subtasks', 'relates', 'blocks', 'blockedBy'];
+function violations(it, i) {
+    const out = [];
+    const isSubtask = String(it.type).toLowerCase() === 'subtask';
+    const keys = isSubtask ? REQUIRED.filter((k) => k !== 'subtasks') : REQUIRED;
+    for (const k of keys) {
+        if (!Array.isArray(it[k])) { out.push(`issue[${i}] ${it.summary || '(no summary)'}: thiếu "${k}"`); continue; }
+        if (it[k].length === 0 && !it.why) out.push(`issue[${i}] ${it.summary || '(no summary)'}: "${k}" rỗng mà không có "why"`);
+    }
+    return out;
+}
+
 const payload = JSON.parse(readFileSync(file, 'utf8'));
 const issues = payload.issues || [];
+const bad = issues.flatMap(violations);
+if (bad.length) {
+    console.error('REFUSED — vi phạm luật bốn quan hệ (standard 07 §6):');
+    for (const b of bad) console.error('  ✗ ' + b);
+    console.error(`\n${bad.length} vi phạm · không ghi gì.`);
+    process.exit(3);
+}
 const project = payload.project || 'ESO';
 console.log(`DRY-RUN=${!apply} · project=${project} · issues to create: ${issues.length}\n`);
 
@@ -85,7 +107,7 @@ for (const it of issues) {
     };
     if (it.parent) fields.parent = { key: it.parent };
     if (it.sprint) fields.customfield_10020 = Number(it.sprint);
-    console.log(`— ${String(it.type).padEnd(8)} parent=${(it.parent || '—').padEnd(9)} · ${it.summary}`);
+    console.log(`— ${String(it.type).padEnd(8)} parent=${(it.parent || '—').padEnd(9)} · sub=${it.subtasks?.length ?? '—'} rel=${it.relates?.length ?? '—'} blocks=${it.blocks?.length ?? '—'} by=${it.blockedBy?.length ?? '—'} · ${it.summary}`);
     if (!apply) continue;
     try {
         const r = await call('POST', '/rest/api/2/issue', { fields });
