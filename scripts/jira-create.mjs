@@ -12,7 +12,7 @@
 //
 // payload.json — mỗi issue phải khai **bốn quan hệ** (standard 07 §6):
 //   { "issues": [ { "type": "Epic|Story|Task|Subtask|Bug", "summary": "...", "description": "...",
-//                   "labels": ["..."], "parent": "ESO-12", "sprint": 123,
+//                   "labels": ["..."], "parent": "ESO-12", "sprint": 123, "storyPoints": 5,
 //                   "subtasks": ["..."], "relates": ["ESO-4"], "blocks": ["ESO-9"], "blockedBy": ["ESO-2"],
 //                   "why": "bắt buộc khi một trong bốn mảng rỗng" } ] }
 //
@@ -118,6 +118,7 @@ for (const it of issues) {
     };
     if (it.parent) fields.parent = { key: it.parent };
     if (it.sprint) fields.customfield_10020 = Number(it.sprint);
+    if (it.storyPoints !== undefined) fields.customfield_10016 = Number(it.storyPoints); // Story point estimate
     console.log(`— ${String(it.type).padEnd(8)} parent=${(it.parent || '—').padEnd(9)} · sub=${it.subtasks?.length ?? '—'} rel=${it.relates?.length ?? '—'} blocks=${it.blocks?.length ?? '—'} by=${it.blockedBy?.length ?? '—'} · ${it.summary}`);
     if (!apply) continue;
     try {
