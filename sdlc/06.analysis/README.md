@@ -28,7 +28,7 @@ cần. Đọc cái này trước để biết chỗ nào trống.
 ```
 ⬜ = **chưa tạo**, vì chưa có nội dung thật. Repo này không tạo folder rỗng.
 
-> **Sửa 2026-11-02.** Khối trên từng ghi `22 US` · `333 AC` · `337 dòng SCN` · `335/353 AC phủ` · `18 chức năng` · `BR-01…BR-13`, và
+> **Sửa 2026-11-02.** Khối trên từng ghi `22 US` · `333 AC` · `337 dòng SCN` · `336/363 AC phủ` · `18 chức năng` · `BR-01…BR-13`, và
 > **không hề nhắc** `00.baseline-v2-narrative/`. Đo lại: **54 · 349 · 355 · 0 chạy · 23 · 18**. Mọi con số cũ đều **thấp hơn** thật —
 > nghĩa là tài liệu này đã ngừng được cập nhật từ lâu và vẫn đang là cửa vào của folder.
 

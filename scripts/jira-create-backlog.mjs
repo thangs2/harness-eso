@@ -45,14 +45,22 @@ for (const f of readdirSync(join(ROOT, wbsDir)).filter((n) => /deliverable-\d+(-
     }
 }
 
-// 2) AC theo work package, từ packet
+// 2) AC theo work package — đọc TỪ DICTIONARY, không từ packet.
+//
+// Đây là bài học đắt nhất của lượt này. Bản đầu đọc `01.packets/01.bip` và vì thế:
+//   · bỏ qua toàn bộ packet UI ở `02.fip` ⇒ 5 slice UI thành "không có AC" ⇒ thành Task sai
+//   · sinh ra ticket tự mâu thuẫn: "không AC nào claim" rồi liệt kê 12 AC ngay dưới
+// Nguồn đúng là dòng `DoD` của dictionary — cũng chính là nguồn `X8a` dùng. Một nguồn, không hai.
 const acOf = new Map();
-for (const f of readdirSync(join(ROOT, wbsDir, '01.packets', '01.bip')).filter((n) => n.endsWith('.md'))) {
-    const s = read(`${wbsDir}/01.packets/01.bip/${f}`);
-    const m = /^id: (?:BIP|FIP)-(\d+)_(\d+)/m.exec(s);
-    if (!m) continue;
-    const k = `${m[1]}.${m[2]}`;
-    acOf.set(k, [...new Set([...(acOf.get(k) || []), ...(s.match(/AC-[A-Z]+-\d+-\d+/g) || [])])]);
+for (const f of readdirSync(join(ROOT, wbsDir)).filter((n) => /deliverable-\d+(-split)?\.md$/.test(n))) {
+    const s = read(`${wbsDir}/${f}`);
+    for (const m of s.matchAll(/^### `(\d+\.\d+)` · /gm)) {
+        const st = m.index + m[0].length;
+        let en = s.indexOf('\n### ', st);
+        if (en < 0) en = s.length;
+        const dod = /^\| \*\*DoD\*\* \| (.+)$/m.exec(s.slice(st, en));
+        acOf.set(m[1], [...new Set((dod ? dod[1] : '').match(/AC-[A-Z]+-\d+-\d+/g) || [])]);
+    }
 }
 
 // 3) US → feature
@@ -67,9 +75,17 @@ const found = await call('GET', `/rest/api/3/search/jql?jql=${encodeURIComponent
 for (const i of found.issues) { const f = (i.fields.labels || []).find((l) => /^f-\d\d$/.test(l)); if (f) epics.set(f.toUpperCase(), i.key); }
 
 // 5) Issue đã có theo label wp-<id>
+// PHÂN TRANG. Bản đầu không phân trang nên chỉ thấy 19/56 nhãn `wp-` — và nếu ai đó chạy `--apply`
+// lần nữa thì nó sẽ tạo **trùng** 37 story còn lại. Một tính năng idempotent mà đếm thiếu thì tệ hơn
+// không idempotent, vì nó *trông* như an toàn.
 const have = new Map();
-const ex = await call('GET', `/rest/api/3/search/jql?jql=${encodeURIComponent('project = ESO ORDER BY key')}&fields=labels&maxResults=300`);
-for (const i of ex.issues) for (const l of i.fields.labels || []) if (l.startsWith('wp-')) have.set(l.slice(3), i.key);
+let pageToken;
+do {
+    const ex = await call('GET', `/rest/api/3/search/jql?jql=${encodeURIComponent('project = ESO ORDER BY key')}` +
+        `&fields=labels&maxResults=100${pageToken ? `&nextPageToken=${pageToken}` : ''}`);
+    for (const i of ex.issues) for (const l of i.fields.labels || []) if (l.startsWith('wp-')) have.set(l.slice(3), i.key);
+    pageToken = ex.nextPageToken;
+} while (pageToken);
 
 const DAYS2SP = (d) => (d === null ? 3 : d <= 0.5 ? 1 : d <= 1 ? 2 : d <= 1.5 ? 3 : d <= 2 ? 5 : d <= 3 ? 8 : 13);
 const plain = (t) => t.replace(/[`*]/g, '').replace(/\s+/g, ' ').trim();
