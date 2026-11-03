@@ -33,6 +33,13 @@ if (!base || !email || !token) {
     console.error('ERROR: JIRA_BASE_URL, JIRA_USER_EMAIL and JIRA_API_TOKEN are required (env or .env).');
     process.exit(1);
 }
+// TLS: một số mạng nội bộ chặn CA (proxy MITM) — baplatform xử lý bằng cách bỏ kiểm chứng. Ở đây làm
+// **tuỳ chọn có tên**: `JIRA_TLS_INSECURE=1`, và nói ra mỗi lần chạy. Không bao giờ bật ngầm.
+if (process.env.JIRA_TLS_INSECURE === '1') {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    console.warn('⚠ JIRA_TLS_INSECURE=1 — KHÔNG kiểm chứng chứng chỉ TLS. Chỉ dùng trong mạng nội bộ.');
+}
+
 const auth = 'Basic ' + Buffer.from(`${email}:${token}`).toString('base64');
 
 async function call(method, path, body) {
