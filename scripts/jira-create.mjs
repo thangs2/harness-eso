@@ -118,7 +118,16 @@ for (const it of issues) {
     };
     if (it.parent) fields.parent = { key: it.parent };
     if (it.sprint) fields.customfield_10020 = Number(it.sprint);
-    if (it.storyPoints !== undefined) fields.customfield_10016 = Number(it.storyPoints); // Story point estimate
+    // Standard 07 §10: Story/Task có con thì điểm là **tổng của con**, không nhập tay.
+    // Nhập tay ở đây là nguồn thứ hai, và nó lệch ngay lần đầu ai đó sửa một subtask.
+    const rollable = ['Story', 'Task', 'Epic'].includes(it.type) && (it.subtasks || []).length > 0;
+    if (rollable) {
+        if (it.storyPoints !== undefined) {
+            console.warn(`    ⚠ ${it.summary}: bỏ storyPoints nhập tay — điểm là tổng của ${it.subtasks.length} con (chạy jira-points-audit để kiểm).`);
+        }
+    } else if (it.storyPoints !== undefined) {
+        fields.customfield_10016 = Number(it.storyPoints);
+    }
     console.log(`— ${String(it.type).padEnd(8)} parent=${(it.parent || '—').padEnd(9)} · sub=${it.subtasks?.length ?? '—'} rel=${it.relates?.length ?? '—'} blocks=${it.blocks?.length ?? '—'} by=${it.blockedBy?.length ?? '—'} · ${it.summary}`);
     if (!apply) continue;
     try {
