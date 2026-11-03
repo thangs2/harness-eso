@@ -72,6 +72,14 @@ async function call(method, path, body) {
 }
 
 // Luật bốn quan hệ (standard 07 §6) — kiểm TRƯỚC khi in ra bất cứ gì. Không có cờ nào tắt.
+// Jira render **wiki markup**, không phải Markdown. Gửi Markdown thì API trả 201 và ticket hiện nguyên dấu — sai
+// im lặng ở cả hai đầu (standard 07 §7). Chặn ngay tại đây thay vì để người đọc ticket phát hiện.
+const MD = [
+    [/\*\*(.+?)\*\*/, 'in đậm: dùng *chữ* không phải **chữ**'],
+    [/`[^`]+`/, 'monospace: dùng {{chữ}} không phải `chữ`'],
+    [/^###?\s/m, 'tiêu đề: dùng "h3. " không phải "### "'],
+    [/^\s*-\s/m, 'gạch đầu dòng: dùng "* " không phải "- "'],
+];
 const REQUIRED = ['subtasks', 'relates', 'blocks', 'blockedBy'];
 function violations(it, i) {
     const out = [];
@@ -81,6 +89,9 @@ function violations(it, i) {
         if (!Array.isArray(it[k])) { out.push(`issue[${i}] ${it.summary || '(no summary)'}: thiếu "${k}"`); continue; }
         if (it[k].length === 0 && !it.why) out.push(`issue[${i}] ${it.summary || '(no summary)'}: "${k}" rỗng mà không có "why"`);
     }
+    for (const [re, msg] of MD) {
+        if (re.test(it.description || '')) out.push(`issue[${i}] ${it.summary || '(no summary)'}: ${msg}`);
+    }
     return out;
 }
 
@@ -88,7 +99,7 @@ const payload = JSON.parse(readFileSync(file, 'utf8'));
 const issues = payload.issues || [];
 const bad = issues.flatMap(violations);
 if (bad.length) {
-    console.error('REFUSED — vi phạm luật bốn quan hệ (standard 07 §6):');
+    console.error('REFUSED — vi phạm luật ticket (standard 07 §6 bốn quan hệ · §7 wiki markup):');
     for (const b of bad) console.error('  ✗ ' + b);
     console.error(`\n${bad.length} vi phạm · không ghi gì.`);
     process.exit(3);
@@ -113,6 +124,25 @@ for (const it of issues) {
         const r = await call('POST', '/rest/api/2/issue', { fields });
         console.log(`    ✅ created ${r.key}`);
         created++;
+
+        // Bốn quan hệ đã khai phải TRỞ THÀNH link thật, nếu không thì luật chỉ là hình thức.
+        // Blocks: id 10000 — outward = "blocks", inward = "is blocked by". Relates: id 10003 — hai chiều.
+        const links = [
+            ...(it.blocks || []).map((k) => ({ type: 'Blocks', outward: r.key, inward: k })),
+            ...(it.blockedBy || []).map((k) => ({ type: 'Blocks', outward: k, inward: r.key })),
+            ...(it.relates || []).map((k) => ({ type: 'Relates', outward: r.key, inward: k })),
+        ];
+        for (const l of links) {
+            try {
+                await call('POST', '/rest/api/2/issueLink', {
+                    type: { name: l.type }, outwardIssue: { key: l.outward }, inwardIssue: { key: l.inward },
+                });
+                console.log(`        link ${l.type}: ${l.outward} → ${l.inward}`);
+            } catch (e) {
+                console.log(`        ⛔ link ${l.type} ${l.outward}→${l.inward}: ${e.message}`);
+                failed++;
+            }
+        }
     } catch (e) {
         console.log(`    ⛔ ${e.message}`);
         failed++;
