@@ -107,6 +107,10 @@ const byKind = { Story: plan.filter((p) => p.kind === 'Story'), Task: plan.filte
 console.log(`DRY-RUN=${!apply} · WP: ${plan.length} → Story ${byKind.Story.length} (${byKind.Story.filter((p) => p.feature).length} có epic) · Task ${byKind.Task.length}`);
 console.log(`đã có issue: ${have.size}\n`);
 
+// TÁM loại subtask (D-75, sửa 2026-11-03). Sinh theo nhu cầu của story, không cố định bốn:
+//   tdd-ba · tdd-unit · tdd-impl · tdd-coverage · tdd-qc  — luôn có
+//   tdd-impl [fe] · tdd-qc [fe]                            — khi story có UI (AC-UI-* / US-UI-*)
+//   tdd-perf · tdd-load · tdd-stress                       — khi story có NFR về tải
 const subs4 = (parentPoints) => [
     ['tdd-unit', 'unit test', 2],
     ['tdd-impl', 'implement', parentPoints],
