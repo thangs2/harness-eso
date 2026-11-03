@@ -136,18 +136,21 @@ for (const it of issues) {
         created++;
 
         // Bốn quan hệ đã khai phải TRỞ THÀNH link thật, nếu không thì luật chỉ là hình thức.
-        // Blocks: id 10000 — outward = "blocks", inward = "is blocked by". Relates: id 10003 — hai chiều.
+        // Chiều Blocks: ĐO 2026-11-03 — payload {inwardIssue: blocker, outwardIssue: blocked} mới ra
+        // "blocker blocks blocked". Bản trước tin docs ("outward = blocks") nên mọi link bị ngược chiều.
+        // Relates: id 10003 — hai chiều, chiều nào cũng được.
         const links = [
-            ...(it.blocks || []).map((k) => ({ type: 'Blocks', outward: r.key, inward: k })),
-            ...(it.blockedBy || []).map((k) => ({ type: 'Blocks', outward: k, inward: r.key })),
+            ...(it.blocks || []).map((k) => ({ type: 'Blocks', blocker: r.key, blocked: k })),
+            ...(it.blockedBy || []).map((k) => ({ type: 'Blocks', blocker: k, blocked: r.key })),
             ...(it.relates || []).map((k) => ({ type: 'Relates', outward: r.key, inward: k })),
         ];
         for (const l of links) {
             try {
-                await call('POST', '/rest/api/2/issueLink', {
-                    type: { name: l.type }, outwardIssue: { key: l.outward }, inwardIssue: { key: l.inward },
-                });
-                console.log(`        link ${l.type}: ${l.outward} → ${l.inward}`);
+                const body = l.type === 'Blocks'
+                    ? { type: { name: 'Blocks' }, inwardIssue: { key: l.blocker }, outwardIssue: { key: l.blocked } }
+                    : { type: { name: 'Relates' }, outwardIssue: { key: l.outward }, inwardIssue: { key: l.inward } };
+                await call('POST', '/rest/api/2/issueLink', body);
+                console.log(`        link ${l.type}: ${l.blocker ?? l.outward} → ${l.blocked ?? l.inward}`);
             } catch (e) {
                 console.log(`        ⛔ link ${l.type} ${l.outward}→${l.inward}: ${e.message}`);
                 failed++;

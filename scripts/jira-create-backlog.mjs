@@ -1,16 +1,25 @@
 #!/usr/bin/env node
 // Tạo Story/Task cho toàn bộ work package — idempotent, dry-run mặc định.
+//   node scripts/jira-create-backlog.mjs            # xem sẽ tạo gì
+//   node scripts/jira-create-backlog.mjs --apply    # tạo issue + subtask + link
 //
 // Phân loại theo chuẩn 07 §3 (ba câu hỏi), KHÔNG theo cảm giác:
-//   có AC (claim trong packet §7)  ⇒ Story, treo dưới epic của feature chiếm đa số AC
-//   không có AC                    ⇒ Task, độc lập (Epic = Feature — không có epic kỹ thuật)
-// Ước lượng ngày → Story Point Fibonacci, theo bảng DAYS2SP dưới đây.
+//   có AC (dictionary §DoD)  ⇒ Story, treo dưới epic của feature chiếm đa số AC
+//   không có AC              ⇒ Task, độc lập (Epic = Feature — không có epic kỹ thuật)
+//
+// Ba lỗi của bản trước, và chỗ sửa:
+//   ① không đọc `Phụ thuộc` ⇒ ticket không có `blocks`/`is blocked by` (chuẩn 07 §6) — nay đọc và tạo link.
+//   ② không đi qua `jira-create.mjs` ⇒ bỏ luôn kiểm bốn quan hệ (§6.3) — nay khai tường minh trong description.
+//   ③ chèn nguyên Markdown của dictionary ⇒ `**`, backtick, `\|` hiện nguyên dấu trên Jira (§7) — nay `mdToWiki`.
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildPlan, buildDescription, planLinks, linkPayload, subtaskPlan } from './lib/eso-wbs.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const apply = process.argv.includes('--apply');
+const argv = process.argv.slice(2);
+const apply = argv.includes('--apply');
+const linksOnly = argv.includes('--links');
 for (const l of (existsSync(join(ROOT, '.env')) ? readFileSync(join(ROOT, '.env'), 'utf8') : '').split('\n')) {
     const m = /^([A-Z_]+)=(.*)$/.exec(l.trim());
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
@@ -18,158 +27,125 @@ for (const l of (existsSync(join(ROOT, '.env')) ? readFileSync(join(ROOT, '.env'
 if (process.env.JIRA_TLS_INSECURE === '1') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const base = (process.env.JIRA_BASE_URL || '').replace(/\/$/, '');
 const auth = 'Basic ' + Buffer.from(`${process.env.JIRA_USER_EMAIL}:${process.env.JIRA_API_TOKEN}`).toString('base64');
+if (!base || !process.env.JIRA_API_TOKEN) { console.error('ERROR: thiếu JIRA_* env (.env)'); process.exit(1); }
 
 const call = async (method, path, body) => {
     const res = await fetch(base + path, { method, headers: { Authorization: auth, Accept: 'application/json', 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     const t = await res.text();
-    if (!res.ok) throw new Error(`${res.status} ${t.slice(0, 200)}`);
+    if (!res.ok) throw new Error(`${res.status} ${t.slice(0, 240)}`);
     return t.trim() ? JSON.parse(t) : {};
 };
-const read = (p) => readFileSync(join(ROOT, p), 'utf8');
-const list = (pat) => { const out = []; for (const f of readdirSync(join(ROOT, dirname(pat)))) if (new RegExp(pat.split('/').pop()).test(f)) out.push(join(dirname(pat), f)); return out; };
-import { readdirSync } from 'node:fs';
+const plain = (t) => String(t ?? '').replace(/[`*]/g, '').replace(/\s+/g, ' ').trim();
+const SP = 'customfield_10016';
 
-// 1) Work packages
-const wbsDir = 'sdlc/09.wbs';
-const wp = new Map();
-for (const f of readdirSync(join(ROOT, wbsDir)).filter((n) => /deliverable-\d+(-split)?\.md$/.test(n))) {
-    const s = read(`${wbsDir}/${f}`);
-    for (const m of s.matchAll(/^### `(\d+\.\d+)` · (.+)$/gm)) {
-        const blk = s.slice(m.index + m[0].length);
-        const end = blk.indexOf('\n### ');
-        const body = end > 0 ? blk.slice(0, end) : blk;
-        const est = /\*\*Ước lượng\*\* \| \*\*([\d.,]+)\s*ngày/.exec(body);
-        const own = /\*\*Owner\*\* \| `([^`]+)`/.exec(body);
-        const dod = /\*\*DoD\*\* \| (.+)$/m.exec(body);
-        wp.set(m[1], { id: m[1], title: m[2].trim(), days: est ? Number(est[1].replace(',', '.')) : null, owner: own ? own[1] : '—', dod: dod ? dod[1].trim() : '' });
+// 1) Dictionary → plan (một nguồn: scripts/lib/eso-wbs.mjs)
+const { plan, links: depLinks } = buildPlan(ROOT);
+const done = plan.filter((p) => p.done);
+const live = plan.filter((p) => !p.done);
+for (const p of done) console.log(`  ⏭  ${p.id} — dictionary ghi đã xong (0 ngày) ⇒ KHÔNG tạo ticket`);
+
+// 2) Issue đã có (label wp-<id>) — Subtask cũng mang label này, phải loại ra kẻo map trỏ vào subtask
+const existing = new Map();
+const byKey = new Map();
+let token;
+do {
+    const q = `/rest/api/3/search/jql?jql=${encodeURIComponent('project = ESO ORDER BY key')}` +
+        `&fields=summary,issuetype,labels,status,parent,subtasks,issuelinks,${SP}&maxResults=100${token ? `&nextPageToken=${token}` : ''}`;
+    const page = await call('GET', q);
+    for (const i of page.issues) {
+        byKey.set(i.key, i);
+        if (i.fields.issuetype.name === 'Subtask') continue;
+        for (const l of i.fields.labels || []) if (l.startsWith('wp-')) existing.set(l.slice(3), i.key);
     }
-}
+    token = page.nextPageToken;
+} while (token);
 
-// 2) AC theo work package — đọc TỪ DICTIONARY, không từ packet.
-//
-// Đây là bài học đắt nhất của lượt này. Bản đầu đọc `01.packets/01.bip` và vì thế:
-//   · bỏ qua toàn bộ packet UI ở `02.fip` ⇒ 5 slice UI thành "không có AC" ⇒ thành Task sai
-//   · sinh ra ticket tự mâu thuẫn: "không AC nào claim" rồi liệt kê 12 AC ngay dưới
-// Nguồn đúng là dòng `DoD` của dictionary — cũng chính là nguồn `X8a` dùng. Một nguồn, không hai.
-const acOf = new Map();
-for (const f of readdirSync(join(ROOT, wbsDir)).filter((n) => /deliverable-\d+(-split)?\.md$/.test(n))) {
-    const s = read(`${wbsDir}/${f}`);
-    for (const m of s.matchAll(/^### `(\d+\.\d+)` · /gm)) {
-        const st = m.index + m[0].length;
-        let en = s.indexOf('\n### ', st);
-        if (en < 0) en = s.length;
-        const dod = /^\| \*\*DoD\*\* \| (.+)$/m.exec(s.slice(st, en));
-        acOf.set(m[1], [...new Set((dod ? dod[1] : '').match(/AC-[A-Z]+-\d+-\d+/g) || [])]);
-    }
-}
-
-// 3) US → feature
-const cat = read('sdlc/06.analysis/01.business-analysis/06.eso-features.md');
-const us2f = new Map();
-for (const m of cat.matchAll(/^\| \*\*(F-\d{2})\*\* \| [^|]+\|[^|]+\|[^|]+\|[^|]+\| ([^|]+)\|/gm))
-    for (const u of m[2].match(/US-[A-Z]+-\d+/g) || []) us2f.set(u, m[1]);
-
-// 4) Epic key của mỗi feature
 const epics = new Map();
 const found = await call('GET', `/rest/api/3/search/jql?jql=${encodeURIComponent('project = ESO AND issuetype = Epic')}&fields=summary,labels&maxResults=100`);
 for (const i of found.issues) { const f = (i.fields.labels || []).find((l) => /^f-\d\d$/.test(l)); if (f) epics.set(f.toUpperCase(), i.key); }
 
-// 5) Issue đã có theo label wp-<id>
-// PHÂN TRANG. Bản đầu không phân trang nên chỉ thấy 19/56 nhãn `wp-` — và nếu ai đó chạy `--apply`
-// lần nữa thì nó sẽ tạo **trùng** 37 story còn lại. Một tính năng idempotent mà đếm thiếu thì tệ hơn
-// không idempotent, vì nó *trông* như an toàn.
-const have = new Map();
-let pageToken;
-do {
-    const ex = await call('GET', `/rest/api/3/search/jql?jql=${encodeURIComponent('project = ESO ORDER BY key')}` +
-        `&fields=labels&maxResults=100${pageToken ? `&nextPageToken=${pageToken}` : ''}`);
-    for (const i of ex.issues) for (const l of i.fields.labels || []) if (l.startsWith('wp-')) have.set(l.slice(3), i.key);
-    pageToken = ex.nextPageToken;
-} while (pageToken);
-
-const DAYS2SP = (d) => (d === null ? 3 : d <= 0.5 ? 1 : d <= 1 ? 2 : d <= 1.5 ? 3 : d <= 2 ? 5 : d <= 3 ? 8 : 13);
-const plain = (t) => t.replace(/[`*]/g, '').replace(/\s+/g, ' ').trim();
-const code = (t) => '{{' + plain(t) + '}}';
-
-const plan = [];
-for (const x of [...wp.values()].sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }))) {
-    const acs = acOf.get(x.id) || [];
-    let feature = null;
-    if (acs.length) {
-        const tally = new Map();
-        for (const a of acs) { const p = a.split('-'); const f = us2f.get(`US-${p[1]}-${p[2]}`); if (f) tally.set(f, (tally.get(f) || 0) + 1); }
-        feature = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-    }
-    plan.push({ ...x, acs, feature, kind: acs.length ? 'Story' : 'Task' });
+const byKind = { Story: live.filter((p) => p.kind === 'Story'), Task: live.filter((p) => p.kind === 'Task') };
+console.log(`DRY-RUN=${!apply} · WP ${plan.length} → bỏ ${done.length} đã xong · Story ${byKind.Story.length} · Task ${byKind.Task.length}`);
+console.log(`đã có issue: ${existing.size} · link theo dictionary: ${depLinks.length}`);
+if (linksOnly) {
+    for (const p of live) console.log(`  ${p.id.padEnd(5)} ${p.kind.padEnd(5)} blocks=${p.blocks.join(',') || '—'} blockedBy=${p.blockedBy.join(',') || '—'}`);
+    process.exit(0);
 }
 
-const byKind = { Story: plan.filter((p) => p.kind === 'Story'), Task: plan.filter((p) => p.kind === 'Task') };
-console.log(`DRY-RUN=${!apply} · WP: ${plan.length} → Story ${byKind.Story.length} (${byKind.Story.filter((p) => p.feature).length} có epic) · Task ${byKind.Task.length}`);
-console.log(`đã có issue: ${have.size}\n`);
-
-// TÁM loại subtask (D-75, sửa 2026-11-03). Sinh theo nhu cầu của story, không cố định bốn:
-//   tdd-ba · tdd-unit · tdd-impl · tdd-coverage · tdd-qc  — luôn có
-//   tdd-impl [fe] · tdd-qc [fe]                            — khi story có UI (AC-UI-* / US-UI-*)
-//   tdd-perf · tdd-load · tdd-stress                       — khi story có NFR về tải
-const subs4 = (parentPoints) => [
-    ['tdd-unit', 'unit test', 2],
-    ['tdd-impl', 'implement', parentPoints],
-    ['tdd-coverage', 'coverage gate', 1],
-    ['tdd-qc', 'scenario + RTM', 3],
-];
-
-let made = 0, skipped = 0, failed = 0;
-for (const p of plan) {
-    if (have.has(p.id)) { skipped++; continue; }
-    const sp = DAYS2SP(p.days);
+// 3) Tạo issue (+ subtask khi là Story)
+const keyOf = new Map(existing);
+const made = [], skipped = [], failed = [];
+for (const p of live) {
+    if (keyOf.has(p.id)) { skipped.push(p.id); continue; }
     const epic = p.feature ? epics.get(p.feature) : null;
-    const label = `wp-${p.id}`;
-    if (!apply) {
-        console.log(`  ${p.kind === 'Story' ? '+' : '·'} ${p.id.padEnd(5)} ${p.kind.padEnd(5)} epic=${(epic || '—').padEnd(7)} sp=${sp} · ${plain(p.title).slice(0, 50)}`);
-        continue;
-    }
     const fields = {
         project: { key: 'ESO' }, issuetype: { name: p.kind },
         summary: `${p.id} — ${plain(p.title)}`,
-        labels: [p.kind.toLowerCase(), label, ...(p.feature ? [p.feature.toLowerCase()] : []), 'needs-dor'],
-        description: [
-            'h3. Work package', `${code(p.id)} — ${plain(p.title)}`, '',
-            'h3. Phân loại', p.kind === 'Story'
-                ? `*Story* — packet §7 claim ${p.acs.length} AC: ${p.acs.map(code).join(' · ')}`
-                : '*Task* — không AC nào claim work package này (chuẩn 07 §3: không AC ⇒ Task).', '',
-            'h3. Ước lượng', `${p.days ?? '—'} ngày ⇒ *${sp}* SP. ${p.kind === 'Story' ? 'Điểm Story là *tổng* của 4 subtask (chuẩn 07 §10).' : 'Task không có subtask; điểm nhập tay.'}`, '',
-            'h3. Owner', code(p.owner), '',
-            'h3. DoD', p.dod || '*OPEN* — dictionary không có dòng DoD.', '',
-            'h3. DoR', 'Chưa đo. Chạy {{jira-points-audit}} rồi kiểm packet §9 trước khi kéo vào sprint.',
-        ].join('\n'),
+        labels: [p.kind.toLowerCase(), `wp-${p.id}`, ...(p.feature ? [p.feature.toLowerCase()] : []), 'needs-dor'],
+        description: buildDescription(p, plain),
     };
     if (epic && p.kind === 'Story') fields.parent = { key: epic };
-    if (p.kind === 'Task') fields.customfield_10016 = sp;
+    if (p.kind === 'Task') fields[SP] = p.sp;
+    if (!apply) {
+        console.log(`  ${p.kind === 'Story' ? '+' : '·'} ${p.id.padEnd(5)} ${p.kind.padEnd(5)} epic=${(epic || '—').padEnd(7)} sp=${p.sp} sub=${p.kind === 'Story' ? subtaskPlan(p, p.sp).length : 'none'} · ${plain(p.title).slice(0, 46)}`);
+        continue;
+    }
     try {
         const r = await call('POST', '/rest/api/2/issue', { fields });
-        made++;
-        console.log(`  ✅ ${r.key} ${p.kind} ${p.id} sp=${sp}`);
+        keyOf.set(p.id, r.key);
+        made.push(p.id);
+        console.log(`  ✅ ${r.key} ${p.kind} ${p.id} sp=${p.sp}`);
         if (p.kind === 'Story') {
             let sum = 0;
-            for (const [tag, what, pts] of subs4(sp)) {
+            for (const s of subtaskPlan(p, p.sp)) {
                 const sr = await call('POST', '/rest/api/2/issue', {
                     fields: {
                         project: { key: 'ESO' }, issuetype: { name: 'Subtask' }, parent: { key: r.key },
-                        summary: `[${tag.startsWith('tdd-qc') ? 'qc' : 'be'}] ${p.id} — ${what}`,
-                        labels: ['subtask', tag, label, ...(p.feature ? [p.feature.toLowerCase()] : [])],
-                        description: `h3. Một bước nguyên tử\n${what} cho work package ${code(p.id)}.\n\nh3. Story Points\n${pts}`,
-                        customfield_10016: pts,
+                        summary: `[${s.lane}] ${p.id} — ${s.title}`,
+                        labels: ['subtask', s.kind, `wp-${p.id}`, ...(p.feature ? [p.feature.toLowerCase()] : [])],
+                        description: `h3. Một bước nguyên tử\n${s.title} cho work package {{${p.id}}}.\n\nh3. Quan hệ\n` +
+                            'subtasks: none — Jira cấm subtask có con (chuẩn 07 §6.2)\nrelates: none\nblocks: none\nblockedBy: none\n\n' +
+                            'h3. Verify\n*OPEN* — người nhận điền lệnh verify',
+                        [SP]: s.points,
                     },
                 });
-                sum += pts;
-                console.log(`      ${sr.key} ${tag} ${pts}`);
+                sum += s.points;
+                console.log(`      ${sr.key} ${s.kind}[${s.lane}] ${s.points}`);
             }
-            await call('PUT', `/rest/api/2/issue/${r.key}`, { fields: { customfield_10016: sum } });
+            await call('PUT', `/rest/api/2/issue/${r.key}`, { fields: { [SP]: sum } });
             console.log(`      = story ${sum} SP (roll-up)`);
         }
-    } catch (e) {
-        failed++;
-        console.log(`  ⛔ ${p.id}: ${e.message}`);
-    }
+    } catch (e) { failed.push(`${p.id}: ${e.message}`); console.log(`  ⛔ ${p.id}: ${e.message}`); }
 }
-console.log(apply ? `\ntạo ${made} · bỏ qua ${skipped} · lỗi ${failed}` : `\n${plan.length - skipped} việc sẽ tạo — thêm --apply`);
+
+// 4) Link — chiều đã đo trên ESO-2 (2026-11-03): outwardIssue = cái CHẶN, inwardIssue = cái BỊ CHẶN
+const linked = new Set();
+for (const i of byKey.values()) for (const l of i.fields.issuelinks || []) {
+    const other = (l.outwardIssue || l.inwardIssue)?.key;
+    if (!other) continue;
+    if (l.type.name === 'Blocks') linked.add(l.outwardIssue ? `${i.key}>${other}` : `${other}>${i.key}`);
+    else if (l.type.name === 'Relates') linked.add(`~${[i.key, other].sort().join('<>')}`);
+}
+const want = [], inverted = [];
+for (const l of depLinks) {
+    if (!keyOf.has(l.blocker) || !keyOf.has(l.blocked)) continue;
+    const from = keyOf.get(l.blocker), to = keyOf.get(l.blocked);
+    if (linked.has(`${from}>${to}`)) continue;
+    if (linked.has(`${to}>${from}`)) { inverted.push({ ...l, from, to }); continue; }
+    want.push({ ...l, from, to });
+}
+console.log(`\nlink: cần tạo ${want.length} · đã đúng ${depLinks.length - want.length - inverted.length} · ⚠ ngược chiều ${inverted.length}`);
+for (const l of inverted) console.log(`  ⚠ ${l.from} (${l.blocker}) ↔ ${l.to} (${l.blocked}): Jira đang nói ${l.blocked} chặn ${l.blocker} — phải đảo (dùng jira-repair.mjs)`);
+if (apply) {
+    let ok = 0;
+    for (const l of want) {
+        try {
+            await call('POST', '/rest/api/2/issueLink', linkPayload(l.from, l.to));
+            ok++;
+        } catch (e) { failed.push(`link ${l.from}->${l.to}: ${e.message}`); }
+    }
+    console.log(`  tạo ${ok}/${want.length} link`);
+}
+
+console.log(`\n${apply ? `tạo ${made.length} issue` : `${live.length - skipped.length} việc sẽ tạo`} · bỏ qua ${skipped.length + done.length} · lỗi ${failed.length}`);
+if (failed.length) { for (const f of failed) console.log('  ✗ ' + f); process.exit(1); }

@@ -28,7 +28,18 @@ function withEnv(value, fn) {
 }
 
 test('the log lives in product state, overridable by the environment', () => {
-    assert.match(blockerLogFile(), /\.harness[\\/]eso-blockers\.jsonl$/);
+    // Test này khẳng định **đường mặc định**, nên nó phải tự kiểm soát đầu vào. Bun chạy nhiều file
+    // trong cùng một process, và file khác (mcp-call-accounting) đặt `HARNESS_PRODUCT_STATE_DIR` —
+    // nếu rò sang đây thì khẳng định "mặc định" đang kiểm một thứ không phải mặc định.
+    const saved = { state: process.env.HARNESS_PRODUCT_STATE_DIR, override: process.env.HARNESS_ESO_BLOCKER_LOG };
+    delete process.env.HARNESS_PRODUCT_STATE_DIR;
+    delete process.env.HARNESS_ESO_BLOCKER_LOG;
+    try {
+        assert.match(blockerLogFile(), /\.harness[\\/]eso-blockers\.jsonl$/);
+    } finally {
+        if (saved.state !== undefined) process.env.HARNESS_PRODUCT_STATE_DIR = saved.state;
+        if (saved.override !== undefined) process.env.HARNESS_ESO_BLOCKER_LOG = saved.override;
+    }
     withEnv('/tmp/custom-blockers.jsonl', () => {
         assert.equal(blockerLogFile(), '/tmp/custom-blockers.jsonl');
     });

@@ -5,6 +5,7 @@
 //   node scripts/jira-create-epics.mjs            # dry-run: liệt kê cái sẽ tạo/đã có
 //   node scripts/jira-create-epics.mjs --apply
 import { readFileSync, existsSync } from 'node:fs';
+import { EPIC_STEPS as STEPS } from './lib/eso-wbs.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,15 +42,7 @@ const features = [...cat.matchAll(/^\| \*\*(F-\d{2})\*\* \| ([^|]+)\| ([^|]+)\| 
 const plain = (t) => t.replace(/[`*]/g, '').replace(/\s+/g, ' ').trim();
 const code = (t) => '{{' + plain(t) + '}}';
 
-// Thứ tự mở khoá (epic-map §3). blockedBy trỏ tới feature của bước trước; relates tới anh em cùng bước.
-const STEPS = [
-    { step: 1, ids: ['F-09'], by: [] },
-    { step: 2, ids: ['F-05', 'F-13'], by: ['F-09'] },
-    { step: 3, ids: ['F-01', 'F-02', 'F-03', 'F-04'], by: ['F-05'] },
-    { step: 4, ids: ['F-06', 'F-07', 'F-08', 'F-10', 'F-15', 'F-16', 'F-14'], by: ['F-01'] },
-    { step: 5, ids: ['F-11', 'F-12', 'F-17', 'F-18'], by: ['F-13'] },
-    { step: 5, ids: ['F-19', 'F-20', 'F-21', 'F-22', 'F-23'], by: ['F-09'] },
-];
+// Thứ tự mở khoá: `EPIC_STEPS` từ lib (một nguồn với audit + repair).
 const stepOf = new Map();
 for (const s of STEPS) for (const id of s.ids) stepOf.set(id, s);
 
@@ -80,7 +73,7 @@ const desc = (x, st) => [
     `* US: ${code(x.us)}`,
     '',
     'h3. DoD (epic-level)',
-    '*OPEN* — chưa viết cho feature này. `F-09` và `F-05` có DoD viết tay; 21 cái còn lại chờ.',
+    '*OPEN* — chưa viết cho feature này. {{F-09}} và {{F-05}} có DoD viết tay; 21 cái còn lại chờ.',
     '',
     'h3. Tài liệu',
     `* {{sdlc/06.analysis/01.business-analysis/06.eso-features}}`,
@@ -109,7 +102,8 @@ for (const s of STEPS) {
         existing.set(id, r.key);
         console.log(`   ✅ ${r.key} — ${id} ${plain(x.name)}`);
         for (const k of blockedBy) {
-            await call('POST', '/rest/api/2/issueLink', { type: { name: 'Blocks' }, outwardIssue: { key: k }, inwardIssue: { key: r.key } })
+            // Chiều ĐO 2026-11-03: payload `inwardIssue` = cái CHẶN (docs nói ngược, tin phép đo).
+            await call('POST', '/rest/api/2/issueLink', { type: { name: 'Blocks' }, inwardIssue: { key: k }, outwardIssue: { key: r.key } })
                 .then(() => console.log(`      link ${k} blocks ${r.key}`))
                 .catch((e) => console.log(`      ⛔ link ${k}→${r.key}: ${e.message}`));
         }
