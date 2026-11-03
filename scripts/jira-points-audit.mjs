@@ -31,9 +31,15 @@ do {
 } while (token);
 
 const byKey = new Map(issues.map((i) => [i.key, i]));
+// Con của **Epic** là issue có `parent` trỏ tới nó — KHÔNG phải `fields.subtasks` (đó là con của Story/Task).
+const childrenOf = new Map();
+for (const i of issues) {
+    const p = i.fields.parent?.key;
+    if (p) childrenOf.set(p, [...(childrenOf.get(p) || []), i.key]);
+}
 const sp = (i) => { const v = i.fields[SP]; return v === null || v === undefined ? null : Number(v); };
 const type = (i) => i.fields.issuetype.name;
-const kids = (i) => (i.fields.subtasks || []).map((s) => s.key);
+const kids = (i) => (type(i) === 'Epic' ? childrenOf.get(i.key) || [] : (i.fields.subtasks || []).map((s) => s.key));
 
 const missing = [], notFib = [], badRoll = [];
 for (const i of issues) {
