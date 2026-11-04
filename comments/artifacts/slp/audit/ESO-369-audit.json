@@ -1,0 +1,32 @@
+{
+  "ticket": "ESO-369",
+  "key": "ESO-369",
+  "summary": "T-04.2 config store: version + hash + event",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-T04-2-01": "PASS: save -> read matches exact hash",
+    "AC-T04-2-02": "PASS: stale expectedHash raises STALE_VERSION",
+    "AC-T04-2-03": "PASS: version increments +1 on every save",
+    "AC-T04-2-04": "PASS: config_event is append-only, UPDATE/DELETE rejected by triggers"
+  },
+  "invariants": {
+    "APPEND_ONLY_EVENTS": "PASS",
+    "OPTIMISTIC_LOCKING_HASH": "PASS"
+  },
+  "slices": {
+    "S1": "eso/control-plane/src/config-store.mjs, eso/control-plane/src/config-schema.mjs",
+    "S2": "qc/eso-cp-config-store.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

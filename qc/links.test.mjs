@@ -44,7 +44,9 @@ test('X1: every link resolves to a file that exists', () => {
 
     const broken = [];
     for (const file of files) {
-        const text = readFileSync(file, 'utf8').replace(/```[\s\S]*?```/g, '');   // links in code samples are not links
+        const text = readFileSync(file, 'utf8')
+            .replace(/```[\s\S]*?```/g, '')   // links in code samples are not links
+            .replace(/`[^`\n]*`/g, '');
         const base = dirname(file);
         for (const m of text.matchAll(LINK)) {
             const url = m[1];

@@ -1,0 +1,31 @@
+{
+  "ticket": "ESO-372",
+  "key": "ESO-372",
+  "summary": "T-04.5 DB adapter một hợp đồng Node + Bun",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-T04-5-01": "PASS: Unified SQLite DB adapter works across Node and Bun runtimes",
+    "AC-T04-5-02": "PASS: Uniform methods: exec, run, all, get, close",
+    "AC-T04-5-03": "PASS: Zero caller branching on typeof db.all required"
+  },
+  "invariants": {
+    "UNIFIED_INTERFACE": "PASS",
+    "RUNTIME_PORTABILITY": "PASS"
+  },
+  "slices": {
+    "S1": "eso/graph/src/db-adapter.mjs",
+    "S2": "qc/eso-db-adapter.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

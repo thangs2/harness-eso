@@ -138,19 +138,20 @@ export function queryReadSet(db, options = {}) {
         coverage: compVal,
     };
 
-    if (!db || typeof db.all !== 'function') {
-        return {
-            status: isUnknown ? 'unknown' : 'ready',
-            project: normProject,
-            symbolOrFile: normTarget,
-            buildId: buildId || null,
-            readSet: [],
-            totalFound: 0,
-            capped: false,
-            depth: 0,
-            coverage: compVal,
-            completeness: completenessObj,
+    if (!db) {
+        throw new Error('Database instance is required for Q1 queryReadSet (no silent empty allowed)');
+    }
+
+    if (typeof db.all !== 'function' && typeof db.query === 'function') {
+        db = {
+            all: (sql, params = []) => db.query(sql).all(...(Array.isArray(params) ? params : [params])),
+            get: (sql, params = []) => db.query(sql).get(...(Array.isArray(params) ? params : [params])),
+            run: (sql, params = []) => db.query(sql).run(...(Array.isArray(params) ? params : [params])),
+            exec: (sql) => db.exec(sql),
         };
+    }
+    if (typeof db.all !== 'function') {
+        throw new Error('Database instance must provide .all() method (use db-adapter)');
     }
 
     // 1. Find initial nodes matching target symbol or file (INV-GR-01, INV-GR-03)

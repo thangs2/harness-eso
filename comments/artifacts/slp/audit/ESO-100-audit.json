@@ -1,14 +1,27 @@
 {
   "ticket": "ESO-100",
   "key": "ESO-100",
-  "score": 100,
+  "score": 97,
   "passed": true,
   "verdict": "AUDIT_PASS",
   "critical": [],
   "critical_findings": [],
-  "findings": [],
-  "minor_findings": [],
-  "summary": "Ticket ESO-100 (US-SUF-02: Operator Sufficiency) passes audit with score 100/100 and 0 CRITICAL. All 7 ACs (AC-SUF-02-01..07) are fully satisfied with dual coverage across unit tests (eso/core/test/core.test.mjs) and QC scenarios (qc/eso-core-suf-02.test.mjs). Invariants BR-01 (pure function across actors), BR-02 (sufficient guaranteed basis), BR-09 (no profile threshold dependencies), INV-ESO-01 (never sufficient without basis), and INV-ESO-02 (operator bypass preserves verdict level, enforces operator + deadline) are strictly satisfied. Slices S1 (eso/core/**) and S2 (qc/eso-core-*.test.mjs) strictly respected allowed_files boundaries.",
+  "summary": "Re-audit under T-02.2 rubric: Verified 7 ACs (AC-SUF-02-01..07), negative cases, operator deadline enforcement, and basis integrity.",
+  "negative_case_verification": {
+    "status": "PASS",
+    "fail_cases_tested": [
+      "AC-SUF-02-04: Operator bypass without explicit operator identity throws BYPASS_OPERATOR_REQUIRED",
+      "AC-SUF-02-05: Operator bypass past expiration deadline is rejected with BYPASS_EXPIRED",
+      "AC-SUF-02-06: Operator bypass without mandatory reason string throws BYPASS_REASON_REQUIRED"
+    ]
+  },
+  "findings": [
+    {
+      "severity": "MINOR",
+      "id": "FINDING-SUF-01",
+      "description": "Operator bypass reason strings should ideally conform to a minimum character length to prevent single-character placeholder reasons."
+    }
+  ],
   "ac_coverage": {
     "AC-SUF-02-01": "PASS",
     "AC-SUF-02-02": "PASS",
@@ -31,8 +44,8 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
+    "invariants": 29,
     "ac_coverage": 25,
-    "slice_bounds": 15
+    "slice_bounds": 13
   }
 }

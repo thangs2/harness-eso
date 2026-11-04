@@ -1,0 +1,8 @@
+{
+  "ticketId": "ESO-387",
+  "score": 100,
+  "verdict": "PASS",
+  "criticalFindings": [],
+  "findings": [],
+  "summary": "B9 Control-plane key shape alignment fixed across flow.mjs, config-mgr.mjs, and team-tool-cfg.mjs. Validated role/attribute in use guards and accurate handover bar checks without false positives."
+}

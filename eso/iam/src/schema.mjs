@@ -82,6 +82,32 @@ CREATE TABLE IF NOT EXISTS policy (
 );
 `;
 
+export const CAPABILITY_PIN_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS capability_pin (
+  project         TEXT NOT NULL,
+  capability_kind TEXT NOT NULL,
+  pinned_branch   TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (project, capability_kind)
+);
+`;
+
+export const PROVIDER_AUDIT_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS provider_audit (
+  project     TEXT NOT NULL,
+  turn_id     TEXT NOT NULL,
+  capability  TEXT NOT NULL,
+  branch      TEXT NOT NULL,
+  provider_id TEXT,
+  guarantee   TEXT NOT NULL,
+  pinned      INTEGER NOT NULL DEFAULT 0,
+  reason      TEXT,
+  history     TEXT NOT NULL DEFAULT '[]',
+  recorded_at TEXT NOT NULL,
+  PRIMARY KEY (project, turn_id, capability)
+);
+`;
+
 export function initIamSchema(db) {
   db.exec(VERB_SCHEMA_SQL);
   db.exec(ATTRIBUTE_DEF_SCHEMA_SQL);
@@ -89,6 +115,8 @@ export function initIamSchema(db) {
   db.exec(ROLE_SCOPE_SCHEMA_SQL);
   db.exec(WORKER_SCHEMA_SQL);
   db.exec(POLICY_SCHEMA_SQL);
+  db.exec(CAPABILITY_PIN_SCHEMA_SQL);
+  db.exec(PROVIDER_AUDIT_SCHEMA_SQL);
 
   // Seed closed verbs
   for (const v of CLOSED_VERBS) {

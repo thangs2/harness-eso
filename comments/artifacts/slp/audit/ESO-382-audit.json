@@ -1,0 +1,8 @@
+{
+  "ticketId": "ESO-382",
+  "score": 100,
+  "verdict": "PASS",
+  "criticalFindings": [],
+  "findings": [],
+  "summary": "B4 Pin persistence across restart in SQLite DB and provider audit reading directly from evidence store implemented in eso/adapters/src/election.mjs and eso/iam/src/schema.mjs. Verified in qc/eso-host-pin.test.mjs with dual node/bun test passes."
+}

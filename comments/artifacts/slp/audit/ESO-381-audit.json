@@ -1,0 +1,31 @@
+{
+  "ticket": "ESO-381",
+  "key": "ESO-381",
+  "summary": "B2 UI frame sai nghĩa: ST6=READY, denied=empty, fixture 0.62",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-B2-01": "PASS: UI_STATES.ST6_STALE = 'STALE'",
+    "AC-B2-02": "PASS: ST4_DENIED message is distinct from emptyMessage both with hideExistence true and false",
+    "AC-B2-03": "PASS: ST5_PARTIAL removes hardcoded 0.62 fixture fallback"
+  },
+  "invariants": {
+    "STATE_FRAME_PURITY": "PASS",
+    "NO_FIXTURE_IN_PRODUCT": "PASS"
+  },
+  "slices": {
+    "S1": "eso/core/src/ui-frames.mjs",
+    "S2": "qc/eso-ui-s1-levels.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

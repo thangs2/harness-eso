@@ -14,13 +14,40 @@ export const TENANT_COVERAGE_FLOOR = 0.70;
 export function querySliceTenantBoundary({
     sliceId,
     tables = [],
+    graph = null,
+    db = null,
     coverage = 1.0,
     isImplicit = false,
 } = {}) {
     if (!sliceId) throw new Error('sliceId is required');
 
+    const database = db || (graph && typeof graph.all === 'function' ? graph : null);
+    let resolvedTables = Array.isArray(tables) ? [...tables] : [];
+
+    if (database && resolvedTables.length === 0) {
+        // Read table nodes associated with slice
+        const rows = database.all(
+            `SELECT gn.id, gn.name, gn.metadata_json
+             FROM graph_node gn
+             JOIN graph_edge ge ON (ge.target_id = gn.id OR ge.source_id = gn.id)
+             WHERE (ge.source_id = ? OR ge.target_id = ?) AND gn.kind = 'table'`,
+            [sliceId, sliceId]
+        ) || [];
+
+        resolvedTables = rows.map((r) => {
+            const meta = JSON.parse(r.metadata_json || '{}');
+            return {
+                id: r.id,
+                name: r.name,
+                has_tenant_marker: meta.has_tenant_marker === true || Boolean(meta.tenant_marker),
+                tenant_marker: meta.tenant_marker || null,
+                cross_tenant: meta.cross_tenant === true,
+            };
+        });
+    }
+
     // AC-ARCH-06-05 / ED1: Slice with 0 tables -> unknown + EMPTY_SLICE
-    if (!Array.isArray(tables) || tables.length === 0) {
+    if (resolvedTables.length === 0) {
         return {
             status: 'unknown',
             code: 'EMPTY_SLICE',
@@ -56,7 +83,7 @@ export function querySliceTenantBoundary({
 
     // Check if tables in slice touch tenant boundary
     // Tables touching tenant: either cross_tenant is true, or tenant_marker is present
-    const touchingTables = tables.filter((t) => t.has_tenant_marker || t.cross_tenant);
+    const touchingTables = resolvedTables.filter((t) => t.has_tenant_marker || t.cross_tenant);
     const touchesTenant = touchingTables.length > 0;
 
     return {

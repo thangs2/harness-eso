@@ -151,9 +151,38 @@ export function executeHandover({
         };
     }
 
-    // AC-IAM-04-01 & AC-IAM-04-02: bar check
-    const carriedSet = new Set(evidenceCarried);
-    const missing = bar.filter((req) => !carriedSet.has(req));
+    // AC-IAM-04-01 & AC-IAM-04-02: bar check (supporting string kinds or { evidence_kind, min_basis } shapes)
+    function getKind(item) {
+        if (!item) return '';
+        if (typeof item === 'string') return item;
+        return item.evidence_kind || item.kind || item.name || '';
+    }
+
+    const carriedMap = new Map();
+    for (const item of evidenceCarried) {
+        const kind = getKind(item);
+        if (kind) {
+            carriedMap.set(kind, typeof item === 'object' ? item : { evidence_kind: kind });
+        }
+    }
+
+    const missing = [];
+    for (const req of bar) {
+        const reqKind = getKind(req);
+        if (!carriedMap.has(reqKind)) {
+            missing.push(reqKind || (typeof req === 'string' ? req : JSON.stringify(req)));
+        } else if (typeof req === 'object' && req.min_basis) {
+            const carried = carriedMap.get(reqKind);
+            if (carried && carried.basis) {
+                const BASIS_RANK = { deterministic: 3, heuristic: 2, assumption: 1 };
+                const reqRank = BASIS_RANK[req.min_basis] || 0;
+                const carriedRank = BASIS_RANK[carried.basis] || 0;
+                if (carriedRank < reqRank) {
+                    missing.push(`${reqKind} (min_basis: ${req.min_basis}, got: ${carried.basis})`);
+                }
+            }
+        }
+    }
 
     if (missing.length > 0) {
         const err = new Error(

@@ -1,19 +1,30 @@
 {
   "ticket": "ESO-160",
+  "key": "ESO-160",
   "verdict": "AUDIT_PASS",
-  "score": 100,
+  "score": 96,
+  "summary": "Re-audit under T-02.2 rubric: Verified 7 ACs (AC-LEARN-03-01..07), negative apply cases, and RBAC enforcement.",
+  "negative_case_verification": {
+    "status": "PASS",
+    "fail_cases_tested": [
+      "AC-LEARN-03-02: Non-human / agent attempting to apply proposal rejected with APPLY_FORBIDDEN",
+      "AC-LEARN-03-03: Applying already applied proposal rejected with ALREADY_APPLIED",
+      "AC-LEARN-03-06: Applying nonexistent proposal rejected with PROPOSAL_NOT_FOUND"
+    ]
+  },
   "critical": [],
-  "findings": [],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "id": "FINDING-LRN-01",
+      "description": "Measurement window start time relies on server wall-clock; clock skew across distributed runners should be monitored."
+    }
+  ],
   "breakdown": {
     "deterministic_green": 30,
-    "invariants": 30,
+    "invariants": 28,
     "ac_coverage_and_contracts": 25,
-    "boundary_discipline": 15
-  },
-  "findings_count": {
-    "critical": 0,
-    "major": 0,
-    "minor": 0
+    "boundary_discipline": 13
   },
   "ac_coverage": {
     "AC-LEARN-03-01": "PASS",

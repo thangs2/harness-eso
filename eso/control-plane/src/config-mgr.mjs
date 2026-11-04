@@ -168,6 +168,9 @@ export function previewAttributeChange({
     currentVersion = 1,
 } = {}) {
     const affectedPolicies = policies.filter((p) => {
+        if (p.attribute === attributeKey) return true;
+        if (p.target_attribute === attributeKey) return true;
+        if (Array.isArray(p.attributes) && p.attributes.includes(attributeKey)) return true;
         if (Array.isArray(p.attributes_used)) return p.attributes_used.includes(attributeKey);
         if (Array.isArray(p.uses)) return p.uses.includes(attributeKey);
         return false;
@@ -216,6 +219,9 @@ export function saveAttributeChange({
     }
 
     const inUsePolicies = policies.filter((p) => {
+        if (p.attribute === attributeKey) return true;
+        if (p.target_attribute === attributeKey) return true;
+        if (Array.isArray(p.attributes) && p.attributes.includes(attributeKey)) return true;
         if (Array.isArray(p.attributes_used)) return p.attributes_used.includes(attributeKey);
         if (Array.isArray(p.uses)) return p.uses.includes(attributeKey);
         return false;

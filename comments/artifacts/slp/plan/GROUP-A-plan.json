@@ -1,0 +1,55 @@
+{
+  "group": "A",
+  "generated_at": "2026-11-04T19:43:00Z",
+  "slices": [
+    {
+      "id": "ESO-381",
+      "summary": "B2 UI frame sai nghĩa: ST6=READY, denied=empty, fixture 0.62",
+      "allowed_files": ["eso/core/src/ui-frames.mjs", "qc/eso-ui-s1-levels.test.mjs"],
+      "depends_on": [],
+      "verify": "bun test qc/eso-ui-s1-levels.test.mjs"
+    },
+    {
+      "id": "ESO-372",
+      "summary": "T-04.5 DB adapter một hợp đồng Node + Bun",
+      "allowed_files": ["eso/graph/src/db-adapter.mjs", "qc/eso-db-adapter.test.mjs"],
+      "depends_on": [],
+      "verify": "node --test qc/eso-db-adapter.test.mjs && bun test qc/eso-db-adapter.test.mjs"
+    },
+    {
+      "id": "ESO-377",
+      "summary": "T-02.5 Hook test flaky: timeout 5s dưới tải",
+      "allowed_files": ["qc/hook-portability.test.mjs"],
+      "depends_on": [],
+      "verify": "bun test qc/hook-portability.test.mjs"
+    },
+    {
+      "id": "ESO-376",
+      "summary": "T-02.4 Đưa 7 suite eso test vào run-tests.mjs",
+      "allowed_files": ["scripts/run-tests.mjs"],
+      "depends_on": [],
+      "verify": "bun run test"
+    },
+    {
+      "id": "ESO-373",
+      "summary": "T-02.1 Backfill verify artefact cho 32 story đã audit",
+      "allowed_files": ["comments/artifacts/slp/verify/**"],
+      "depends_on": [],
+      "verify": "ls comments/artifacts/slp/verify | wc -l"
+    },
+    {
+      "id": "ESO-368",
+      "summary": "T-04.1 init profile sinh config + state",
+      "allowed_files": ["eso/cli/**", "provision.sh"],
+      "depends_on": [],
+      "verify": "./provision.sh sandbox --eso-v2 --dry-run"
+    },
+    {
+      "id": "ESO-385",
+      "summary": "B7 Q1 completeness luôn 0 vì extractor chỉ phát file",
+      "allowed_files": ["eso/graph/src/extractor.mjs", "eso/graph/src/completeness.mjs"],
+      "depends_on": [],
+      "verify": "bun test qc/eso-graph-completeness.test.mjs"
+    }
+  ]
+}

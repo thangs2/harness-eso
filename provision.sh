@@ -50,8 +50,10 @@ die() {
 
 usage() {
     cat <<EOF
-Usage: ./provision.sh <consumer | all> [--plan] [--force] [--host-mode dual-ide|all-ide|claude|superset]
+Usage: ./provision.sh <consumer | all> [--plan] [--dry-run] [--force] [--eso-v2] [--host-mode dual-ide|all-ide|claude|superset]
 
+  --eso-v2       use ESO v2 runtime provisioning
+  --dry-run      alias for --plan; print the file plan, write nothing
   --plan         print the file plan; nothing is written
   --force        rewrite files that are already correct (harness.config.json included)
   --host-mode    which IDE trees to wire (default: the consumer's recorded mode)
@@ -101,20 +103,43 @@ resolve_consumer() {
     rows=$(registry_rows)
     local line
     line=$(printf '%s\n' "$rows" | awk -F'\t' -v id="$wanted" '$2 == id { print; exit }')
-    if [[ -z "$line" ]]; then
-        echo "❌ Unknown consumer: '$wanted' — it is not in the registry." >&2
-        list_consumers >&2
-        return 2
+    if [[ -n "$line" ]]; then
+        local port root
+        port=$(printf '%s' "$line" | cut -f3)
+        root=$(printf '%s' "$line" | cut -f5)
+        if [[ -z "$port" || "$port" == "-" ]]; then
+            if [[ "$eso_v2" == "true" ]]; then
+                port="8792"
+            else
+                echo "❌ Consumer '$wanted' has no observe port in the registry." >&2
+                echo "   Assign one:  ./console.sh up  →  Projects → open '$wanted', or re-run init profile with --port" >&2
+                return 1
+            fi
+        fi
+        printf '%s\t%s\t%s\n' "$wanted" "$port" "$root"
+        return 0
     fi
-    local port root
-    port=$(printf '%s' "$line" | cut -f3)
-    root=$(printf '%s' "$line" | cut -f5)
-    if [[ -z "$port" || "$port" == "-" ]]; then
-        echo "❌ Consumer '$wanted' has no observe port in the registry." >&2
-        echo "   Assign one:  ./console.sh up  →  Projects → open '$wanted', or re-run init profile with --port" >&2
-        return 1
+
+    # Fallback for ESO v2 consumers (e.g. sandbox or path)
+    if [[ "$eso_v2" == "true" ]]; then
+        local cand_root=""
+        if [[ -d "$wanted" ]]; then
+            cand_root="$(cd "$wanted" && pwd)"
+        elif [[ -d "$ROOT/$wanted" ]]; then
+            cand_root="$(cd "$ROOT/$wanted" && pwd)"
+        elif [[ "$wanted" == "sandbox" ]]; then
+            cand_root="$ROOT/sandbox"
+        fi
+
+        if [[ -n "$cand_root" ]]; then
+            printf '%s\t%s\t%s\n' "$wanted" "8792" "$cand_root"
+            return 0
+        fi
     fi
-    printf '%s\t%s\t%s\n' "$wanted" "$port" "$root"
+
+    echo "❌ UNKNOWN_CONSUMER: '$wanted' — it is not in the registry." >&2
+    list_consumers >&2
+    return 2
 }
 
 provision_single_consumer() {
@@ -129,6 +154,61 @@ provision_single_consumer() {
     printf '⚙️  Provisioning consumer: \033[36m%s\033[0m (port :%s)\n' "$id" "$port"
     echo "   Repo root: $root"
     echo "=================================================="
+
+    if [[ "$eso_v2" == "true" ]]; then
+        local v2_cli="$ROOT/eso/cli/cli.mjs"
+        local v2_cmd=(node "$v2_cli" init profile "$root" --id "$id")
+        if [[ "$dry_run" == "true" ]]; then
+            v2_cmd+=("--dry-run")
+        fi
+        if [[ ${#extra_flags[@]} -gt 0 ]]; then
+            for flag in "${extra_flags[@]}"; do
+                [[ "$flag" == "--dry-run" || "$flag" == "--plan" ]] && continue
+                v2_cmd+=("$flag")
+            done
+        fi
+
+        local out
+        if ! out="$("${v2_cmd[@]}" 2>&1)"; then
+            echo "$out" >&2
+            echo "❌ ESO v2 provision failed for '$id'" >&2
+            return 1
+        fi
+
+        if ! printf '%s' "$out" | node --input-type=module -e '
+let raw = "";
+process.stdin.on("data", (d) => (raw += d)).on("end", () => {
+    const start = raw.indexOf("{");
+    let res;
+    try {
+        res = JSON.parse(start < 0 ? raw : raw.slice(start));
+    } catch {
+        console.log(raw);
+        console.error("❌ provision.sh: CLI output was not JSON");
+        process.exit(1);
+    }
+    if (!res.ok) {
+        console.error(`❌ ${res.error || "provision reported ok:false"}`);
+        process.exit(1);
+    }
+    if (res.dryRun) {
+        console.log("📋 DRY RUN (ESO v2) — files that would be written:");
+        for (const f of res.files || []) {
+            console.log(`   - [${f.action}] ${f.relative} ${f.exists ? "(exists)" : "(new)"}`);
+        }
+        console.log(`   changed: false`);
+        return;
+    }
+    console.log(`✅ Provisioned ESO v2 (changed: ${res.changed})`);
+    for (const f of res.files || []) {
+        console.log(`   - [${f.action}] ${f.relative}`);
+    }
+});
+'; then
+            return 1
+        fi
+        return 0
+    fi
 
     local cmd=(node "$CLI" init profile "$root" --id "$id" --name "$id" --port "$port")
     if ((${#extra_flags[@]})); then
@@ -204,10 +284,20 @@ process.stdin.on("data", (d) => (raw += d)).on("end", () => {
 
 target_consumer=""
 extra_flags=()
+eso_v2=false
+dry_run=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --eso-v2)
+            eso_v2=true
+            ;;
+        --dry-run)
+            dry_run=true
+            extra_flags+=("--dry-run")
+            ;;
         --plan)
+            dry_run=true
             extra_flags+=("--plan")
             ;;
         --force)

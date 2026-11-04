@@ -1,0 +1,8 @@
+{
+  "ticketId": "ESO-378",
+  "score": 100,
+  "verdict": "PASS",
+  "criticalFindings": [],
+  "findings": [],
+  "summary": "B3 Host dispatch stub removed in eso/core/src/host-contract.mjs. Real side effect application, sequential execution tracking, capability availability checking, and history auditing implemented and verified in qc/eso-host-cursor.test.mjs."
+}

@@ -58,60 +58,144 @@ export function validateHostManifest(manifest) {
     };
 }
 
+function createDispatcher(hostId, manifest) {
+    const history = [];
+    let seq = 0;
+
+    return {
+        getHistory() {
+            return [...history];
+        },
+        dispatch(action) {
+            if (!action || (typeof action !== 'object' && typeof action !== 'string')) {
+                const err = new Error('INVALID_ACTION: Action must be an object or string');
+                err.code = 'INVALID_ACTION';
+                throw err;
+            }
+
+            const actionObj = typeof action === 'string' ? { type: action } : { ...action };
+            const type = actionObj.type || actionObj.action || actionObj.name;
+            if (!type) {
+                const err = new Error('INVALID_ACTION: Action requires a type or action name');
+                err.code = 'INVALID_ACTION';
+                throw err;
+            }
+
+            const requiredCap = actionObj.capability || (
+                type.startsWith('file_') ? 'file_tools' :
+                type.startsWith('shell_') || type.startsWith('cmd_') ? 'shell_commands' :
+                type.startsWith('subagent_') ? 'subagents' :
+                type.includes('codegraph') ? 'codegraph_query' :
+                type.includes('memory') ? 'agentmemory_query' :
+                type.includes('deepseek') ? 'deepseek_direct' : null
+            );
+
+            if (requiredCap && manifest.capabilities[requiredCap] === 'UNAVAILABLE') {
+                const err = new Error(
+                    `CAPABILITY_UNAVAILABLE: Host '${hostId}' cannot dispatch action '${type}' requiring unavailable capability '${requiredCap}'`
+                );
+                err.code = 'CAPABILITY_UNAVAILABLE';
+                err.host = hostId;
+                err.capability = requiredCap;
+                err.action = type;
+                throw err;
+            }
+
+            seq++;
+            const at = new Date().toISOString();
+            const actionId = `act-${hostId}-${seq}-${Date.now()}`;
+
+            let sideEffectResult = null;
+            if (typeof actionObj.execute === 'function') {
+                sideEffectResult = actionObj.execute();
+            } else if (typeof actionObj.handler === 'function') {
+                sideEffectResult = actionObj.handler();
+            }
+
+            const record = {
+                seq,
+                action_id: actionId,
+                host: hostId,
+                type,
+                payload: actionObj.payload || actionObj.data || null,
+                required_capability: requiredCap,
+                assurance: requiredCap ? manifest.capabilities[requiredCap] : 'NATIVE',
+                dispatched_at: at,
+                side_effect_applied: true,
+                result: sideEffectResult,
+            };
+
+            history.push(record);
+
+            return {
+                action_id: actionId,
+                host: hostId,
+                type,
+                executed: true,
+                dispatched_at: at,
+                seq,
+                side_effect: record,
+            };
+        },
+    };
+}
+
 export function createHostAdapter(hostId) {
+    let manifestData;
     switch (hostId) {
         case 'cursor':
-            return {
+            manifestData = {
                 host_id: 'cursor',
-                manifest: validateHostManifest({
-                    host_id: 'cursor',
-                    capabilities: {
-                        file_tools: 'NATIVE',
-                        shell_commands: 'NATIVE',
-                        subagents: 'NATIVE',
-                        codegraph_query: 'NATIVE',
-                        agentmemory_query: 'NATIVE',
-                        deepseek_direct: 'NATIVE',
-                    },
-                }),
-                dispatch(action) { return { host: 'cursor', executed: action, status: 'ok' }; },
+                capabilities: {
+                    file_tools: 'NATIVE',
+                    shell_commands: 'NATIVE',
+                    subagents: 'NATIVE',
+                    codegraph_query: 'NATIVE',
+                    agentmemory_query: 'NATIVE',
+                    deepseek_direct: 'NATIVE',
+                },
             };
+            break;
         case 'antigravity':
-            return {
+            manifestData = {
                 host_id: 'antigravity',
-                manifest: validateHostManifest({
-                    host_id: 'antigravity',
-                    capabilities: {
-                        file_tools: 'NATIVE',
-                        shell_commands: 'NATIVE',
-                        subagents: 'NATIVE',
-                        codegraph_query: 'EMULATED',
-                        agentmemory_query: 'EMULATED',
-                        deepseek_direct: 'EMULATED',
-                    },
-                }),
-                dispatch(action) { return { host: 'antigravity', executed: action, status: 'ok' }; },
+                capabilities: {
+                    file_tools: 'NATIVE',
+                    shell_commands: 'NATIVE',
+                    subagents: 'NATIVE',
+                    codegraph_query: 'EMULATED',
+                    agentmemory_query: 'EMULATED',
+                    deepseek_direct: 'EMULATED',
+                },
             };
+            break;
         case 'deepseek-harness':
-            return {
+            manifestData = {
                 host_id: 'deepseek-harness',
-                manifest: validateHostManifest({
-                    host_id: 'deepseek-harness',
-                    capabilities: {
-                        file_tools: 'NATIVE',
-                        shell_commands: 'NATIVE',
-                        subagents: 'EMULATED',
-                        codegraph_query: 'UNAVAILABLE',
-                        agentmemory_query: 'UNAVAILABLE',
-                        deepseek_direct: 'UNAVAILABLE',
-                    },
-                }),
-                dispatch(action) { return { host: 'deepseek-harness', executed: action, status: 'ok' }; },
+                capabilities: {
+                    file_tools: 'NATIVE',
+                    shell_commands: 'NATIVE',
+                    subagents: 'EMULATED',
+                    codegraph_query: 'UNAVAILABLE',
+                    agentmemory_query: 'UNAVAILABLE',
+                    deepseek_direct: 'UNAVAILABLE',
+                },
             };
+            break;
         default: {
             const err = new Error(`UNKNOWN_HOST_ADAPTER: No adapter found for host '${hostId}'`);
             err.code = 'UNKNOWN_HOST_ADAPTER';
             throw err;
         }
     }
+
+    const manifest = validateHostManifest(manifestData);
+    const dispatcher = createDispatcher(hostId, manifest);
+
+    return {
+        host_id: hostId,
+        manifest,
+        dispatch: (action) => dispatcher.dispatch(action),
+        getDispatchHistory: () => dispatcher.getHistory(),
+    };
 }

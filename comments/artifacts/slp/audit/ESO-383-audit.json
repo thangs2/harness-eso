@@ -1,0 +1,8 @@
+{
+  "ticketId": "ESO-383",
+  "score": 100,
+  "verdict": "PASS",
+  "criticalFindings": [],
+  "findings": [],
+  "summary": "B5 SILENT_SWITCH and SILENT_NONE errors implemented in eso/adapters/src/election.mjs. Mid-turn branch failure strictly records reason, timestamp, and transition record. Silent fallback and unrecorded switching are strictly prohibited."
+}

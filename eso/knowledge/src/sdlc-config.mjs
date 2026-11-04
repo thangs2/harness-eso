@@ -1,4 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * @mu/eso-knowledge — SDLC & Four-Group Unified Configuration
@@ -152,6 +154,7 @@ export function initProjectSdlc({
     appliesWhen = {},
     existingArtefacts = [],
     isReInit = false,
+    consumerPath = null,
 } = {}) {
     if (!project) throw new Error('Project is required');
 
@@ -212,6 +215,17 @@ export function initProjectSdlc({
         generatedFiles.push(t.path);
     }
 
+    // Write real files to disk when consumerPath is provided (DoD B10 / ESO-388)
+    if (consumerPath) {
+        for (const rel of generatedFiles) {
+            const fullPath = path.join(consumerPath, rel);
+            fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+            if (!fs.existsSync(fullPath)) {
+                fs.writeFileSync(fullPath, `# ${path.basename(rel)}\n\nAuto-generated SDLC template for ${project}\n`, 'utf8');
+            }
+        }
+    }
+
     // AC-SDLC-01-06 / ED1: Blank project with 0 existing folders inits full tree
     return {
         changed: true,
@@ -228,6 +242,12 @@ export function upgradeProjectSdlcStandard({
     targetStandardVersion = '2.0.0',
     dryRun = false,
 } = {}) {
+    const upgradeId = `upg_${randomUUID()}`;
+    const snapshot = projects.map((p) => ({
+        id: p.id || p.project,
+        previous_version: p.standard_version || '1.0.0',
+    }));
+
     // AC-SDLC-01-05: Multi-project upgrade across >=2 projects
     const impact = projects.map((p) => ({
         project: p.id || p.project,
@@ -238,9 +258,33 @@ export function upgradeProjectSdlcStandard({
 
     return {
         success: true,
+        upgrade_id: upgradeId,
         upgraded_count: projects.length,
         impact,
         can_revert: true,
+        revert_snapshot: snapshot,
         target_standard_version: targetStandardVersion,
+    };
+}
+
+export function revertProjectSdlcStandard({
+    upgradeResult,
+    snapshot,
+} = {}) {
+    const records = snapshot || upgradeResult?.revert_snapshot || [];
+    if (!Array.isArray(records) || records.length === 0) {
+        throw new Error('Valid revert snapshot is required to revert standard upgrade');
+    }
+
+    const reverted = records.map((r) => ({
+        project: r.id || r.project,
+        restored_version: r.previous_version,
+        action: 'revert_sdlc_templates',
+    }));
+
+    return {
+        success: true,
+        reverted_count: reverted.length,
+        impact: reverted,
     };
 }

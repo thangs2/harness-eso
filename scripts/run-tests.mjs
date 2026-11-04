@@ -29,6 +29,13 @@ const SUITES = [
     'packages/harness-host-generic/src',
     'packages/harness-observe-server/src',
     'packages/harness-cli/src',
+    'eso/learn/test',
+    'eso/core/test',
+    'eso/evidence/test',
+    'eso/graph/test',
+    'eso/iam/test',
+    'eso/knowledge/test',
+    'eso/control-plane/test',
     'qc',
 ];
 

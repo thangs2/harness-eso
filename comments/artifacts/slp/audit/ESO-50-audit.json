@@ -1,14 +1,28 @@
 {
   "ticket": "ESO-50",
   "key": "ESO-50",
-  "score": 100,
+  "score": 96,
   "passed": true,
   "verdict": "AUDIT_PASS",
   "critical": [],
   "critical_findings": [],
-  "findings": [],
+  "summary": "Re-audit under T-02.2 rubric: Verified 5 ACs (AC-ARCH-02-01..05), BFS depth <= 2 traversal, and mandatory failure cases.",
+  "negative_case_verification": {
+    "status": "PASS",
+    "fail_cases_tested": [
+      "AC-ARCH-02-03: Missing project or symbolOrFile refused with NO_COVERAGE",
+      "AC-ARCH-02-03: Completeness below floor refused with NO_COVERAGE and error details",
+      "AC-ARCH-02-05: Fanout beyond maxFanout (50) is capped with capped: true and accurate totalFound"
+    ]
+  },
+  "findings": [
+    {
+      "severity": "MINOR",
+      "id": "FINDING-Q1-01",
+      "description": "Caller should be encouraged to provide explicit completeness object rather than relying on synchronous database lookup in q1-readset.mjs."
+    }
+  ],
   "minor_findings": [],
-  "summary": "ESO-50 implementation strictly satisfies all acceptance criteria (AC-ARCH-02-01 through AC-ARCH-02-05) and architectural invariants (INV-GR-01, INV-GR-02, INV-GR-03, BR-05). Traversal enforces BFS depth <= 2, pure graph relationships without fabrication, per-question completeness with threshold >= floor validation, refusal on sub-floor/missing coverage, safe empty set handling for isolated symbols, and fanout capping. All modifications remain within the allowed_files bounds for S1 and S2. 0 critical, 0 minor findings.",
   "ac_coverage": {
     "AC-ARCH-02-01": "PASS",
     "AC-ARCH-02-02": "PASS",
@@ -28,8 +42,8 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
+    "invariants": 28,
     "ac_coverage": 25,
-    "slice_bounds": 15
+    "slice_bounds": 13
   }
 }

@@ -1,0 +1,8 @@
+{
+  "ticketId": "ESO-380",
+  "score": 100,
+  "verdict": "PASS",
+  "criticalFindings": [],
+  "findings": [],
+  "summary": "B1 S1 page real surface implemented in eso/control-plane/src/page/s1.mjs and eso/control-plane/src/page/index.mjs. All 12 test suites specified in AC-UI-01 §3 implemented under qc/eso-ui-*.test.mjs covering empty, loading, error, denied, partial, stale, list, why, switch, read-only, and level differentiation. All 14 tests pass."
+}

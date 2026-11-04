@@ -1,0 +1,31 @@
+{
+  "ticket": "ESO-368",
+  "key": "ESO-368",
+  "summary": "T-04.1 init profile sinh config + state",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-T04-1-01": "PASS: 2 repeated runs return changed:false (idempotent)",
+    "AC-T04-1-02": "PASS: Unknown consumer outputs UNKNOWN_CONSUMER with exit code 2",
+    "AC-T04-1-03": "PASS: --dry-run writes 0 files to disk",
+    "AC-T04-1-04": "PASS: Boundary check enforces zero writes outside consumer root"
+  },
+  "invariants": {
+    "IDEMPOTENCY": "PASS",
+    "BOUNDARY_CONTAINMENT": "PASS"
+  },
+  "slices": {
+    "S1": "eso/cli/** (cli.mjs, init-profile.mjs, init-profile.test.mjs), provision.sh"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

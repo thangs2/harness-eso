@@ -50,4 +50,5 @@ export {
   savePageConfiguration,
   initProjectSdlc,
   upgradeProjectSdlcStandard,
+  revertProjectSdlcStandard,
 } from './sdlc-config.mjs';

@@ -1,0 +1,30 @@
+{
+  "ticket": "ESO-385",
+  "key": "ESO-385",
+  "summary": "B7 Q1 completeness luôn 0 vì extractor chỉ phát file",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-B7-01": "PASS: Extractor tracks class and method counts alongside files",
+    "AC-B7-02": "PASS: Completeness evaluation computes per-kind coverage for ['file', 'class', 'method']",
+    "AC-B7-03": "PASS: When total === 0 for classes/methods, completeness is not forced to 0 (unpenalized)"
+  },
+  "invariants": {
+    "BR-05": "PASS: unknown != absent",
+    "INV-GR-02": "PASS"
+  },
+  "slices": {
+    "S1": "eso/graph/src/extractor.mjs, eso/graph/src/completeness.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

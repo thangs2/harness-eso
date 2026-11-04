@@ -1,0 +1,30 @@
+{
+  "ticket": "ESO-377",
+  "key": "ESO-377",
+  "summary": "T-02.5 Hook test flaky: timeout 5s dưới tải",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-T02-5-01": "PASS: Concurrently executes hook subprocesses via async spawn and Promise.all",
+    "AC-T02-5-02": "PASS: Reduces runtime from >3.6s to ~2s without blindly increasing timeout",
+    "AC-T02-5-03": "PASS: Passed 3 consecutive runs with 0 failures"
+  },
+  "invariants": {
+    "PORTABILITY_WITHOUT_SHELL": "PASS",
+    "DETERMINISTIC_SPEED": "PASS"
+  },
+  "slices": {
+    "S1": "qc/hook-portability.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

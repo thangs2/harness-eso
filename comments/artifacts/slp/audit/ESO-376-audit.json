@@ -1,0 +1,28 @@
+{
+  "ticket": "ESO-376",
+  "key": "ESO-376",
+  "summary": "T-02.4 Đưa 7 suite eso test vào run-tests.mjs",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-T02-4-01": "PASS: All 7 eso test suites included in scripts/run-tests.mjs",
+    "AC-T02-4-02": "PASS: bun run test runs and passes all suites (1007 tests passed)"
+  },
+  "invariants": {
+    "CI_TEST_COVERAGE": "PASS"
+  },
+  "slices": {
+    "S1": "scripts/run-tests.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

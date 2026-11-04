@@ -16,6 +16,7 @@ export const UI_STATES = Object.freeze({
     ST3_FAILED: 'FAILED',
     ST4_DENIED: 'DENIED',
     ST5_PARTIAL: 'PARTIAL',
+    ST6_STALE: 'STALE',
     ST6_READY: 'READY',
 });
 
@@ -58,8 +59,7 @@ export function renderStateFrame({
             return {
                 state: UI_STATES.ST4_DENIED,
                 rendered: true,
-                // Denied and Empty use the EXACT same phrase when hiding existence
-                message: hideExistence ? emptyMessage : 'Không có quyền truy cập',
+                message: hideExistence ? 'Không có quyền truy cập hoặc dự án không tồn tại' : 'Không có quyền truy cập',
                 actions: ['CHANGE_PROJECT'],
             };
         case UI_STATES.ST5_PARTIAL:
@@ -68,7 +68,14 @@ export function renderStateFrame({
                 rendered: true,
                 content: data,
                 warning: 'Dữ liệu chưa hoàn chỉnh',
-                completeness: (data && data.completeness) || 0.62,
+                completeness: (data && data.completeness !== undefined) ? data.completeness : null,
+            };
+        case UI_STATES.ST6_STALE:
+            return {
+                state: UI_STATES.ST6_STALE,
+                rendered: true,
+                content: data,
+                stale: true,
             };
         case UI_STATES.ST6_READY:
             return {

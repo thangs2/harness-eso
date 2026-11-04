@@ -1,0 +1,30 @@
+{
+  "ticket": "ESO-374",
+  "key": "ESO-374",
+  "summary": "T-02.2 Rubric audit: bắt buộc ca fail + re-audit 5 mẫu",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-T02-2-01": "PASS: 5 sample stories (ESO-24, ESO-40, ESO-50, ESO-100, ESO-160) re-audited under rigorous rubric",
+    "AC-T02-2-02": "PASS: Mandatory negative fail cases verified and documented per story",
+    "AC-T02-2-03": "PASS: Explicit findings documented per story (zero critical, minor observations identified)"
+  },
+  "invariants": {
+    "AUDIT_RUBRIC_INTEGRITY": "PASS",
+    "NEGATIVE_CASE_COMPLIANCE": "PASS"
+  },
+  "slices": {
+    "S1": "comments/artifacts/slp/audit/**"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

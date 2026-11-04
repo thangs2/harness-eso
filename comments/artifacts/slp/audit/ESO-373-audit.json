@@ -1,0 +1,28 @@
+{
+  "ticket": "ESO-373",
+  "key": "ESO-373",
+  "summary": "T-02.1 Backfill verify artefact cho 32 story đã audit",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-T02-1-01": "PASS: 32 verify log files generated under comments/artifacts/slp/verify/",
+    "AC-T02-1-02": "PASS: Every verify log contains verbatim command, stdout/stderr and real exit code (all exit code 0)"
+  },
+  "invariants": {
+    "VERBATIM_VERIFY_EVIDENCE": "PASS"
+  },
+  "slices": {
+    "S1": "comments/artifacts/slp/verify/**"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

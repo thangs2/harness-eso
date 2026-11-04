@@ -1,9 +1,24 @@
 {
   "key": "ESO-40",
   "verdict": "AUDIT_PASS",
-  "score": 100,
+  "score": 96,
   "critical": [],
-  "findings": [],
+  "summary": "Re-audit under T-02.2 rubric: DDL idempotence, source_claim trigger immutability, completeness table constraints.",
+  "negative_case_verification": {
+    "status": "PASS",
+    "fail_cases_tested": [
+      "BR-06: UPDATE on source_claim fails with BR-06 violation trigger abort",
+      "BR-06: DELETE on source_claim fails with BR-06 violation trigger abort",
+      "INV-GR-01: Extractor called with onTurnPath: true throws INV-GR-01 error"
+    ]
+  },
+  "findings": [
+    {
+      "severity": "MINOR",
+      "id": "FINDING-GR-01",
+      "description": "PostgreSQL RLS DDL script is maintained separately in POSTGRES_RLS_SQL and tested via emulation; ensure CI pipeline runs PG container test for native RLS."
+    }
+  ],
   "ac_coverage": {
     "AC-ARCH-01-01": "FULL",
     "AC-ARCH-01-02": "FULL",
@@ -11,9 +26,9 @@
   },
   "rubric_breakdown": {
     "deterministic_green": 30,
-    "invariants": 30,
+    "invariants": 28,
     "ac_coverage": 25,
-    "boundary_discipline": 15
+    "boundary_discipline": 13
   },
   "invariants_checked": [
     {
@@ -29,22 +44,22 @@
     {
       "id": "INV-GR-03",
       "status": "PASS",
-      "evidence": "All tables (graph_node, graph_edge, source_claim, completeness) include project NOT NULL; PostgreSQL RLS policies defined in POSTGRES_RLS_SQL; queryGraphFiles enforces project parameter and isolation is verified in qc/eso-graph-schema.test.mjs"
+      "evidence": "All tables include project NOT NULL; PostgreSQL RLS policies defined in POSTGRES_RLS_SQL"
     },
     {
       "id": "BR-05",
       "status": "PASS",
-      "evidence": "Completeness value is always numeric NOT NULL; incomplete coverage yields status 'unknown' with coverage ratio, never 'absent'; verified in qc/eso-graph-completeness.test.mjs"
+      "evidence": "Completeness value is always numeric NOT NULL; incomplete coverage yields status 'unknown' with coverage ratio, never 'absent'"
     },
     {
       "id": "BR-06",
       "status": "PASS",
-      "evidence": "source_claim table has NO parallel sources column; SQLite triggers trg_prevent_source_claim_update and trg_prevent_source_claim_delete reject UPDATE and DELETE; verified in qc/eso-graph-completeness.test.mjs"
+      "evidence": "source_claim table has NO parallel sources column; SQLite triggers reject UPDATE and DELETE"
     },
     {
       "id": "DDL-IDEMPOTENT",
       "status": "PASS",
-      "evidence": "initSchema() uses IF NOT EXISTS for all tables, indexes, and triggers; verified by executing initSchema twice consecutively in qc/eso-graph-schema.test.mjs"
+      "evidence": "initSchema() uses IF NOT EXISTS for all tables, indexes, and triggers; verified by executing initSchema twice consecutively"
     }
   ]
 }

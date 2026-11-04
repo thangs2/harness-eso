@@ -1,0 +1,31 @@
+{
+  "ticket": "ESO-386",
+  "key": "ESO-386",
+  "summary": "B8 Q4/Q5 đọc map caller; RLS PostgreSQL không chạy",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-B8-01": "PASS: Q4 queryEndpointPermissions reads from DB graph store (graph_node & graph_edge)",
+    "AC-B8-02": "PASS: Q5 querySliceTenantBoundary reads from DB graph store (graph_node & graph_edge)",
+    "AC-B8-03": "PASS: unknown != absent enforced; undeclared endpoint or low coverage (< 0.70) returns status: unknown"
+  },
+  "invariants": {
+    "BR-05": "PASS: unknown != absent",
+    "GRAPH_STORE_PERSISTENCE": "PASS"
+  },
+  "slices": {
+    "S1": "eso/graph/src/q4-permissions.mjs, eso/graph/src/q5-tenant.mjs",
+    "S2": "qc/eso-graph-q4q5-store.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

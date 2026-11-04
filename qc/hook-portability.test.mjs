@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -88,7 +88,7 @@ test('every non-python hook command runs the pack entrypoint with --hook and --t
     assert.deepEqual(problems, []);
 });
 
-test('every hook command works with no bash on PATH', () => {
+test('every hook command works with no bash on PATH', async () => {
     /*
      * Behavioural half. The commands are literals the host runs; the portable claim is that they
      * resolve without a shell, so run the pack entrypoint directly for each distinct `--hook` value
@@ -108,29 +108,43 @@ test('every hook command works with no bash on PATH', () => {
     assert.ok(hooks.size >= 5, `expected several distinct hooks, found ${[...hooks].join(', ')}`);
 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-hookpath-'));
+    const emptyBin = path.join(dir, 'empty-bin');
+    fs.mkdirSync(emptyBin, { recursive: true });
     try {
-        for (const hook of hooks) {
-            const res = spawnSyncNoShell(process.execPath, [pack, '--hook', hook, '--tree', 'cursor'], dir);
-            assert.ok(
-                /"permission"|"decision"|"hookSpecificOutput"/.test(res.stdout),
-                `${hook} produced no decision without a shell: stdout=${res.stdout.slice(0, 200)} stderr=${res.stderr.slice(0, 200)}`,
-            );
-        }
+        await Promise.all(
+            [...hooks].map(async (hook) => {
+                const res = await spawnNoShell(process.execPath, [pack, '--hook', hook, '--tree', 'cursor'], dir, emptyBin);
+                assert.ok(
+                    /"permission"|"decision"|"hookSpecificOutput"/.test(res.stdout),
+                    `${hook} produced no decision without a shell: stdout=${res.stdout.slice(0, 200)} stderr=${res.stderr.slice(0, 200)}`,
+                );
+            }),
+        );
     } finally {
         fs.rmSync(dir, { recursive: true, force: true });
     }
 });
 
 /** Run node with a PATH that cannot contain bash (an empty directory), as a Windows host would. */
-function spawnSyncNoShell(bin, args, cwd) {
-    const emptyBin = path.join(cwd, 'empty-bin');
-    fs.mkdirSync(emptyBin, { recursive: true });
-    const res = spawnSync(bin, args, {
-        cwd,
-        encoding: 'utf8',
-        input: '{"command":"ls","tool_input":{}}',
-        timeout: 30_000,
-        env: { ...process.env, PATH: emptyBin, HARNESS_TREE: 'cursor', HARNESS_PRODUCT_STATE_DIR: cwd },
+function spawnNoShell(bin, args, cwd, emptyBin) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(bin, args, {
+            cwd,
+            env: { ...process.env, PATH: emptyBin, HARNESS_TREE: 'cursor', HARNESS_PRODUCT_STATE_DIR: cwd },
+            stdio: ['pipe', 'pipe', 'pipe'],
+        });
+
+        let stdout = '';
+        let stderr = '';
+        child.stdout.setEncoding('utf8');
+        child.stdout.on('data', (chunk) => { stdout += chunk; });
+        child.stderr.setEncoding('utf8');
+        child.stderr.on('data', (chunk) => { stderr += chunk; });
+        child.on('error', reject);
+        child.on('close', (status) => {
+            resolve({ stdout, stderr, status });
+        });
+
+        child.stdin.end('{"command":"ls","tool_input":{}}');
     });
-    return { stdout: String(res.stdout || ''), stderr: String(res.stderr || ''), status: res.status };
 }

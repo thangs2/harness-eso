@@ -1,0 +1,13 @@
+{
+  "ticketId": "ESO-379",
+  "score": 95,
+  "verdict": "PASS",
+  "criticalFindings": [],
+  "findings": [
+    {
+      "category": "rubric-enforcement",
+      "note": "Independent auditor agent prompt now mandates evaluating negative/failure cases and prohibits automatic 100/100 scoring without evidence."
+    }
+  ],
+  "summary": "B12 test constants and audit rubric re-calibrated. Independent evaluator agent instructions updated to mandate negative case validation and prevent automatic ungrounded 100/100 scores."
+}

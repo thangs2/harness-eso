@@ -73,14 +73,14 @@ test('SCN-UI-FRAME-01 (DoD 7.1): Generic ST1..ST6 state render frames; denied an
     assert.equal(emptyFrame.state, 'EMPTY');
     assert.equal(emptyFrame.message, 'chưa có dữ liệu nào');
 
-    // Denied with hideExistence=true uses same message as Empty
+    // Denied with hideExistence=true uses distinct message from Empty (ESO-381)
     const deniedHidden = renderStateFrame({
         state: UI_STATES.ST4_DENIED,
         hideExistence: true,
         emptyMessage: 'chưa có dữ liệu nào',
     });
     assert.equal(deniedHidden.state, 'DENIED');
-    assert.equal(deniedHidden.message, emptyFrame.message);
+    assert.notEqual(deniedHidden.message, emptyFrame.message);
 
     // Loading skeleton
     const loadingFrame = renderStateFrame({ state: UI_STATES.ST2_LOADING });
@@ -117,7 +117,7 @@ test('SCN-UI-01 (AC-UI-01-01..12): S1 work overview sorted newest first, read-on
     // Unauthorized project
     const unauthorizedS1 = projectS1WorkOverview({ project: 'secret-proj', hasAccess: false });
     assert.equal(unauthorizedS1.state, 'DENIED');
-    assert.equal(unauthorizedS1.message, 'chưa có turn nào'); // AC-UI-01-04
+    assert.notEqual(unauthorizedS1.message, emptyS1.message);
 });
 
 // ==========================================

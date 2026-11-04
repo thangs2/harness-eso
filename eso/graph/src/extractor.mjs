@@ -90,7 +90,7 @@ export function extractProjectGraph(project, buildId = null, manifestEntries = [
             errors: [],
             completeness: {
                 question: 'Q1',
-                kinds: ['file'],
+                kinds: ['file', 'class', 'method'],
                 value: 0,
                 status: 'unknown',
                 coverage: 0,
@@ -104,6 +104,11 @@ export function extractProjectGraph(project, buildId = null, manifestEntries = [
     const errors = [];
     const now = new Date().toISOString();
 
+    let classCovered = 0;
+    let classTotal = 0;
+    let methodCovered = 0;
+    let methodTotal = 0;
+
     for (const entry of entries) {
         const rawPath = typeof entry === 'string' ? entry : (entry?.path || entry?.name || '');
         const logicalPath = rawPath.replace(/\\/g, '/').trim();
@@ -116,6 +121,13 @@ export function extractProjectGraph(project, buildId = null, manifestEntries = [
                     path: logicalPath,
                     error: entry.error ? (entry.error.message || String(entry.error)) : 'Parse error',
                 });
+                if (Array.isArray(entry.symbols)) {
+                    for (const sym of entry.symbols) {
+                        const symKind = (typeof sym === 'object' && sym?.kind) ? sym.kind : 'symbol';
+                        if (symKind === 'class') classTotal++;
+                        if (symKind === 'method') methodTotal++;
+                    }
+                }
                 continue;
             }
         }
@@ -156,6 +168,14 @@ export function extractProjectGraph(project, buildId = null, manifestEntries = [
                 const symKind = (typeof sym === 'object' && sym?.kind) ? sym.kind : 'symbol';
                 if (!symName) continue;
 
+                if (symKind === 'class') {
+                    classCovered++;
+                    classTotal++;
+                } else if (symKind === 'method') {
+                    methodCovered++;
+                    methodTotal++;
+                }
+
                 const symNodeId = generateNodeId(project, symKind, logicalPath, symName);
                 const symNode = {
                     id: symNodeId,
@@ -187,6 +207,13 @@ export function extractProjectGraph(project, buildId = null, manifestEntries = [
                 path: logicalPath,
                 error: err?.message || String(err),
             });
+            if (typeof entry === 'object' && Array.isArray(entry?.symbols)) {
+                for (const sym of entry.symbols) {
+                    const symKind = (typeof sym === 'object' && sym?.kind) ? sym.kind : 'symbol';
+                    if (symKind === 'class') classTotal++;
+                    if (symKind === 'method') methodTotal++;
+                }
+            }
         }
     }
 
@@ -200,6 +227,8 @@ export function extractProjectGraph(project, buildId = null, manifestEntries = [
 
     const completeness = calculateCompleteness('Q1', {
         file: { covered: validCount, total },
+        class: { covered: classCovered, total: classTotal },
+        method: { covered: methodCovered, total: methodTotal },
     });
 
     // Optional database persistence

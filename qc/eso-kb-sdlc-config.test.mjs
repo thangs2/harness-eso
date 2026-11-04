@@ -268,3 +268,42 @@ test('SCN-SDLC-01-07 (AC-SDLC-01-07 / ED10): Changing sdlc_root while artefacts 
         return true;
     });
 });
+
+test('ESO-388 (B10): init writes real files to disk and upgrade supports revert', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { revertProjectSdlcStandard } = await import('../eso/knowledge/src/index.mjs');
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-sdlc-real-'));
+    try {
+        const initRes = initProjectSdlc({
+            project: 'real-fs-proj',
+            config: { sdlc_root: 'sdlc' },
+            consumerPath: tempDir,
+        });
+
+        assert.equal(initRes.changed, true);
+        assert.ok(fs.existsSync(path.join(tempDir, 'sdlc', '01.architecture.md')));
+        assert.ok(fs.existsSync(path.join(tempDir, 'sdlc', '02.backend-spec.md')));
+
+        // Test upgrade and revert
+        const projects = [
+            { id: 'p1', standard_version: '1.0.0' },
+            { id: 'p2', standard_version: '1.2.0' },
+        ];
+        const upg = upgradeProjectSdlcStandard({
+            projects,
+            targetStandardVersion: '2.0.0',
+        });
+        assert.equal(upg.can_revert, true);
+
+        const rev = revertProjectSdlcStandard({ upgradeResult: upg });
+        assert.equal(rev.success, true);
+        assert.equal(rev.reverted_count, 2);
+        assert.equal(rev.impact[0].restored_version, '1.0.0');
+        assert.equal(rev.impact[1].restored_version, '1.2.0');
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});

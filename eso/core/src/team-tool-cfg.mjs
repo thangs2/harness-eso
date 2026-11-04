@@ -53,9 +53,10 @@ export function applyTeamPreset({
     const missingRoles = [];
 
     for (const w of workers) {
-        if (w.role_id && !activeRoleIds.has(w.role_id) && w.state !== 'retired') {
-            if (!missingRoles.includes(w.role_id)) {
-                missingRoles.push(w.role_id);
+        const workerRoleId = w.role_id || w.role_name || w.role;
+        if (workerRoleId && !activeRoleIds.has(workerRoleId) && w.state !== 'retired') {
+            if (!missingRoles.includes(workerRoleId)) {
+                missingRoles.push(workerRoleId);
             }
         }
     }
@@ -78,14 +79,17 @@ export function deleteTeamRole({
     if (!roleId) throw new Error('Role ID is required');
 
     // AC-CFG-02-02: Role currently assigned to active workers cannot be deleted
-    const assignedWorkers = workers.filter((w) => w.role_id === roleId && w.state !== 'retired');
+    const assignedWorkers = workers.filter((w) => {
+        const assigned = w.role_id || w.role_name || w.role;
+        return assigned === roleId && w.state !== 'retired';
+    });
     if (assignedWorkers.length > 0) {
         const err = new Error(
             `ROLE_IN_USE: Cannot delete role '${roleId}'. It is currently assigned to ${assignedWorkers.length} active worker(s)`
         );
         err.code = 'ROLE_IN_USE';
         err.role_id = roleId;
-        err.assigned_workers = assignedWorkers.map((w) => w.worker_id || w.id);
+        err.assigned_workers = assignedWorkers.map((w) => w.worker_id || w.id || w.name);
         throw err;
     }
 

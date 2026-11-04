@@ -27,7 +27,7 @@ function canonicalJson(obj) {
     return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}';
 }
 
-function computeHash(content) {
+export function computeHash(content) {
     return createHash('sha256').update(typeof content === 'string' ? content : canonicalJson(content)).digest('hex');
 }
 
@@ -228,5 +228,189 @@ export function queryHistoricalPack({
         tampered: isTampered,
         ac_drift: acDrift,
         unknowns,
+    };
+}
+
+export function createTicketPackStore({ db = null } = {}) {
+    const memoryRecords = [];
+
+    if (db) {
+        const createTableSql = `
+            CREATE TABLE IF NOT EXISTS ticket_pack (
+                project      TEXT NOT NULL,
+                source       TEXT NOT NULL,
+                ticket_key   TEXT,
+                tried        TEXT NOT NULL DEFAULT '[]',
+                fetched_at   TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                pack         TEXT NOT NULL,
+                PRIMARY KEY (project, source, fetched_at)
+            )
+        `;
+        if (typeof db.exec === 'function') {
+            db.exec(createTableSql);
+        } else if (typeof db.run === 'function') {
+            db.run(createTableSql);
+        }
+    }
+
+    return {
+        appendPack({
+            project,
+            source = 'jira',
+            ticket_key = null,
+            tried = [],
+            fetched_at = new Date().toISOString(),
+            pack,
+            content_hash = null,
+        } = {}) {
+            if (!project) throw new Error('project is required');
+            if (!source) throw new Error('source is required');
+            if (!pack || typeof pack !== 'object') throw new Error('pack object is required');
+
+            const computed = computeHash(pack);
+            if (content_hash && content_hash !== computed) {
+                const err = new Error(`PACK_TAMPERED: Provided content_hash '${content_hash}' does not match computed hash '${computed}'`);
+                err.code = 'PACK_TAMPERED';
+                err.provided_hash = content_hash;
+                err.computed_hash = computed;
+                throw err;
+            }
+
+            const record = {
+                project,
+                source,
+                ticket_key: ticket_key !== undefined ? ticket_key : null,
+                tried: Array.isArray(tried) ? tried : [],
+                fetched_at,
+                content_hash: computed,
+                pack,
+            };
+
+            if (db) {
+                const sql = `
+                    INSERT INTO ticket_pack (project, source, ticket_key, tried, fetched_at, content_hash, pack)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                `;
+                const params = [
+                    record.project,
+                    record.source,
+                    record.ticket_key,
+                    JSON.stringify(record.tried),
+                    record.fetched_at,
+                    record.content_hash,
+                    JSON.stringify(record.pack),
+                ];
+                try {
+                    if (typeof db.run === 'function') {
+                        db.run(sql, ...params);
+                    } else if (typeof db.prepare === 'function') {
+                        db.prepare(sql).run(...params);
+                    }
+                } catch (e) {
+                    if (e.message && (e.message.includes('UNIQUE') || e.message.includes('PRIMARY KEY'))) {
+                        const err = new Error(`IMMUTABLE_RECORD: ticket_pack is append-only and cannot overwrite existing primary key`);
+                        err.code = 'IMMUTABLE_RECORD';
+                        throw err;
+                    }
+                    throw e;
+                }
+            } else {
+                const exists = memoryRecords.some(
+                    (r) => r.project === project && r.source === source && r.fetched_at === fetched_at
+                );
+                if (exists) {
+                    const err = new Error(`IMMUTABLE_RECORD: ticket_pack is append-only and cannot overwrite existing record`);
+                    err.code = 'IMMUTABLE_RECORD';
+                    throw err;
+                }
+                memoryRecords.push(JSON.parse(JSON.stringify(record)));
+            }
+
+            return record;
+        },
+
+        getPacks({ project, ticket_key = null, source = null } = {}) {
+            if (!project) throw new Error('project is required');
+
+            let records = [];
+            if (db) {
+                let sql = `SELECT * FROM ticket_pack WHERE project = ?`;
+                const params = [project];
+                if (ticket_key !== null && ticket_key !== undefined) {
+                    sql += ` AND ticket_key = ?`;
+                    params.push(ticket_key);
+                }
+                if (source !== null && source !== undefined) {
+                    sql += ` AND source = ?`;
+                    params.push(source);
+                }
+                sql += ` ORDER BY fetched_at ASC`;
+                let rows = [];
+                if (typeof db.all === 'function') {
+                    rows = db.all(sql, ...params);
+                } else if (typeof db.prepare === 'function') {
+                    rows = db.prepare(sql).all(...params);
+                }
+                records = rows.map((r) => ({
+                    project: r.project,
+                    source: r.source,
+                    ticket_key: r.ticket_key,
+                    tried: JSON.parse(r.tried || '[]'),
+                    fetched_at: r.fetched_at,
+                    content_hash: r.content_hash,
+                    pack: JSON.parse(r.pack),
+                }));
+            } else {
+                records = memoryRecords
+                    .filter((r) => {
+                        if (r.project !== project) return false;
+                        if (ticket_key !== null && ticket_key !== undefined && r.ticket_key !== ticket_key) return false;
+                        if (source !== null && source !== undefined && r.source !== source) return false;
+                        return true;
+                    })
+                    .map((r) => JSON.parse(JSON.stringify(r)));
+            }
+
+            return records;
+        },
+
+        getLatestPack({ project, ticket_key = null, source = null } = {}) {
+            const list = this.getPacks({ project, ticket_key, source });
+            if (list.length === 0) return null;
+            return list[list.length - 1];
+        },
+
+        verifyIntegrity(record) {
+            if (!record || !record.pack || !record.content_hash) {
+                const err = new Error('INVALID_RECORD: Record must contain pack and content_hash');
+                err.code = 'INVALID_RECORD';
+                throw err;
+            }
+            const computed = computeHash(record.pack);
+            if (computed !== record.content_hash) {
+                const err = new Error(`PACK_TAMPERED: Recorded hash '${record.content_hash}' does not match computed hash '${computed}'`);
+                err.code = 'PACK_TAMPERED';
+                err.recorded_hash = record.content_hash;
+                err.computed_hash = computed;
+                throw err;
+            }
+            return {
+                valid: true,
+                content_hash: computed,
+            };
+        },
+
+        update() {
+            const err = new Error('FORBIDDEN_MUTATION: ticket_pack is strictly append-only (no UPDATE)');
+            err.code = 'FORBIDDEN_MUTATION';
+            throw err;
+        },
+
+        delete() {
+            const err = new Error('FORBIDDEN_MUTATION: ticket_pack is strictly append-only (no DELETE)');
+            err.code = 'FORBIDDEN_MUTATION';
+            throw err;
+        },
     };
 }

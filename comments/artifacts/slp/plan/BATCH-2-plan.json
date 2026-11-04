@@ -1,0 +1,41 @@
+{
+  "batch": 2,
+  "generated_at": "2026-11-04T20:02:30Z",
+  "slices": [
+    {
+      "id": "ESO-384",
+      "summary": "B6 Q1 trả ready+rỗng trên bun:sqlite",
+      "allowed_files": ["eso/graph/src/q1-readset.mjs", "qc/eso-graph-q1-precision.test.mjs"],
+      "depends_on": ["ESO-372"],
+      "verify": "node --test qc/eso-graph-q1-precision.test.mjs"
+    },
+    {
+      "id": "ESO-370",
+      "summary": "T-04.3 control-plane HTTP: health/config/preview",
+      "allowed_files": ["eso/control-plane/src/server.mjs", "eso/control-plane/src/routes.mjs", "qc/eso-cp-server.test.mjs"],
+      "depends_on": ["ESO-369"],
+      "verify": "bun test qc/eso-cp-server.test.mjs"
+    },
+    {
+      "id": "ESO-388",
+      "summary": "B10 SDLC init ghi 0 file; upgrade là stub",
+      "allowed_files": ["eso/knowledge/src/sdlc-config.mjs"],
+      "depends_on": ["ESO-368", "ESO-369"],
+      "verify": "bun test qc/eso-kb-sdlc-config.test.mjs"
+    },
+    {
+      "id": "ESO-389",
+      "summary": "B11 Không có ticket_pack store",
+      "allowed_files": ["eso/core/src/ticket-pack.mjs", "qc/eso-ticket-pack-store.test.mjs"],
+      "depends_on": ["ESO-369"],
+      "verify": "bun test qc/eso-ticket-pack-store.test.mjs"
+    },
+    {
+      "id": "ESO-387",
+      "summary": "B9 Control-plane key shape lệch",
+      "allowed_files": ["eso/control-plane/src/flow.mjs", "eso/control-plane/src/config-mgr.mjs", "eso/core/src/team-tool-cfg.mjs", "qc/eso-cp-keyshape.test.mjs"],
+      "depends_on": ["ESO-369"],
+      "verify": "bun test qc/eso-cp-keyshape.test.mjs"
+    }
+  ]
+}

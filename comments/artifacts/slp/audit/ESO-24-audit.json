@@ -1,9 +1,25 @@
 {
   "key": "ESO-24",
+  "ticket": "ESO-24",
   "verdict": "AUDIT_PASS",
-  "score": 100,
+  "score": 95,
+  "summary": "Re-audit under T-02.2 rubric: Verified 5 ACs (AC-KB-01-01..05) and fail cases. Verified project isolation, append-only trigger, and RLS policies.",
+  "negative_case_verification": {
+    "status": "PASS",
+    "fail_cases_tested": [
+      "AC-KB-01-02: Querying foreign project item returns NOT_FOUND indistinguishable from absent item",
+      "AC-KB-01-05: Declaration outside declared zone is rejected with OUT_OF_ZONE",
+      "BR-10: Attempted DELETE on declaration table is aborted by trigger"
+    ]
+  },
   "critical": [],
-  "findings": [],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "id": "FINDING-KB-01",
+      "description": "RLS policy enforcement is verified in SQLite via application logic and trigger constraints; production PostgreSQL deployment requires explicit ALTER TABLE ENABLE ROW LEVEL SECURITY verification during provisioning."
+    }
+  ],
   "ac_coverage": {
     "AC-KB-01-01": "FULL",
     "AC-KB-01-02": "FULL",
@@ -13,9 +29,9 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
-    "ac_coverage": 25,
-    "boundary_discipline": 15
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 13
   },
   "artifact_path": "comments/artifacts/slp/audit/ESO-24-audit.json"
 }

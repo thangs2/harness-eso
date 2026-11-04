@@ -1,0 +1,31 @@
+{
+  "ticket": "ESO-384",
+  "key": "ESO-384",
+  "summary": "B6 Q1 trả ready+rỗng trên bun:sqlite",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-B6-01": "PASS: Adapter DB used; silent empty ready branch removed",
+    "AC-B6-02": "PASS: Missing or non-queryable database throws descriptive error",
+    "AC-B6-03": "PASS: Works uniformly across Node and Bun without runtime-dependent return"
+  },
+  "invariants": {
+    "NO_SILENT_EMPTY_RETURN": "PASS",
+    "BR-05": "PASS: unknown != absent"
+  },
+  "slices": {
+    "S1": "eso/graph/src/q1-readset.mjs",
+    "S2": "qc/eso-graph-q1-precision.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

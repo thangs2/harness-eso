@@ -16,6 +16,11 @@ const args = process.argv.slice(2);
 const jsonMode = args.includes('--json');
 const ticketKey = args.find((a) => !a.startsWith('-')) || '';
 
+if (args.includes('-h') || args.includes('--help')) {
+    console.log('Usage: scripts/jira-pack.sh <TICKET-KEY> [--json]');
+    process.exit(0);
+}
+
 if (!ticketKey) {
     console.error('Usage: scripts/jira-pack.sh <TICKET-KEY> [--json]');
     process.exit(1);

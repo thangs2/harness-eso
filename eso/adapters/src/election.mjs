@@ -14,6 +14,9 @@ export const BRANCH_ORDER = Object.freeze(['host-native', 'eso-native', 'externa
 
 export const KNOWN_HOSTS = Object.freeze(['cursor', 'antigravity', 'deepseek-harness']);
 
+export const ERROR_SILENT_SWITCH = 'SILENT_SWITCH';
+export const ERROR_SILENT_NONE = 'SILENT_NONE';
+
 export function electCapabilityProvider({
     project,
     turnId,
@@ -131,6 +134,8 @@ export function handleMidTurnBranchFailure({
     failureReason,
     branches = {},
     uninstalledProviders = [],
+    silent = false,
+    silentNone = false,
 } = {}) {
     if (!currentElection) throw new Error('currentElection is required');
 
@@ -142,6 +147,13 @@ export function handleMidTurnBranchFailure({
             is_active: false,
             message: `nguồn đã mất: provider '${currentElection.provider_id}' đã bị gỡ`,
         };
+    }
+
+    // ESO-383 / B5: Silent switch is strictly forbidden
+    if (silent || !failureReason || typeof failureReason !== 'string' || failureReason.trim() === '') {
+        const err = new Error('SILENT_SWITCH: Mid-turn branch switch cannot be silent; explicit failure reason is required');
+        err.code = ERROR_SILENT_SWITCH;
+        throw err;
     }
 
     const currentBranch = currentElection.branch;
@@ -187,6 +199,13 @@ export function handleMidTurnBranchFailure({
         }
     }
 
+    // ESO-383 / B5: Silent fallback to none is strictly forbidden
+    if (nextBranch === 'none' && silentNone) {
+        const err = new Error('SILENT_NONE: Falling back to none without recording is prohibited');
+        err.code = ERROR_SILENT_NONE;
+        throw err;
+    }
+
     updatedHistory.push({
         branch: nextBranch,
         status: 'switched',
@@ -203,14 +222,23 @@ export function handleMidTurnBranchFailure({
         reason: nextReason,
         history: updatedHistory,
         switched: true,
+        switch_record: {
+            from: currentBranch,
+            to: nextBranch,
+            reason: failureReason,
+            at: new Date().toISOString(),
+            silent: false,
+        },
     };
 }
 
 export function setCapabilityPin({
+    project = 'default',
     capabilityKind,
     targetBranch,
     actorRole = 'operator',
     currentPins = {},
+    db = null,
 } = {}) {
     // AC-HOST-04-02 / RBAC: Agent prohibited from mutating pin
     if (actorRole !== 'operator' && actorRole !== 'admin') {
@@ -220,27 +248,194 @@ export function setCapabilityPin({
         throw err;
     }
 
+    if (db) {
+        const ensureTableSql = `
+            CREATE TABLE IF NOT EXISTS capability_pin (
+                project         TEXT NOT NULL,
+                capability_kind TEXT NOT NULL,
+                pinned_branch   TEXT NOT NULL,
+                updated_at      TEXT NOT NULL,
+                PRIMARY KEY (project, capability_kind)
+            );
+        `;
+        if (typeof db.exec === 'function') db.exec(ensureTableSql);
+        else if (typeof db.run === 'function') db.run(ensureTableSql);
+    }
+
     // AC-HOST-04-05 / ED1: Empty pin removes pinning
     if (!targetBranch || targetBranch.trim() === '') {
         const updated = { ...currentPins };
         delete updated[capabilityKind];
+        if (db) {
+            const delSql = `DELETE FROM capability_pin WHERE project = ? AND capability_kind = ?`;
+            if (typeof db.run === 'function') db.run(delSql, project, capabilityKind);
+            else if (typeof db.prepare === 'function') db.prepare(delSql).run(project, capabilityKind);
+        }
         return updated;
+    }
+
+    const branch = targetBranch.trim();
+    if (db) {
+        const insertSql = `
+            INSERT INTO capability_pin (project, capability_kind, pinned_branch, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(project, capability_kind) DO UPDATE SET
+                pinned_branch = excluded.pinned_branch,
+                updated_at = excluded.updated_at
+        `;
+        const now = new Date().toISOString();
+        if (typeof db.run === 'function') db.run(insertSql, project, capabilityKind, branch, now);
+        else if (typeof db.prepare === 'function') db.prepare(insertSql).run(project, capabilityKind, branch, now);
     }
 
     return {
         ...currentPins,
-        [capabilityKind]: targetBranch.trim(),
+        [capabilityKind]: branch,
     };
+}
+
+export function loadCapabilityPins({
+    project = 'default',
+    db = null,
+} = {}) {
+    if (!db) return {};
+
+    const checkTableSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='capability_pin'`;
+    let exists = false;
+    if (typeof db.get === 'function') exists = !!db.get(checkTableSql);
+    else if (typeof db.prepare === 'function') exists = !!db.prepare(checkTableSql).get();
+
+    if (!exists) return {};
+
+    const sql = `SELECT capability_kind, pinned_branch FROM capability_pin WHERE project = ?`;
+    let rows = [];
+    if (typeof db.all === 'function') rows = db.all(sql, project);
+    else if (typeof db.prepare === 'function') rows = db.prepare(sql).all(project);
+
+    const pins = {};
+    for (const r of rows) {
+        pins[r.capability_kind] = r.pinned_branch;
+    }
+    return pins;
+}
+
+export function recordTurnProviderAudit({
+    project = 'default',
+    turnId,
+    election,
+    db = null,
+    auditLog = null,
+} = {}) {
+    if (!turnId) throw new Error('turnId is required');
+    if (!election) throw new Error('election is required');
+
+    const record = {
+        project,
+        turn_id: turnId,
+        capability: election.capability,
+        branch: election.branch,
+        provider_id: election.provider_id,
+        guarantee: election.guarantee || 'G-FULL',
+        pinned: election.pinned ? 1 : 0,
+        reason: election.reason || '',
+        history: election.history || [],
+        recorded_at: new Date().toISOString(),
+    };
+
+    if (db) {
+        const ensureSql = `
+            CREATE TABLE IF NOT EXISTS provider_audit (
+                project     TEXT NOT NULL,
+                turn_id     TEXT NOT NULL,
+                capability  TEXT NOT NULL,
+                branch      TEXT NOT NULL,
+                provider_id TEXT,
+                guarantee   TEXT NOT NULL,
+                pinned      INTEGER NOT NULL DEFAULT 0,
+                reason      TEXT,
+                history     TEXT NOT NULL DEFAULT '[]',
+                recorded_at TEXT NOT NULL,
+                PRIMARY KEY (project, turn_id, capability)
+            );
+        `;
+        if (typeof db.exec === 'function') db.exec(ensureSql);
+        else if (typeof db.run === 'function') db.run(ensureSql);
+
+        const insertSql = `
+            INSERT INTO provider_audit (project, turn_id, capability, branch, provider_id, guarantee, pinned, reason, history, recorded_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(project, turn_id, capability) DO UPDATE SET
+                branch = excluded.branch,
+                provider_id = excluded.provider_id,
+                guarantee = excluded.guarantee,
+                pinned = excluded.pinned,
+                reason = excluded.reason,
+                history = excluded.history,
+                recorded_at = excluded.recorded_at
+        `;
+        const params = [
+            project,
+            turnId,
+            record.capability,
+            record.branch,
+            record.provider_id,
+            record.guarantee,
+            record.pinned,
+            record.reason,
+            JSON.stringify(record.history),
+            record.recorded_at,
+        ];
+        if (typeof db.run === 'function') db.run(insertSql, ...params);
+        else if (typeof db.prepare === 'function') db.prepare(insertSql).run(...params);
+    }
+
+    if (Array.isArray(auditLog)) {
+        auditLog.push(record);
+    }
+
+    return record;
 }
 
 export function queryTurnProviderAudit({
     turnId,
+    project = 'default',
+    db = null,
     auditLog = [],
 } = {}) {
     if (!turnId) throw new Error('turnId is required');
 
-    // AC-HOST-05-04 / ED1: Turn with 0 capabilities
-    const records = auditLog.filter((r) => r.turn_id === turnId);
+    let records = [];
+    if (db) {
+        const checkSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='provider_audit'`;
+        let exists = false;
+        if (typeof db.get === 'function') exists = !!db.get(checkSql);
+        else if (typeof db.prepare === 'function') exists = !!db.prepare(checkSql).get();
+
+        if (exists) {
+            const sql = `SELECT * FROM provider_audit WHERE project = ? AND turn_id = ?`;
+            let rows = [];
+            if (typeof db.all === 'function') rows = db.all(sql, project, turnId);
+            else if (typeof db.prepare === 'function') rows = db.prepare(sql).all(project, turnId);
+
+            records = rows.map((r) => ({
+                project: r.project,
+                turn_id: r.turn_id,
+                capability: r.capability,
+                branch: r.branch,
+                provider_id: r.provider_id,
+                guarantee: r.guarantee,
+                pinned: !!r.pinned,
+                reason: r.reason,
+                history: JSON.parse(r.history || '[]'),
+                recorded_at: r.recorded_at,
+            }));
+        }
+    }
+
+    if (records.length === 0 && Array.isArray(auditLog)) {
+        records = auditLog.filter((r) => r.turn_id === turnId);
+    }
+
     if (records.length === 0) {
         return {
             turn_id: turnId,
@@ -258,13 +453,45 @@ export function queryTurnProviderAudit({
 
 export function queryBatchProviderAudit({
     turnIds = [],
+    project = 'default',
+    db = null,
     auditLog = [],
 } = {}) {
-    // AC-HOST-05-05 / ED3: 200 turns query is stably sorted
-    const idSet = new Set(turnIds);
-    const matched = auditLog.filter((r) => idSet.has(r.turn_id));
+    let records = [];
+    if (db) {
+        const checkSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='provider_audit'`;
+        let exists = false;
+        if (typeof db.get === 'function') exists = !!db.get(checkSql);
+        else if (typeof db.prepare === 'function') exists = !!db.prepare(checkSql).get();
 
-    // Sort deterministically by turn_id, then capability
+        if (exists && turnIds.length > 0) {
+            const placeholders = turnIds.map(() => '?').join(',');
+            const sql = `SELECT * FROM provider_audit WHERE project = ? AND turn_id IN (${placeholders})`;
+            let rows = [];
+            if (typeof db.all === 'function') rows = db.all(sql, project, ...turnIds);
+            else if (typeof db.prepare === 'function') rows = db.prepare(sql).all(project, ...turnIds);
+
+            records = rows.map((r) => ({
+                project: r.project,
+                turn_id: r.turn_id,
+                capability: r.capability,
+                branch: r.branch,
+                provider_id: r.provider_id,
+                guarantee: r.guarantee,
+                pinned: !!r.pinned,
+                reason: r.reason,
+                history: JSON.parse(r.history || '[]'),
+                recorded_at: r.recorded_at,
+            }));
+        }
+    }
+
+    if (records.length === 0 && Array.isArray(auditLog)) {
+        const idSet = new Set(turnIds);
+        records = auditLog.filter((r) => idSet.has(r.turn_id));
+    }
+
+    const matched = [...records];
     matched.sort((a, b) => {
         if (a.turn_id !== b.turn_id) return a.turn_id.localeCompare(b.turn_id);
         return a.capability.localeCompare(b.capability);

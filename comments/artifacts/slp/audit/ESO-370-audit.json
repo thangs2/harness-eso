@@ -1,0 +1,32 @@
+{
+  "ticket": "ESO-370",
+  "key": "ESO-370",
+  "summary": "T-04.3 control-plane HTTP: health/config/preview",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "ac_coverage": {
+    "AC-T04-3-01": "PASS: GET /health returns 200 without authentication",
+    "AC-T04-3-02": "PASS: Missing or invalid token returns 401 UNAUTHORIZED",
+    "AC-T04-3-03": "PASS: GET /config reads from config store matching version and hash",
+    "AC-T04-3-04": "PASS: POST /config missing preview hash returns 409 PREVIEW_REQUIRED"
+  },
+  "invariants": {
+    "PREVIEW_BEFORE_SAVE": "PASS",
+    "SECURE_CONTROL_PLANE": "PASS"
+  },
+  "slices": {
+    "S1": "eso/control-plane/src/server.mjs, eso/control-plane/src/routes.mjs",
+    "S2": "qc/eso-cp-server.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

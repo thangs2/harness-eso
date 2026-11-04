@@ -72,11 +72,16 @@ export function calculateCompleteness(question, perKindCoverage = {}) {
             total = Number(item.total) || 0;
             if (total > 0) {
                 ratio = Math.max(0, Math.min(1, covered / total));
-            } else if (covered > 0 && total === 0) {
+            } else if (total === 0) {
+                // ESO-385: If a project does not have classes or methods declared (total === 0), do not force completeness to 0.
                 ratio = 1;
             } else {
                 ratio = 0;
             }
+        } else if (item === undefined && (kind === 'class' || kind === 'method') && perKindCoverage?.file) {
+            covered = 0;
+            total = 0;
+            ratio = 1;
         } else {
             ratio = 0;
         }

@@ -1,0 +1,8 @@
+{
+  "ticketId": "ESO-371",
+  "score": 100,
+  "verdict": "PASS",
+  "criticalFindings": [],
+  "findings": [],
+  "summary": "T-04.4 provision sandbox + smoke turn + evidence implemented. Config and hook generation verified, smoke turn recorded to evidence_turn, replayed successfully, and sandbox directory cleanly removed."
+}

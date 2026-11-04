@@ -54,6 +54,8 @@ Ghi vào `comments/artifacts/slp/audit/<KEY>-<timestamp>.json`.
 ## Rules
 
 - `AUDIT_PASS` **chỉ** khi `score >= 85` **và** `critical` rỗng.
+- Rubric bắt buộc kiểm tra negative cases (ca fail, boundary violations, forbidden inputs).
+- Auditor độc lập không tự chấm 100/100 theo quán tính — mỗi audit phải nêu rõ bằng chứng kiểm tra ca fail hoặc ghi nhận finding nếu thiếu kiểm thử phủ định.
 - FAIL ⇒ trả `findings[]` cho `fixbug-runtime`; **không** tự sửa.
 - Không chuyển trạng thái ticket — Lead làm sau `AUDIT_PASS`.
 - Điểm cao không xoá được CRITICAL, và **không** có "tạm pass".

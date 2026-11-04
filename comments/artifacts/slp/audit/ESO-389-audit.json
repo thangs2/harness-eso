@@ -1,0 +1,8 @@
+{
+  "ticketId": "ESO-389",
+  "score": 100,
+  "verdict": "PASS",
+  "criticalFindings": [],
+  "findings": [],
+  "summary": "B11 ticket_pack store implemented in eso/core/src/ticket-pack.mjs with support for both in-memory and SQLite backing. Validated 2 packs historical retention, immutability, tamper rejection (PACK_TAMPERED), and source: none support."
+}
