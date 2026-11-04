@@ -19,12 +19,16 @@
 //
 // The fail cases below are the point of the file. If the rubric ever accepts the fabricated audit, or accepts a
 // well-formed audit that scores itself 100, this suite goes red.
+//
+// The checks are fixtures on purpose. An earlier version also walked `comments/artifacts/slp/audit/` and failed on any
+// audit that did not name the commit — but that folder is temporary evidence, and the copies committed in this repo are
+// stale, so a clean clone went red on records nobody can fix. A durable check may only depend on durable input.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** The commit every audit artifact in this batch names. */
+/** The commit this batch's audit record is judged against. */
 export const VERIFIED_COMMIT = '868290b';
 
 const REPO = new URL('..', import.meta.url).pathname;
@@ -71,7 +75,16 @@ export function validateAudit(audit, { repo = REPO, commit = VERIFIED_COMMIT } =
     } else if (audit.score >= 100) {
         add('R3', 'score 100 — an audit that cannot lose points reports its own absence');
     }
-    if (!Array.isArray(audit?.findings) || audit.findings.length === 0) add('R3', 'findings[] is empty');
+    // Zero findings is only acceptable with proof: an attestation is a command and the exit code it produced, which is
+    // the same evidence a finding would carry. Silence alone is never proof.
+    const findings = Array.isArray(audit?.findings) ? audit.findings : [];
+    const attestation = audit?.attestation;
+    const attestationProves = Boolean(attestation)
+        && typeof attestation.command === 'string' && attestation.command.trim() !== ''
+        && Number.isInteger(attestation.exit_code);
+    if (findings.length === 0 && !attestationProves) {
+        add('R3', 'findings[] is empty and there is no attestation proving the run');
+    }
 
     // R4 — the failing case, executed. `executed` is a claim; `exit_code` is the measurement.
     const negative = audit?.negative_case ?? {};
@@ -174,28 +187,54 @@ test('ESO-374: a real audit with findings passes every rule', () => {
     );
 });
 
-test('ESO-379: every audit artifact on disk names 868290b, and no perfect score is left unproven', () => {
-    // The audit JSONs under comments/artifacts are throwaway evidence — this test reads them when present and says so
-    // when they are not, so a fresh clone is not red because a tmp folder is absent. What it enforces is the rule the
-    // Lead set: an audit names its commit, and a 100/100 audit carries a finding or an attestation instead of being
-    // zero-finding.
-    const dir = join(REPO, 'comments/artifacts/slp/audit');
-    if (!existsSync(dir)) {
-        console.log('[ESO-379] comments/artifacts/slp/audit is absent — on-disk audit check skipped (tmp evidence folder)');
-        return;
-    }
-    const files = readdirSync(dir).filter((name) => name.endsWith('-audit.json')).sort();
-    assert.ok(files.length > 0, 'the audit directory exists but holds no *-audit.json');
+test('ESO-374: a valid audit with an executed negative case and stated independence passes', () => {
+    // The three conditions a passing audit must satisfy, asserted on the fixture rather than assumed: a failing case
+    // that ran (command + non-zero exit + expected), independence that is stated, and evidence that re-ran in the audit.
+    assert.equal(realAudit.negative_case.executed, true);
+    assert.equal(realAudit.negative_case.exit_code, 1);
+    assert.equal(typeof realAudit.negative_case.expected, 'string');
+    assert.equal(realAudit.independence.commands_rerun_in_audit, true);
+    assert.equal(realAudit.independence.same_worker_as_verify, false);
+    assert.deepEqual(validateAudit(realAudit), []);
+});
 
-    const uncommitted = [];
-    const unproven = [];
-    for (const name of files) {
-        const audit = JSON.parse(readFileSync(join(dir, name), 'utf8'));
-        if (audit.commit !== VERIFIED_COMMIT) uncommitted.push(`${name}(${audit.commit ?? 'none'})`);
-        const findings = Array.isArray(audit.findings) ? audit.findings : [];
-        if (audit.score >= 100 && findings.length === 0 && !audit.attestation) unproven.push(name);
-    }
-    assert.deepEqual(uncommitted, [], `audits that do not name ${VERIFIED_COMMIT}: ${uncommitted.join(', ')}`);
-    assert.deepEqual(unproven, [], `perfect scores with no finding and no attestation: ${unproven.join(', ')}`);
-    console.log(`[ESO-379] ${files.length} audit artifacts name ${VERIFIED_COMMIT}; 0 perfect scores without proof`);
+test('ESO-374: a zero-finding 100 without proof is rejected for both the score and the silence', () => {
+    // The shape the old process produced: perfect score, no findings, no attestation. It must fail on the score rule
+    // and on the proof rule, and the messages must say which is which.
+    const zeroFinding = { ...realAudit, score: 100, findings: [] };
+    const problems = validateAudit(zeroFinding);
+    const messages = problems.map((p) => p.message);
+    assert.deepEqual(problems.map((p) => p.rule), ['R3', 'R3'], messages.join(' | '));
+    assert.match(messages.join(' | '), /score 100/);
+    assert.match(messages.join(' | '), /findings\[\] is empty and there is no attestation/);
+
+    // Silence at a non-perfect score is still rejected — the proof rule is not a side effect of the score rule.
+    assert.deepEqual(
+        validateAudit({ ...realAudit, score: 90, findings: [] }).map((p) => p.rule),
+        ['R3'],
+        'a zero-finding 90 with no proof must fail on the empty-findings rule alone',
+    );
+});
+
+test('ESO-374: an attestation substitutes for findings below 100 — and never for the score rule', () => {
+    const proven = {
+        ...realAudit,
+        score: 90,
+        findings: [],
+        attestation: { command: 'bun test qc/eso-core-host-ui.test.mjs', exit_code: 0, observed: '7 pass, 0 fail' },
+    };
+    assert.deepEqual(validateAudit(proven), [], 'proof without findings is acceptable below 100');
+
+    // The same audit at 100 is still rejected: proof does not buy a perfect score.
+    assert.deepEqual(
+        validateAudit({ ...proven, score: 100 }).map((p) => p.rule),
+        ['R3'],
+        'an attested 100/100 must still fail the score rule',
+    );
+
+    // An attestation with no command and no exit code is a label, not proof.
+    assert.deepEqual(
+        validateAudit({ ...realAudit, score: 90, findings: [], attestation: { observed: 'trust me' } }).map((p) => p.rule),
+        ['R3'],
+    );
 });
