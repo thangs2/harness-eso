@@ -65,6 +65,33 @@ function runSuite(rel) {
     return { rel, status: res.status === 0 ? 'pass' : 'fail', output };
 }
 
+/*
+ * Builds that a test suite depends on. `qc/eso-cp-nestjs.test.mjs` imports
+ * `eso/control-plane/dist/server.js`, so a clean checkout must build it first.
+ * Keep this list explicit rather than hiding the dependency inside the test.
+ */
+const BUILDS = [{ rel: 'eso/control-plane', script: 'build' }];
+let buildFailed = false;
+for (const b of BUILDS) {
+    const cwd = path.join(REPO, b.rel);
+    if (!fs.existsSync(cwd)) continue;
+    const res = spawnSync(process.env.BUN_BIN || 'bun', ['run', b.script], {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (res.status !== 0) {
+        buildFailed = true;
+        const output = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-20);
+        console.error(`  FAIL  build ${b.rel} (${b.script})`);
+        for (const line of output) console.error(`        ${line}`);
+    }
+}
+if (buildFailed) {
+    console.error('build failed — suites not run');
+    process.exit(1);
+}
+
 const results = SUITES.map(runSuite);
 let failed = 0;
 
