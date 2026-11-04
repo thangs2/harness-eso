@@ -60,6 +60,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@angular/common": "22.1.1",
+        "@angular/compiler": "22.1.1",
         "@angular/core": "22.1.1",
         "@angular/router": "22.1.1",
       },
@@ -196,6 +197,8 @@
     "@alloc/quick-lru": ["@alloc/quick-lru@5.3.0", "", {}, "sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA=="],
 
     "@angular/common": ["@angular/common@22.1.1", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/core": "22.1.1", "rxjs": "^6.5.3 || ^7.4.0" } }, "sha512-5iiyPWqO3acpOPMcJWYtVbXF5z9wy43MFQQdd7wZPHfYOIC7c3KRnziWrRpELae+SkEB4srAYr6XIu9rQ743nw=="],
+
+    "@angular/compiler": ["@angular/compiler@22.1.1", "", { "dependencies": { "tslib": "^2.3.0" } }, "sha512-UfQZALwewk+WyE5fqrXT3CK0sxWXre4XojAvUdFQSZsVHTZEM1QD4FncuePa44I6BQMhfqQUvYNlqFnev4WOQg=="],
 
     "@angular/core": ["@angular/core@22.1.1", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/compiler": "22.1.1", "rxjs": "^6.5.3 || ^7.4.0", "zone.js": "~0.15.0 || ~0.16.0" }, "optionalPeers": ["@angular/compiler", "zone.js"] }, "sha512-QFZNFzyFw9l1B1D7NCEU3YiLLBnMSejyp9mzJrzZ9vzc70BsewikcLFwuj+qqleqFmi5VW3f9GFNgwUq8dWGAg=="],
 

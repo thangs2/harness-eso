@@ -9,7 +9,11 @@
     "skipLibCheck": true,
     "strict": false,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./"
   },
-  "include": ["src/**/*"]
+  "include": [
+    "apps/**/*",
+    "libs/**/*",
+    "src/**/*"
+  ]
 }
