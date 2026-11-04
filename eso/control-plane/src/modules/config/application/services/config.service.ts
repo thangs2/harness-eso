@@ -5,8 +5,8 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../../../common/infrastructure/database.service.js';
-import { readConfig, saveConfig } from '../../../../../src/config-store.mjs';
-import { previewConfigChange } from '../../../../../src/config-mgr.mjs';
+import { readConfig, saveConfig } from '../../../../../src/config-store.js';
+import { previewConfigChange } from '../../../../../src/config-mgr.js';
 import { PreviewConfigDto } from '../../api/dto/preview-config.dto.js';
 import { SaveConfigDto } from '../../api/dto/save-config.dto.js';
 
@@ -147,7 +147,7 @@ export class ConfigService {
                 project: dto.project,
                 version: saved.version,
                 hash: saved.hash,
-                updated_at: saved.updated_at,
+                updated_at: saved.saved_at,
             };
         } catch (err: any) {
             if (err?.code === 'STALE_VERSION' || err?.message?.includes('STALE_VERSION')) {

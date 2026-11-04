@@ -26,5 +26,5 @@ export {
     revertConfigChange,
     previewAttributeChange,
     saveAttributeChange,
-} from './config-mgr.mjs';
+} from './config-mgr.ts';
 

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { initConfigSchema } from './config-schema.mjs';
+import { initConfigSchema } from './config-schema.js';
 
 /**
  * Compute deterministic hash of config content.
@@ -23,7 +23,7 @@ export function saveConfig(db, {
     config,
     expectedHash = null,
     operator = 'operator',
-} = {}) {
+}: any = {}) {
     if (!project || typeof project !== 'string' || !project.trim()) {
         throw new Error('Project is required');
     }
@@ -36,14 +36,14 @@ export function saveConfig(db, {
 
     if (current) {
         if (expectedHash !== null && expectedHash !== current.hash) {
-            const err = new Error(`STALE_VERSION: Expected hash "${expectedHash}" does not match current hash "${current.hash}" (version ${current.version})`);
+            const err: any = new Error(`STALE_VERSION: Expected hash "${expectedHash}" does not match current hash "${current.hash}" (version ${current.version})`);
             err.code = 'STALE_VERSION';
             err.current_hash = current.hash;
             err.current_version = current.version;
             throw err;
         }
     } else if (expectedHash !== null) {
-        const err = new Error(`STALE_VERSION: Project "${normProject}" has no prior version, expected hash "${expectedHash}" is invalid`);
+        const err: any = new Error(`STALE_VERSION: Project "${normProject}" has no prior version, expected hash "${expectedHash}" is invalid`);
         err.code = 'STALE_VERSION';
         throw err;
     }

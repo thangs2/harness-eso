@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDbAdapter } from '../eso/graph/src/db-adapter.mjs';
-import { initConfigSchema } from '../eso/control-plane/src/config-schema.mjs';
+import { initConfigSchema } from '../eso/control-plane/src/config-schema.ts';
 import {
     saveConfig,
     readConfig,
     listConfigEvents,
-} from '../eso/control-plane/src/config-store.mjs';
+} from '../eso/control-plane/src/config-store.ts';
 
 function createTestDb() {
     const db = createDbAdapter(':memory:');

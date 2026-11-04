@@ -21,7 +21,7 @@ export function previewConfigChange({
     pendingChange,
     projectsList = [],
     artefacts = [],
-} = {}) {
+}: any = {}) {
     if (!project || typeof project !== 'string') {
         throw new Error('Project is required');
     }
@@ -67,14 +67,14 @@ export function saveConfigChange({
     pendingChange,
     previewHash,
     operator = 'operator',
-} = {}) {
+}: any = {}) {
     if (!project || typeof project !== 'string') {
         throw new Error('Project is required');
     }
 
     // AC-IAM-06-04 / tenant: Verify project isolation
     if (currentConfig.project && currentConfig.project !== project) {
-        const err = new Error(`TENANT_VIOLATION: Cannot modify configuration for '${currentConfig.project}' from tenant '${project}'`);
+        const err: any = new Error(`TENANT_VIOLATION: Cannot modify configuration for '${currentConfig.project}' from tenant '${project}'`);
         err.code = 'TENANT_VIOLATION';
         throw err;
     }
@@ -82,7 +82,7 @@ export function saveConfigChange({
     // AC-IAM-06-02 & AC-IAM-06-05 / ED4: Exact preview hash check
     const expectedHash = computeHash({ project, baseVersion: currentConfig.version || 1, pendingChange });
     if (!previewHash || previewHash !== expectedHash) {
-        const err = new Error('PREVIEW_HASH_MISMATCH: Configuration changes must be previewed prior to save; preview hash does not match');
+        const err: any = new Error('PREVIEW_HASH_MISMATCH: Configuration changes must be previewed prior to save; preview hash does not match');
         err.code = 'PREVIEW_HASH_MISMATCH';
         err.expected_hash = expectedHash;
         err.provided_hash = previewHash;
@@ -121,9 +121,9 @@ export function revertConfigChange({
     history = [],
     artefacts = [],
     operator = 'operator',
-} = {}) {
+}: any = {}) {
     if (!history || history.length === 0) {
-        const err = new Error('NO_HISTORY_TO_REVERT: No previous configuration version available');
+        const err: any = new Error('NO_HISTORY_TO_REVERT: No previous configuration version available');
         err.code = 'NO_HISTORY_TO_REVERT';
         throw err;
     }
@@ -166,7 +166,7 @@ export function previewAttributeChange({
     newValue,
     policies = [],
     currentVersion = 1,
-} = {}) {
+}: any = {}) {
     const affectedPolicies = policies.filter((p) => {
         if (p.attribute === attributeKey) return true;
         if (p.target_attribute === attributeKey) return true;
@@ -200,10 +200,10 @@ export function saveAttributeChange({
     requestedVersion = 1,
     actorRole = 'operator',
     hasMigrationPlan = false,
-} = {}) {
+}: any = {}) {
     // AC-IAM-09-02 / rbac: Only operator/human can mutate policies/attributes
     if (actorRole !== 'operator' && actorRole !== 'admin') {
-        const err = new Error(`FORBIDDEN_MUTATION: Actor with role '${actorRole}' is prohibited from modifying policy attributes`);
+        const err: any = new Error(`FORBIDDEN_MUTATION: Actor with role '${actorRole}' is prohibited from modifying policy attributes`);
         err.code = 'FORBIDDEN_MUTATION';
         err.role = actorRole;
         throw err;
@@ -211,7 +211,7 @@ export function saveAttributeChange({
 
     // AC-IAM-09-04 / ED7: Optimistic concurrency control
     if (requestedVersion !== currentVersion) {
-        const err = new Error(`STALE_VERSION: Attribute version mismatch. Expected ${currentVersion}, got ${requestedVersion}`);
+        const err: any = new Error(`STALE_VERSION: Attribute version mismatch. Expected ${currentVersion}, got ${requestedVersion}`);
         err.code = 'STALE_VERSION';
         err.current_version = currentVersion;
         err.requested_version = requestedVersion;
@@ -229,7 +229,7 @@ export function saveAttributeChange({
 
     // AC-IAM-09-03: Deleting attribute currently in use
     if (action === 'delete' && inUsePolicies.length > 0) {
-        const err = new Error(
+        const err: any = new Error(
             `ATTRIBUTE_IN_USE: Cannot delete attribute '${attributeKey}' used by ${inUsePolicies.length} policy/policies`
         );
         err.code = 'ATTRIBUTE_IN_USE';
@@ -240,7 +240,7 @@ export function saveAttributeChange({
 
     // AC-IAM-09-05 / ED10: Renaming attribute currently in use without migration plan
     if (action === 'rename' && inUsePolicies.length > 0 && !hasMigrationPlan) {
-        const err = new Error(
+        const err: any = new Error(
             `RENAME_WITHOUT_MIGRATION: Cannot rename attribute '${attributeKey}' without an explicit migration plan`
         );
         err.code = 'RENAME_WITHOUT_MIGRATION';
