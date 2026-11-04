@@ -18,7 +18,7 @@ import type { AuditItem } from '../models/audit.model.js';
             </header>
 
             <eso-state-frame
-                [state]="items().length === 0 ? 'ST1_EMPTY' : 'ST6_READY'"
+                [state]="items().length === 0 ? 'ST1_EMPTY' : 'READY'"
                 emptyMessage="Chưa có hiện vật nào được lưu trữ"
             >
                 <div class="artefact-grid">

@@ -10,6 +10,15 @@
  * - US-UI-05 / ESO-221: S5 Artefact reconstruction (turn, hash, reverted skill flag, dirty content notice, pagination)
  */
 
+/**
+ * The six UX states are a closed set (sdlc/08.ui-design/03.states.md §1):
+ * ST1 empty · ST2 loading · ST3 error · ST4 denied · ST5 partial · ST6 stale.
+ *
+ * ST6 means **stale only**. A surface with recorded data and enough coverage is
+ * not a seventh state — it is `READY`, the content branch. Keeping `ST6_READY`
+ * made every ready surface claim the stale state, so all `AC-UI-0x-06` frames
+ * could never appear.
+ */
 export const UI_STATES = Object.freeze({
     ST1_EMPTY: 'EMPTY',
     ST2_LOADING: 'LOADING',
@@ -17,7 +26,7 @@ export const UI_STATES = Object.freeze({
     ST4_DENIED: 'DENIED',
     ST5_PARTIAL: 'PARTIAL',
     ST6_STALE: 'STALE',
-    ST6_READY: 'READY',
+    READY: 'READY',
 });
 
 // ----------------------------------------------------
@@ -76,10 +85,14 @@ export function renderStateFrame({
                 rendered: true,
                 content: data,
                 stale: true,
+                // AC-UI-01-06: the coverage ratio is DATA. When the caller has
+                // none, the frame says nothing about it instead of inventing a
+                // number — a made-up ratio is false certainty on a warning.
+                coverage: (data && data.coverage !== undefined) ? data.coverage : null,
             };
-        case UI_STATES.ST6_READY:
+        case UI_STATES.READY:
             return {
-                state: UI_STATES.ST6_READY,
+                state: UI_STATES.READY,
                 rendered: true,
                 content: data,
             };
@@ -119,22 +132,26 @@ export function projectS1WorkOverview({
 
     const rows = sortedTurns.map((t) => {
         const isPartial = t.level === 'partial' || (t.missing && t.missing.length > 0);
-        const completeness = t.completeness !== undefined ? t.completeness : 1.0;
+        // AC-UI-01-06: an unrecorded ratio stays `null`; defaulting it to 1.0
+        // would print "complete" for a turn nobody measured.
+        const completeness = (t.completeness === undefined || t.completeness === null) ? null : t.completeness;
 
         return {
             turn_id: t.turn_id,
             work: t.work || t.task,
-            level: t.level || 'sufficient',
+            // AC-UI-01-12: an unrecorded level stays `null` — `sufficient` is a
+            // verdict, and the surface must never invent one.
+            level: t.level === undefined || t.level === null ? null : t.level,
             missing_count: (t.missing && t.missing.length) || 0,
             missing_badge: isPartial ? `⚠ ${(t.missing && t.missing.length) || 0} thiếu` : null, // AC-UI-01-05
-            completeness_bar: completeness < 0.70 ? { warning: true, ratio: completeness } : null, // AC-UI-01-06
+            completeness_bar: completeness !== null && completeness < 0.70 ? { warning: true, ratio: completeness } : null, // AC-UI-01-06
             distinct_styling: t.level === 'cannot-judge' ? 'border-dashed' : (t.level === 'insufficient' ? 'border-solid-red' : 'border-normal'), // AC-UI-01-12
             actions: ['WHY'], // AC-UI-01-08: [Vì sao] button opens S2
         };
     });
 
     return {
-        state: UI_STATES.ST6_READY,
+        state: UI_STATES.READY,
         project,
         total_turns: rows.length,
         has_write_buttons: false, // AC-UI-01-11: Read-only, 0 write buttons
@@ -167,7 +184,7 @@ export function projectS2WhyDetails({
 
     // AC-UI-02-07: 4 parts in order: verdict, evidence, basis, unknowns
     return {
-        state: UI_STATES.ST6_READY,
+        state: UI_STATES.READY,
         turn_id: turn.turn_id,
         rule_version_banner: isOldRule ? `theo luật cũ (v${ruleVersion})` : null, // AC-UI-02-06
         four_parts: {
@@ -194,7 +211,7 @@ export function projectS3Configuration({
     const canSave = preview && preview.preview_hash && pendingChanges;
 
     return {
-        state: UI_STATES.ST6_READY,
+        state: UI_STATES.READY,
         current_config: config,
         save_button_enabled: Boolean(canSave),
         preview_hash: preview ? preview.preview_hash : null,
@@ -242,7 +259,7 @@ export function projectS4DebtList({
     });
 
     return {
-        state: UI_STATES.ST6_READY,
+        state: UI_STATES.READY,
         project,
         open_items: items,
         closed_items_folded: closedDebts, // AC-UI-04-05: Preserved folded under ĐÃ ĐÓNG
@@ -309,7 +326,7 @@ export function projectS5ArtefactReconstruct({
     const paginatedTurns = record.turns_used ? record.turns_used.slice(startIndex, startIndex + pageSize) : [];
 
     return {
-        state: UI_STATES.ST6_READY,
+        state: UI_STATES.READY,
         artefact_id: artefactId,
         turn_id: record.turn_id,
         file_hash: fileIsDirty ? null : record.file_hash,

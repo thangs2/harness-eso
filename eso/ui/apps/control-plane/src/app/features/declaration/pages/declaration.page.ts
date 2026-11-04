@@ -20,7 +20,7 @@ import type { DeclarationPreview } from '../models/declaration.model.js';
                 <h1>Cấu hình hệ thống (S3 Config)</h1>
             </header>
 
-            <eso-state-frame [state]="isSaving() ? 'ST2_LOADING' : 'ST6_READY'">
+            <eso-state-frame [state]="isSaving() ? 'ST2_LOADING' : 'READY'">
                 <div class="config-actions">
                     <button type="button" class="btn-preview" (click)="generatePreview()">Xem trước</button>
                     <button

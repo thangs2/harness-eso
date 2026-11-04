@@ -45,7 +45,8 @@ export class WorkOverviewStore {
         if (items.length === 0) {
             this.state.set('ST1_EMPTY');
         } else {
-            this.state.set('ST6_READY');
+            // ST6 is stale only; a list with content is READY.
+            this.state.set('READY');
         }
     }
 

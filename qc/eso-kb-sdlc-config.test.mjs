@@ -177,26 +177,50 @@ test('SCN-CFG-01-05 (AC-CFG-01-05 / ED1): 0 changes across all groups is a no-op
     assert.ok(result.message.includes('không đổi'));
 });
 
-test('SCN-SDLC-01-01 (AC-SDLC-01-01 & AC-SDLC-01-06): Project init generates templates; re-run is idempotent', () => {
-    // Blank project initialization (AC-SDLC-01-06 / ED1)
-    const initResult = initProjectSdlc({
-        project: 'clean-project',
+test('SCN-SDLC-01-01 (AC-SDLC-01-01 & AC-SDLC-01-06): Project init generates templates; re-run is idempotent', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-sdlc-init-'));
+    try {
+        // Blank project initialization (AC-SDLC-01-06 / ED1). `changed`/`files_created`
+        // describe bytes written, so the run needs a consumer root to write into.
+        const initResult = initProjectSdlc({
+            project: 'clean-project',
+            config: { sdlc_root: 'sdlc' },
+            appliesWhen: { has_fe: true, has_jira: true },
+            consumerPath: tempDir,
+        });
+
+        assert.equal(initResult.changed, true);
+        assert.equal(initResult.files_created.length, 4);
+        assert.ok(fs.existsSync(path.join(tempDir, 'sdlc', '01.architecture.md')));
+
+        // Re-run is idempotent (AC-SDLC-01-01), detected from disk, not only from the flag.
+        const reRun = initProjectSdlc({
+            project: 'clean-project',
+            config: { sdlc_root: 'sdlc' },
+            consumerPath: tempDir,
+        });
+
+        assert.equal(reRun.changed, false);
+        assert.equal(reRun.files_created.length, 0);
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('ESO-388 (B10): init without consumerPath writes nothing and must not claim files', () => {
+    const result = initProjectSdlc({
+        project: 'no-consumer',
         config: { sdlc_root: 'sdlc' },
         appliesWhen: { has_fe: true, has_jira: true },
     });
 
-    assert.equal(initResult.changed, true);
-    assert.equal(initResult.files_created.length, 4);
-
-    // Re-run is idempotent (AC-SDLC-01-01)
-    const reRun = initProjectSdlc({
-        project: 'clean-project',
-        config: { sdlc_root: 'sdlc' },
-        isReInit: true,
-    });
-
-    assert.equal(reRun.changed, false);
-    assert.equal(reRun.files_created.length, 0);
+    assert.equal(result.changed, false, 'nothing was written, so nothing changed');
+    assert.deepEqual(result.files_created, [], 'files_created must only name bytes actually written');
+    assert.deepEqual(result.out_scope, []);
 });
 
 test('SCN-SDLC-01-02 (AC-SDLC-01-02): Missing declaration (sdlc_root) rejects initialization with MISSING_CONFIG', () => {
@@ -212,17 +236,29 @@ test('SCN-SDLC-01-02 (AC-SDLC-01-02): Missing declaration (sdlc_root) rejects in
     });
 });
 
-test('SCN-SDLC-01-03 (AC-SDLC-01-03): applies_when filtering excludes non-matching templates and records OUT', () => {
-    const result = initProjectSdlc({
-        project: 'backend-only',
-        config: { sdlc_root: 'sdlc' },
-        appliesWhen: { has_fe: false, has_jira: true },
-    });
+test('SCN-SDLC-01-03 (AC-SDLC-01-03): applies_when filtering excludes non-matching templates and records OUT', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
 
-    assert.ok(result.files_created.includes('sdlc/02.backend-spec.md'));
-    assert.ok(!result.files_created.includes('sdlc/03.frontend-spec.md'));
-    assert.equal(result.out_scope.length, 1);
-    assert.equal(result.out_scope[0].template, 'sdlc/03.frontend-spec.md');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-sdlc-filter-'));
+    try {
+        const result = initProjectSdlc({
+            project: 'backend-only',
+            config: { sdlc_root: 'sdlc' },
+            appliesWhen: { has_fe: false, has_jira: true },
+            consumerPath: tempDir,
+        });
+
+        assert.ok(result.files_created.includes('sdlc/02.backend-spec.md'));
+        assert.ok(!result.files_created.includes('sdlc/03.frontend-spec.md'));
+        assert.ok(fs.existsSync(path.join(tempDir, 'sdlc', '02.backend-spec.md')));
+        assert.ok(!fs.existsSync(path.join(tempDir, 'sdlc', '03.frontend-spec.md')));
+        assert.equal(result.out_scope.length, 1);
+        assert.equal(result.out_scope[0].template, 'sdlc/03.frontend-spec.md');
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
 });
 
 test('SCN-SDLC-01-04 (AC-SDLC-01-04 / tenant): Init on Project A leaves Project B completely untouched', () => {
@@ -317,6 +353,49 @@ test('ESO-388 (B10): init writes real files to disk, second run is idempotent, u
         assert.equal(rev.reverted_count, 1);
         assert.equal(rev.impact[0].restored_version, '1.0.0');
         assert.ok(!fs.existsSync(versionFile));
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('ESO-388 (B10): upgrade across 2 projects writes disk, revert restores the previous file bytes', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { revertProjectSdlcStandard } = await import('../eso/knowledge/src/index.mjs');
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-sdlc-revert-'));
+    try {
+        const projA = path.join(tempDir, 'p1');
+        const projB = path.join(tempDir, 'p2');
+        fs.mkdirSync(projA, { recursive: true });
+        fs.mkdirSync(projB, { recursive: true });
+
+        const fileA = path.join(projA, '.sdlc-standard.json');
+        const fileB = path.join(projB, '.sdlc-standard.json');
+        const originalA = JSON.stringify({ standard_version: '1.4.0', keep: 'this-exact-bytes' }, null, 2);
+        fs.writeFileSync(fileA, originalA, 'utf8');
+        // p2 starts without a standard file at all
+
+        const projects = [
+            { id: 'p1', standard_version: '1.4.0', path: projA },
+            { id: 'p2', standard_version: '1.0.0', path: projB },
+        ];
+
+        const upg = upgradeProjectSdlcStandard({ projects, targetStandardVersion: '2.0.0' });
+        assert.equal(upg.can_revert, true);
+        assert.equal(upg.upgraded_count, 2);
+        assert.equal(JSON.parse(fs.readFileSync(fileA, 'utf8')).standard_version, '2.0.0');
+        assert.equal(JSON.parse(fs.readFileSync(fileB, 'utf8')).standard_version, '2.0.0');
+
+        const rev = revertProjectSdlcStandard({ upgradeResult: upg });
+        assert.equal(rev.success, true);
+        assert.equal(rev.reverted_count, 2);
+
+        // Revert must put the previous bytes back, not merely drop the file.
+        assert.equal(fs.readFileSync(fileA, 'utf8'), originalA);
+        // A file the upgrade created did not exist before, so revert removes it.
+        assert.ok(!fs.existsSync(fileB));
     } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
     }

@@ -17,7 +17,7 @@ import type { DiagnosisEvidence } from '../models/diagnosis.model.js';
                 <h1>Giải trình quyết định (S2 Why)</h1>
             </header>
 
-            <eso-state-frame [state]="evidence() ? 'ST6_READY' : 'ST1_EMPTY'" emptyMessage="Chưa có bằng chứng cho lượt chạy này">
+            <eso-state-frame [state]="evidence() ? 'READY' : 'ST1_EMPTY'" emptyMessage="Chưa có bằng chứng cho lượt chạy này">
                 @if (evidence()) {
                     <article class="evidence-card">
                         <h2>Quyết định: {{ evidence()?.decision }}</h2>

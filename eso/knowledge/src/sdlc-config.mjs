@@ -232,7 +232,9 @@ export function initProjectSdlc({
         }
     }
 
-    // Write real files to disk when consumerPath is provided (DoD B10 / ESO-388)
+    // Write real files to disk when consumerPath is provided (DoD B10 / ESO-388).
+    // Without a consumer root there is nowhere to write, so report no files: the old
+    // `else` branch listed every template as created while the disk stayed untouched.
     const generatedFiles = [];
     if (consumerPath) {
         for (const rel of targetTemplates) {
@@ -243,8 +245,6 @@ export function initProjectSdlc({
                 generatedFiles.push(rel);
             }
         }
-    } else {
-        generatedFiles.push(...targetTemplates);
     }
 
     // AC-SDLC-01-06 / ED1: Blank project with 0 existing folders inits full tree

@@ -12,6 +12,11 @@
  * This is a Node script rather than a shell one-liner because the repo runs on Windows too
  * (`deploy.sh` is bash, so Windows goes through `bun run test` instead), where `for … do … done` is not
  * a thing.
+ *
+ * Coverage is part of the exit code, not just the log: a listed suite that disappeared used to print
+ * `SKIP` and still exit 0, so deleting a suite left CI green while 42 tests stopped running. A
+ * required suite that is missing, or has no tests left, now fails the run, and the `eso/` suites must
+ * still contribute at least `ESO_TEST_FLOOR` tests.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -36,14 +41,45 @@ const SUITES = [
     'eso/iam/test',
     'eso/knowledge/test',
     'eso/control-plane/test',
+    'eso/cli',
     'qc',
 ];
+
+/**
+ * Suites that must be present *and* still hold tests.
+ *
+ * `eso-core`, `decision` and `system-one` are intentionally test-less today, so they stay unlisted
+ * here; they are in `SUITES` so that adding a test file is enough to have it picked up.
+ */
+const REQUIRED_SUITES = new Set([...SUITES.filter((rel) => rel.startsWith('eso/')), 'qc']);
+
+/**
+ * Ratchet over the `eso/` suites: the floor the ticket states, not a snapshot of today's total (that
+ * total moves whenever a peer adds a test, and a floor that tracks it would red their branch). Losing
+ * one small suite is caught by `REQUIRED_SUITES` instead; the floor catches a wholesale collapse.
+ *
+ * 210 already excludes `eso/cli`, which was missing from `SUITES` until 2026-11-05, so its
+ * `init-profile` suite — the ESO-368 acceptance tests — never ran in CI. It is listed now.
+ * Raise the floor when tests are added; lower it only for tests removed on purpose, named in the commit.
+ */
+const ESO_TEST_FLOOR = 210;
+
+/** `bun test` prints `Ran 42 tests across 1 file.` — read the count so a vanished suite cannot hide. */
+export function parseRanCount(output) {
+    const match = /Ran (\d+) tests? across/.exec(String(output || ''));
+    return match ? Number(match[1]) : null;
+}
+
+/** `1 test` reads better than `1 tests` in a CI log. */
+function plural(n) {
+    return `${n} test${n === 1 ? '' : 's'}`;
+}
 
 /** `bun test` exit codes: 0 pass, 1 test failure, >1 runner error. Capture, then classify. */
 function runSuite(rel) {
     const cwd = path.join(REPO, rel);
     if (!fs.existsSync(cwd)) {
-        return { rel, status: 'missing' };
+        return { rel, status: 'missing', ran: null };
     }
     const res = spawnSync(process.env.BUN_BIN || 'bun', ['test'], {
         cwd,
@@ -51,75 +87,129 @@ function runSuite(rel) {
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     if (res.error) {
-        return { rel, status: 'error', output: String(res.error.message || res.error) };
+        return { rel, status: 'error', output: String(res.error.message || res.error), ran: null };
     }
     const output = `${res.stdout || ''}${res.stderr || ''}`;
+    const ran = parseRanCount(output);
     /*
-     * `No tests found!` is not a failure. Not every package has unit tests — of the directories this
-     * runs, `eso-core`, `decision` and `system-one` have none. They stay listed so that adding a test
-     * file is enough to have it picked up, and so the gap is visible rather than implied.
+     * `No tests found!` is not a failure by itself. Not every package has unit tests — but a package
+     * that used to have them must not quietly become one of those (`REQUIRED_SUITES` decides).
      */
     if (res.status !== 0 && /No tests found!/.test(output)) {
-        return { rel, status: 'none', output };
+        return { rel, status: 'none', output, ran: null };
     }
-    return { rel, status: res.status === 0 ? 'pass' : 'fail', output };
+    return { rel, status: res.status === 0 ? 'pass' : 'fail', output, ran };
 }
 
-/*
- * Builds that a test suite depends on. `qc/eso-cp-nestjs.test.mjs` imports
- * `eso/control-plane/dist/server.js`, so a clean checkout must build it first.
- * Keep this list explicit rather than hiding the dependency inside the test.
+/**
+ * Decide what a suite's status means for the exit code. Pure so the rule can be exercised without
+ * deleting a suite: `missing`/`none` fail for a required suite, and stay informational otherwise.
  */
-const BUILDS = [{ rel: 'eso/control-plane', script: 'build' }];
-let buildFailed = false;
-for (const b of BUILDS) {
-    const cwd = path.join(REPO, b.rel);
-    if (!fs.existsSync(cwd)) continue;
-    const res = spawnSync(process.env.BUN_BIN || 'bun', ['run', b.script], {
-        cwd,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    if (res.status !== 0) {
-        buildFailed = true;
-        const output = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-20);
-        console.error(`  FAIL  build ${b.rel} (${b.script})`);
-        for (const line of output) console.error(`        ${line}`);
-    }
-}
-if (buildFailed) {
-    console.error('build failed — suites not run');
-    process.exit(1);
+export function suiteFailure(result, required = REQUIRED_SUITES.has(result.rel)) {
+    if (result.status === 'fail' || result.status === 'error') return true;
+    if (result.status === 'missing' || result.status === 'none') return required;
+    return false;
 }
 
-const results = SUITES.map(runSuite);
-let failed = 0;
-
-for (const r of results) {
-    if (r.status === 'pass') {
-        console.log(`  ok    ${r.rel}`);
-        continue;
-    }
-    if (r.status === 'missing') {
-        console.log(`  SKIP  ${r.rel} (not present)`);
-        continue;
-    }
-    if (r.status === 'none') {
-        console.log(`  --    ${r.rel} (no test files)`);
-        continue;
-    }
-    failed += 1;
-    console.log(`  FAIL  ${r.rel}`);
-    for (const line of String(r.output || '').trim().split('\n').slice(-40)) {
-        console.log(`        ${line}`);
-    }
+/** `eso/` coverage verdict. A shortfall means tests were removed without saying so. */
+export function coverageShortfall({ esoRan, floor = ESO_TEST_FLOOR }) {
+    return typeof esoRan === 'number' && esoRan < floor ? { esoRan, floor } : null;
 }
 
-console.log();
-if (failed) {
-    console.error(`${failed} suite(s) failed`);
-    process.exit(1);
+function main() {
+    /*
+     * Positional arguments restrict the run to named suites, for a targeted check; `bun run test`
+     * passes none and stays the full gate. The coverage ratchet only applies to the full run, since a
+     * subset cannot meet a total.
+     */
+    const requested = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
+    const unknown = requested.filter((rel) => !SUITES.includes(rel));
+    if (unknown.length) {
+        console.error(`unknown suite(s): ${unknown.join(', ')}`);
+        console.error(`known: ${SUITES.join(', ')}`);
+        process.exit(2);
+    }
+    const selected = requested.length ? SUITES.filter((rel) => requested.includes(rel)) : SUITES;
+    const fullRun = requested.length === 0;
+
+    /*
+     * Builds that a test suite depends on. `qc/eso-cp-nestjs.test.mjs` imports
+     * `eso/control-plane/dist/server.js`, so a clean checkout must build it first.
+     * Keep this list explicit rather than hiding the dependency inside the test.
+     */
+    const BUILDS = [{ rel: 'eso/control-plane', script: 'build' }];
+    let buildFailed = false;
+    for (const b of BUILDS) {
+        const cwd = path.join(REPO, b.rel);
+        if (!fs.existsSync(cwd)) continue;
+        const res = spawnSync(process.env.BUN_BIN || 'bun', ['run', b.script], {
+            cwd,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        if (res.status !== 0) {
+            buildFailed = true;
+            const output = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-20);
+            console.error(`  FAIL  build ${b.rel} (${b.script})`);
+            for (const line of output) console.error(`        ${line}`);
+        }
+    }
+    if (buildFailed) {
+        console.error('build failed — suites not run');
+        process.exit(1);
+    }
+
+    const results = selected.map(runSuite);
+    let failed = 0;
+
+    for (const r of results) {
+        const bad = suiteFailure(r);
+        if (r.status === 'pass') {
+            console.log(`  ok    ${r.rel}${r.ran === null ? '' : ` (${plural(r.ran)})`}`);
+            continue;
+        }
+        if (r.status === 'missing') {
+            console.log(`  ${bad ? 'FAIL' : 'SKIP'}  ${r.rel} (not present${bad ? ' — listed as required' : ''})`);
+            if (bad) failed += 1;
+            continue;
+        }
+        if (r.status === 'none') {
+            console.log(`  ${bad ? 'FAIL' : '--'}    ${r.rel} (no test files${bad ? ' — a required suite must hold tests' : ''})`);
+            if (bad) failed += 1;
+            continue;
+        }
+        failed += 1;
+        console.log(`  FAIL  ${r.rel}`);
+        for (const line of String(r.output || '').trim().split('\n').slice(-40)) {
+            console.log(`        ${line}`);
+        }
+    }
+
+    const esoResults = results.filter((r) => r.rel.startsWith('eso/'));
+    const esoRan = esoResults.reduce((sum, r) => sum + (r.ran || 0), 0);
+    console.log(`\n  eso coverage: ${plural(esoRan)} across ${esoResults.length} suites (floor ${ESO_TEST_FLOOR})`);
+
+    if (fullRun) {
+        const shortfall = coverageShortfall({ esoRan });
+        if (shortfall) {
+            failed += 1;
+            console.error(
+                `  FAIL  eso coverage dropped to ${plural(shortfall.esoRan)}, below the ${shortfall.floor} floor — ` +
+                'restore the removed tests, or lower the floor and say which tests went in the commit',
+            );
+        }
+    }
+
+    console.log();
+    if (failed) {
+        console.error(`${failed} suite(s) failed`);
+        process.exit(1);
+    }
+    console.log(
+        `all ${results.length} suites passed (${results.filter((r) => r.status === 'pass').length} with tests, ${results.filter((r) => r.status === 'none').length} with none)`,
+    );
 }
-console.log(
-    `all ${results.length} suites passed (${results.filter((r) => r.status === 'pass').length} with tests, ${results.filter((r) => r.status === 'none').length} with none)`,
-);
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    main();
+}

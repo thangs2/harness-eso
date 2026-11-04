@@ -434,10 +434,35 @@ export function queryTurnProviderAudit({
             else if (typeof db.prepare === 'function') hasEvItem = !!db.prepare(checkEvSql).get();
 
             if (hasEvItem) {
-                const evSql = `SELECT payload, at FROM evidence_item WHERE project = ? AND turn_id = ? AND kind = 'election'`;
+                // The canonical evidence schema (eso/evidence/src/schema.mjs) has no `at` column on
+                // evidence_item; the adapter-local schema (host-bridge.mjs) adds one. Detect the shape
+                // so the audit reads whichever evidence store is attached instead of silently
+                // returning zero records when the column is absent.
+                let hasAtColumn = false;
+                try {
+                    let columns = [];
+                    if (typeof db.all === 'function') columns = db.all('PRAGMA table_info(evidence_item)');
+                    else if (typeof db.prepare === 'function') columns = db.prepare('PRAGMA table_info(evidence_item)').all();
+                    hasAtColumn = columns.some((c) => (c.name || c.column_name) === 'at');
+                } catch {}
+
+                const evSql = hasAtColumn
+                    ? `SELECT payload, at FROM evidence_item WHERE project = ? AND turn_id = ? AND kind = 'election' ORDER BY seq ASC`
+                    : `SELECT payload FROM evidence_item WHERE project = ? AND turn_id = ? AND kind = 'election' ORDER BY seq ASC`;
                 let evRows = [];
                 if (typeof db.all === 'function') evRows = db.all(evSql, project, turnId);
                 else if (typeof db.prepare === 'function') evRows = db.prepare(evSql).all(project, turnId);
+
+                // Without a per-item timestamp, the turn record is the only real time the store holds.
+                let turnAt = null;
+                if (!hasAtColumn) {
+                    try {
+                        const turnRow = typeof db.get === 'function'
+                            ? db.get(`SELECT at FROM evidence_turn WHERE project = ? AND turn_id = ?`, project, turnId)
+                            : db.prepare(`SELECT at FROM evidence_turn WHERE project = ? AND turn_id = ?`).get(project, turnId);
+                        turnAt = turnRow ? turnRow.at : null;
+                    } catch {}
+                }
 
                 for (const r of evRows) {
                     const p = typeof r.payload === 'string' ? JSON.parse(r.payload) : (r.payload || {});
@@ -451,7 +476,7 @@ export function queryTurnProviderAudit({
                         pinned: !!p.pinned,
                         reason: p.reason,
                         history: p.history || [],
-                        recorded_at: r.at || new Date().toISOString(),
+                        recorded_at: r.at || p.at || turnAt || null,
                     });
                 }
             }

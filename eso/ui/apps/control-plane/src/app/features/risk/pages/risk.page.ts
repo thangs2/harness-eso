@@ -14,7 +14,7 @@ import type { RiskItem } from '../models/risk.model.js';
             </header>
 
             <eso-state-frame
-                [state]="items().length === 0 ? 'ST1_EMPTY' : 'ST6_READY'"
+                [state]="items().length === 0 ? 'ST1_EMPTY' : 'READY'"
                 emptyMessage="Không có nợ kỹ thuật nào được ghi nhận"
             >
                 <ul class="debt-list">

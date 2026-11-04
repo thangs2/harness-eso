@@ -16,8 +16,14 @@ export function queryEndpointPermissions({
     project = null,
     coverage = null,
 } = {}) {
+    if (!project || typeof project !== 'string' || !project.trim()) {
+        const err = new Error('project is mandatory');
+        err.code = 'INVALID_PROJECT';
+        throw err;
+    }
     if (!endpointId) throw new Error('endpointId is required');
 
+    const proj = project.trim();
     const database = db || (graph && typeof graph.all === 'function' ? graph : null);
 
     let endpoint = null;
@@ -25,27 +31,19 @@ export function queryEndpointPermissions({
     let perm = null;
 
     if (database) {
-        let epSql = `SELECT id, name, metadata_json, project FROM graph_node WHERE (id = ? OR name = ?) AND kind = 'endpoint'`;
-        const epParams = [endpointId, endpointId];
-        if (project) {
-            epSql += ` AND project = ?`;
-            epParams.push(project);
-        }
+        const epSql = `SELECT id, name, metadata_json, project FROM graph_node WHERE (id = ? OR name = ?) AND kind = 'endpoint' AND project = ?`;
+        const epParams = [endpointId, endpointId, proj];
         const epNode = database.get(epSql, epParams);
 
         if (epNode) {
             const meta = JSON.parse(epNode.metadata_json || '{}');
-            const targetProject = project || epNode.project;
 
-            let permSql = `SELECT ge.target_id, gn.id, gn.name, gn.metadata_json
+            const permSql = `SELECT ge.target_id, gn.id, gn.name, gn.metadata_json
                  FROM graph_edge ge
                  JOIN graph_node gn ON ge.target_id = gn.id
-                 WHERE ge.source_id = ? AND (ge.relation = 'requires' OR ge.relation = 'declares') AND gn.kind = 'permission'`;
-            const permParams = [epNode.id];
-            if (targetProject) {
-                permSql += ` AND ge.project = ? AND gn.project = ?`;
-                permParams.push(targetProject, targetProject);
-            }
+                 WHERE ge.source_id = ? AND (ge.relation = 'requires' OR ge.relation = 'declares') AND gn.kind = 'permission'
+                   AND ge.project = ? AND gn.project = ?`;
+            const permParams = [epNode.id, proj, proj];
             const permEdge = database.get(permSql, permParams);
 
             if (permEdge) {
@@ -56,15 +54,12 @@ export function queryEndpointPermissions({
                     dynamic: pMeta.dynamic === true,
                 };
 
-                let grantSql = `SELECT ge.target_id, gn.id, gn.name, gn.path, gn.metadata_json
+                const grantSql = `SELECT ge.target_id, gn.id, gn.name, gn.path, gn.metadata_json
                      FROM graph_edge ge
                      JOIN graph_node gn ON ge.target_id = gn.id
-                     WHERE ge.source_id = ? AND (ge.relation = 'granted_by' OR ge.relation = 'maps_to') AND gn.kind = 'grant'`;
-                const grantParams = [permEdge.id];
-                if (targetProject) {
-                    grantSql += ` AND ge.project = ? AND gn.project = ?`;
-                    grantParams.push(targetProject, targetProject);
-                }
+                     WHERE ge.source_id = ? AND (ge.relation = 'granted_by' OR ge.relation = 'maps_to') AND gn.kind = 'grant'
+                       AND ge.project = ? AND gn.project = ?`;
+                const grantParams = [permEdge.id, proj, proj];
                 const grantEdge = database.get(grantSql, grantParams);
 
                 if (grantEdge) {
@@ -84,16 +79,16 @@ export function queryEndpointPermissions({
             endpoint = {
                 id: epNode.id,
                 permission: perm,
-                project: targetProject,
+                project: proj,
             };
         }
     } else {
         const endpoints = graph.endpoints || [];
-        endpoint = endpoints.find((e) => (e.id === endpointId || e.name === endpointId) && (!project || !e.project || e.project === project));
+        endpoint = endpoints.find((e) => (e.id === endpointId || e.name === endpointId) && e.project === proj);
         perm = endpoint?.permission;
         const grants = graph.grants || [];
         if (perm) {
-            grantRecord = grants.find((g) => (g.permission_id === perm.id || g.permission_name === perm.name) && (!project || !g.project || g.project === project));
+            grantRecord = grants.find((g) => (g.permission_id === perm.id || g.permission_name === perm.name) && g.project === proj);
         }
     }
 

@@ -1,4 +1,4 @@
-import type { S1TurnListResponse, ConfigPreviewDto, ProblemDetailsDto } from './types.js';
+import type { WorkOverviewResponse, ConfigPreviewDto, ProblemDetailsDto } from './types.js';
 
 export class ControlPlaneApiClient {
     private baseUrl: string;
@@ -20,7 +20,7 @@ export class ControlPlaneApiClient {
         return headers;
     }
 
-    async getS1Work(project: string = 'default'): Promise<S1TurnListResponse> {
+    async getWorkOverview(project: string = 'default'): Promise<WorkOverviewResponse> {
         const url = `${this.baseUrl}/api/v1/work-overview?project=${encodeURIComponent(project)}`;
         const res = await fetch(url, {
             method: 'GET',
@@ -41,10 +41,10 @@ export class ControlPlaneApiClient {
             throw errorDetail;
         }
 
-        return await res.json() as S1TurnListResponse;
+        return await res.json() as WorkOverviewResponse;
     }
 
-    async getS1Html(project: string = 'default'): Promise<{ html: string; status: number }> {
+    async getWorkOverviewHtml(project: string = 'default'): Promise<{ html: string; status: number }> {
         const url = `${this.baseUrl}/work-overview?project=${encodeURIComponent(project)}`;
         const res = await fetch(url, {
             method: 'GET',

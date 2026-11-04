@@ -27,13 +27,15 @@ export function ensureEvidenceSchema(db) {
             PRIMARY KEY (project, turn_id)
         );
 
+        -- Must match eso/evidence/src/schema.mjs: the canonical recorder inserts items
+        -- without a timestamp (the turn row carries the only at). An extra NOT NULL
+        -- at column here rejected every canonical recordTurn on adapter-created stores.
         CREATE TABLE IF NOT EXISTS evidence_item (
             project      TEXT NOT NULL,
             turn_id      TEXT NOT NULL,
             seq          INTEGER NOT NULL,
             kind         TEXT NOT NULL,
             payload      TEXT NOT NULL,
-            at           TEXT NOT NULL,
             PRIMARY KEY (project, turn_id, seq)
         );
     `;

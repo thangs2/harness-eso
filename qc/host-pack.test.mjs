@@ -22,6 +22,55 @@ import { buildHostPack, externalImports, PACK_FILES } from '../scripts/build-hos
 const ESO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PACK_DIR = path.join(ESO_ROOT, 'packages/harness-host-generic/dist/host-pack');
 const PROFILES_DIR = path.join(ESO_ROOT, 'profiles');
+const PACK_LOCK = path.join(os.tmpdir(), 'harness-eso-host-pack.lock');
+
+/**
+ * Serialise the tests that temporarily corrupt the built pack with any test that executes it.
+ *
+ * `PACK_DIR` is shared by the whole suite: the checksum tests swap its bundle for a throwing
+ * stub, and one also rewrites the manifest hash so the install accepts it. `qc/hook-portability`
+ * spawns that same bundle, so a concurrent run sees `throw new Error("bundle is broken")` and
+ * fails for a reason unrelated to the code under test (ESO-377). The corrupt window must be
+ * private; the lock is shared across processes, not a retry or a wider timeout.
+ */
+function acquirePackLock() {
+    const deadline = Date.now() + 30000;
+    for (;;) {
+        try {
+            const fd = fs.openSync(PACK_LOCK, 'wx');
+            fs.writeSync(fd, String(process.pid));
+            return () => {
+                try { fs.closeSync(fd); } catch { /* already closed */ }
+                try { fs.unlinkSync(PACK_LOCK); } catch { /* already released */ }
+            };
+        } catch (err) {
+            if (err.code !== 'EEXIST') throw err;
+            // A crashed holder must not wedge the suite forever; a live holder is never broken.
+            let stale = false;
+            try {
+                const pid = Number(fs.readFileSync(PACK_LOCK, 'utf8'));
+                if (!Number.isInteger(pid) || pid <= 0) stale = true;
+                else {
+                    try {
+                        process.kill(pid, 0);
+                    } catch (killErr) {
+                        stale = killErr.code === 'ESRCH';
+                    }
+                }
+            } catch {
+                stale = true;
+            }
+            if (stale) {
+                try { fs.unlinkSync(PACK_LOCK); } catch { /* raced another waiter */ }
+                continue;
+            }
+            if (Date.now() > deadline) {
+                throw new Error(`timed out waiting for ${PACK_LOCK}`);
+            }
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+        }
+    }
+}
 
 function tempConsumer() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'harness-pack-'));
@@ -93,16 +142,21 @@ test('install copies every manifest file and verifies its checksum', () => {
     assert.ok(actions.length >= PACK_FILES.length);
 });
 
-test('install refuses a pack whose checksum does not match the manifest', () => {
+test('install refuses a pack whose checksum does not match the manifest', { timeout: 30000 }, () => {
     const root = tempConsumer();
-    const saved = fs.readFileSync(path.join(PACK_DIR, 'route-hook.py'));
+    const release = acquirePackLock();
     try {
-        // Corrupt the source pack, then restore. A truncated install would leave hooks that throw
-        // on every tool call, and guards fail closed — so a bad pack must fail the provision.
-        fs.writeFileSync(path.join(PACK_DIR, 'route-hook.py'), `${saved}\n# tampered\n`);
-        assert.throws(() => installHostPack(root), /checksum mismatch/);
+        const saved = fs.readFileSync(path.join(PACK_DIR, 'route-hook.py'));
+        try {
+            // Corrupt the source pack, then restore. A truncated install would leave hooks that throw
+            // on every tool call, and guards fail closed — so a bad pack must fail the provision.
+            fs.writeFileSync(path.join(PACK_DIR, 'route-hook.py'), `${saved}\n# tampered\n`);
+            assert.throws(() => installHostPack(root), /checksum mismatch/);
+        } finally {
+            fs.writeFileSync(path.join(PACK_DIR, 'route-hook.py'), saved);
+        }
     } finally {
-        fs.writeFileSync(path.join(PACK_DIR, 'route-hook.py'), saved);
+        release();
     }
 });
 
@@ -257,43 +311,53 @@ test('verification fails when the pack cannot run', () => {
     assert.ok(res.failures.length >= 7 || res.reason, 'a broken pack must be reported');
 });
 
-test('provision refuses to declare success when its own guards cannot decide', () => {
+test('provision refuses to declare success when its own guards cannot decide', { timeout: 30000 }, () => {
     const root = tempConsumer();
     const profiles = [loadHostProfile(PROFILES_DIR, 'cursor-superset')];
-    // Make a pack that passes its OWN integrity check but cannot execute — the case the checksum
-    // layer cannot catch, and the reason verification exists. Corrupt the source bundle and give
-    // the manifest the matching hash so the install copies it happily.
-    const srcBundle = path.join(PACK_DIR, 'harness-hook.mjs');
-    const srcManifest = path.join(PACK_DIR, 'host-pack.json');
-    const savedBundle = fs.readFileSync(srcBundle);
-    const savedManifest = fs.readFileSync(srcManifest);
+    const release = acquirePackLock();
     try {
-        const broken = 'throw new Error("bundle is broken");\n';
-        fs.writeFileSync(srcBundle, broken);
-        const manifest = JSON.parse(savedManifest.toString('utf8'));
-        manifest.files['harness-hook.mjs'] = createHash('sha256').update(broken).digest('hex');
-        fs.writeFileSync(srcManifest, `${JSON.stringify(manifest, null, 2)}\n`);
+        // Make a pack that passes its OWN integrity check but cannot execute — the case the checksum
+        // layer cannot catch, and the reason verification exists. Corrupt the source bundle and give
+        // the manifest the matching hash so the install copies it happily.
+        const srcBundle = path.join(PACK_DIR, 'harness-hook.mjs');
+        const srcManifest = path.join(PACK_DIR, 'host-pack.json');
+        const savedBundle = fs.readFileSync(srcBundle);
+        const savedManifest = fs.readFileSync(srcManifest);
+        try {
+            const broken = 'throw new Error("bundle is broken");\n';
+            fs.writeFileSync(srcBundle, broken);
+            const manifest = JSON.parse(savedManifest.toString('utf8'));
+            manifest.files['harness-hook.mjs'] = createHash('sha256').update(broken).digest('hex');
+            fs.writeFileSync(srcManifest, `${JSON.stringify(manifest, null, 2)}\n`);
 
-        assert.throws(
-            () => applyHostProfiles(root, profiles, { observePort: 8792 }),
-            /verification failed/,
-        );
+            assert.throws(
+                () => applyHostProfiles(root, profiles, { observePort: 8792 }),
+                /verification failed/,
+            );
+        } finally {
+            fs.writeFileSync(srcBundle, savedBundle);
+            fs.writeFileSync(srcManifest, savedManifest);
+        }
     } finally {
-        fs.writeFileSync(srcBundle, savedBundle);
-        fs.writeFileSync(srcManifest, savedManifest);
+        release();
     }
 });
 
-test('a corrupt source pack is refused by the checksum layer before it is installed', () => {
+test('a corrupt source pack is refused by the checksum layer before it is installed', { timeout: 30000 }, () => {
     const root = tempConsumer();
     const profiles = [loadHostProfile(PROFILES_DIR, 'cursor-superset')];
-    const srcBundle = path.join(PACK_DIR, 'harness-hook.mjs');
-    const saved = fs.readFileSync(srcBundle);
+    const release = acquirePackLock();
     try {
-        fs.writeFileSync(srcBundle, `${saved}\n// tampered\n`);
-        assert.throws(() => applyHostProfiles(root, profiles, { observePort: 8792 }), /checksum mismatch/);
+        const srcBundle = path.join(PACK_DIR, 'harness-hook.mjs');
+        const saved = fs.readFileSync(srcBundle);
+        try {
+            fs.writeFileSync(srcBundle, `${saved}\n// tampered\n`);
+            assert.throws(() => applyHostProfiles(root, profiles, { observePort: 8792 }), /checksum mismatch/);
+        } finally {
+            fs.writeFileSync(srcBundle, saved);
+        }
     } finally {
-        fs.writeFileSync(srcBundle, saved);
+        release();
     }
 });
 

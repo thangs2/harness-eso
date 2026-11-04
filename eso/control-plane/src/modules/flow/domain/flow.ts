@@ -11,6 +11,8 @@
  * - AC-IAM-07-03: Retired worker present in flow -> Reads flow with warning requiring edit or OPEN risk
  */
 
+import { BASIS_RANK } from '../../../../../iam/src/schema.mjs';
+
 export function validateAndCreateFlow({
     id,
     project,
@@ -174,16 +176,6 @@ export function executeHandover({
         } else if (typeof req === 'object' && req.min_basis) {
             const carried = carriedMap.get(reqKind);
             if (carried && (carried.basis || carried.level)) {
-                const BASIS_RANK = {
-                    unverified: 0,
-                    none: 0,
-                    assumption: 1,
-                    partial: 1,
-                    heuristic: 2,
-                    full: 2,
-                    deterministic: 3,
-                    strict: 3,
-                };
                 const actualBasis = carried.basis || carried.level;
                 const reqRank = BASIS_RANK[req.min_basis] ?? 0;
                 const carriedRank = BASIS_RANK[actualBasis] ?? 0;

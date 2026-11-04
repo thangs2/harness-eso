@@ -20,22 +20,25 @@ export function querySliceTenantBoundary({
     coverage = null,
     isImplicit = false,
 } = {}) {
+    if (!project || typeof project !== 'string' || !project.trim()) {
+        const err = new Error('project is mandatory');
+        err.code = 'INVALID_PROJECT';
+        throw err;
+    }
     if (!sliceId) throw new Error('sliceId is required');
 
+    const proj = project.trim();
     const database = db || (graph && typeof graph.all === 'function' ? graph : null);
-    let resolvedTables = Array.isArray(tables) ? [...tables] : [];
+    let resolvedTables = Array.isArray(tables) ? tables.filter((t) => !t.project || t.project === proj) : [];
 
     if (database && resolvedTables.length === 0) {
         // Read table nodes associated with slice
-        let sql = `SELECT gn.id, gn.name, gn.metadata_json
+        const sql = `SELECT gn.id, gn.name, gn.metadata_json
              FROM graph_node gn
              JOIN graph_edge ge ON (ge.target_id = gn.id OR ge.source_id = gn.id)
-             WHERE (ge.source_id = ? OR ge.target_id = ?) AND gn.kind = 'table'`;
-        const params = [sliceId, sliceId];
-        if (project) {
-            sql += ` AND gn.project = ? AND ge.project = ?`;
-            params.push(project, project);
-        }
+             WHERE (ge.source_id = ? OR ge.target_id = ?) AND gn.kind = 'table'
+               AND gn.project = ? AND ge.project = ?`;
+        const params = [sliceId, sliceId, proj, proj];
         const rows = database.all(sql, params) || [];
 
         resolvedTables = rows.map((r) => {

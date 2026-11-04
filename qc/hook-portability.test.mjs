@@ -28,6 +28,55 @@ import test from 'node:test';
  */
 
 const HOST_PROFILES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'profiles', 'host');
+const PACK_LOCK = path.join(os.tmpdir(), 'harness-eso-host-pack.lock');
+
+/**
+ * Wait out the window in which `qc/host-pack` corrupts the built pack it shares with this file.
+ *
+ * That file's checksum tests replace `dist/host-pack/harness-hook.mjs` with a throwing stub
+ * (and sometimes a matching manifest) and restore it afterwards. Spawning the bundle inside
+ * that window fails with `throw new Error("bundle is broken")` — a race, not a portability
+ * defect (ESO-377). Both files take the same cross-process lock so the window stays private;
+ * no retry, no widened timeout.
+ */
+async function acquirePackLock() {
+    const deadline = Date.now() + 30000;
+    for (;;) {
+        try {
+            const fd = fs.openSync(PACK_LOCK, 'wx');
+            fs.writeSync(fd, String(process.pid));
+            return () => {
+                try { fs.closeSync(fd); } catch { /* already closed */ }
+                try { fs.unlinkSync(PACK_LOCK); } catch { /* already released */ }
+            };
+        } catch (err) {
+            if (err.code !== 'EEXIST') throw err;
+            // A crashed holder must not wedge the suite forever; a live holder is never broken.
+            let stale = false;
+            try {
+                const pid = Number(fs.readFileSync(PACK_LOCK, 'utf8'));
+                if (!Number.isInteger(pid) || pid <= 0) stale = true;
+                else {
+                    try {
+                        process.kill(pid, 0);
+                    } catch (killErr) {
+                        stale = killErr.code === 'ESRCH';
+                    }
+                }
+            } catch {
+                stale = true;
+            }
+            if (stale) {
+                try { fs.unlinkSync(PACK_LOCK); } catch { /* raced another waiter */ }
+                continue;
+            }
+            if (Date.now() > deadline) {
+                throw new Error(`timed out waiting for ${PACK_LOCK}`);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+    }
+}
 
 function profileCommands() {
     const out = [];
@@ -100,26 +149,49 @@ test('every hook command works with no bash on PATH', { timeout: 15000 }, async 
     const pack = path.resolve(HOST_PROFILES, '..', '..', 'packages', 'harness-host-generic', 'dist', 'host-pack', 'harness-hook.mjs');
     if (!fs.existsSync(pack)) return;
 
-    const hooks = new Set();
-    for (const { command } of profileCommands()) {
-        const m = /--hook[= ]([A-Za-z0-9_-]+)/.exec(command);
-        if (m && !/\bpython(3)?\b/.test(command)) hooks.add(m[1]);
-    }
-    assert.ok(hooks.size >= 5, `expected several distinct hooks, found ${[...hooks].join(', ')}`);
-
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-hookpath-'));
-    const emptyBin = path.join(dir, 'empty-bin');
-    fs.mkdirSync(emptyBin, { recursive: true });
+    /*
+     * Snapshot the built pack while nobody may be corrupting it, then run the hooks from the
+     * copy. `qc/host-pack` swaps the shared bundle for a throwing stub while its checksum tests
+     * run; copying first means a later corruption cannot change what this test executes.
+     */
+    const snapshotDir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-hookpack-'));
     try {
-        for (const hook of hooks) {
-            const res = await spawnNoShell(process.execPath, [pack, '--hook', hook, '--tree', 'cursor'], dir, emptyBin);
-            assert.ok(
-                /"permission"|"decision"|"hookSpecificOutput"/.test(res.stdout),
-                `${hook} produced no decision without a shell: stdout=${res.stdout.slice(0, 200)} stderr=${res.stderr.slice(0, 200)}`,
-            );
+        const release = await acquirePackLock();
+        try {
+            fs.cpSync(path.dirname(pack), snapshotDir, { recursive: true });
+        } finally {
+            release();
+        }
+        assert.ok(fs.existsSync(path.join(snapshotDir, 'harness-hook.mjs')), 'pack snapshot must include the entrypoint');
+
+        const hooks = new Set();
+        for (const { command } of profileCommands()) {
+            const m = /--hook[= ]([A-Za-z0-9_-]+)/.exec(command);
+            if (m && !/\bpython(3)?\b/.test(command)) hooks.add(m[1]);
+        }
+        assert.ok(hooks.size >= 5, `expected several distinct hooks, found ${[...hooks].join(', ')}`);
+
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-hookpath-'));
+        const emptyBin = path.join(dir, 'empty-bin');
+        fs.mkdirSync(emptyBin, { recursive: true });
+        try {
+            for (const hook of hooks) {
+                const res = await spawnNoShell(
+                    process.execPath,
+                    [path.join(snapshotDir, 'harness-hook.mjs'), '--hook', hook, '--tree', 'cursor'],
+                    dir,
+                    emptyBin,
+                );
+                assert.ok(
+                    /"permission"|"decision"|"hookSpecificOutput"/.test(res.stdout),
+                    `${hook} produced no decision without a shell: stdout=${res.stdout.slice(0, 200)} stderr=${res.stderr.slice(0, 200)}`,
+                );
+            }
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
         }
     } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
+        fs.rmSync(snapshotDir, { recursive: true, force: true });
     }
 });
 

@@ -11,6 +11,26 @@ export const CLOSED_VERBS = Object.freeze([
   'handoff',
 ]);
 
+/**
+ * Ranking of evidence basis values used by a role bar (`bar[].min_basis`).
+ *
+ * Two vocabularies live in the tree: the IAM role basis {unverified, partial, full, strict}
+ * and the evidence basis {assumption, heuristic, deterministic}. The control-plane handover
+ * check (eso/control-plane/src/modules/flow/domain/flow.ts) already ranks both on one scale;
+ * IAM role sufficiency must rank them identically or the same bar means two different things
+ * depending on which path evaluates it.
+ */
+export const BASIS_RANK = Object.freeze({
+  unverified: 0,
+  none: 0,
+  assumption: 1,
+  partial: 1,
+  heuristic: 2,
+  full: 2,
+  deterministic: 3,
+  strict: 3,
+});
+
 export const CLOSED_ATTRIBUTES = Object.freeze([
   'project',
   'path',

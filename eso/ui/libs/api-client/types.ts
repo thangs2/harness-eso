@@ -3,7 +3,7 @@
  * NEVER hand-write DTOs in feature code.
  */
 
-export interface S1TurnDto {
+export interface WorkOverviewTurnDto {
     turn_id: string;
     work: string;
     level: 'sufficient' | 'partial' | 'missing' | 'none';
@@ -12,10 +12,10 @@ export interface S1TurnDto {
     timestamp?: string;
 }
 
-export interface S1TurnListResponse {
+export interface WorkOverviewResponse {
     project: string;
     total: number;
-    items: S1TurnDto[];
+    items: WorkOverviewTurnDto[];
 }
 
 export interface ConfigPreviewDto {

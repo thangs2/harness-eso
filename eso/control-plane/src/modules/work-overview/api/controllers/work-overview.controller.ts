@@ -1,22 +1,23 @@
 import {
     Controller,
     Get,
+    Inject,
     Query,
     Res,
     UseGuards,
 } from '@nestjs/common';
 import { FastifyReply } from 'fastify';
 import { AuthGuard } from '../../../../common/guards/auth.guard.js';
-import { DatabaseService } from '../../../../common/infrastructure/database.service.js';
-import { renderWorkOverviewPage } from '../../application/work-overview.presenter.js';
+import { renderS1Request } from '../../application/work-overview.presenter.js';
+import { PROJECT_ACCESS, ProjectAccessPort } from '../../application/ports/project-access.port.js';
 import { EvidenceRepository } from '../../infrastructure/evidence.repository.js';
 
 @Controller('work-overview')
 @UseGuards(AuthGuard)
 export class WorkOverviewController {
     constructor(
-        private readonly dbService: DatabaseService,
-        private readonly evidence: EvidenceRepository
+        private readonly evidence: EvidenceRepository,
+        @Inject(PROJECT_ACCESS) private readonly projectAccess: ProjectAccessPort
     ) {}
 
     @Get()
@@ -24,19 +25,16 @@ export class WorkOverviewController {
         @Query('project') project: string,
         @Res({ passthrough: true }) reply: FastifyReply
     ) {
-        const db = this.dbService.getDatabase();
-        let turns: any[] = [];
-        try {
-            turns = this.evidence.list(project || 'default');
-        } catch {}
-
-        const page = renderWorkOverviewPage({
+        // The server owns the access decision (AC-UI-01-04): the S1 surface
+        // only renders it. Denial answers with the one refusal sentence the
+        // not-found case also gets, before the store is touched.
+        const result = renderS1Request({
             project: project || 'default',
-            hasAccess: true,
-            turns,
+            canRead: (requested: string) => this.projectAccess.canReadProject(requested),
+            loadTurns: (requested: string) => this.evidence.list(requested),
         });
 
-        reply.header('content-type', 'text/html; charset=utf-8');
-        return page.html;
+        reply.code(result.status).header('content-type', 'text/html; charset=utf-8');
+        return result.html;
     }
 }

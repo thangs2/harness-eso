@@ -11,7 +11,7 @@
  * - AC-IAM-02-07: Role pointing to missing/deleted policy flags DANGLING_POLICY
  */
 
-import { CLOSED_VERBS } from './schema.mjs';
+import { CLOSED_VERBS, BASIS_RANK } from './schema.mjs';
 
 export function createRole({
     project,
@@ -125,7 +125,6 @@ export function evaluateRoleSufficiency({
     }
 
     const deficits = [];
-    const basisRanks = { unverified: 0, partial: 1, full: 2, strict: 3 };
 
     for (const req of role.bar) {
         const matchingEvidence = evidence.find(
@@ -142,8 +141,8 @@ export function evaluateRoleSufficiency({
             continue;
         }
 
-        const actualRank = basisRanks[matchingEvidence.basis || matchingEvidence.level] || 0;
-        const requiredRank = basisRanks[req.min_basis] || 0;
+        const actualRank = BASIS_RANK[matchingEvidence.basis || matchingEvidence.level] || 0;
+        const requiredRank = BASIS_RANK[req.min_basis] || 0;
 
         if (actualRank < requiredRank) {
             deficits.push({

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { initProfileV2, assertWithinConsumer } from './init-profile.mjs';
 
@@ -74,7 +75,7 @@ test('dry-run writes 0 files to disk and returns dryRun: true', () => {
     }
 });
 
-test('idempotency: first run changed: true, second run changed: false', () => {
+test('idempotency: first run changed: true, then two consecutive runs report changed: false', () => {
     const { dir, cleanup } = createTempConsumer();
     try {
         const first = initProfileV2(dir, { projectId: 'test-sandbox' });
@@ -86,6 +87,13 @@ test('idempotency: first run changed: true, second run changed: false', () => {
         const second = initProfileV2(dir, { projectId: 'test-sandbox' });
         assert.equal(second.ok, true);
         assert.equal(second.changed, false);
+        assert.ok(second.files.every((f) => f.action === 'unchanged'));
+
+        // Two consecutive no-op runs, not one: a run that rewrote a file on the second pass would
+        // still report `changed:false` a single time if the rewrite only shows up on the next read.
+        const third = initProfileV2(dir, { projectId: 'test-sandbox' });
+        assert.equal(third.ok, true);
+        assert.equal(third.changed, false);
     } finally {
         cleanup();
     }
@@ -93,7 +101,10 @@ test('idempotency: first run changed: true, second run changed: false', () => {
 
 test('cli: unknown consumer exits with code 2 and writes 0 files', () => {
     const nonExistent = path.join(os.tmpdir(), `khong-ton-tai-${Date.now()}`);
-    const cliPath = path.resolve('eso/cli/cli.mjs');
+    // Anchored to this file, not to the cwd: `scripts/run-tests.mjs` runs the suite from `eso/cli`,
+    // where a cwd-relative path resolves to `eso/cli/eso/cli/cli.mjs` and node exits 1 (module not
+    // found) whatever the CLI actually does — the assertion below would then test the wrong failure.
+    const cliPath = fileURLToPath(new URL('./cli.mjs', import.meta.url));
     const res = spawnSync(process.execPath, [cliPath, 'init', 'profile', nonExistent, '--dry-run'], {
         encoding: 'utf8',
     });

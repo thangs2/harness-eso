@@ -123,6 +123,36 @@ test('ESO-383: invokeCapabilityProvider on zero-source branch none throws SILENT
     );
 });
 
+test('ESO-383: mid-turn fallback to none records the switch with the failure reason', () => {
+    const election = {
+        turn_id: 'turn-fallback-none',
+        capability: 'codegraph_query',
+        branch: 'external',
+        provider_id: 'ext-cg',
+        history: [{ branch: 'external', status: 'elected' }],
+    };
+
+    const res = handleMidTurnBranchFailure({
+        currentElection: election,
+        failureReason: 'Provider uninstalled mid-turn',
+        branches: {}, // nothing left: the switch lands on none
+    });
+
+    assert.equal(res.branch, 'none');
+    assert.equal(res.switched, true);
+    assert.equal(res.guarantee, 'G-DEGRADED');
+    assert.ok(res.switch_record, 'fallback to none must still record the switch');
+    assert.equal(res.switch_record.from, 'external');
+    assert.equal(res.switch_record.to, 'none');
+    assert.equal(res.switch_record.reason, 'Provider uninstalled mid-turn');
+    assert.equal(res.switch_record.silent, false);
+    assert.equal(res.reason, 'Nhánh \'external\' gặp lỗi (Provider uninstalled mid-turn); hạ xuống none');
+    assert.ok(
+        res.history.some((h) => h.status === 'failed' && h.reason === 'Provider uninstalled mid-turn'),
+        'failed branch must remain in history with its reason'
+    );
+});
+
 test('ESO-382: election reads capability_pin from DB store and queryTurnProviderAudit reads evidence_item', async () => {
     const { createDbAdapter } = await import('../eso/graph/src/db-adapter.mjs');
     const {
@@ -160,8 +190,8 @@ test('ESO-382: election reads capability_pin from DB store and queryTurnProvider
 
     // 3. Record election in evidence_item
     db.run(
-        `INSERT INTO evidence_item (project, turn_id, seq, kind, payload, at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO evidence_item (project, turn_id, seq, kind, payload)
+         VALUES (?, ?, ?, ?, ?)`,
         [
             'proj-pin-test',
             'turn-pin-1',
@@ -175,7 +205,6 @@ test('ESO-382: election reads capability_pin from DB store and queryTurnProvider
                 pinned: true,
                 reason: 'Elected via DB pin',
             }),
-            new Date().toISOString(),
         ]
     );
 
@@ -189,4 +218,92 @@ test('ESO-382: election reads capability_pin from DB store and queryTurnProvider
     assert.equal(auditRes.records[0].capability, 'codegraph');
     assert.equal(auditRes.records[0].branch, 'eso-native');
     assert.equal(auditRes.records[0].provider_id, 'eso-cg');
+});
+
+test('ESO-382: pin written in one process drives election after a restart (fresh DB handle, no pins argument)', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { createDbAdapter } = await import('../eso/graph/src/db-adapter.mjs');
+    const { electCapabilityProvider, setCapabilityPin } = await import('../eso/adapters/src/election.mjs');
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'eso-pin-restart-'));
+    const dbFile = path.join(dir, 'eso.db');
+    try {
+        // Process 1: operator pins the capability, then the connection goes away.
+        let db = createDbAdapter(dbFile);
+        setCapabilityPin({ project: 'proj-restart', capabilityKind: 'codegraph', targetBranch: 'eso-native', db });
+        db.close();
+
+        // Process 2: brand-new handle on the same file; no pins passed in memory.
+        db = createDbAdapter(dbFile);
+        const branches = {
+            'host-native': { available: true, provider_id: 'cursor-cg' },
+            'eso-native': { available: true, provider_id: 'eso-cg' },
+        };
+        const election = electCapabilityProvider({
+            project: 'proj-restart',
+            turnId: 'turn-restart-1',
+            capabilityKind: 'codegraph',
+            host: 'cursor',
+            branches,
+            db,
+        });
+        assert.equal(election.branch, 'eso-native', 'pin must survive the restart');
+        assert.equal(election.pinned, true);
+
+        // Control: the same reopened store does not pin another project.
+        const unpinned = electCapabilityProvider({
+            project: 'proj-other',
+            turnId: 'turn-restart-2',
+            capabilityKind: 'codegraph',
+            host: 'cursor',
+            branches,
+            db,
+        });
+        assert.equal(unpinned.branch, 'host-native');
+        assert.notEqual(unpinned.pinned, true);
+        db.close();
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('ESO-382: turn audit reads elections written by the evidence recorder into the canonical evidence store', async () => {
+    const { createDbAdapter } = await import('../eso/graph/src/db-adapter.mjs');
+    const { initEvidenceSchema } = await import('../eso/evidence/src/schema.mjs');
+    const { recordTurn } = await import('../eso/evidence/src/recorder.mjs');
+    const { electCapabilityProvider, queryTurnProviderAudit } = await import('../eso/adapters/src/election.mjs');
+
+    const db = createDbAdapter(':memory:');
+    initEvidenceSchema(db);
+
+    const election = electCapabilityProvider({
+        project: 'proj-evidence',
+        turnId: 'turn-evidence-1',
+        capabilityKind: 'codegraph',
+        host: 'cursor',
+        branches: { 'host-native': { available: true, provider_id: 'cursor-cg' } },
+    });
+
+    recordTurn(
+        db,
+        {
+            project: 'proj-evidence',
+            turn_id: 'turn-evidence-1',
+            at: '2026-11-05T00:00:00.000Z',
+            resolved: [election],
+        },
+        { isRuntime: true }
+    );
+
+    const audit = queryTurnProviderAudit({ project: 'proj-evidence', turnId: 'turn-evidence-1', db });
+    assert.equal(audit.records.length, 1, 'audit must read the evidence_item written by the recorder');
+    assert.equal(audit.records[0].capability, 'codegraph');
+    assert.equal(audit.records[0].branch, 'host-native');
+    assert.equal(audit.records[0].provider_id, 'cursor-cg');
+    assert.equal(audit.records[0].reason, election.reason);
+    assert.equal(audit.records[0].recorded_at, '2026-11-05T00:00:00.000Z');
+
+    db.close();
 });
