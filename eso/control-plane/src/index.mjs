@@ -28,14 +28,3 @@ export {
     saveAttributeChange,
 } from './config-mgr.mjs';
 
-export {
-    createNestFastifyControlPlane,
-} from '../dist/server.js';
-
-export {
-    AppModule,
-} from '../dist/app.module.js';
-
-export {
-    DatabaseService,
-} from '../dist/common/infrastructure/database.service.js';
