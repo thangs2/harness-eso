@@ -59,6 +59,9 @@ async function main() {
             process.exit(0);
         } catch (err) {
             console.error(`❌ init profile failed: ${err.message}`);
+            if (err.code === 'UNKNOWN_CONSUMER') {
+                process.exit(2);
+            }
             process.exit(1);
         }
     } else {

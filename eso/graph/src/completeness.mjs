@@ -40,6 +40,8 @@ export function resolveQuestionKinds(question) {
  * - value = min(coverage(k)) across K(Q)
  * - enforce BR-05: value is ALWAYS numeric 0..1 (NOT NULL), if covered < total or value < 1.0,
  *   status is 'unknown' with coverage ratio, NEVER 'absent'.
+ * - ESO-385: When total === 0 for class or method (or any kind), coverage must NOT default to 1.0!
+ *   total === 0 or undefined is treated as coverage: null / unknown (status = 'unknown').
  *
  * @param {string|{ id: string }} question
  * @param {Record<string, number | { covered: number, total: number }>} perKindCoverage
@@ -48,8 +50,8 @@ export function resolveQuestionKinds(question) {
  *   kinds: string[],
  *   value: number,
  *   status: 'ready' | 'unknown',
- *   coverage: number,
- *   perKind: Record<string, { coverage: number, covered?: number, total?: number }>
+ *   coverage: number | null,
+ *   perKind: Record<string, { coverage: number | null, status: 'ready' | 'unknown', covered?: number, total?: number }>
  * }}
  */
 export function calculateCompleteness(question, perKindCoverage = {}) {
@@ -58,54 +60,64 @@ export function calculateCompleteness(question, perKindCoverage = {}) {
 
     const perKind = {};
     const ratios = [];
+    let hasUnknownOrNull = false;
 
     for (const kind of kinds) {
         const item = perKindCoverage?.[kind];
-        let ratio = 0;
+        let ratio = null;
         let covered;
         let total;
 
         if (typeof item === 'number') {
-            ratio = Number.isFinite(item) ? Math.max(0, Math.min(1, item)) : 0;
+            if (Number.isFinite(item)) {
+                ratio = Math.max(0, Math.min(1, item));
+            } else {
+                ratio = null;
+            }
         } else if (item && typeof item === 'object') {
-            covered = Number(item.covered) || 0;
-            total = Number(item.total) || 0;
+            covered = typeof item.covered === 'number' ? item.covered : (Number(item.covered) || 0);
+            total = typeof item.total === 'number' ? item.total : (Number(item.total) || 0);
             if (total > 0) {
                 ratio = Math.max(0, Math.min(1, covered / total));
-            } else if (total === 0) {
-                // ESO-385: If a project does not have classes or methods declared (total === 0), do not force completeness to 0.
-                ratio = 1;
             } else {
-                ratio = 0;
+                // ESO-385: When total === 0, coverage must NOT default to 1.0!
+                // Treat as coverage: null and status: 'unknown'
+                ratio = null;
             }
-        } else if (item === undefined && (kind === 'class' || kind === 'method') && perKindCoverage?.file) {
-            covered = 0;
-            total = 0;
-            ratio = 1;
         } else {
-            ratio = 0;
+            // Undefined or missing kind
+            ratio = null;
+        }
+
+        if (ratio === null) {
+            hasUnknownOrNull = true;
+        } else {
+            ratios.push(ratio);
         }
 
         perKind[kind] = {
             coverage: ratio,
+            status: (ratio !== null && ratio >= 1.0) ? 'ready' : 'unknown',
             ...(covered !== undefined ? { covered } : {}),
             ...(total !== undefined ? { total } : {}),
         };
-        ratios.push(ratio);
     }
 
-    const rawMin = ratios.length > 0 ? Math.min(...ratios) : 0;
-    const value = Number.isFinite(rawMin) ? Math.max(0, Math.min(1, rawMin)) : 0;
-
-    const isComplete = value >= 1.0 && ratios.every((r) => r >= 1.0);
+    const isComplete = !hasUnknownOrNull && ratios.length === kinds.length && ratios.every((r) => r >= 1.0);
     const status = isComplete ? 'ready' : 'unknown';
+
+    // If any required kind has null/unknown coverage, status is 'unknown', value is 0 (BR-05 numeric),
+    // and coverage is marked unknown (null).
+    const rawMin = ratios.length > 0 ? Math.min(...ratios) : 0;
+    const value = hasUnknownOrNull ? 0 : (Number.isFinite(rawMin) ? Math.max(0, Math.min(1, rawMin)) : 0);
+    const coverage = hasUnknownOrNull ? null : value;
 
     return {
         question: typeof question === 'string' ? question : questionId,
         kinds,
         value,
         status,
-        coverage: value,
+        coverage,
         perKind,
     };
 }

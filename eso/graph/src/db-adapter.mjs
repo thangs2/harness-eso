@@ -16,18 +16,68 @@ if (isBun) {
     DatabaseSyncClass = DatabaseSync;
 }
 
-function normalizeParams(args) {
-    if (args.length === 1 && Array.isArray(args[0])) {
-        return args[0];
+function normalizeOptions(options) {
+    const opts = options ? { ...options } : {};
+    const isReadOnly = Boolean(opts.readonly || opts.readOnly);
+    if (isBun) {
+        opts.safeIntegers = true;
+        if (isReadOnly) {
+            opts.readonly = true;
+            delete opts.readOnly;
+        }
+    } else {
+        if (isReadOnly) {
+            opts.readOnly = true;
+            delete opts.readonly;
+        }
     }
-    return args;
+    return opts;
+}
+
+function normalizeQuery(sql, args) {
+    if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null && !Array.isArray(args[0])) {
+        const paramObj = args[0];
+        const positionalParams = [];
+        const transformedSql = sql.replace(/([:@$][a-zA-Z0-9_]+)/g, (match, paramName) => {
+            const keyWithoutPrefix = paramName.slice(1);
+            if (paramName in paramObj) {
+                positionalParams.push(paramObj[paramName]);
+                return '?';
+            } else if (keyWithoutPrefix in paramObj) {
+                positionalParams.push(paramObj[keyWithoutPrefix]);
+                return '?';
+            }
+            return match;
+        });
+        return { sql: transformedSql, params: positionalParams };
+    }
+    if (args.length === 1 && Array.isArray(args[0])) {
+        return { sql, params: args[0] };
+    }
+    return { sql, params: args };
+}
+
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+
+function normalizeRow(row) {
+    if (!row || typeof row !== 'object') return row;
+    for (const key of Object.keys(row)) {
+        const val = row[key];
+        if (typeof val === 'bigint') {
+            if (val >= MIN_SAFE_BIGINT && val <= MAX_SAFE_BIGINT) {
+                row[key] = Number(val);
+            }
+        }
+    }
+    return row;
 }
 
 export function createDbAdapter(filename = ':memory:', options) {
-    const hasOptions = options && Object.keys(options).length > 0;
+    const normOptions = normalizeOptions(options);
     const rawDb = isBun
-        ? (hasOptions ? new BunDatabaseClass(filename, options) : new BunDatabaseClass(filename))
-        : (hasOptions ? new DatabaseSyncClass(filename, options) : new DatabaseSyncClass(filename));
+        ? new BunDatabaseClass(filename, normOptions)
+        : new DatabaseSyncClass(filename, normOptions);
 
     return {
         raw: rawDb,
@@ -38,35 +88,43 @@ export function createDbAdapter(filename = ':memory:', options) {
         },
 
         run(sql, ...params) {
-            const normalized = normalizeParams(params);
+            const { sql: normSql, params: normParams } = normalizeQuery(sql, params);
             if (isBun) {
-                const query = rawDb.query(sql);
-                return query.run(...normalized);
+                const query = rawDb.query(normSql);
+                return query.run(...normParams);
             }
-            const stmt = rawDb.prepare(sql);
-            return stmt.run(...normalized);
+            const stmt = rawDb.prepare(normSql);
+            return stmt.run(...normParams);
         },
 
         all(sql, ...params) {
-            const normalized = normalizeParams(params);
+            const { sql: normSql, params: normParams } = normalizeQuery(sql, params);
             if (isBun) {
-                const query = rawDb.query(sql);
-                return query.all(...normalized);
+                const query = rawDb.query(normSql);
+                const rows = query.all(...normParams);
+                return rows.map(normalizeRow);
             }
-            const stmt = rawDb.prepare(sql);
-            return stmt.all(...normalized);
+            const stmt = rawDb.prepare(normSql);
+            if (typeof stmt.setReadBigInts === 'function') {
+                stmt.setReadBigInts(true);
+            }
+            const rows = stmt.all(...normParams);
+            return rows.map(normalizeRow);
         },
 
         get(sql, ...params) {
-            const normalized = normalizeParams(params);
+            const { sql: normSql, params: normParams } = normalizeQuery(sql, params);
             if (isBun) {
-                const query = rawDb.query(sql);
-                const res = query.get(...normalized);
-                return res === null ? undefined : res;
+                const query = rawDb.query(normSql);
+                const res = query.get(...normParams);
+                return res === null || res === undefined ? undefined : normalizeRow(res);
             }
-            const stmt = rawDb.prepare(sql);
-            const res = stmt.get(...normalized);
-            return res === null ? undefined : res;
+            const stmt = rawDb.prepare(normSql);
+            if (typeof stmt.setReadBigInts === 'function') {
+                stmt.setReadBigInts(true);
+            }
+            const res = stmt.get(...normParams);
+            return res === null || res === undefined ? undefined : normalizeRow(res);
         },
 
         close() {

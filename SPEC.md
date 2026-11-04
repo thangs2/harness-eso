@@ -12,5 +12,6 @@ Write each requirement as one row under its section, in this format. The fence k
 ```
 
 ## G · Goals: what the client asked for
+- G1 [draft, must] Fix batch ESO-368...389: init-profile, db-adapter, flaky hook, and AST extractor | gate: review
 
 ## K · Constraints

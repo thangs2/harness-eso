@@ -2,12 +2,90 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
+ * Resolve existing ancestor realpath if target does not yet exist.
+ * Traces symlinks so that even if the target does not exist,
+ * symlinks along the path (e.g. symlink .harness) are resolved to their target.
+ */
+function resolveRealPathWithAncestors(targetPath, depth = 0) {
+    if (depth > 40) {
+        const err = new Error(`Too many symbolic links encountered resolving "${targetPath}"`);
+        err.code = 'ELOOP';
+        throw err;
+    }
+
+    let curr = path.resolve(targetPath);
+    const segments = [];
+
+    while (true) {
+        try {
+            const lstat = fs.lstatSync(curr);
+            if (lstat.isSymbolicLink()) {
+                const linkTarget = fs.readlinkSync(curr);
+                const resolvedLink = path.isAbsolute(linkTarget)
+                    ? linkTarget
+                    : path.resolve(path.dirname(curr), linkTarget);
+                const realLinkTarget = resolveRealPathWithAncestors(resolvedLink, depth + 1);
+                return segments.length > 0 ? path.join(realLinkTarget, ...segments) : realLinkTarget;
+            }
+            const realCurr = fs.realpathSync(curr);
+            return segments.length > 0 ? path.join(realCurr, ...segments) : realCurr;
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                const parent = path.dirname(curr);
+                if (parent === curr) {
+                    return segments.length > 0 ? path.join(curr, ...segments) : curr;
+                }
+                segments.unshift(path.basename(curr));
+                curr = parent;
+            } else {
+                throw err;
+            }
+        }
+    }
+}
+
+/**
  * Validate that target path is strictly inside consumerRoot (Never write outside consumer directory).
  */
 export function assertWithinConsumer(consumerRoot, targetPath) {
-    const resolvedRoot = path.resolve(consumerRoot);
-    const resolvedTarget = path.resolve(targetPath);
-    if (!resolvedTarget.startsWith(resolvedRoot + path.sep) && resolvedTarget !== resolvedRoot) {
+    if (!consumerRoot) {
+        const err = new Error('UNKNOWN_CONSUMER: Missing consumer root path');
+        err.code = 'UNKNOWN_CONSUMER';
+        throw err;
+    }
+
+    let resolvedRoot;
+    try {
+        if (!fs.existsSync(consumerRoot)) {
+            const err = new Error(`UNKNOWN_CONSUMER: Consumer directory does not exist: "${consumerRoot}"`);
+            err.code = 'UNKNOWN_CONSUMER';
+            throw err;
+        }
+        resolvedRoot = fs.realpathSync(consumerRoot);
+        const stat = fs.statSync(resolvedRoot);
+        if (!stat.isDirectory()) {
+            const err = new Error(`UNKNOWN_CONSUMER: Consumer path is not a directory: "${consumerRoot}"`);
+            err.code = 'UNKNOWN_CONSUMER';
+            throw err;
+        }
+    } catch (err) {
+        if (err.code === 'UNKNOWN_CONSUMER') {
+            throw err;
+        }
+        const e = new Error(`UNKNOWN_CONSUMER: Consumer directory does not exist: "${consumerRoot}"`);
+        e.code = 'UNKNOWN_CONSUMER';
+        throw e;
+    }
+
+    const resolvedTarget = resolveRealPathWithAncestors(
+        path.isAbsolute(targetPath) ? targetPath : path.resolve(resolvedRoot, targetPath)
+    );
+
+    const rel = path.relative(resolvedRoot, resolvedTarget);
+    const isInside = (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) &&
+                     (resolvedTarget === resolvedRoot || resolvedTarget.startsWith(resolvedRoot + path.sep));
+
+    if (!isInside) {
         const err = new Error(`ACCESS_DENIED: Target path "${resolvedTarget}" is outside consumer directory "${resolvedRoot}"`);
         err.code = 'OUTSIDE_CONSUMER';
         throw err;
@@ -47,6 +125,12 @@ export function defaultEsoV2State(projectId) {
  * Build file plan for ESO v2 init profile.
  */
 export function buildProfilePlan(consumerPath, { projectId = null } = {}) {
+    if (!consumerPath || !fs.existsSync(consumerPath)) {
+        const err = new Error(`UNKNOWN_CONSUMER: Consumer directory does not exist: "${consumerPath}"`);
+        err.code = 'UNKNOWN_CONSUMER';
+        throw err;
+    }
+
     const root = path.resolve(consumerPath);
     const id = projectId || path.basename(root);
 
@@ -85,6 +169,12 @@ export function buildProfilePlan(consumerPath, { projectId = null } = {}) {
  * - Never write outside the consumer directory.
  */
 export function initProfileV2(consumerPath, opts = {}) {
+    if (!consumerPath || !fs.existsSync(consumerPath)) {
+        const err = new Error(`UNKNOWN_CONSUMER: Consumer directory does not exist: "${consumerPath}"`);
+        err.code = 'UNKNOWN_CONSUMER';
+        throw err;
+    }
+
     const dryRun = opts.dryRun === true || opts.plan === true;
     const force = opts.force === true;
     const plan = buildProfilePlan(consumerPath, opts);
@@ -106,7 +196,7 @@ export function initProfileV2(consumerPath, opts = {}) {
                 const prior = JSON.parse(existingContent);
                 const planned = JSON.parse(f.content);
                 const isSemanticallyEqual = (f.relative === '.harness/config.json')
-                    ? (prior.version === planned.version && prior.project === planned.project && JSON.stringify(prior.eso) === JSON.stringify(planned.eso))
+                    ? (prior.version === planned.version && prior.project === planned.project && (!planned.id || prior.id === planned.id) && JSON.stringify(prior.eso) === JSON.stringify(planned.eso))
                     : (f.relative === '.harness/state.json')
                         ? (prior.version === planned.version && prior.status === planned.status && prior.project === planned.project)
                         : (existingContent === f.content);
@@ -132,6 +222,7 @@ export function initProfileV2(consumerPath, opts = {}) {
 
         if (!dryRun && willWrite) {
             fs.mkdirSync(path.dirname(f.path), { recursive: true });
+            assertWithinConsumer(plan.root, f.path);
             fs.writeFileSync(f.path, f.content, 'utf8');
         }
     }

@@ -53,7 +53,7 @@ export function generateNodeId(project, kind, logicalPath = '', symbol = '') {
  *   project: string,
  *   buildId: string|null,
  *   status: 'ready' | 'unknown',
- *   coverage: number,
+ *   coverage: number | null,
  *   scannedNodesCount: number,
  *   node_count: number,
  *   nodes: Array<object>,
@@ -220,16 +220,23 @@ export function extractProjectGraph(project, buildId = null, manifestEntries = [
     const total = entries.length;
     const validCount = total - failedFiles.length;
     const rawCoverage = total > 0 ? validCount / total : 0;
-    const coverage = Number(rawCoverage.toFixed(4));
+    const fileCoverage = Number(rawCoverage.toFixed(4));
 
-    // BR-05: unknown != absent: status is 'unknown' if coverage < 1.0 or failedFiles exist, never absent
-    const status = (coverage >= 1.0 && failedFiles.length === 0) ? 'ready' : 'unknown';
-
+    // ESO-385: perKindCoverage counts classes & methods; if file-only, totals are 0 leading to unknown coverage
     const completeness = calculateCompleteness('Q1', {
         file: { covered: validCount, total },
         class: { covered: classCovered, total: classTotal },
         method: { covered: methodCovered, total: methodTotal },
     });
+
+    // BR-05: status is 'ready' only if file coverage >= 1.0, 0 failed files, and completeness is 'ready'
+    const isReady = fileCoverage >= 1.0 && failedFiles.length === 0 && completeness.status === 'ready';
+    const status = isReady ? 'ready' : 'unknown';
+
+    // Graph coverage: if ready, 1.0; if partial known coverage, reflects completeness coverage; if unknown/file-only, null
+    const coverage = isReady
+        ? fileCoverage
+        : (completeness.coverage !== null ? completeness.coverage : null);
 
     // Optional database persistence
     if (options?.db && typeof options.db.run === 'function') {

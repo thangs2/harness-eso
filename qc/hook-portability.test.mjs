@@ -88,7 +88,7 @@ test('every non-python hook command runs the pack entrypoint with --hook and --t
     assert.deepEqual(problems, []);
 });
 
-test('every hook command works with no bash on PATH', async () => {
+test('every hook command works with no bash on PATH', { timeout: 15000 }, async () => {
     /*
      * Behavioural half. The commands are literals the host runs; the portable claim is that they
      * resolve without a shell, so run the pack entrypoint directly for each distinct `--hook` value
@@ -111,15 +111,13 @@ test('every hook command works with no bash on PATH', async () => {
     const emptyBin = path.join(dir, 'empty-bin');
     fs.mkdirSync(emptyBin, { recursive: true });
     try {
-        await Promise.all(
-            [...hooks].map(async (hook) => {
-                const res = await spawnNoShell(process.execPath, [pack, '--hook', hook, '--tree', 'cursor'], dir, emptyBin);
-                assert.ok(
-                    /"permission"|"decision"|"hookSpecificOutput"/.test(res.stdout),
-                    `${hook} produced no decision without a shell: stdout=${res.stdout.slice(0, 200)} stderr=${res.stderr.slice(0, 200)}`,
-                );
-            }),
-        );
+        for (const hook of hooks) {
+            const res = await spawnNoShell(process.execPath, [pack, '--hook', hook, '--tree', 'cursor'], dir, emptyBin);
+            assert.ok(
+                /"permission"|"decision"|"hookSpecificOutput"/.test(res.stdout),
+                `${hook} produced no decision without a shell: stdout=${res.stdout.slice(0, 200)} stderr=${res.stderr.slice(0, 200)}`,
+            );
+        }
     } finally {
         fs.rmSync(dir, { recursive: true, force: true });
     }
