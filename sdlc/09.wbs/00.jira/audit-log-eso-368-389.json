@@ -1,0 +1,114 @@
+{
+  "audit_id": "QC-V2-2026-11-05",
+  "auditor": "Lead / L4 QC",
+  "scope": "ESO-368…389 (22 tickets)",
+  "base_commit": "015ba05",
+  "reviewed_commits": [
+    "e37339d",
+    "13c16cf",
+    "3d83a9d",
+    "7a80610",
+    "f80cf8f",
+    "015ba05"
+  ],
+  "method": {
+    "clusters": [
+      "build",
+      "criticals",
+      "nest",
+      "angular",
+      "process"
+    ],
+    "repo_readonly": true,
+    "temp_dir": "/tmp/eso-qc2",
+    "no_npm_install": true,
+    "no_x79": true
+  },
+  "commands": [
+    {
+      "cmd": "bun run test",
+      "exit": 0,
+      "note": "green but does not build TS/NG; relies on local dist/"
+    },
+    {
+      "cmd": "npm run build (eso/control-plane)",
+      "exit": 127,
+      "note": "tsc: command not found"
+    },
+    {
+      "cmd": "npm run build (eso/ui)",
+      "exit": 127,
+      "note": "ng: command not found"
+    },
+    {
+      "cmd": "bun test qc/merge-block.test.mjs",
+      "exit": 1,
+      "note": "gate red after reconnecting root marker"
+    },
+    {
+      "cmd": "bun test qc/sdlc-wbs qc/sdlc-conformance qc/links",
+      "exit": 0,
+      "note": "35 pass"
+    }
+  ],
+  "verdict": {
+    "result": "REJECT",
+    "pass_count": 5,
+    "partial_count": 10,
+    "fail_count": 7
+  },
+  "tickets": {
+    "PASS": [
+      "ESO-369",
+      "ESO-372",
+      "ESO-378",
+      "ESO-384",
+      "ESO-385"
+    ],
+    "PARTIAL": [
+      "ESO-368",
+      "ESO-374",
+      "ESO-377",
+      "ESO-379",
+      "ESO-381",
+      "ESO-382",
+      "ESO-383",
+      "ESO-387",
+      "ESO-388",
+      "ESO-389"
+    ],
+    "FAIL": [
+      "ESO-370",
+      "ESO-371",
+      "ESO-373",
+      "ESO-375",
+      "ESO-376",
+      "ESO-380",
+      "ESO-386"
+    ]
+  },
+  "critical": [
+    "build impossible: tsc/ng undeclared; eso/ui lacks angular.json/main.ts/devDeps",
+    "CI green fake: test imports gitignored dist/",
+    "auth fail-open: /config, /config/preview, /s1 200 without token",
+    "stored XSS: eso/control-plane/src/page/s1.mjs:71",
+    "preview hash not verified; stale save overwrites",
+    "Q4/Q5 project optional -> cross-project",
+    "SCN runner writes tracked report; 0/24 automated files exist",
+    "merge block removed by author before re-QC; gate pointed at deleted path",
+    "evidence not SHA-cited; 14/22 verify logs predate fixes; ESO-371 audit runs nonexistent test",
+    "no decision record for NestJS/Angular after D-88"
+  ],
+  "actions": [
+    "re-added MERGE_BLOCKED.md at repo root",
+    "fixed qc/merge-block.test.mjs path to root marker; gate red",
+    "wrote sdlc/09.wbs/00.jira/06.qc-v2-eso-368-389.md",
+    "commit 3f557d3"
+  ],
+  "limitations": [
+    "bun run test does not build Nest/Angular",
+    "clean-clone conclusion from lockfile/import inspection, not a CI run",
+    "Jira status unchanged during audit",
+    "raw probe JSON in /tmp/eso-qc2 is ephemeral"
+  ]
+}
