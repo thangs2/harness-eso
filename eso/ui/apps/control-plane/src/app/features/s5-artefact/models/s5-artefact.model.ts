@@ -1,8 +1,0 @@
-export interface S5ArtefactItem {
-    id: string;
-    name: string;
-    type: string;
-    sizeBytes: number;
-    createdAt: string;
-    url: string;
-}
