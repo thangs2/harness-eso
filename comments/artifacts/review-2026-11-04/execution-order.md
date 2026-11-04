@@ -1,0 +1,111 @@
+---
+id: EXEC-ORDER-2026-11-04
+type: execution-order
+status: ACTIVE
+date: 2026-11-04
+source: "Jira ESO — ESO-367…389 + 34 story reopen"
+---
+
+# Thứ tự thực hiện — 23 ticket mới + 34 story reopen
+
+> **Cách đọc:** cột **Phải xong trước** là điều kiện cứng. Cột **Song song với** nghĩa là `allowed_files` rời nhau,
+> được chạy đồng thời. Không có ticket nào được coi là xong nếu thiếu **verify artefact + test AC + audit độc lập**.
+
+## 0. Trạng thái hiện tại (2026-11-04)
+
+| Hạng mục | Số | Trạng thái |
+|---|---:|---|
+| Epic `ESO-367` — T-04 runtime | 1 | To Do (container, không có việc) |
+| Task `ESO-368…372` — T-04 | 5 | To Do |
+| Task `ESO-373…377` — T-02 cổng | 5 | To Do |
+| Bug `ESO-378…389` — 12 defect | 12 | To Do |
+| Story reopen | 34 | In Progress |
+| P7 (3 Story + 12 Subtask) | 0 | **chưa tạo** — chờ AC + packet |
+
+## 1. Danh sách theo thứ tự phụ thuộc
+
+| # | Ticket | Việc | Phải xong trước | Song song với | Xong khi |
+|---:|---|---|---|---|---|
+| 1 | **ESO-368** | T-04.1 `init profile` | — | 372, 381, 373, 376, 377 | 2 lần chạy `changed:false`; `--dry-run` 0 file |
+| 2 | **ESO-372** | T-04.5 DB adapter Node+Bun | — | 368, 381, 385 | cùng test pass trên `node --test` và `bun test` |
+| 3 | **ESO-381** | B2 UI frame: ST6/denied/fixture 0.62 | — | 368, 372 | ST6=`stale`; denied≠empty; bỏ fixture 0.62 |
+| 4 | **ESO-373** | T-02.1 backfill verify 32 story | — | 368, 376, 377 | đủ 32 file verify có exit code verbatim |
+| 5 | **ESO-376** | T-02.4 đưa 7 suite `eso/*/test` vào CI | — | 373, 377 | `bun run test` chạy 210 test eso |
+| 6 | **ESO-377** | T-02.5 flaky hook test | — | 373, 376 | `bun test` 3 lần liền 0 fail |
+| 7 | **ESO-369** | T-04.2 config store | **368** | 385 | save→read; hash cũ → `STALE_VERSION`; event append-only |
+| 8 | **ESO-385** | B7 Q1 completeness / extractor kinds | — | 369 | graph có ≥1 kind ngoài `file`; completeness ≠ 0 |
+| 9 | **ESO-374** | T-02.2 rubric audit + re-audit 5 mẫu | **373** | 369, 385 | 5 story chấm lại; mỗi audit nêu ≥1 finding |
+| 10 | **ESO-370** | T-04.3 control-plane HTTP | **369** | 387, 388 | `/health` 200; thiếu preview hash → 409 |
+| 11 | **ESO-387** | B9 control-plane key shape | **369** | 370, 388 | xoá role/attribute đang dùng bị chặn |
+| 12 | **ESO-388** | B10 SDLC init/upgrade | **368, 369** | 370, 387 | init ghi file thật; upgrade có revert |
+| 13 | **ESO-389** | B11 ticket_pack store | **369** | 371, 386 | 2 pack giữ lịch sử; tamper bị từ chối |
+| 14 | **ESO-386** | B8 Q4/Q5 đọc graph store | **372, 385** | 389 | Q4 trả lời từ graph; unknown ≠ absent |
+| 15 | **ESO-371** | T-04.4 provision + smoke + evidence | **368, 370** | 380 (build), 375 (build) | 1 dòng `evidence_turn`; replay đọc lại |
+| 16 | **ESO-380** | B1 S1 page thật | **370** (verify sau 371) | 371 | page S1 + test AC §3 |
+| 17 | **ESO-378** | B3 host dispatch thật | **371** | 384 | dispatch có side effect; xoá stub `status:'ok'` |
+| 18 | **ESO-384** | B6 Q1 silent empty trên bun:sqlite | **372** | 378 | không còn `ready` + `readSet:[]` |
+| 19 | **ESO-382** | B4 pin persist + audit store | **378** | 383 | pin sống qua restart; audit đọc evidence store |
+| 20 | **ESO-383** | B5 `SILENT_SWITCH` / `SILENT_NONE` | **378** | 382 | đổi nhánh giữa turn có record + reason |
+| 21 | **ESO-375** | T-02.3 SCN harness + execute | **370** (build), **371** (execute) | 380, 378 | ≥20 SCN `executed` + run id |
+| 22 | **ESO-379** | B12 test constants / audit tự 100 | **374** | — | rubric mới; audit không tự chấm |
+
+## 2. Nhóm chạy song song
+
+| Nhóm | Chạy được ngay khi | Ticket | Build song song |
+|---|---|---|---|
+| **A** | bây giờ | **368 · 372 · 381** + gate **373 · 376 · 377** | 3 build + 3 gate |
+| **B** | 368 xong | **369 · 385** + gate **374** | 2 build |
+| **C** | 369 xong | **370 · 387 · 388** | 3 build |
+| **D** | 372+385 xong | **386 · 389** | 2 build |
+| **E** | 370 xong | **371 · 380** + build **375** | 2 build |
+| **F** | 371 xong | **378 · 384** + execute **375** | 2 build |
+| **G** | 378 xong | **382 · 383** + đóng **379** | 2 build |
+| **H** | sau G | verify + audit 34 story đã reopen | — |
+
+## 3. Đường găng
+
+```
+368 (5) → 369 (8) → 370 (8) → 371 (13) → 378 (8) → 382/383 (5)
+= 47 SP · 6 bước tuần tự
+```
+
+Nhánh phụ:
+- `372 (5) → 385 (8) → 386 (8)` = 21 SP
+- `373 (5) → 374 (8) → 379 (5)` = 18 SP
+
+**Quick win chạy ngay, không chờ ai:** 372, 381, 373, 376, 377, 385.
+
+## 4. Story đóng khi bug tương ứng xong
+
+| Story | Bug |
+|---|---|
+| ESO-217 | 380, 381 |
+| ESO-228 | 378 |
+| ESO-222 | 382 |
+| ESO-233 | 383 |
+| ESO-50 | 384 |
+| ESO-45 | 385 |
+| ESO-305 | 386 |
+| ESO-295 | 387 |
+| ESO-206 | 388 |
+| ESO-253 | 389 |
+
+## 5. 24 story chưa có bug riêng — triage ở nhóm H
+
+`ESO-130 · 176 · 181 · 186 · 191 · 196 · 201 · 211 · 216 · 218 · 219 · 220 · 221 · 227 · 238 · 243 · 248 · 300 · 310 · 315 · 320 · 325 · 330 · 335`
+
+Không nằm trên đường găng. Mỗi story cần tách finding từ deep dive thành bug/subtask trước khi build lại.
+
+## 6. P7 — chưa vào list
+
+3 Story + 12 Subtask (`Inventory · Transfer · Conformance`, epic F-19/F-22/F-23) chỉ được tạo sau khi:
+1. có **AC** `AC-INV-01-*` · `AC-TRF-01-*` · `AC-CNF-01-*` trong `sdlc/06.analysis/03.acceptance-criteria/`;
+2. có **packet BIP** tương ứng ở trạng thái `READY`.
+
+Viết draft AC là việc docs, chạy song song ngay được, không chặn đường găng.
+
+## 7. Ghi chú cấu trúc Jira (đã đo)
+
+- Board là **team-managed**: `parent` chỉ nhận **Epic** cho issue chuẩn. Bug không treo được vào Story → dùng `parent = Epic` + `relates = Story`.
+- Story **không** được treo dưới epic kỹ thuật (`D-79`); toàn bộ Story nằm dưới `F-nn`.
+- `subtasks` trong payload `jira-create` chỉ dùng để roll-up điểm; **không** tạo subtask. Subtask phải tạo riêng với `type: Subtask` + `parent = story key`.

@@ -1,0 +1,495 @@
+{
+  "generated_at": "2026-11-04",
+  "epic": {
+    "key": "ESO-367",
+    "title": "T-04 — V2 runtime & walking skeleton"
+  },
+  "items": [
+    {
+      "key": "ESO-368",
+      "id": "T-04.1",
+      "type": "Task",
+      "sp": 5,
+      "title": "init profile",
+      "depends_on": [],
+      "parallel_with": [
+        "ESO-372",
+        "ESO-381",
+        "ESO-373",
+        "ESO-376",
+        "ESO-377"
+      ],
+      "done_when": "2 lần chạy changed:false; --dry-run 0 file"
+    },
+    {
+      "key": "ESO-372",
+      "id": "T-04.5",
+      "type": "Task",
+      "sp": 5,
+      "title": "DB adapter Node+Bun",
+      "depends_on": [],
+      "parallel_with": [
+        "ESO-368",
+        "ESO-381",
+        "ESO-385"
+      ],
+      "done_when": "cùng test pass trên node và bun"
+    },
+    {
+      "key": "ESO-381",
+      "id": "B2",
+      "type": "Bug",
+      "sp": 8,
+      "title": "UI frame: ST6/denied/fixture",
+      "depends_on": [],
+      "parallel_with": [
+        "ESO-368",
+        "ESO-372"
+      ],
+      "done_when": "ST6=stale; denied!=empty; bỏ fixture 0.62"
+    },
+    {
+      "key": "ESO-373",
+      "id": "T-02.1",
+      "type": "Task",
+      "sp": 5,
+      "title": "backfill verify 32 story",
+      "depends_on": [],
+      "parallel_with": [
+        "ESO-368",
+        "ESO-376",
+        "ESO-377"
+      ],
+      "done_when": "đủ 32 file verify có exit code"
+    },
+    {
+      "key": "ESO-376",
+      "id": "T-02.4",
+      "type": "Task",
+      "sp": 2,
+      "title": "đưa 7 suite eso vào CI",
+      "depends_on": [],
+      "parallel_with": [
+        "ESO-373",
+        "ESO-377"
+      ],
+      "done_when": "bun run test chạy 210 test eso"
+    },
+    {
+      "key": "ESO-377",
+      "id": "T-02.5",
+      "type": "Task",
+      "sp": 2,
+      "title": "flaky hook test",
+      "depends_on": [],
+      "parallel_with": [
+        "ESO-373",
+        "ESO-376"
+      ],
+      "done_when": "bun test 3 lần 0 fail"
+    },
+    {
+      "key": "ESO-369",
+      "id": "T-04.2",
+      "type": "Task",
+      "sp": 8,
+      "title": "config store",
+      "depends_on": [
+        "ESO-368"
+      ],
+      "parallel_with": [
+        "ESO-385"
+      ],
+      "done_when": "save→read; hash cũ STALE_VERSION; event append-only"
+    },
+    {
+      "key": "ESO-385",
+      "id": "B7",
+      "type": "Bug",
+      "sp": 8,
+      "title": "Q1 completeness / extractor kinds",
+      "depends_on": [],
+      "parallel_with": [
+        "ESO-369"
+      ],
+      "done_when": "graph có kind ngoài file; completeness != 0"
+    },
+    {
+      "key": "ESO-374",
+      "id": "T-02.2",
+      "type": "Task",
+      "sp": 8,
+      "title": "rubric audit + re-audit 5 mẫu",
+      "depends_on": [
+        "ESO-373"
+      ],
+      "parallel_with": [
+        "ESO-369",
+        "ESO-385"
+      ],
+      "done_when": "5 story chấm lại; audit nêu finding"
+    },
+    {
+      "key": "ESO-370",
+      "id": "T-04.3",
+      "type": "Task",
+      "sp": 8,
+      "title": "control-plane HTTP",
+      "depends_on": [
+        "ESO-369"
+      ],
+      "parallel_with": [
+        "ESO-387",
+        "ESO-388"
+      ],
+      "done_when": "/health 200; thiếu preview hash 409"
+    },
+    {
+      "key": "ESO-387",
+      "id": "B9",
+      "type": "Bug",
+      "sp": 8,
+      "title": "control-plane key shape",
+      "depends_on": [
+        "ESO-369"
+      ],
+      "parallel_with": [
+        "ESO-370",
+        "ESO-388"
+      ],
+      "done_when": "xoá role/attribute đang dùng bị chặn"
+    },
+    {
+      "key": "ESO-388",
+      "id": "B10",
+      "type": "Bug",
+      "sp": 5,
+      "title": "SDLC init/upgrade",
+      "depends_on": [
+        "ESO-368",
+        "ESO-369"
+      ],
+      "parallel_with": [
+        "ESO-370",
+        "ESO-387"
+      ],
+      "done_when": "init ghi file; upgrade có revert"
+    },
+    {
+      "key": "ESO-389",
+      "id": "B11",
+      "type": "Bug",
+      "sp": 5,
+      "title": "ticket_pack store",
+      "depends_on": [
+        "ESO-369"
+      ],
+      "parallel_with": [
+        "ESO-371",
+        "ESO-386"
+      ],
+      "done_when": "2 pack giữ lịch sử; tamper bị từ chối"
+    },
+    {
+      "key": "ESO-386",
+      "id": "B8",
+      "type": "Bug",
+      "sp": 8,
+      "title": "Q4/Q5 đọc graph store",
+      "depends_on": [
+        "ESO-372",
+        "ESO-385"
+      ],
+      "parallel_with": [
+        "ESO-389"
+      ],
+      "done_when": "Q4 trả lời từ graph; unknown != absent"
+    },
+    {
+      "key": "ESO-371",
+      "id": "T-04.4",
+      "type": "Task",
+      "sp": 13,
+      "title": "provision + smoke + evidence",
+      "depends_on": [
+        "ESO-368",
+        "ESO-370"
+      ],
+      "parallel_with": [
+        "ESO-380",
+        "ESO-375"
+      ],
+      "done_when": "1 dòng evidence_turn; replay đọc lại"
+    },
+    {
+      "key": "ESO-380",
+      "id": "B1",
+      "type": "Bug",
+      "sp": 8,
+      "title": "S1 page thật",
+      "depends_on": [
+        "ESO-370",
+        "ESO-371"
+      ],
+      "parallel_with": [
+        "ESO-371",
+        "ESO-378"
+      ],
+      "done_when": "page S1 + test AC §3"
+    },
+    {
+      "key": "ESO-378",
+      "id": "B3",
+      "type": "Bug",
+      "sp": 8,
+      "title": "host dispatch thật",
+      "depends_on": [
+        "ESO-371"
+      ],
+      "parallel_with": [
+        "ESO-384"
+      ],
+      "done_when": "dispatch có side effect; xoá stub"
+    },
+    {
+      "key": "ESO-384",
+      "id": "B6",
+      "type": "Bug",
+      "sp": 8,
+      "title": "Q1 silent empty trên bun:sqlite",
+      "depends_on": [
+        "ESO-372"
+      ],
+      "parallel_with": [
+        "ESO-378"
+      ],
+      "done_when": "không còn ready + rỗng"
+    },
+    {
+      "key": "ESO-382",
+      "id": "B4",
+      "type": "Bug",
+      "sp": 5,
+      "title": "pin persist + audit store",
+      "depends_on": [
+        "ESO-378"
+      ],
+      "parallel_with": [
+        "ESO-383"
+      ],
+      "done_when": "pin sống qua restart; audit đọc store"
+    },
+    {
+      "key": "ESO-383",
+      "id": "B5",
+      "type": "Bug",
+      "sp": 5,
+      "title": "SILENT_SWITCH / SILENT_NONE",
+      "depends_on": [
+        "ESO-378"
+      ],
+      "parallel_with": [
+        "ESO-382"
+      ],
+      "done_when": "đổi nhánh có record + reason"
+    },
+    {
+      "key": "ESO-375",
+      "id": "T-02.3",
+      "type": "Task",
+      "sp": 8,
+      "title": "SCN harness + execute",
+      "depends_on": [
+        "ESO-370",
+        "ESO-371"
+      ],
+      "parallel_with": [
+        "ESO-380",
+        "ESO-378"
+      ],
+      "done_when": ">=20 SCN executed + run id"
+    },
+    {
+      "key": "ESO-379",
+      "id": "B12",
+      "type": "Bug",
+      "sp": 5,
+      "title": "test constants / audit tự 100",
+      "depends_on": [
+        "ESO-374"
+      ],
+      "parallel_with": [],
+      "done_when": "rubric mới; audit không tự chấm"
+    }
+  ],
+  "groups": [
+    {
+      "name": "A",
+      "start": "now",
+      "tickets": [
+        "ESO-368",
+        "ESO-372",
+        "ESO-381",
+        "ESO-373",
+        "ESO-376",
+        "ESO-377"
+      ],
+      "build": 3
+    },
+    {
+      "name": "B",
+      "start": "ESO-368 done",
+      "tickets": [
+        "ESO-369",
+        "ESO-385",
+        "ESO-374"
+      ],
+      "build": 2
+    },
+    {
+      "name": "C",
+      "start": "ESO-369 done",
+      "tickets": [
+        "ESO-370",
+        "ESO-387",
+        "ESO-388"
+      ],
+      "build": 3
+    },
+    {
+      "name": "D",
+      "start": "ESO-372+ESO-385 done",
+      "tickets": [
+        "ESO-386",
+        "ESO-389"
+      ],
+      "build": 2
+    },
+    {
+      "name": "E",
+      "start": "ESO-370 done",
+      "tickets": [
+        "ESO-371",
+        "ESO-380",
+        "ESO-375"
+      ],
+      "build": 2
+    },
+    {
+      "name": "F",
+      "start": "ESO-371 done",
+      "tickets": [
+        "ESO-378",
+        "ESO-384",
+        "ESO-375"
+      ],
+      "build": 2
+    },
+    {
+      "name": "G",
+      "start": "ESO-378 done",
+      "tickets": [
+        "ESO-382",
+        "ESO-383",
+        "ESO-379"
+      ],
+      "build": 2
+    },
+    {
+      "name": "H",
+      "start": "after G",
+      "tickets": [],
+      "build": 0
+    }
+  ],
+  "critical_path": {
+    "tickets": [
+      "ESO-368",
+      "ESO-369",
+      "ESO-370",
+      "ESO-371",
+      "ESO-378",
+      "ESO-382"
+    ],
+    "sp": 47,
+    "note": "ESO-383 chạy song song với ESO-382 nên không cộng vào độ dài đường găng"
+  },
+  "story_bug_map": {
+    "ESO-217": [
+      "ESO-380",
+      "ESO-381"
+    ],
+    "ESO-228": [
+      "ESO-378"
+    ],
+    "ESO-222": [
+      "ESO-382"
+    ],
+    "ESO-233": [
+      "ESO-383"
+    ],
+    "ESO-50": [
+      "ESO-384"
+    ],
+    "ESO-45": [
+      "ESO-385"
+    ],
+    "ESO-305": [
+      "ESO-386"
+    ],
+    "ESO-295": [
+      "ESO-387"
+    ],
+    "ESO-206": [
+      "ESO-388"
+    ],
+    "ESO-253": [
+      "ESO-389"
+    ]
+  },
+  "stories_without_bug": [
+    "ESO-130",
+    "ESO-176",
+    "ESO-181",
+    "ESO-186",
+    "ESO-191",
+    "ESO-196",
+    "ESO-201",
+    "ESO-211",
+    "ESO-216",
+    "ESO-218",
+    "ESO-219",
+    "ESO-220",
+    "ESO-221",
+    "ESO-227",
+    "ESO-238",
+    "ESO-243",
+    "ESO-248",
+    "ESO-300",
+    "ESO-310",
+    "ESO-315",
+    "ESO-320",
+    "ESO-325",
+    "ESO-330",
+    "ESO-335"
+  ],
+  "p7_blocked": {
+    "stories": 3,
+    "subtasks": 12,
+    "epics": [
+      "ESO-18",
+      "ESO-21",
+      "ESO-22"
+    ],
+    "requires": [
+      "AC-INV/TRF/CNF written",
+      "BIP packet READY"
+    ]
+  },
+  "jira_structure_notes": [
+    "parent only accepts Epic for standard issues (team-managed)",
+    "Bug uses parent=Epic + relates=Story",
+    "Story must not hang under T-nn (D-79)",
+    "subtasks array only rolls up points; subtasks are created separately"
+  ]
+}
