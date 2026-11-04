@@ -1,0 +1,322 @@
+{
+  "cluster": "E",
+  "cluster_title": "Graph Q4 permissions + Q5 tenant boundary",
+  "auditor": "L4 independent (read-only)",
+  "date": "2026-11-04",
+  "cluster_verdict": "PARTIAL",
+  "method": {
+    "code_read": [
+      "eso/graph/src/q4-permissions.mjs",
+      "eso/graph/src/q5-tenant.mjs",
+      "eso/graph/src/dispatcher.mjs",
+      "eso/graph/src/schema.mjs",
+      "eso/graph/src/index.mjs",
+      "eso/graph/src/completeness.mjs",
+      "eso/graph/src/extractor.mjs (kinds emitted)",
+      "eso/graph/src/q1-readset.mjs, q2-impact.mjs, q3-cycles.mjs (control group)"
+    ],
+    "tests_read": ["qc/eso-graph-q4-q5.test.mjs", "qc/eso-graph-schema.test.mjs (head)", "eso/graph/test/graph.test.mjs (grep)"],
+    "tests_run": "node --test qc/eso-graph-q4-q5.test.mjs -> 10 pass / 0 fail (self-consistent with implementation, does not validate provenance)",
+    "probes_run": "/tmp/eso-dd-probe.mjs (8 adversarial probes against exported functions; no repo writes)",
+    "ignored_as_untrusted": "comments/artifacts/slp/audit/*.json self-reported 100/100 — not used"
+  },
+  "key_questions_answered": [
+    {
+      "q": "Q4 answers from graph_edge/graph_node or an input map?",
+      "answer": "INPUT MAP. The function never receives or opens a database; it reads caller-supplied arrays graph.endpoints / graph.grants. No code in the repo populates those arrays: the extractor emits only 'file' and symbol nodes/edges (relations: 'declares'), and grep for endpoints/grants producers outside q4-permissions.mjs returns nothing. Contrast: Q1/Q2/Q3 all take a real db handle.",
+      "evidence": [
+        "eso/graph/src/q4-permissions.mjs:12 — `export function queryEndpointPermissions({ endpointId, graph = {}, coverage = 1.0 } = {}) {`",
+        "eso/graph/src/q4-permissions.mjs:19 — `const endpoints = graph.endpoints || [];`",
+        "eso/graph/src/q4-permissions.mjs:47 — `const grants = graph.grants || [];`",
+        "eso/graph/src/q1-readset.mjs:40 — `export function queryReadSet(db, options = {}) {`",
+        "eso/graph/src/q2-impact.mjs:42 — `export function queryColumnImpact(db, {`",
+        "eso/graph/src/extractor.mjs:144 — `kind: 'file',` (only file nodes; symbol nodes at :163, edges relation 'declares')",
+        "MISSING: eso — any producer of endpoint/permission/grant nodes or edges (grep `endpoints`/`grants` outside q4-permissions.mjs returned 0 hits)"
+      ]
+    },
+    {
+      "q": "Q5 heuristics and is unknown reported as unknown (BR-05)?",
+      "answer": "PARTLY. Q5 returns status:'unknown' for empty slice, implicit flag and coverage<0.70, so the word 'unknown' is produced. But the inputs are caller booleans/numbers: there is no inference of tenant from schema (isImplicit is a parameter), coverage is not measured (caller number, default 1.0, unvalidated/unclamped), and no `unknowns[]` array is returned even though sibling Q2/Q3 return one and AC-06-05's postcondition demands it. A caller who omits coverage gets a definitive `touches_tenant:false` with empty evidence — the exact statement AC-06-03 forbids.",
+      "evidence": [
+        "eso/graph/src/q5-tenant.mjs:14 — `export function querySliceTenantBoundary({ ... coverage = 1.0, isImplicit = false } = {}) {`",
+        "eso/graph/src/q5-tenant.mjs:34 — `if (isImplicit) {` (caller flag, no schema inference; grep `implicit` in eso/graph/src returns only comments)",
+        "eso/graph/src/q5-tenant.mjs:47 — `if (coverage < TENANT_COVERAGE_FLOOR) {`",
+        "eso/graph/src/q5-tenant.mjs:59 — `const touchingTables = tables.filter((t) => t.has_tenant_marker || t.cross_tenant);`",
+        "eso/graph/src/q5-tenant.mjs:68 — `marker: t.tenant_marker || 'tenant_id',` (fabricated marker)",
+        "eso/graph/src/q2-impact.mjs:60 — `unknowns: [],` (control: Q2 returns unknowns[]; Q5 has no such field)",
+        "eso/graph/src/q3-cycles.mjs:110 — `unknowns: [],` (control)"
+      ]
+    },
+    {
+      "q": "schema.mjs emits PostgreSQL RLS DDL but the product runs SQLite — is tenant isolation enforced anywhere in code or only in unused DDL text?",
+      "answer": "ONLY IN UNUSED DDL TEXT for the DB layer. POSTGRES_RLS_SQL is exported from index.mjs and never executed; initSchema() executes SCHEMA_SQL only, and the runtime is SQLite (bun:sqlite / node:sqlite in tests) where `CREATE POLICY` / `ROW LEVEL SECURITY` do not exist. SCHEMA_SQL has no tenant column at all. Whatever isolation exists is hand-written `WHERE project = ?` inside each SQL query (Q1/Q2/Q3/queryGraphFiles); Q4/Q5 do no DB access, so they enforce nothing.",
+      "evidence": [
+        "eso/graph/src/schema.mjs:84 — `export const POSTGRES_RLS_SQL = `",
+        "eso/graph/src/schema.mjs:123 — `db.exec(SCHEMA_SQL);` (RLS block never passed to db.exec)",
+        "eso/graph/src/index.mjs:5 — `import { initSchema, SCHEMA_SQL, POSTGRES_RLS_SQL, TABLES } from './schema.mjs';` (exported at :39, never executed)",
+        "eso/graph/src/schema.mjs:13-22 — `CREATE TABLE IF NOT EXISTS graph_node ( id TEXT PRIMARY KEY, project TEXT NOT NULL, ...` (no tenant column)",
+        "qc/eso-graph-schema.test.mjs:3 — `import { Database } from 'bun:sqlite';` (runtime is SQLite)",
+        "eso/graph/src/q1-readset.mjs:161 — `WHERE project = ? AND (` (actual isolation mechanism, applied per query)",
+        "MISSING: eso/graph/src — `db.exec(POSTGRES_RLS_SQL)` anywhere (grep 0 hits)"
+      ]
+    }
+  ],
+  "stories": [
+    {
+      "key": "ESO-305",
+      "us": "US-ARCH-05",
+      "ac_file": "sdlc/06.analysis/03.acceptance-criteria/34.arch-us-05-permissions.md",
+      "code": "eso/graph/src/q4-permissions.mjs",
+      "verdict": "PARTIAL",
+      "acs_total": 5,
+      "acs_pass": 2,
+      "acs_partial": 3,
+      "acs_fail": 0,
+      "acs": [
+        {
+          "ac_id": "AC-ARCH-05-01",
+          "title": "Static permission resolves 2-tier endpoint -> permission -> grant",
+          "verdict": "PARTIAL",
+          "implemented_evidence": "eso/graph/src/q4-permissions.mjs:73-81 — returns `path: [endpointId, perm.name || perm.id, grantRecord.id]` plus `grant` and `granted_at`.",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:29 — `assert.deepEqual(result.path, ['ep-get-user', 'user:read', 'grant-operator']);`",
+          "gap": "The two tiers are read from a test-authored object, not from the graph store. No db handle, no graph_node/graph_edge read, and the extractor emits no endpoint/permission/grant kinds; the 'hỏi endpoint→permission' trigger cannot be served against a warm graph."
+        },
+        {
+          "ac_id": "AC-ARCH-05-02",
+          "title": "Dynamic (concatenated string) permission -> unknown + DYNAMIC_UNKNOWN",
+          "verdict": "PARTIAL",
+          "implemented_evidence": "eso/graph/src/q4-permissions.mjs:37-45 — `if (perm.dynamic || (typeof perm.name === 'string' && perm.name.includes('${'))) { ... code: 'DYNAMIC_UNKNOWN' ... message: 'khai động' }`",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:46-47 — `assert.equal(result.code, 'DYNAMIC_UNKNOWN');` / `assert.ok(result.message.includes('khai động'));`",
+          "gap": "Detection only fires for object-form permission with `dynamic:true` or a `${` inside `perm.name`. AC's precondition is 'string ghép' (concatenated). Probe: permission declared as the string 'user:${action}' bypasses the dynamic branch and throws NO_GRANT_PATH (probe P4: `NO_GRANT_PATH: Permission 'undefined' declared without grant location`). JS concatenation ('user:' + action) is undetectable by this heuristic."
+        },
+        {
+          "ac_id": "AC-ARCH-05-03",
+          "title": "Permission stated without grant path is refused (NO_GRANT_PATH)",
+          "verdict": "PASS",
+          "implemented_evidence": "eso/graph/src/q4-permissions.mjs:64-69 — `if (!grantRecord) { const err = new Error(`NO_GRANT_PATH: ...`); err.code = 'NO_GRANT_PATH'; ... throw err; }`",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:58-67 — `assert.throws(...)` with `assert.equal(err.code, 'NO_GRANT_PATH'); assert.equal(err.permission, 'admin:super');`",
+          "gap": "Refusal is an uncaught throw rather than a structured 'REFUSED' answer (contrast q1-readset.mjs:54 `status: 'REFUSED', error: 'NO_COVERAGE'`); the thrown error carries no completeness (probe P7: `err.completeness = undefined`)."
+        },
+        {
+          "ac_id": "AC-ARCH-05-04",
+          "title": "ED1 — endpoint declares no permission -> unknown PERM_UNDECLARED, never public",
+          "verdict": "PASS",
+          "implemented_evidence": "eso/graph/src/q4-permissions.mjs:23-32 — `if (!endpoint || !endpoint.permission) { status: 'unknown', code: 'PERM_UNDECLARED', public: false, message: 'Endpoint không khai permission; không kết luận public' }`",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:82-85 — `assert.equal(result.code, 'PERM_UNDECLARED'); assert.equal(result.public, false);`",
+          "gap": "An unknown endpoint id is collapsed into the same PERM_UNDECLARED answer and an invented `public:false` (probe P6 for endpointId 'nope'), so 'node missing from graph' is reported as 'permission undeclared'."
+        },
+        {
+          "ac_id": "AC-ARCH-05-05",
+          "title": "ED10 — deleted grant record -> dangling grant, never 'has grant'; dangling list recorded",
+          "verdict": "PARTIAL",
+          "implemented_evidence": "eso/graph/src/q4-permissions.mjs:51-61 — `if (grantRecord && (grantRecord.deleted || grantRecord.dangling)) { code: 'DANGLING_GRANT', dangling_grant_id: grantRecord.id, message: 'grant treo; không nói có grant' }`",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:103-106 — `assert.equal(result.code, 'DANGLING_GRANT'); assert.equal(result.dangling_grant_id, 'grant-old');`",
+          "gap": "Only a soft-delete flag on a record that is still present is detected. A grant actually deleted (absent from the array) falls through to the NO_GRANT_PATH throw (probe P5), so the ED10 case is misclassified. Postcondition 'danh sách grant treo ghi lại' is not implemented: a single id is returned, no list, no persistence, no unknowns[] entry."
+        }
+      ]
+    },
+    {
+      "key": "ESO-211",
+      "us": "US-ARCH-06",
+      "ac_file": "sdlc/06.analysis/03.acceptance-criteria/35.arch-us-06-tenant.md",
+      "code": "eso/graph/src/q5-tenant.mjs",
+      "verdict": "PARTIAL",
+      "acs_total": 5,
+      "acs_pass": 2,
+      "acs_partial": 3,
+      "acs_fail": 0,
+      "acs": [
+        {
+          "ac_id": "AC-ARCH-06-01",
+          "title": "tenant_marker coverage >= 0.95 -> yes/no + evidence",
+          "verdict": "PARTIAL",
+          "implemented_evidence": "eso/graph/src/q5-tenant.mjs:59-71 — `touchingTables = tables.filter((t) => t.has_tenant_marker || t.cross_tenant)`; returns `touches_tenant`, `evidence: touchingTables.map(...)`.",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:121-124 — `assert.equal(result.touches_tenant, true); assert.equal(result.evidence.length, 1);`",
+          "gap": "Coverage is not measured, it is taken from the caller (default 1.0, no 0.95 gate exists in code). The 'không' branch is answered with `evidence: []` (probe P1/P8), i.e. no evidence at all for the negative claim, and no test asserts the negative branch carries evidence. Threshold 0.95 prescribed by the AC appears nowhere: grep finds only 0.70."
+        },
+        {
+          "ac_id": "AC-ARCH-06-02",
+          "title": "Implicit tenant (inferred from schema) -> unknown + LOW_COVERAGE, never 'không chạm'",
+          "verdict": "PARTIAL",
+          "implemented_evidence": "eso/graph/src/q5-tenant.mjs:34-42 — `if (isImplicit) { status: 'unknown', code: 'LOW_COVERAGE', message: 'tenant ngầm; không kết luận không chạm' }`",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:134-140 — `isImplicit: true, // inferred from schema, undeclared` then `assert.equal(result.code, 'LOW_COVERAGE');`",
+          "gap": "No inference exists. The caller asserts `isImplicit` itself; grep `implicit` across eso/graph/src returns only comments, and nothing parses a schema for undeclared tenant columns. The AC case 'tenant ngầm (suy từ schema)' is therefore only observable when the caller already knows the answer."
+        },
+        {
+          "ac_id": "AC-ARCH-06-03",
+          "title": "Coverage < 0.70 -> refuse the statement 'không chạm tenant'",
+          "verdict": "PASS",
+          "implemented_evidence": "eso/graph/src/q5-tenant.mjs:47-55 — `if (coverage < TENANT_COVERAGE_FLOOR) { status: 'unknown', code: 'LOW_COVERAGE', message: 'Độ phủ < 0.70: từ chối phát biểu không chạm tenant' }`",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:152-154 — `assert.equal(result.code, 'LOW_COVERAGE'); assert.ok(result.message.includes('từ chối phát biểu không chạm tenant'));`",
+          "gap": "The guard is bypassable by omission: `coverage` defaults to 1.0, so a caller who supplies no coverage gets `status:'answered', touches_tenant:false` (probe P1) — precisely the forbidden safe statement."
+        },
+        {
+          "ac_id": "AC-ARCH-06-04",
+          "title": "ED4 — coverage exactly 0.70 is answerable (closed threshold)",
+          "verdict": "PASS",
+          "implemented_evidence": "eso/graph/src/q5-tenant.mjs:47 — strict `<` against `TENANT_COVERAGE_FLOOR = 0.70` (line 12), so 0.70 falls through to the answered branch.",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:166-168 — `assert.equal(result.status, 'answered'); assert.equal(result.completeness, 0.70);`",
+          "gap": "The floor is a hard-coded constant (q5-tenant.mjs:12) while the cited SoT (18.graph-queries.md §5) requires thresholds as data (D-11): 'Ngưỡng là **dữ liệu** ... không phải hằng số trong code.'"
+        },
+        {
+          "ac_id": "AC-ARCH-06-05",
+          "title": "ED1 — slice with 0 tables -> unknown + 'slice rỗng'; unknowns[] has an entry",
+          "verdict": "PARTIAL",
+          "implemented_evidence": "eso/graph/src/q5-tenant.mjs:23-31 — `status: 'unknown', code: 'EMPTY_SLICE', message: 'slice rỗng; không kết luận không chạm'`",
+          "test_evidence": "qc/eso-graph-q4-q5.test.mjs:178-180 — `assert.equal(result.code, 'EMPTY_SLICE'); assert.ok(result.message.includes('slice rỗng'));`",
+          "gap": "Postcondition '`unknowns[]` có mục' is unmet: the returned object has no `unknowns` field, while sibling queries do (q2-impact.mjs:60, q3-cycles.mjs:110). No test asserts an unknowns entry because there is none."
+        }
+      ]
+    }
+  ],
+  "test_file_traceability": {
+    "required_by_ac_s3": [
+      "qc/eso-arch-permissions-01.test.mjs",
+      "qc/eso-arch-permissions-02.test.mjs",
+      "qc/eso-arch-permissions-03.test.mjs",
+      "qc/eso-arch-tenant-01.test.mjs",
+      "qc/eso-arch-tenant-02.test.mjs",
+      "qc/eso-arch-tenant-03.test.mjs"
+    ],
+    "present": "0 of 6",
+    "evidence": "MISSING: qc/eso-arch-permissions-01.test.mjs — does not exist (ls qc/eso-arch* -> No such file or directory; `ls qc | grep -c eso-arch` -> 0)",
+    "equivalent": "qc/eso-graph-q4-q5.test.mjs covers all 10 ACs 1:1 (SCN-ARCH-05-01..05, SCN-ARCH-06-01..05), so the breadth is equivalent; traceability to the SoT filenames is broken and the single file mixes two stories."
+  },
+  "defects": [
+    {
+      "id": "D1",
+      "severity": "CRITICAL",
+      "title": "Q4/Q5 are input-map functions; they never read the graph store and nothing produces their inputs",
+      "detail": "Q4 reads `graph.endpoints` / `graph.grants`; Q5 reads a `tables` array. Neither takes a db. Q1/Q2/Q3 take a db and query graph_node/graph_edge with `WHERE project = ?`. The extractor only emits file+symbol nodes, so endpoint/permission/grant/tenant_marker records have no producer anywhere in the product. The 10 passing tests build their own input objects, which makes the suite self-referential: it proves the branching, not that the question can be answered from a warm graph.",
+      "evidence": [
+        "eso/graph/src/q4-permissions.mjs:19 — `const endpoints = graph.endpoints || [];`",
+        "eso/graph/src/q5-tenant.mjs:16 — `tables = [],`",
+        "eso/graph/src/q1-readset.mjs:40 — `export function queryReadSet(db, options = {}) {`",
+        "eso/graph/src/extractor.mjs:144 — `kind: 'file',`",
+        "MISSING: eso/graph/src — any SQL SELECT on graph_edge/graph_node for endpoint/permission/grant/tenant_marker (grep 0 hits)"
+      ]
+    },
+    {
+      "id": "D2",
+      "severity": "HIGH",
+      "title": "Q5 fabricates full coverage by default and never validates it -> definitive 'không chạm tenant' with zero coverage data (BR-05 violation)",
+      "detail": "`coverage = 1.0` default + no clamp/normalisation means: (a) omitting coverage yields `answered / touches_tenant:false / evidence:[] / completeness:1`; (b) coverage 1.7 is echoed as completeness 1.7; (c) coverage NaN is echoed as NaN, breaking 'completeness is NOT NULL'. Q1 clamps and refuses instead.",
+      "evidence": [
+        "eso/graph/src/q5-tenant.mjs:17 — `coverage = 1.0,`",
+        "eso/graph/src/q5-tenant.mjs:70 — `completeness: coverage,`",
+        "eso/graph/src/q1-readset.mjs:87-89 — `compVal = Math.max(0, Math.min(1, completeness.value));`",
+        "eso/graph/src/q1-readset.mjs:54-55 — `status: 'REFUSED', error: 'NO_COVERAGE',`",
+        "probe /tmp/eso-dd-probe.mjs — P1 `{\"status\":\"answered\",\"touches_tenant\":false,\"evidence\":[],\"completeness\":1}`; P3a completeness 1.7; P3b completeness null/NaN"
+      ]
+    },
+    {
+      "id": "D3",
+      "severity": "HIGH",
+      "title": "Q5 fabricates evidence: a marker string is invented when the table declared none",
+      "detail": "`marker: t.tenant_marker || 'tenant_id'` emits 'tenant_id' for a table whose only signal was `cross_tenant:true` and which has no tenant_marker. Evidence is supposed to be the proof the AC-06-01 answer rests on; this manufactures it.",
+      "evidence": [
+        "eso/graph/src/q5-tenant.mjs:68 — `marker: t.tenant_marker || 'tenant_id',`",
+        "probe P2 — `{\"touches_tenant\":true,\"evidence\":[{\"table\":\"audit_log\",\"marker\":\"tenant_id\"}]}` for `{ name:'audit_log', cross_tenant:true }`"
+      ]
+    },
+    {
+      "id": "D4",
+      "severity": "HIGH",
+      "title": "Isolation is advertised as PostgreSQL RLS but the product runs SQLite and never executes that DDL; nothing enforces tenant at DB level",
+      "detail": "POSTGRES_RLS_SQL is imported and re-exported by index.mjs but never passed to db.exec; initSchema only runs SCHEMA_SQL. SQLite cannot execute CREATE POLICY. SCHEMA_SQL has no tenant column, so even the ad-hoc protection is project-scoped `WHERE project = ?` in individual queries (Q1/Q2/Q3/queryGraphFiles). Q4/Q5 do not touch the DB, so Q5's 'tenant boundary' is not enforced by any mechanism.",
+      "evidence": [
+        "eso/graph/src/schema.mjs:84 — `export const POSTGRES_RLS_SQL = `",
+        "eso/graph/src/schema.mjs:123 — `db.exec(SCHEMA_SQL);`",
+        "eso/graph/src/index.mjs:39 — `POSTGRES_RLS_SQL,`",
+        "qc/eso-graph-schema.test.mjs:3 — `import { Database } from 'bun:sqlite';`",
+        "MISSING: eso/graph/src — `db.exec(POSTGRES_RLS_SQL)` (0 hits repo-wide)"
+      ]
+    },
+    {
+      "id": "D5",
+      "severity": "MEDIUM",
+      "title": "Dynamic permission declared as a string is misrouted into NO_GRANT_PATH instead of DYNAMIC_UNKNOWN (AC-05-02)",
+      "detail": "The dynamic branch requires object form. With `permission: 'user:${action}'` the code evaluates `perm.dynamic` (undefined) and `perm.name` (undefined), falls to the grant lookup (`g.permission_id === undefined`) and throws. Error message also leaks `'undefined'` as the permission name.",
+      "evidence": [
+        "eso/graph/src/q4-permissions.mjs:37 — `if (perm.dynamic || (typeof perm.name === 'string' && perm.name.includes('${'))) {`",
+        "probe P4 — `NO_GRANT_PATH: Permission 'undefined' declared without grant location`"
+      ]
+    },
+    {
+      "id": "D6",
+      "severity": "MEDIUM",
+      "title": "ED10 only handles soft-deleted grant records; a genuinely deleted grant becomes NO_GRANT_PATH and no dangling list is recorded",
+      "detail": "Detection requires the record to still be in `graph.grants` carrying `deleted`/`dangling`. AC-05-05's precondition is a grant record 'đã xoá'; once removed, the code cannot distinguish 'never granted' from 'grant deleted'. Postcondition 'danh sách grant treo ghi lại' has no representation beyond one scalar id.",
+      "evidence": [
+        "eso/graph/src/q4-permissions.mjs:51 — `if (grantRecord && (grantRecord.deleted || grantRecord.dangling)) {`",
+        "probe P5 — empty grants array with declared permission -> threw `NO_GRANT_PATH`"
+      ]
+    },
+    {
+      "id": "D7",
+      "severity": "MEDIUM",
+      "title": "Q5 never returns `unknowns[]`, so every 'unknown' answer is a bare status with no machine-readable reason list",
+      "detail": "AC-06-05 postcondition names `unknowns[]`; Q2/Q3 return it. Q5 returns `{status,code,slice_id,message,completeness}` only, for EMPTY_SLICE, implicit tenant and low coverage alike.",
+      "evidence": [
+        "eso/graph/src/q5-tenant.mjs:24-30 — `status: 'unknown', code: 'EMPTY_SLICE', slice_id: sliceId, message: 'slice rỗng; không kết luận không chạm', completeness: coverage,`",
+        "eso/graph/src/q2-impact.mjs:60 — `unknowns: [],`",
+        "eso/graph/src/q3-cycles.mjs:110 — `unknowns: [],`"
+      ]
+    },
+    {
+      "id": "D8",
+      "severity": "MEDIUM",
+      "title": "All six AC §3 test files are absent (traceability)",
+      "detail": "Both AC documents name three test files each; none exist. The combined `qc/eso-graph-q4-q5.test.mjs` is an equivalent in coverage, so this is a traceability/process defect rather than an untested-AC defect, but the SoT-to-test chain the repo mandates is broken and no per-AC file can regress independently.",
+      "evidence": [
+        "sdlc/06.analysis/03.acceptance-criteria/34.arch-us-05-permissions.md:32 — `| 01 | `qc/eso-arch-permissions-01.test.mjs` |`",
+        "sdlc/06.analysis/03.acceptance-criteria/35.arch-us-06-tenant.md:32 — `| 01 | `qc/eso-arch-tenant-01.test.mjs` |`",
+        "MISSING: qc/eso-arch-tenant-01.test.mjs — does not exist"
+      ]
+    },
+    {
+      "id": "D9",
+      "severity": "LOW",
+      "title": "Unknown endpoint id is reported as PERM_UNDECLARED with an invented `public:false`",
+      "detail": "`!endpoint || !endpoint.permission` merge two different unknowns. A query for an endpoint absent from the graph returns a well-formed PERM_UNDECLARED answer instead of surfacing 'endpoint not found', which invites the reader to believe the endpoint exists and merely lacks a permission.",
+      "evidence": [
+        "eso/graph/src/q4-permissions.mjs:23 — `if (!endpoint || !endpoint.permission) {`",
+        "probe P6 — `{\"status\":\"unknown\",\"code\":\"PERM_UNDECLARED\",\"endpoint\":\"nope\",\"public\":false,...}`"
+      ]
+    },
+    {
+      "id": "D10",
+      "severity": "LOW",
+      "title": "Q5 hard-codes the 0.70 floor, contradicting the SoT rule that thresholds are data (D-11)",
+      "detail": "The cited completeness doc states the threshold must be data, not a constant. Q1/Q2/Q3 expose floor as an overridable option with a default; Q5 exposes none and exports a frozen constant.",
+      "evidence": [
+        "eso/graph/src/q5-tenant.mjs:12 — `export const TENANT_COVERAGE_FLOOR = 0.70;`",
+        "sdlc/07.technical/01.architecture/18.graph-queries.md:75 — `Ngưỡng là **dữ liệu** ... không phải hằng số trong code.`"
+      ]
+    },
+    {
+      "id": "D11",
+      "severity": "LOW",
+      "title": "Q4/Q5 bypass calculateCompleteness; QUESTION_KIND_MAP's Q5 kinds contradict the design doc and have no producer",
+      "detail": "completeness.mjs maps Q4->[endpoint,permission,grant], Q5->[slice,table,tenant_marker], but 18.graph-queries.md §2 says Q5 draws on entity·app_service + tenant marker (line 25/38). Neither Q4 nor Q5 calls calculateCompleteness; both accept an opaque number, so 'completeness of that question' (AC §2) is whatever the caller says.",
+      "evidence": [
+        "eso/graph/src/completeness.mjs:12-13 — `Q4: Object.freeze(['endpoint', 'permission', 'grant']), Q5: Object.freeze(['slice', 'table', 'tenant_marker']),`",
+        "sdlc/07.technical/01.architecture/18.graph-queries.md:25 — `| **Q5** | slice có chạm **ranh giới tenant** không | `entity`·`app_service` + dấu `tenant` | **thấp nhất** |`",
+        "eso/graph/src/q5-tenant.mjs:14-18 — signature takes `coverage` and never imports calculateCompleteness"
+      ]
+    }
+  ],
+  "dispatcher_scope": {
+    "relevant_acs": "none of ESO-305/ESO-211",
+    "observation": "eso/graph/src/dispatcher.mjs only gates heavy queries off-path (regex + flags); neither Q4 nor Q5 is dispatched through dispatchQuery, so there is no turn-path wiring for these questions either.",
+    "evidence": [
+      "eso/graph/src/dispatcher.mjs:43 — `export async function dispatchQuery(question, runner, options = {}) {`",
+      "eso/graph/src/index.mjs:61-63 — exports `queryEndpointPermissions`, `querySliceTenantBoundary`, `TENANT_COVERAGE_FLOOR` only"
+    ]
+  },
+  "notes": [
+    "10/10 tests in qc/eso-graph-q4-q5.test.mjs pass but are written against the same input shapes the implementation expects; none exercises a DB or a producer, so green tests do not evidence AC satisfaction end-to-end.",
+    "Self-reported comments/artifacts/slp/audit/*.json (100/100, zero findings) were deliberately ignored; the findings above are reproducible with node on /tmp/eso-dd-probe.mjs.",
+    "No repo files were modified; probes ran from /tmp only."
+  ]
+}

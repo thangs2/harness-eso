@@ -1,0 +1,619 @@
+{
+  "review": {
+    "date": "2026-11-04",
+    "baseline": "US-AC strict + offline probe on x79 data corpus (v2 NOT provisioned)",
+    "scope": "65 stories / 618 SP / 6 sprints"
+  },
+  "board": {
+    "stories": 65,
+    "sp": 618,
+    "status": "65/65 Human In Review, 0 Done, 6/6 sprints state=future"
+  },
+  "artifact_coverage": {
+    "audited_stories": 32,
+    "audited_sp": 298,
+    "unaudited_stories": 33,
+    "unaudited_sp": 320,
+    "verify_artifacts": 0,
+    "audit_scores": "32/32 = 100/100, 0 findings"
+  },
+  "test_traceability": {
+    "ac_named_test_files": 375,
+    "missing": 308,
+    "missing_pct": 82,
+    "ui_named": 61,
+    "ui_existing": 0,
+    "scn_total": 361,
+    "scn_planned": 356
+  },
+  "ac_totals": {
+    "scope": "27 unaudited stories of sprints 4-6",
+    "acs": 174,
+    "pass": 30,
+    "partial": 86,
+    "fail": 58,
+    "pass_pct": 17,
+    "fail_pct": 33
+  },
+  "sprints": [
+    {
+      "sprint": 1,
+      "stories": 16,
+      "sp": 102,
+      "audited_stories": 10,
+      "audited_sp": 93,
+      "verdict": "PARTIAL",
+      "detail": "6 setup tasks PASS; 10 audited stories unproven (audit pattern non-defensible)"
+    },
+    {
+      "sprint": 2,
+      "stories": 12,
+      "sp": 105,
+      "audited_stories": 12,
+      "audited_sp": 105,
+      "verdict": "UNPROVEN",
+      "detail": "1 story sampled: PARTIAL; remaining 11 rely on 100/100 audits"
+    },
+    {
+      "sprint": 3,
+      "stories": 10,
+      "sp": 100,
+      "audited_stories": 10,
+      "audited_sp": 100,
+      "verdict": "PARTIAL",
+      "detail": "4 stories sampled: all PARTIAL; 4/4 audits non-defensible"
+    },
+    {
+      "sprint": 4,
+      "stories": 9,
+      "sp": 103,
+      "audited_stories": 0,
+      "audited_sp": 0,
+      "verdict": "FAIL",
+      "detail": "0 PASS / 5 PARTIAL / 4 FAIL at story level"
+    },
+    {
+      "sprint": 5,
+      "stories": 9,
+      "sp": 110,
+      "audited_stories": 0,
+      "audited_sp": 0,
+      "verdict": "FAIL",
+      "detail": "0 PASS / 3 PARTIAL / 6 FAIL at story level"
+    },
+    {
+      "sprint": 6,
+      "stories": 9,
+      "sp": 98,
+      "audited_stories": 0,
+      "audited_sp": 0,
+      "verdict": "FAIL",
+      "detail": "0 PASS / 7 PARTIAL / 2 FAIL at story level"
+    }
+  ],
+  "stories": [
+    {
+      "key": "ESO-34",
+      "sprint": "1",
+      "sp": null,
+      "cluster": "setup",
+      "verdict": "PASS",
+      "ac_count": null,
+      "ac_pass": null,
+      "ac_partial": null,
+      "ac_fail": null,
+      "note": "Sprint 0 deliverables verified by inspection; jira-pack.sh renders an execution pack for ESO-24"
+    },
+    {
+      "key": "ESO-35",
+      "sprint": "1",
+      "sp": null,
+      "cluster": "setup",
+      "verdict": "PASS",
+      "ac_count": null,
+      "ac_pass": null,
+      "ac_partial": null,
+      "ac_fail": null,
+      "note": "Sprint 0 deliverables verified by inspection; jira-pack.sh renders an execution pack for ESO-24"
+    },
+    {
+      "key": "ESO-36",
+      "sprint": "1",
+      "sp": null,
+      "cluster": "setup",
+      "verdict": "PASS",
+      "ac_count": null,
+      "ac_pass": null,
+      "ac_partial": null,
+      "ac_fail": null,
+      "note": "Sprint 0 deliverables verified by inspection; jira-pack.sh renders an execution pack for ESO-24"
+    },
+    {
+      "key": "ESO-37",
+      "sprint": "1",
+      "sp": null,
+      "cluster": "setup",
+      "verdict": "PASS",
+      "ac_count": null,
+      "ac_pass": null,
+      "ac_partial": null,
+      "ac_fail": null,
+      "note": "Sprint 0 deliverables verified by inspection; jira-pack.sh renders an execution pack for ESO-24"
+    },
+    {
+      "key": "ESO-38",
+      "sprint": "1",
+      "sp": null,
+      "cluster": "setup",
+      "verdict": "PASS",
+      "ac_count": null,
+      "ac_pass": null,
+      "ac_partial": null,
+      "ac_fail": null,
+      "note": "Sprint 0 deliverables verified by inspection; jira-pack.sh renders an execution pack for ESO-24"
+    },
+    {
+      "key": "ESO-39",
+      "sprint": "1",
+      "sp": null,
+      "cluster": "setup",
+      "verdict": "PASS",
+      "ac_count": null,
+      "ac_pass": null,
+      "ac_partial": null,
+      "ac_fail": null,
+      "note": "Sprint 0 deliverables verified by inspection; jira-pack.sh renders an execution pack for ESO-24"
+    },
+    {
+      "key": "ESO-130",
+      "sprint": "2",
+      "sp": 8,
+      "cluster": "F",
+      "verdict": "PARTIAL",
+      "ac_count": 7,
+      "ac_pass": 1,
+      "ac_partial": 2,
+      "ac_fail": 0,
+      "note": "3 ACs sampled; audit 100/100 not defensible"
+    },
+    {
+      "key": "ESO-176",
+      "sprint": "3",
+      "sp": 11,
+      "cluster": "F",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 1,
+      "ac_partial": 2,
+      "ac_fail": 0,
+      "note": "3 ACs sampled; owner of accepted debt unasserted"
+    },
+    {
+      "key": "ESO-181",
+      "sprint": "3",
+      "sp": 14,
+      "cluster": "F",
+      "verdict": "PARTIAL",
+      "ac_count": 7,
+      "ac_pass": 1,
+      "ac_partial": 2,
+      "ac_fail": 0,
+      "note": "3 ACs sampled; audit 100/100 not defensible"
+    },
+    {
+      "key": "ESO-186",
+      "sprint": "3",
+      "sp": 14,
+      "cluster": "F",
+      "verdict": "PARTIAL",
+      "ac_count": 7,
+      "ac_pass": 1,
+      "ac_partial": 2,
+      "ac_fail": 0,
+      "note": "3 ACs sampled; refusal record absent while audit says AC-IAM-03-02 PASS"
+    },
+    {
+      "key": "ESO-315",
+      "sprint": "3",
+      "sp": 11,
+      "cluster": "F",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 0,
+      "ac_partial": 3,
+      "ac_fail": 0,
+      "note": "3 ACs sampled; retire race untested"
+    },
+    {
+      "key": "ESO-191",
+      "sprint": "4",
+      "sp": 9,
+      "cluster": "C",
+      "verdict": "PARTIAL",
+      "ac_count": 6,
+      "ac_pass": 4,
+      "ac_partial": 1,
+      "ac_fail": 1,
+      "note": ""
+    },
+    {
+      "key": "ESO-196",
+      "sprint": "4",
+      "sp": 14,
+      "cluster": "C",
+      "verdict": "PARTIAL",
+      "ac_count": 6,
+      "ac_pass": 2,
+      "ac_partial": 4,
+      "ac_fail": 0,
+      "note": ""
+    },
+    {
+      "key": "ESO-201",
+      "sprint": "4",
+      "sp": 14,
+      "cluster": "D",
+      "verdict": "PARTIAL",
+      "ac_count": 6,
+      "ac_pass": 2,
+      "ac_partial": 4,
+      "ac_fail": 0,
+      "note": ""
+    },
+    {
+      "key": "ESO-206",
+      "sprint": "4",
+      "sp": 11,
+      "cluster": "D",
+      "verdict": "FAIL",
+      "ac_count": 7,
+      "ac_pass": 0,
+      "ac_partial": 4,
+      "ac_fail": 3,
+      "note": "init writes zero files; upgrade is a stub"
+    },
+    {
+      "key": "ESO-295",
+      "sprint": "4",
+      "sp": 11,
+      "cluster": "C",
+      "verdict": "FAIL",
+      "ac_count": 6,
+      "ac_pass": 1,
+      "ac_partial": 2,
+      "ac_fail": 3,
+      "note": ""
+    },
+    {
+      "key": "ESO-320",
+      "sprint": "4",
+      "sp": 11,
+      "cluster": "C",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 3,
+      "ac_partial": 2,
+      "ac_fail": 0,
+      "note": ""
+    },
+    {
+      "key": "ESO-325",
+      "sprint": "4",
+      "sp": 11,
+      "cluster": "C",
+      "verdict": "FAIL",
+      "ac_count": 5,
+      "ac_pass": 0,
+      "ac_partial": 2,
+      "ac_fail": 3,
+      "note": "attribute impact keyed on a shape the policy store never produces"
+    },
+    {
+      "key": "ESO-330",
+      "sprint": "4",
+      "sp": 11,
+      "cluster": "C",
+      "verdict": "FAIL",
+      "ac_count": 5,
+      "ac_pass": 1,
+      "ac_partial": 1,
+      "ac_fail": 3,
+      "note": "team group keyed role_id, domain uses role_name; in-use role deletable"
+    },
+    {
+      "key": "ESO-335",
+      "sprint": "4",
+      "sp": 11,
+      "cluster": "C",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 1,
+      "ac_partial": 3,
+      "ac_fail": 1,
+      "note": ""
+    },
+    {
+      "key": "ESO-211",
+      "sprint": "5",
+      "sp": 11,
+      "cluster": "E",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 2,
+      "ac_partial": 3,
+      "ac_fail": 0,
+      "note": ""
+    },
+    {
+      "key": "ESO-216",
+      "sprint": "5",
+      "sp": 5,
+      "cluster": "A",
+      "verdict": "PARTIAL",
+      "ac_count": 0,
+      "ac_pass": null,
+      "ac_partial": null,
+      "ac_fail": null,
+      "note": "frame library only; ST6 labelled READY instead of stale"
+    },
+    {
+      "key": "ESO-217",
+      "sprint": "5",
+      "sp": 16,
+      "cluster": "A",
+      "verdict": "FAIL",
+      "ac_count": 12,
+      "ac_pass": 0,
+      "ac_partial": 5,
+      "ac_fail": 7,
+      "note": ""
+    },
+    {
+      "key": "ESO-218",
+      "sprint": "5",
+      "sp": 16,
+      "cluster": "A",
+      "verdict": "FAIL",
+      "ac_count": 12,
+      "ac_pass": 0,
+      "ac_partial": 5,
+      "ac_fail": 7,
+      "note": "S2 fabricates basis declared and stale-rule banner on real data"
+    },
+    {
+      "key": "ESO-219",
+      "sprint": "5",
+      "sp": 16,
+      "cluster": "A",
+      "verdict": "FAIL",
+      "ac_count": 13,
+      "ac_pass": 0,
+      "ac_partial": 3,
+      "ac_fail": 10,
+      "note": "no save path, no role parameter"
+    },
+    {
+      "key": "ESO-220",
+      "sprint": "5",
+      "sp": 16,
+      "cluster": "A",
+      "verdict": "FAIL",
+      "ac_count": 12,
+      "ac_pass": 0,
+      "ac_partial": 7,
+      "ac_fail": 5,
+      "note": ""
+    },
+    {
+      "key": "ESO-221",
+      "sprint": "5",
+      "sp": 16,
+      "cluster": "A",
+      "verdict": "FAIL",
+      "ac_count": 12,
+      "ac_pass": 0,
+      "ac_partial": 8,
+      "ac_fail": 4,
+      "note": ""
+    },
+    {
+      "key": "ESO-227",
+      "sprint": "5",
+      "sp": 3,
+      "cluster": "B",
+      "verdict": "FAIL",
+      "ac_count": 0,
+      "ac_pass": null,
+      "ac_partial": null,
+      "ac_fail": null,
+      "note": "dispatch() returns status ok without acting; DoD clauses 2 fail, 1 partial"
+    },
+    {
+      "key": "ESO-305",
+      "sprint": "5",
+      "sp": 11,
+      "cluster": "E",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 2,
+      "ac_partial": 3,
+      "ac_fail": 0,
+      "note": ""
+    },
+    {
+      "key": "ESO-222",
+      "sprint": "6",
+      "sp": 9,
+      "cluster": "B",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 1,
+      "ac_partial": 3,
+      "ac_fail": 1,
+      "note": ""
+    },
+    {
+      "key": "ESO-228",
+      "sprint": "6",
+      "sp": 14,
+      "cluster": "B",
+      "verdict": "PARTIAL",
+      "ac_count": 8,
+      "ac_pass": 2,
+      "ac_partial": 5,
+      "ac_fail": 1,
+      "note": ""
+    },
+    {
+      "key": "ESO-233",
+      "sprint": "6",
+      "sp": 14,
+      "cluster": "B",
+      "verdict": "FAIL",
+      "ac_count": 5,
+      "ac_pass": 1,
+      "ac_partial": 1,
+      "ac_fail": 3,
+      "note": "mid-turn switch never enters election/audit trail"
+    },
+    {
+      "key": "ESO-238",
+      "sprint": "6",
+      "sp": 11,
+      "cluster": "B",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 1,
+      "ac_partial": 3,
+      "ac_fail": 1,
+      "note": "pin not persisted"
+    },
+    {
+      "key": "ESO-243",
+      "sprint": "6",
+      "sp": 11,
+      "cluster": "D",
+      "verdict": "PARTIAL",
+      "ac_count": 7,
+      "ac_pass": 2,
+      "ac_partial": 5,
+      "ac_fail": 0,
+      "note": "no Jira/Notion call; local file path only"
+    },
+    {
+      "key": "ESO-248",
+      "sprint": "6",
+      "sp": 8,
+      "cluster": "D",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 1,
+      "ac_partial": 4,
+      "ac_fail": 0,
+      "note": ""
+    },
+    {
+      "key": "ESO-253",
+      "sprint": "6",
+      "sp": 9,
+      "cluster": "D",
+      "verdict": "PARTIAL",
+      "ac_count": 7,
+      "ac_pass": 2,
+      "ac_partial": 3,
+      "ac_fail": 2,
+      "note": "no append-only ticket_pack store"
+    },
+    {
+      "key": "ESO-300",
+      "sprint": "6",
+      "sp": 11,
+      "cluster": "B",
+      "verdict": "FAIL",
+      "ac_count": 5,
+      "ac_pass": 0,
+      "ac_partial": 3,
+      "ac_fail": 2,
+      "note": "SILENT_NONE absent product-wide"
+    },
+    {
+      "key": "ESO-310",
+      "sprint": "6",
+      "sp": 11,
+      "cluster": "D",
+      "verdict": "PARTIAL",
+      "ac_count": 5,
+      "ac_pass": 2,
+      "ac_partial": 2,
+      "ac_fail": 1,
+      "note": ""
+    }
+  ],
+  "measurements": {
+    "graph": {
+      "result": "FAIL",
+      "nodes": 101525,
+      "edges": 188090,
+      "q1": "REFUSED on graph-derived completeness (0.0 / 0.0049 / 0.0135 vs floor 0.80); answers only with caller-supplied completeness; faithful edge mapping returns 0/10 real call sites; precision 0.10-0.20",
+      "q4": "47 real routes: 0 answered (19 NO_GRANT_PATH, 28 PERM_UNDECLARED); no permission/grant edges in 101k nodes",
+      "q5": "whole slice correct (touches_tenant=true, 6 evidence rows); junction-only slice returns false at coverage 1.0"
+    },
+    "ui": {
+      "result": "PARTIAL",
+      "turns": 3276,
+      "s1": "ordering 0 inversions; level/gap count echoed 3276/3276; completeness bar exact",
+      "s2": "basis declared fabricated 3276/3276; stale-rule banner 3276/3276; \"khong co gi chua biet\" on 3185 insufficient/partial turns",
+      "note": "no S1/S2 client exists; x79/.harness/harness.db is 0 bytes, real DB at ~/.harness/observe/x79/harness.db",
+      "input": "3,276 v1 turn rows (no basis/rule_version columns)"
+    }
+  },
+  "tests": {
+    "bun_run_test": "exit 0 (qc + 5 package suites)",
+    "bun_test": "1003 tests, 1002 pass, 1 flaky timeout (qc/hook-portability.test.mjs; passes alone)",
+    "eso_unit": "210 pass across 7 suites, not included in scripts/run-tests.mjs"
+  },
+  "consumer": {
+    "x79": {
+      "tier": "T2",
+      "pass": 22,
+      "fail": 7,
+      "critical": 0,
+      "containers": "4 observe-server + console healthy"
+    }
+  },
+  "verdict": {
+    "sprint_goal": "mostly met at library level",
+    "us_ac": "NOT MET",
+    "product_e2e": "NOT MET",
+    "summary": "6 sprints produced a real library with unit tests, not a product behaviour that a user or host can exercise; no story outside setup earned PASS under the strict baseline.",
+    "e2e": "NOT MEASURED - v2 has no entrypoint (0 server/CLI/init) and is not provisioned; x79 runs v1"
+  },
+  "critical_defects": [
+    "UI has no surface; 0/61 AC §3 test files; denied and empty share the sentence \"chưa có turn nào\" (ui-frames.mjs:105-108) and the test asserts the leak (qc/eso-core-host-ui.test.mjs:120)",
+    "ST6 defined as READY, not stale (ui-frames.mjs:19) — the state behind AC-UI-0x-06 in all 5 UI stories cannot be produced",
+    "Completeness fixture 0.62 hardcoded in product code (ui-frames.mjs:71)",
+    "Host dispatch() returns status ok without acting (host-contract.mjs:77,93,109); SILENT_SWITCH/SILENT_NONE absent product-wide",
+    "Capability pin is never persisted; turn audit reads a caller-supplied array (election.mjs:238), not the evidence store",
+    "Q1 silently returns status ready with an empty read set when the DB has no .all() — bun:sqlite has none (q1-readset.mjs:141)",
+    "Q1 completeness is always 0 because K(Q1) needs file+class+method and the extractor emits only kind=file (completeness.mjs:9)",
+    "Q4/Q5 read caller-supplied maps, never the graph store (q4-permissions.mjs:19); tenant isolation exists only as unused PostgreSQL RLS text (schema.mjs:84 vs initSchema:123)",
+    "Control-plane key shapes disagree across modules (flow.mjs:156 vs role.mjs:74; config-mgr.mjs:219 vs policy.mjs:47; team-tool-cfg.mjs:81 vs worker.mjs:72) — probes delete in-use roles/attributes without error",
+    "SDLC init writes zero files (sdlc-config.mjs:181); upgrade is a stub with can_revert:true (sdlc-config.mjs:243)",
+    "No append-only ticket_pack store exists; AC-TICKET-04-03/-05 unimplementable (grep ticket_pack over eso/ = 0 hits)",
+    "Tests pass by asserting the implementation own constants (active_requests:1, has_write_buttons:false) — 5 sampled audits claim 100/100 while the behaviours are absent"
+  ],
+  "e2e_status": {
+    "v2_provisioned_into_x79": false,
+    "x79_runtime": "v1 image mu/harness-observe:local, created 2026-10-23, up 6 days",
+    "x79_config_modified": false,
+    "only_write_to_x79": ".harness/diagnostics/latest.md from ./verify-consumer.sh x79 (v1 tool, by design)",
+    "what_was_run_at_x79": "copied .codegraph/codegraph.db and ~/.harness/observe/x79/harness.db to /tmp; imported graph and fed turns into v2 functions offline",
+    "what_it_proves": "v2 query/projection logic on real data shapes; NOT provisionability, NOT E2E",
+    "ui_caveat": "S2 numbers come from v1 turn rows lacking basis/rule_version; they prove fail-open + v1->v2 migration risk, not v2-native behaviour"
+  },
+  "recommendation": {
+    "T-0": "walking skeleton v2: eso init profile -> config store -> control-plane HTTP -> 1 config page -> provision a sandbox consumer -> 1 turn recorded",
+    "T-1": "first vertical slice: Q1 read set on real graph OR S1/S2 surface",
+    "T-2": "QC E2E on x79 only after T-0+T-1, with rollback (x79 is a live v1 consumer)"
+  }
+}

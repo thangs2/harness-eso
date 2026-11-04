@@ -1,0 +1,533 @@
+{
+  "cluster": "B",
+  "cluster_name": "Host integration",
+  "auditor": "L4 independent",
+  "repo": "/Users/thangs2net/Workspaces/harness-eso",
+  "date": "2026-11-04",
+  "verdict": "FAIL",
+  "verdict_rationale": "5 of 28 ACs pass (15 partial, 8 fail). The election library produces plausible data shapes but: (a) 17/17 AC §3 test files named by the AC SoT do not exist and were never committed; (b) the two failure-mode ACs that give the domain its meaning (SILENT_SWITCH, SILENT_NONE) have zero code; (c) mid-turn switch results never reach the election/audit trail, so the audit answers the wrong provider; (d) pin RBAC is bypassable by omitting the role argument; (e) the guarantee vocabulary violates the 8.1 host-contract DoD (G-DEGRADED is a 4th level; G-SCOPE/G-ADVISORY never exist); (f) nothing outside qc tests imports the v2 host code — installed host packages depend on v1 @mu/harness-eso-core.",
+  "sources_read": {
+    "acceptance_criteria": [
+      "sdlc/06.analysis/03.acceptance-criteria/20.host-us-01-election.md",
+      "sdlc/06.analysis/03.acceptance-criteria/27.host-us-02-none.md",
+      "sdlc/06.analysis/03.acceptance-criteria/28.host-us-03-switch.md",
+      "sdlc/06.analysis/03.acceptance-criteria/29.host-us-04-pin.md",
+      "sdlc/06.analysis/03.acceptance-criteria/30.host-us-05-audit.md"
+    ],
+    "product_code": [
+      "eso/core/src/host-contract.mjs",
+      "eso/adapters/src/election.mjs",
+      "eso/adapters/src/index.mjs",
+      "eso/core/src/index.mjs",
+      "eso/core/src/judge.mjs",
+      "eso/evidence/src/recorder.mjs",
+      "eso/evidence/src/schema.mjs",
+      "packages/harness-host-generic/package.json",
+      "packages/harness-host-dsh/src/law-provider.mjs",
+      "packages/harness-eso-core/src/capability-probe.mjs"
+    ],
+    "tests": [
+      "qc/eso-adapter-election.test.mjs",
+      "qc/eso-core-host-ui.test.mjs"
+    ],
+    "law": [
+      "sdlc/09.wbs/01.packets/01.bip/39.host-contract-out.md",
+      "sdlc/07.technical/01.architecture/11.host-capability.md",
+      "sdlc/06.analysis/04.quality-control/06.host.md"
+    ]
+  },
+  "test_file_presence": {
+    "ac3_named_files_total": 17,
+    "present": 0,
+    "missing": 17,
+    "never_committed_in_git": true,
+    "files": [
+      "MISSING: qc/eso-host-election.test.mjs — does not exist",
+      "MISSING: qc/eso-host-none.test.mjs — does not exist",
+      "MISSING: qc/eso-host-silent-switch.test.mjs — does not exist",
+      "MISSING: qc/eso-host-order.test.mjs — does not exist",
+      "MISSING: qc/eso-host-scope.test.mjs — does not exist",
+      "MISSING: qc/eso-host-none-runs.test.mjs — does not exist",
+      "MISSING: qc/eso-host-none-degrades.test.mjs — does not exist",
+      "MISSING: qc/eso-host-none-silent.test.mjs — does not exist",
+      "MISSING: qc/eso-host-switch-record.test.mjs — does not exist",
+      "MISSING: qc/eso-host-switch-both.test.mjs — does not exist",
+      "MISSING: qc/eso-host-pin.test.mjs — does not exist",
+      "MISSING: qc/eso-host-pin-rbac.test.mjs — does not exist",
+      "MISSING: qc/eso-host-pin-unavailable.test.mjs — does not exist",
+      "MISSING: qc/eso-host-audit.test.mjs — does not exist",
+      "MISSING: qc/eso-host-audit-unelected.test.mjs — does not exist",
+      "MISSING: qc/eso-host-audit-diff.test.mjs — does not exist",
+      "MISSING: qc/eso-host-walk-once.test.mjs — does not exist"
+    ],
+    "equivalent_test_judgement": {
+      "claimed_equivalents": [
+        "qc/eso-adapter-election.test.mjs (5 test() blocks, 240 lines)",
+        "qc/eso-core-host-ui.test.mjs:21-62 (1 test() block, 'DoD 8.1')"
+      ],
+      "accepted_as_equivalent": false,
+      "why": [
+        "qc/eso-adapter-election.test.mjs:12 — 'SCN-HOST-01 (AC-HOST-01-01..08)' bundles 8 ACs into one test; no test is per-AC and no test covers the failure ACs 01-03 / 02-03 / 03-02.",
+        "qc/eso-adapter-election.test.mjs:14 — 'assert.deepEqual(BRANCH_ORDER, [...])' asserts a frozen constant, not the observed branch-trial sequence demanded by AC-HOST-01-04.",
+        "qc/eso-adapter-election.test.mjs:91 — 'assert.equal(election.guarantee, 'G-DEGRADED')' enshrines a guarantee value that does not exist in the spec set {G-FULL,G-SCOPE,G-ADVISORY}.",
+        "qc/eso-core-host-ui.test.mjs:22 — 'assert.deepEqual(ASSURANCE_LEVELS, ['NATIVE','EMULATED','UNAVAILABLE'])' tests a different level axis than the 8.1 DoD's three guarantees.",
+        "sdlc/06.analysis/04.quality-control/06.host.md:83 — 'scenario | **27 planned · 0 executed**' and :86 — 'code | **chưa có**' (the QC plan itself declares no executed evidence)."
+      ]
+    }
+  },
+  "integration": {
+    "v2_code_callers_outside_tests": "none — grep 'electCapabilityProvider|handleMidTurnBranchFailure|setCapabilityPin|queryTurnProviderAudit' over eso/ and packages/ returns only eso/adapters/src/{election,index}.mjs and qc test files",
+    "host_packages_import_v2": false,
+    "host_packages_evidence": [
+      "packages/harness-host-generic/package.json:14 — '\"@mu/harness-eso-core\": \"0.1.0\"' (v1 package, not eso/core)",
+      "packages/harness-host-dsh/package.json:12 — '\"@mu/harness-eso-core\": \"0.1.0\"'",
+      "grep '\"host-native\"|\"eso-native\"' under packages/ — 0 matches",
+      "grep 'EMULATED' under packages/ (--include=*.mjs) — 0 matches",
+      "MISSING: eso/core/package.json — does not exist (v2 host-contract is not even a workspace package)"
+    ],
+    "parallel_implementation": "packages/harness-eso-core/src/capability-probe.mjs:10 — 'export const PROBE_KINDS = ['law', 'code', 'memory', 'verifier', 'reasoner'];' — the shipped host path has its own capability probe that never reads the v2 matrix",
+    "pin_persistence": "none — setCapabilityPin (eso/adapters/src/election.mjs:209) returns a plain object '{ ...currentPins, [capabilityKind]: targetBranch.trim() }'; grep for 'pins|capabilityPin|pinned' outside election.mjs in eso/ — 0 matches; no config/state file writes",
+    "turn_audit_store": "in-memory caller array — eso/adapters/src/election.mjs:238 'auditLog = []'; no wiring to eso/evidence/src/recorder.mjs:31 'export function recordTurn(db, turnData, ...)' though schema.mjs:94 already has kind CHECK(...'election'...)",
+    "election_inputs": "fixtures supplied by the caller — eso/adapters/src/election.mjs:22 'branches = {}'; the real capability matrix built in eso/core/src/host-contract.mjs:61-110 is never consulted by election"
+  },
+  "stories": [
+    {
+      "key": "ESO-227",
+      "title": "WBS 8.1 host contract (OUT slice, 0 AC)",
+      "ac_source": "sdlc/09.wbs/01.packets/01.bip/39.host-contract-out.md",
+      "verdict": "FAIL",
+      "counts": {
+        "acs": 0,
+        "pass": 0,
+        "partial": 0,
+        "fail": 0,
+        "dod_clauses": 3,
+        "dod_met": 0,
+        "dod_partial": 1,
+        "dod_fail": 2
+      },
+      "dod_clauses": [
+        {
+          "clause": "D1 — one interface (session · guarantee · capability table), closed type, caller has no `if (host === ...)`",
+          "verdict": "FAIL",
+          "evidence": [
+            "eso/core/src/host-contract.mjs:61 — 'export function createHostAdapter(hostId) {' returns per-host object literals with only {host_id, manifest, dispatch} (probe Object.keys -> ['host_id','manifest','dispatch'])",
+            "eso/core/src/host-contract.mjs:64 — 'return { host_id: cursor, manifest: ..., dispatch(action) {...} }' — no `session` field and no `guarantee` field on any adapter",
+            "probe: adapter_has_session=false, adapter_has_guarantee=false for createHostAdapter('deepseek-harness')",
+            "eso/core/src/host-contract.mjs:57 — 'capabilities: { ...capabilities },' — extra capability keys are accepted (probe: bogus 7th capability 'extra_bogus_cap' passes with valid:true), i.e. the type is open, contradicting 39.host-contract-out.md §2.1 'adapter thừa trường / thiếu trường | **không** hợp lệ — kiểu **đóng**'",
+            "no shared interface validator exists: grep 'createHostAdapter|validateHostManifest' outside eso/core/src and the qc test — 0 matches"
+          ]
+        },
+        {
+          "clause": "D2 — exactly three guarantee levels {G-FULL, G-SCOPE, G-ADVISORY}, no fourth, guaranteed field mandatory per turn",
+          "verdict": "FAIL",
+          "evidence": [
+            "sdlc/07.technical/01.architecture/11.host-capability.md:52 — 'guarantee: G-FULL | G-SCOPE | G-ADVISORY'",
+            "eso/core/src/host-contract.mjs:10 — 'export const ASSURANCE_LEVELS = Object.freeze(['NATIVE', 'EMULATED', 'UNAVAILABLE']);' — a different set than the DoD requires",
+            "eso/adapters/src/election.mjs:93 — 'guarantee: 'G-DEGRADED'' — a fourth guarantee level invented by the implementation",
+            "grep 'G-SCOPE|G-ADVISORY' in eso/ and qc/ (--include=*.mjs) — 0 matches: two of the three spec levels never exist",
+            "qc/eso-core-host-ui.test.mjs:22 — 'assert.deepEqual(ASSURANCE_LEVELS, ['NATIVE','EMULATED','UNAVAILABLE']);' — the DoD test asserts the wrong vocabulary"
+          ]
+        },
+        {
+          "clause": "D3 — missing capability ⇒ invalid; capability = none + mandatory reason ⇒ valid; unreadable table ⇒ must declare 'unverified', never infer none",
+          "verdict": "PARTIAL",
+          "evidence": [
+            "MET: eso/core/src/host-contract.mjs:35 — 'if (!(cap in capabilities)) { ... err.code = 'INVALID_HOST_MANIFEST'; throw err; }' and :43 rejects a non-member level",
+            "NOT MET: no 'none' capability level exists (ASSURANCE_LEVELS has UNAVAILABLE only) and no reason field is required anywhere in validateHostManifest",
+            "NOT MET: no 'unverified'/unknown state — an unreadable table throws INVALID_ASSURANCE_LEVEL instead of declaring itself unverified (39.host-contract-out.md §2.3 third row)",
+            "test: qc/eso-core-host-ui.test.mjs:35-61 covers only the missing-capability and bad-level throws"
+          ]
+        }
+      ],
+      "extra_defect": {
+        "title": "dispatch() returns status ok without acting",
+        "allowed": false,
+        "evidence": [
+          "eso/core/src/host-contract.mjs:77 — 'dispatch(action) { return { host: 'cursor', executed: action, status: 'ok' }; }' (identical at :93 and :109)",
+          "probe: a.dispatch({write:'/tmp/eso-dd/should-not-exist.txt', body:'x'}) returned {\"status\":\"ok\"} and the file was never created — a success report for work that did not happen"
+        ],
+        "why_it_matters": "The adapter is the only place a host action could be executed; returning {status:'ok'} unconditionally makes any caller believe the host ran the action. It is a stub-shaped success, and no test asserts that a side effect occurred."
+      }
+    },
+    {
+      "key": "ESO-228",
+      "title": "US-HOST-01 — chọn nguồn năng lực",
+      "ac_source": "sdlc/06.analysis/03.acceptance-criteria/20.host-us-01-election.md",
+      "verdict": "PARTIAL",
+      "counts": {
+        "acs": 8,
+        "pass": 2,
+        "partial": 5,
+        "fail": 1
+      },
+      "acs": [
+        {
+          "ac_id": "AC-HOST-01-01",
+          "type": "happy",
+          "verdict": "PASS",
+          "implementation": "eso/adapters/src/election.mjs:103-117 elects an available branch in order and pushes {branch, provider_id, reason} to the caller's turnAuditLog",
+          "test": "qc/eso-adapter-election.test.mjs:29-31 — 'assert.equal(election1.branch, 'host-native'); assert.equal(election1.provider_id, 'cursor-files'); assert.ok(election1.reason.includes('host-native'));'",
+          "notes": "Library-level only: no product caller exists, so no turn ever elects."
+        },
+        {
+          "ac_id": "AC-HOST-01-02",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:86-99 — none branch with guarantee 'G-DEGRADED' and a Vietnamese reason naming the degradation",
+          "test": "qc/eso-adapter-election.test.mjs:90-92 — 'assert.equal(election.branch, 'none'); assert.equal(election.guarantee, 'G-DEGRADED'); assert.ok(election.reason.includes('G-DEGRADED'));'",
+          "gap": "The 'lowered' level is an out-of-spec fourth value (G-DEGRADED, not G-ADVISORY); nothing compares against a baseline, so 'hạ mức bảo đảm' is asserted as a string, not as a state change."
+        },
+        {
+          "ac_id": "AC-HOST-01-03",
+          "type": "failure",
+          "verdict": "FAIL",
+          "implementation": "MISSING: eso/adapters/src/election.mjs — no SILENT_SWITCH detection; grep 'SILENT_SWITCH' over eso/ and packages/ returns 0 matches (only sdlc docs)",
+          "test": "MISSING: qc/eso-host-silent-switch.test.mjs — does not exist (never committed in git)",
+          "gap": "AC requires 'không đổi nhánh mà không ghi' + 'lần chọn mới được ghi'. handleMidTurnBranchFailure (election.mjs:129-207) has no turnAuditLog parameter, so the new selection is never written; probe: after elect+switch, auditLog length stayed 1 and still said branch 'external'."
+        },
+        {
+          "ac_id": "AC-HOST-01-04",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:13 BRANCH_ORDER and :82 'for (const branch of BRANCH_ORDER)' — the loop does honour the declared order",
+          "test": "qc/eso-adapter-election.test.mjs:14 — 'assert.deepEqual(BRANCH_ORDER, ['host-native', 'eso-native', 'external', 'none']);'",
+          "gap": "The test asserts a frozen constant, not the observed trial sequence (trialHistory). No test makes several branches available simultaneously and checks which one won, and no test inspects the skipped rows. AC §3 file qc/eso-host-order.test.mjs is missing."
+        },
+        {
+          "ac_id": "AC-HOST-01-05",
+          "type": "tenant",
+          "verdict": "PARTIAL",
+          "implementation": "There is no per-project capability configuration to leak (branches/pins are per-call arguments), so isolation is vacuous rather than enforced; OUT_OF_SCOPE is not emitted by any host code (grep 'OUT_OF_SCOPE' in eso/: only iam/policy.mjs:82, evidence, control-plane)",
+          "test": "qc/eso-adapter-election.test.mjs:50-63 — the test passes project-B its own empty 'branches' map and then asserts branch === 'none'",
+          "gap": "The test supplies the answer as input: nothing would change if the code shared state across projects. No OUT_OF_SCOPE path, no assertion that project A's pins/branches are invisible to B."
+        },
+        {
+          "ac_id": "AC-HOST-01-06",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:82-126 — each of host-native/eso-native/external is visited once (one 'skipped' history row each), then the loop falls through to none",
+          "test": "MISSING: qc/eso-host-walk-once.test.mjs — does not exist (named in sdlc/06.analysis/04.quality-control/06.host.md:35 as planned)",
+          "gap": "No test counts the trials or asserts '0 nhánh bị thử lại'."
+        },
+        {
+          "ac_id": "AC-HOST-01-07",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "electCapabilityProvider is a synchronous pure function with no module-level state, so two turns cannot interleave in-process; but nothing separates records when two turns share one project and one log except the turn_id field",
+          "test": "MISSING: qc/eso-host-concurrent.test.mjs — does not exist (planned at 06.host.md:36)",
+          "gap": "No concurrency test, and no test asserting two turns on the same project produce two distinct records."
+        },
+        {
+          "ac_id": "AC-HOST-01-08",
+          "type": "failure",
+          "verdict": "PASS",
+          "implementation": "eso/adapters/src/election.mjs:33-38 — throws HOST_NOT_DECLARED before any branch is touched",
+          "test": "qc/eso-adapter-election.test.mjs:66-76 — 'assert.equal(err.code, 'HOST_NOT_DECLARED')'",
+          "notes": "KNOWN_HOSTS (election.mjs:15) is a third hardcoded host list, independent of the adapter manifests — a separate source of truth that can drift."
+        }
+      ]
+    },
+    {
+      "key": "ESO-300",
+      "title": "US-HOST-02 — none là trạng thái hợp lệ",
+      "ac_source": "sdlc/06.analysis/03.acceptance-criteria/27.host-us-02-none.md",
+      "verdict": "FAIL",
+      "counts": {
+        "acs": 5,
+        "pass": 0,
+        "partial": 3,
+        "fail": 2
+      },
+      "acs": [
+        {
+          "ac_id": "AC-HOST-02-01",
+          "type": "happy",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:86-99 — records branch 'none' + guarantee 'G-DEGRADED' + reason",
+          "test": "qc/eso-adapter-election.test.mjs:81-92 — asserts only branch/guarantee/reason strings",
+          "gap": "'việc vẫn chạy' (the work still runs) is not implemented or asserted: nothing constructs a turn, calls the election and then runs work. This is a data shape where the AC demands an observable state change."
+        },
+        {
+          "ac_id": "AC-HOST-02-02",
+          "type": "edge",
+          "verdict": "FAIL",
+          "implementation": "MISSING: eso/core/src/judge.mjs — 'guarantee' has 0 occurrences in eso/core/src (grep), so a judgement can never lower its level because of an election; election.mjs:94 invents 'level: 'degraded'' but nothing reads it",
+          "test": "MISSING: qc/eso-host-none-degrades.test.mjs — does not exist",
+          "gap": "AC wants 'level hạ + lý do hiện cùng [phán quyết]'. The judgement path (judgeSufficiency) does not accept or emit guarantee, so no judgement ever shows the downgrade."
+        },
+        {
+          "ac_id": "AC-HOST-02-03",
+          "type": "failure",
+          "verdict": "FAIL",
+          "implementation": "MISSING: eso/adapters/src/election.mjs — SILENT_NONE appears 0 times in eso/ and packages/ (grep); the reason is a hardcoded template so no caller can omit it, but there is also no refusal path/error code",
+          "test": "MISSING: qc/eso-host-none-silent.test.mjs — does not exist",
+          "gap": "'0 phán quyết im lặng' is claimed by construction, not by a check: nothing detects a record with branch 'none' and an empty reason."
+        },
+        {
+          "ac_id": "AC-HOST-02-04",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "One record per capabilityKind when the caller invokes once per kind (election.mjs:87-99)",
+          "test": "qc/eso-adapter-election.test.mjs:104-115 — calls election a second time for 'codegraph' and asserts capability/branch and 'assert.notEqual(electionCap2.reason, election.reason)'",
+          "gap": "No test asserts the two records are separate entries in the turn log (the log is never inspected), and the reason difference is only the interpolated kind name."
+        },
+        {
+          "ac_id": "AC-HOST-02-05",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:41-46 — dedupes only against a caller-supplied 'existingElections' array; turnAuditLog is ignored for this purpose",
+          "test": "qc/eso-adapter-election.test.mjs:94-102 — passes 'existingElections: [election]' itself and then asserts 'assert.equal(secondElection, election)'",
+          "gap": "Self-fulfilling: the test hands the function the very input that makes it idempotent. Probe with the log as the only input: electing twice for (project A, turn t9, graph) produced 2 records — '0 bản ghi trùng' fails in the natural usage."
+        }
+      ]
+    },
+    {
+      "key": "ESO-233",
+      "title": "US-HOST-03 — đổi nhánh phải ghi",
+      "ac_source": "sdlc/06.analysis/03.acceptance-criteria/28.host-us-03-switch.md",
+      "verdict": "FAIL",
+      "counts": {
+        "acs": 5,
+        "pass": 1,
+        "partial": 1,
+        "fail": 3
+      },
+      "acs": [
+        {
+          "ac_id": "AC-HOST-03-01",
+          "type": "happy",
+          "verdict": "FAIL",
+          "implementation": "eso/adapters/src/election.mjs:196-206 — returns a new object with previous_branch/reason/history, but the function signature (:129-134) has no turnAuditLog and never appends, so the postcondition 'elections có 2 mục' is unmet",
+          "test": "qc/eso-adapter-election.test.mjs:135-139 — asserts switched/previous_branch/branch/guarantee and 'assert.equal(switched.history.length, 3)' — counts history rows, never the elections list",
+          "gap": "Probe: elect (external) then handleMidTurnBranchFailure -> turnAuditLog length 1, containing only 'external'. The new selection is not recorded anywhere a reader can query."
+        },
+        {
+          "ac_id": "AC-HOST-03-02",
+          "type": "failure",
+          "verdict": "FAIL",
+          "implementation": "MISSING: eso/adapters/src/election.mjs — no SILENT_SWITCH refusal path, no error code, 0 occurrences repo-wide outside sdlc docs",
+          "test": "MISSING: qc/eso-host-silent-switch.test.mjs — does not exist",
+          "gap": "AC requires a refusal ('từ chối', '0 thay đổi'). Nothing can refuse: the branch is a plain property a caller may reassign, and no validation compares the returned record against a persisted one."
+        },
+        {
+          "ac_id": "AC-HOST-03-03",
+          "type": "edge",
+          "verdict": "FAIL",
+          "implementation": "queryTurnProviderAudit (election.mjs:236-257) filters the caller log, which still holds the pre-switch record",
+          "test": "none — the audit-after-switch path is never exercised",
+          "gap": "Probe: after switching external -> none, queryTurnProviderAudit({turnId:'t1'}) returned ['external'] — the reader sees the dead provider as the active one, the opposite of '0 mất dấu'."
+        },
+        {
+          "ac_id": "AC-HOST-03-04",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:181-187 — intermediate failing branches get a 'failed_immediately' history row, then the loop continues to the next branch",
+          "test": "MISSING: qc/eso-host-switch-fallthrough.test.mjs — does not exist (planned at 06.host.md:39)",
+          "gap": "Behaviour exists but is untested; 'ghi cả hai lần thử' is only visible inside the returned object, never in elections."
+        },
+        {
+          "ac_id": "AC-HOST-03-05",
+          "type": "edge",
+          "verdict": "PASS",
+          "implementation": "eso/adapters/src/election.mjs:137-145 — returns status DANGLING_PROVIDER, is_active false, message 'nguồn đã mất: provider ... đã bị gỡ'",
+          "test": "qc/eso-adapter-election.test.mjs:141-148 — 'assert.equal(replay.status, 'DANGLING_PROVIDER'); assert.equal(replay.is_active, false); assert.ok(replay.message.includes('nguồn đã mất'));'",
+          "notes": "Uninstalled providers are caller-supplied (UNAVAILABLE fixture), i.e. no probe reads the real host."
+        }
+      ]
+    },
+    {
+      "key": "ESO-238",
+      "title": "US-HOST-04 — ghim nguồn",
+      "ac_source": "sdlc/06.analysis/03.acceptance-criteria/29.host-us-04-pin.md",
+      "verdict": "PARTIAL",
+      "counts": {
+        "acs": 5,
+        "pass": 1,
+        "partial": 3,
+        "fail": 1
+      },
+      "acs": [
+        {
+          "ac_id": "AC-HOST-04-01",
+          "type": "happy",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:50-77 — a pin short-circuits the branch walk and the record carries pinned:true, provider_id and reason",
+          "test": "qc/eso-adapter-election.test.mjs:152-166 — 'assert.equal(election.branch, 'external'); assert.equal(election.provider_id, 'pinned-mcp-graph'); assert.equal(election.pinned, true);'",
+          "gap": "The pin is a per-call argument only (election.mjs:23 'pins = {}'). Probe: no store, no file, no config write — a pin cannot survive from the turn that set it to the next turn, and the AC's precondition is 'kind=graph ghim external'."
+        },
+        {
+          "ac_id": "AC-HOST-04-02",
+          "type": "rbac",
+          "verdict": "FAIL",
+          "implementation": "eso/adapters/src/election.mjs:209-221 — guards on a caller-supplied string with a default of 'operator' (:212), and throws FORBIDDEN_MUTATION, not the AC's CONFIG_FORBIDDEN (grep 'CONFIG_FORBIDDEN' repo-wide: 0 matches)",
+          "test": "qc/eso-adapter-election.test.mjs:187-197 — 'assert.equal(err.code, 'FORBIDDEN_MUTATION')' — asserts a code the AC does not define",
+          "gap": "Probe: setCapabilityPin({capabilityKind:'graph', targetBranch:'external'}) with no actorRole returned {graph:'external'} — the RBAC check is skipped entirely. There is no IAM lookup (eso/iam/src/policy.mjs is not consulted), so an agent can pass actorRole:'operator' itself."
+        },
+        {
+          "ac_id": "AC-HOST-04-03",
+          "type": "failure",
+          "verdict": "PASS",
+          "implementation": "eso/adapters/src/election.mjs:52-61 — throws PIN_UNAVAILABLE and never falls through to another branch",
+          "test": "qc/eso-adapter-election.test.mjs:168-185 — 'assert.equal(err.code, 'PIN_UNAVAILABLE'); assert.equal(err.pinned_branch, 'external');'"
+        },
+        {
+          "ac_id": "AC-HOST-04-04",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:53 — treats branchAvailability.status === 'OUT' the same as unavailable, so the ED4 shape is handled",
+          "test": "MISSING: qc/eso-host-pin-out.test.mjs — does not exist (planned at 06.host.md:41); the existing test only uses available:false",
+          "gap": "'OUT cho năng lực đó' is not modelled per capability: branches is one flat map per call, so a branch cannot be OUT for graph and available for memory."
+        },
+        {
+          "ac_id": "AC-HOST-04-05",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:224-228 deletes the key on an empty pin; election.mjs:50 treats '' as falsy and walks the normal order",
+          "test": "qc/eso-adapter-election.test.mjs:199-206 — asserts only 'assert.equal(pins.graph, undefined)'",
+          "gap": "No test asserts the second half of the postcondition ('elections không ghi pinned') — the election is never run after unpinning."
+        }
+      ]
+    },
+    {
+      "key": "ESO-222",
+      "title": "US-HOST-05 — kiểm toán nguồn",
+      "ac_source": "sdlc/06.analysis/03.acceptance-criteria/30.host-us-05-audit.md",
+      "verdict": "PARTIAL",
+      "counts": {
+        "acs": 5,
+        "pass": 1,
+        "partial": 3,
+        "fail": 1
+      },
+      "acs": [
+        {
+          "ac_id": "AC-HOST-05-01",
+          "type": "happy",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:236-257 — returns {turn_id, records, has_degraded}; each record carries capability / branch / provider_id / reason (key names differ from the AC's kind / provider)",
+          "test": "qc/eso-adapter-election.test.mjs:216-219 — 'assert.equal(audit50.records.length, 2); assert.equal(audit50.has_degraded, true);'",
+          "gap": "No assertion on kind/provider/reason for the capability; and the source is a caller array (election.mjs:238 'auditLog = []'), not the evidence store — a turn recorded by eso/evidence/src/recorder.mjs:31 can never be found by this query."
+        },
+        {
+          "ac_id": "AC-HOST-05-02",
+          "type": "edge",
+          "verdict": "FAIL",
+          "implementation": "MISSING: eso/adapters/src/election.mjs — no OUT row is ever produced; queryTurnProviderAudit only filters records that exist, and never enumerates REQUIRED_CAPABILITIES (host-contract.mjs:12) to mark the rest OUT",
+          "test": "MISSING: qc/eso-host-audit-unelected.test.mjs — does not exist",
+          "gap": "AC wants 'OUT + lý do; không bịa host-native'. Today an unelected capability is simply absent, which is indistinguishable from 'we never asked'."
+        },
+        {
+          "ac_id": "AC-HOST-05-03",
+          "type": "failure",
+          "verdict": "PARTIAL",
+          "implementation": "Records carry provider_id and turn_id, so two turns are distinguishable in principle",
+          "test": "qc/eso-adapter-election.test.mjs:209-219 — builds two turns in the fixture but asserts only the count and has_degraded for turn-50; providers are never compared across turns",
+          "gap": "No test performs the comparison the AC describes; also, after a mid-turn switch the provider is stale (see AC-HOST-03-03), so the comparison would report the wrong source."
+        },
+        {
+          "ac_id": "AC-HOST-05-04",
+          "type": "edge",
+          "verdict": "PASS",
+          "implementation": "eso/adapters/src/election.mjs:242-250 — returns {records: [], message: 'turn không dùng năng lực nào'}",
+          "test": "qc/eso-adapter-election.test.mjs:221-224 — 'assert.equal(emptyAudit.records.length, 0); assert.ok(emptyAudit.message.includes('turn không dùng năng lực nào'));'",
+          "notes": "Same code path is also what a real, unelected-store turn returns, so the honest message is used to mask a missing store (probe: queryTurnProviderAudit({turnId:'real-turn-999'}) -> empty + 'turn không dùng năng lực nào')."
+        },
+        {
+          "ac_id": "AC-HOST-05-05",
+          "type": "edge",
+          "verdict": "PARTIAL",
+          "implementation": "eso/adapters/src/election.mjs:268-271 — deterministic sort by turn_id then capability; probe over 200 turns returns 400 rows identical across two calls",
+          "test": "qc/eso-adapter-election.test.mjs:227-239 — 50 turns, 100 rows, one read, asserts only batchRes[0] and [1]",
+          "gap": "The AC's 200-turn / two-read stability clause is not asserted; the planned volume test qc/eso-host-audit-volume.test.mjs is missing."
+        }
+      ]
+    }
+  ],
+  "defects": [
+    {
+      "severity": "CRITICAL",
+      "title": "Mid-turn branch switch never reaches the election/audit trail",
+      "proof": "eso/adapters/src/election.mjs:129 — 'export function handleMidTurnBranchFailure({ currentElection, failureReason, branches = {}, uninstalledProviders = [] } = {})' has no turnAuditLog parameter; probe: after switching external->none, auditLog length stayed 1 and queryTurnProviderAudit returned ['external']",
+      "impact": "AC-HOST-03-01 postcondition 'elections có 2 mục' unmet; AC-HOST-03-03 and AC-HOST-05-01/03 report the dead provider as active — 'vì sao khác' is unanswerable, which is the whole point of the story."
+    },
+    {
+      "severity": "CRITICAL",
+      "title": "SILENT_SWITCH and SILENT_NONE do not exist anywhere in product code",
+      "proof": "grep 'SILENT_SWITCH|SILENT_NONE' over eso/ and packages/ (--include=*.mjs) — 0 matches; the only hits are sdlc docs (e.g. 28.switch.md:37). No refusal path, no error code, no detector.",
+      "impact": "Three failure ACs (01-03, 02-03, 03-02) cannot pass: the system can neither detect an unrecorded switch nor refuse one. The ACs were written specifically to make silent degradation a defect."
+    },
+    {
+      "severity": "CRITICAL",
+      "title": "17/17 AC §3 test files missing, never committed; the substitute tests assert data shapes and encode a wrong vocabulary",
+      "proof": "MISSING: qc/eso-host-election.test.mjs — does not exist (git log --all for the path: empty for all 17 names). Substitute qc/eso-adapter-election.test.mjs:14 asserts the constant BRANCH_ORDER; :91 asserts 'G-DEGRADED'; :218 asserts only record length. sdlc/06.analysis/04.quality-control/06.host.md:83 — '27 planned · 0 executed'.",
+      "impact": "No AC has a per-AC proof. The strict baseline ('a test asserts it') is not met for any of the 28 ACs by the named tests; the two consolidated files pass while the behaviour they claim to prove is absent."
+    },
+    {
+      "severity": "HIGH",
+      "title": "Pin RBAC is bypassable by omitting the role argument, and uses the wrong error code",
+      "proof": "eso/adapters/src/election.mjs:212 — 'actorRole = 'operator'' default; :216 — 'if (actorRole !== 'operator' && actorRole !== 'admin')'. Probe: setCapabilityPin({capabilityKind:'graph', targetBranch:'external'}) returned {graph:'external'}. AC requires CONFIG_FORBIDDEN; code throws FORBIDDEN_MUTATION (grep CONFIG_FORBIDDEN: 0 matches) and qc/eso-adapter-election.test.mjs:195 asserts the wrong code.",
+      "impact": "AC-HOST-04-02 ('agent đổi ghim ⇒ từ chối') fails: an agent calling the API without a role succeeds, and no IAM role lookup is performed."
+    },
+    {
+      "severity": "HIGH",
+      "title": "Guarantee vocabulary violates the 8.1 host contract, and dispatch() is a no-op that reports success",
+      "proof": "eso/core/src/host-contract.mjs:10 — 'ASSURANCE_LEVELS = ['NATIVE','EMULATED','UNAVAILABLE']' vs sdlc/07.technical/01.architecture/11.host-capability.md:52 — 'guarantee: G-FULL | G-SCOPE | G-ADVISORY'; eso/adapters/src/election.mjs:93 invents 'G-DEGRADED'; G-SCOPE/G-ADVISORY: 0 occurrences. host-contract.mjs:77 — 'dispatch(action) { return { host: 'cursor', executed: action, status: 'ok' }; }' — probe wrote no file yet reported status ok.",
+      "impact": "ESO-227 DoD clauses D1/D2 fail; a fourth guarantee level is exactly the failure 39.host-contract-out.md §2.2 says no check would catch — and qc/eso-core-host-ui.test.mjs:22 asserts the wrong set as proof."
+    },
+    {
+      "severity": "HIGH",
+      "title": "v2 host election is dead code; installed host packages use v1",
+      "proof": "grep 'electCapabilityProvider|handleMidTurnBranchFailure|setCapabilityPin|queryTurnProviderAudit' over eso/ and packages/ — only eso/adapters/src and qc tests. packages/harness-host-generic/package.json:14 and packages/harness-host-dsh/package.json:12 depend on '@mu/harness-eso-core' (v1), not eso/core; 0 matches for 'host-native'/'eso-native'/'EMULATED' under packages/; MISSING: eso/core/package.json — does not exist.",
+      "impact": "No AC's user-visible state change can occur in the product: the only executable path is a test importing relative files."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "Turn audit reads a caller array with a default of [], not the evidence store",
+      "proof": "eso/adapters/src/election.mjs:238 — 'auditLog = []'; no call site passes it outside tests; the real store exists at eso/evidence/src/recorder.mjs:31 'export function recordTurn(db, turnData, ...)' and schema.mjs:94 already permits kind 'election'. Probe: queryTurnProviderAudit({turnId:'real-turn-999'}) -> {records: [], message: 'turn không dùng năng lực nào'}.",
+      "impact": "AC-HOST-05-01/02 cannot be satisfied for real turns; the 'empty turn' message is emitted for turns that did use capabilities (a fabricated statement)."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "Idempotency is caller-fed; duplicate election records occur in normal use",
+      "proof": "eso/adapters/src/election.mjs:41-46 dedupes only via 'existingElections'; probe: two electCapabilityProvider calls for (A, t9, graph) with turnAuditLog as the only input produced 2 records. qc/eso-adapter-election.test.mjs:99 supplies 'existingElections: [election]' itself.",
+      "impact": "AC-HOST-02-05 '0 bản ghi trùng' fails unless the caller duplicates the log into a second parameter; the test hides this."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "Tenant-isolation test is vacuous and OUT_OF_SCOPE is never emitted",
+      "proof": "qc/eso-adapter-election.test.mjs:55-59 gives project-B its own 'branches: {host-native:{available:false},...}' and then asserts branch 'none'; AC-HOST-01-05 error column requires OUT_OF_SCOPE, which no host file emits (grep in eso/: iam/policy.mjs:82 only).",
+      "impact": "AC-HOST-01-05 is asserted by supplying the expected input; nothing would detect cross-project leakage if a store were added later."
+    },
+    {
+      "severity": "LOW",
+      "title": "Order test asserts a constant; batch test is 50 turns and one read",
+      "proof": "qc/eso-adapter-election.test.mjs:14 'assert.deepEqual(BRANCH_ORDER, ...)' never observes a trial sequence; :227 'Array.from({ length: 50 }, ...)' and a single query against AC-HOST-05-05's 200 turns / two reads.",
+      "impact": "AC-HOST-01-04 and AC-HOST-05-05 are structurally unverified even though the implementation appears correct (probe over 200 turns: stable, 400 rows)."
+    }
+  ],
+  "key_questions_answered": {
+    "dispatch_returns_ok_without_acting_allowed": "No. The adapter is the only place a host action could run; returning a constant {status:'ok'} (host-contract.mjs:77/93/109) makes every caller believe the host executed the action. Probe: dispatch({write:'/tmp/.../should-not-exist.txt'}) reported ok and created no file. A stub-shaped success is precisely the 'returns success without acting' pattern the baseline excludes.",
+    "election_against_real_capabilities_or_fixtures": "Fixtures. election.mjs:22 takes 'branches = {}' from the caller; the only real capability matrix (host-contract.mjs:61-110) is never read, and KNOWN_HOSTS (election.mjs:15) is a third hardcoded list. No probe exists.",
+    "pin_persisted_anywhere": "No. setCapabilityPin (election.mjs:209-234) returns a plain object; grep for pins/capabilityPin/pinned outside election.mjs returns nothing; no config file or db write. A pin cannot survive a turn boundary.",
+    "mid_turn_switch_recorded_with_reason": "Reason and history yes (election.mjs:196-206); recording no — the function has no audit-log parameter and appends nothing. Audit log does NOT reflect it: probe kept the old 'external' row and the audit query returned 'external' while the active branch was 'none'.",
+    "turn_audit_real_store_or_array": "In-memory array supplied by the caller (election.mjs:238 'auditLog = []'), with no production caller and no wiring to eso/evidence recorder/db. Default call answers with an empty list plus the message 'turn không dùng năng lực nào'.",
+    "ac3_test_files_present": "No — 17/17 named files missing, never committed; two consolidated substitutes exist (qc/eso-adapter-election.test.mjs, qc/eso-core-host-ui.test.mjs) and are not equivalent (no failure-mode coverage, constant assertions, wrong guarantee vocabulary).",
+    "host_packages_import_v2": "No — packages/harness-host-generic and packages/harness-host-dsh depend on @mu/harness-eso-core v1; 0 imports of eso/core/src or eso/adapters/src anywhere in packages/."
+  },
+  "test_execution": {
+    "command": "node --test qc/eso-adapter-election.test.mjs qc/eso-core-host-ui.test.mjs",
+    "result": "12 tests, 12 pass, 0 fail",
+    "interpretation": "Green tests prove the data shapes, not the AC behaviours; the passing suite coexists with the CRITICAL defects above."
+  },
+  "ignored_artifacts": [
+    "comments/artifacts/slp/audit/*.json — self-reported 'score: 100' entries were not used as evidence; the findings above contradict them."
+  ],
+  "ac_totals": {
+    "acs": 28,
+    "pass": 5,
+    "partial": 15,
+    "fail": 8,
+    "dod_clauses_not_met": 2
+  }
+}
