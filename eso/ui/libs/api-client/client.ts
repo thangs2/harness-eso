@@ -21,7 +21,7 @@ export class ControlPlaneApiClient {
     }
 
     async getS1Work(project: string = 'default'): Promise<S1TurnListResponse> {
-        const url = `${this.baseUrl}/api/v1/s1?project=${encodeURIComponent(project)}`;
+        const url = `${this.baseUrl}/api/v1/work-overview?project=${encodeURIComponent(project)}`;
         const res = await fetch(url, {
             method: 'GET',
             headers: this.getHeaders(),
@@ -45,7 +45,7 @@ export class ControlPlaneApiClient {
     }
 
     async getS1Html(project: string = 'default'): Promise<{ html: string; status: number }> {
-        const url = `${this.baseUrl}/s1?project=${encodeURIComponent(project)}`;
+        const url = `${this.baseUrl}/work-overview?project=${encodeURIComponent(project)}`;
         const res = await fetch(url, {
             method: 'GET',
             headers: this.getHeaders(),

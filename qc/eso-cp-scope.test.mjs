@@ -5,7 +5,7 @@ import {
     executeFileWrite,
     transitionTaskStatus,
     queryTaskJudgement,
-} from '../eso/control-plane/src/scope.ts';
+} from '../eso/control-plane/src/modules/scope/domain/scope.ts';
 
 test('SCN-CP-01 (AC-AGENT-01-01 & AC-AGENT-01-04): Enforces locked allowed_files boundary; refuses out-of-scope with BLOCKED_SCOPE', () => {
     let diskModified = false;

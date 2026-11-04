@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { S1Controller } from './api/controllers/s1.controller.js';
+import { WorkOverviewController } from './api/controllers/work-overview.controller.js';
 import { EvidenceRepository } from './infrastructure/evidence.repository.js';
 
 @Module({
-    controllers: [S1Controller],
+    controllers: [WorkOverviewController],
     providers: [EvidenceRepository],
 })
-export class S1Module {}
+export class WorkOverviewModule {}

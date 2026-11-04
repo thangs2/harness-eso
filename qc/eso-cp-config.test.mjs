@@ -6,7 +6,7 @@ import {
     revertConfigChange,
     previewAttributeChange,
     saveAttributeChange,
-} from '../eso/control-plane/src/config-mgr.ts';
+} from '../eso/control-plane/src/modules/config/domain/config-change.ts';
 
 test('SCN-IAM-06-01 (AC-IAM-06-01): Preview config change returns users, overrides, and affected artefacts', () => {
     const currentConfig = {

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDbAdapter } from '../eso/graph/src/db-adapter.mjs';
-import { createNestFastifyControlPlane } from '../eso/control-plane/dist/server.js';
+import { createNestFastifyControlPlane } from '../eso/control-plane/dist/main.js';
 import { initSchema } from '../eso/graph/src/schema.mjs';
 
-import { initConfigSchema } from '../eso/control-plane/src/config-schema.ts';
+import { initConfigSchema } from '../eso/control-plane/src/modules/config/infrastructure/persistence/config.schema.ts';
 
 function createTestDb() {
     const db = createDbAdapter(':memory:');
@@ -40,7 +40,7 @@ test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite'
         assert.equal(unauthRes.status, 401);
 
         // 3. GET /config reads config with valid token
-        const { saveConfig } = await import('../eso/control-plane/src/config-store.ts');
+        const { saveConfig } = await import('../eso/control-plane/src/modules/config/infrastructure/persistence/repositories/config.repository.ts');
         const savedInitial = saveConfig(db, {
             project: 'p1',
             config: { setting: 'initial' },
@@ -135,7 +135,7 @@ test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite'
         const staleBody = await staleRes.json();
         assert.equal(staleBody.error, 'STALE_VERSION');
 
-        // 8. GET /s1 returns text/html work overview
+        // 8. GET /work-overview returns text/html work overview
         const { ensureEvidenceSchema, recordTurnEvidence } = await import('../eso/adapters/src/host-bridge.mjs');
         ensureEvidenceSchema(db);
         recordTurnEvidence({
@@ -150,7 +150,7 @@ test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite'
             payload: { command: 'bun test' },
         });
 
-        const s1Res = await fetch(`${baseUrl}/s1?project=p1`, {
+        const s1Res = await fetch(`${baseUrl}/work-overview?project=p1`, {
             headers: {
                 'Authorization': `Bearer ${BEARER_SAMPLE}`,
             },

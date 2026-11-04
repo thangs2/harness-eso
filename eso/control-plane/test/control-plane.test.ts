@@ -10,7 +10,7 @@ import {
     executeFileWrite,
     transitionTaskStatus,
     queryTaskJudgement,
-} from '../src/scope.ts';
+} from '../src/modules/scope/domain/scope.ts';
 
 describe('@mu/eso-control-plane — Scope Guard Unit Tests (Slice S1)', () => {
     describe('AC-AGENT-01-01 & AC-AGENT-01-04: File write scope enforcement', () => {

@@ -5,8 +5,8 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../../../common/infrastructure/database.service.js';
-import { readConfig, saveConfig } from '../../../../../src/config-store.js';
-import { previewConfigChange } from '../../../../../src/config-mgr.js';
+import { readConfig, saveConfig } from '../../infrastructure/persistence/repositories/config.repository.js';
+import { previewConfigChange } from '../../domain/config-change.js';
 import { PreviewConfigDto } from '../../api/dto/preview-config.dto.js';
 import { SaveConfigDto } from '../../api/dto/save-config.dto.js';
 

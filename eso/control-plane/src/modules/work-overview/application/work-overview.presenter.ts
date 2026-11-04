@@ -17,7 +17,7 @@ function escapeHtml(str: any) {
  * Implements S1 Work Overview (US-UI-01 / ESO-217 / ESO-380)
  */
 
-export function renderS1Page({
+export function renderWorkOverviewPage({
     project = 'default',
     hasAccess = true,
     turns = [],

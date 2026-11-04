@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { initConfigSchema } from './config-schema.js';
+import { initConfigSchema } from '../config.schema.js';
 
 /**
  * Compute deterministic hash of config content.

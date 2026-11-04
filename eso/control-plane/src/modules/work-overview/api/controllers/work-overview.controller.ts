@@ -8,12 +8,12 @@ import {
 import { FastifyReply } from 'fastify';
 import { AuthGuard } from '../../../../common/guards/auth.guard.js';
 import { DatabaseService } from '../../../../common/infrastructure/database.service.js';
-import { renderS1Page } from '../../application/s1.presenter.js';
+import { renderWorkOverviewPage } from '../../application/work-overview.presenter.js';
 import { EvidenceRepository } from '../../infrastructure/evidence.repository.js';
 
-@Controller('s1')
+@Controller('work-overview')
 @UseGuards(AuthGuard)
-export class S1Controller {
+export class WorkOverviewController {
     constructor(
         private readonly dbService: DatabaseService,
         private readonly evidence: EvidenceRepository
@@ -30,7 +30,7 @@ export class S1Controller {
             turns = this.evidence.list(project || 'default');
         } catch {}
 
-        const page = renderS1Page({
+        const page = renderWorkOverviewPage({
             project: project || 'default',
             hasAccess: true,
             turns,

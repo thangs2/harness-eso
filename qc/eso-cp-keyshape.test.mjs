@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { executeHandover } from '../eso/control-plane/src/flow.ts';
-import { previewAttributeChange, saveAttributeChange } from '../eso/control-plane/src/config-mgr.ts';
+import { executeHandover } from '../eso/control-plane/src/modules/flow/domain/flow.ts';
+import { previewAttributeChange, saveAttributeChange } from '../eso/control-plane/src/modules/config/domain/config-change.ts';
 import { deleteTeamRole, applyTeamPreset } from '../eso/core/src/team-tool-cfg.mjs';
 
 test('ESO-387 / B9: Flow handover with role.mjs bar shape ({ evidence_kind, min_basis })', () => {

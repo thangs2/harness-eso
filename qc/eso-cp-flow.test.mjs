@@ -4,7 +4,7 @@ import {
     validateAndCreateFlow,
     executeHandover,
     inspectFlowWorkers,
-} from '../eso/control-plane/src/flow.ts';
+} from '../eso/control-plane/src/modules/flow/domain/flow.ts';
 
 test('SCN-IAM-04-01 (AC-IAM-04-01): Flow A->B with evidence superset of bar(B) permits handover', () => {
     const flow = validateAndCreateFlow({
