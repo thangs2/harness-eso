@@ -27,6 +27,7 @@ export function electCapabilityProvider({
     actorRole = 'operator',
     existingElections = [],
     turnAuditLog = [],
+    db = null,
 } = {}) {
     if (!project) throw new Error('Project is required');
     if (!turnId) throw new Error('turnId is required');
@@ -48,8 +49,27 @@ export function electCapabilityProvider({
         return existing;
     }
 
-    // Check for pinning (US-HOST-04)
-    const pin = pins[capabilityKind];
+    // Check for pinning (US-HOST-04 & ESO-382: read from capability_pin store if present)
+    let effectivePins = { ...pins };
+    if (db) {
+        try {
+            const checkSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='capability_pin'`;
+            let exists = false;
+            if (typeof db.get === 'function') exists = !!db.get(checkSql);
+            else if (typeof db.prepare === 'function') exists = !!db.prepare(checkSql).get();
+            if (exists) {
+                const getPinSql = `SELECT pinned_branch FROM capability_pin WHERE project = ? AND capability_kind = ?`;
+                let row = null;
+                if (typeof db.get === 'function') row = db.get(getPinSql, project, capabilityKind);
+                else if (typeof db.prepare === 'function') row = db.prepare(getPinSql).get(project, capabilityKind);
+                if (row && row.pinned_branch) {
+                    effectivePins[capabilityKind] = row.pinned_branch;
+                }
+            }
+        } catch {}
+    }
+
+    const pin = effectivePins[capabilityKind];
     if (pin && typeof pin === 'string' && pin.trim() !== '') {
         // AC-HOST-04-03 & AC-HOST-04-04 / ED4: Pin unavailable or OUT
         const branchAvailability = branches[pin];
@@ -200,8 +220,8 @@ export function handleMidTurnBranchFailure({
     }
 
     // ESO-383 / B5: Silent fallback to none is strictly forbidden
-    if (nextBranch === 'none' && silentNone) {
-        const err = new Error('SILENT_NONE: Falling back to none without recording is prohibited');
+    if (nextBranch === 'none' && (silentNone || !failureReason || failureReason.trim() === '')) {
+        const err = new Error('SILENT_NONE: Falling back to none on zero-source path without reason or silently is prohibited');
         err.code = ERROR_SILENT_NONE;
         throw err;
     }
@@ -406,29 +426,62 @@ export function queryTurnProviderAudit({
 
     let records = [];
     if (db) {
-        const checkSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='provider_audit'`;
-        let exists = false;
-        if (typeof db.get === 'function') exists = !!db.get(checkSql);
-        else if (typeof db.prepare === 'function') exists = !!db.prepare(checkSql).get();
+        // ESO-382: Read from evidence_item table (kind='election')
+        try {
+            const checkEvSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='evidence_item'`;
+            let hasEvItem = false;
+            if (typeof db.get === 'function') hasEvItem = !!db.get(checkEvSql);
+            else if (typeof db.prepare === 'function') hasEvItem = !!db.prepare(checkEvSql).get();
 
-        if (exists) {
-            const sql = `SELECT * FROM provider_audit WHERE project = ? AND turn_id = ?`;
-            let rows = [];
-            if (typeof db.all === 'function') rows = db.all(sql, project, turnId);
-            else if (typeof db.prepare === 'function') rows = db.prepare(sql).all(project, turnId);
+            if (hasEvItem) {
+                const evSql = `SELECT payload, at FROM evidence_item WHERE project = ? AND turn_id = ? AND kind = 'election'`;
+                let evRows = [];
+                if (typeof db.all === 'function') evRows = db.all(evSql, project, turnId);
+                else if (typeof db.prepare === 'function') evRows = db.prepare(evSql).all(project, turnId);
 
-            records = rows.map((r) => ({
-                project: r.project,
-                turn_id: r.turn_id,
-                capability: r.capability,
-                branch: r.branch,
-                provider_id: r.provider_id,
-                guarantee: r.guarantee,
-                pinned: !!r.pinned,
-                reason: r.reason,
-                history: JSON.parse(r.history || '[]'),
-                recorded_at: r.recorded_at,
-            }));
+                for (const r of evRows) {
+                    const p = typeof r.payload === 'string' ? JSON.parse(r.payload) : (r.payload || {});
+                    records.push({
+                        project,
+                        turn_id: turnId,
+                        capability: p.capability || p.capabilityKind,
+                        branch: p.branch,
+                        provider_id: p.provider_id || p.providerId,
+                        guarantee: p.guarantee,
+                        pinned: !!p.pinned,
+                        reason: p.reason,
+                        history: p.history || [],
+                        recorded_at: r.at || new Date().toISOString(),
+                    });
+                }
+            }
+        } catch {}
+
+        if (records.length === 0) {
+            const checkSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='provider_audit'`;
+            let exists = false;
+            if (typeof db.get === 'function') exists = !!db.get(checkSql);
+            else if (typeof db.prepare === 'function') exists = !!db.prepare(checkSql).get();
+
+            if (exists) {
+                const sql = `SELECT * FROM provider_audit WHERE project = ? AND turn_id = ?`;
+                let rows = [];
+                if (typeof db.all === 'function') rows = db.all(sql, project, turnId);
+                else if (typeof db.prepare === 'function') rows = db.prepare(sql).all(project, turnId);
+
+                records = rows.map((r) => ({
+                    project: r.project,
+                    turn_id: r.turn_id,
+                    capability: r.capability,
+                    branch: r.branch,
+                    provider_id: r.provider_id,
+                    guarantee: r.guarantee,
+                    pinned: !!r.pinned,
+                    reason: r.reason,
+                    history: JSON.parse(r.history || '[]'),
+                    recorded_at: r.recorded_at,
+                }));
+            }
         }
     }
 
@@ -498,4 +551,16 @@ export function queryBatchProviderAudit({
     });
 
     return matched;
+}
+
+export function invokeCapabilityProvider(election, fn) {
+    if (!election || election.branch === 'none' || !election.provider_id) {
+        const err = new Error(`SILENT_NONE: Cannot invoke capability '${election?.capability || 'unknown'}' on zero-source path`);
+        err.code = ERROR_SILENT_NONE;
+        throw err;
+    }
+    if (typeof fn === 'function') {
+        return fn(election);
+    }
+    return election;
 }

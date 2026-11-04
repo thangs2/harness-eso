@@ -1,0 +1,118 @@
+import {
+    Injectable,
+    ConflictException,
+    BadRequestException,
+    NotFoundException,
+} from '@nestjs/common';
+import { DatabaseService } from '../../../../common/infrastructure/database.service.js';
+import { readConfig, saveConfig } from '../../../../../src/config-store.mjs';
+import { previewConfigChange } from '../../../../../src/config-mgr.mjs';
+import { PreviewConfigDto } from '../../api/dto/preview-config.dto.js';
+import { SaveConfigDto } from '../../api/dto/save-config.dto.js';
+
+@Injectable()
+export class ConfigService {
+    constructor(private readonly dbService: DatabaseService) {}
+
+    getConfig(project: string, version?: number) {
+        if (!project) {
+            throw new BadRequestException({
+                type: 'https://eso.dev/errors/missing-project',
+                title: 'Bad Request',
+                status: 400,
+                code: 'PROJECT_REQUIRED',
+                error: 'PROJECT_REQUIRED',
+                detail: 'Query parameter ?project= is required',
+            });
+        }
+        const db = this.dbService.getDatabase();
+        const record = readConfig(db, project, version ? Number(version) : null);
+        if (!record) {
+            throw new NotFoundException({
+                type: 'https://eso.dev/errors/config-not-found',
+                title: 'Not Found',
+                status: 404,
+                code: 'CONFIG_NOT_FOUND',
+                error: 'CONFIG_NOT_FOUND',
+                detail: `No config found for project "${project}"`,
+            });
+        }
+        return {
+            ok: true,
+            ...record,
+        };
+    }
+
+    previewConfig(dto: PreviewConfigDto) {
+        const db = this.dbService.getDatabase();
+        const current = readConfig(db, dto.project);
+        const currentConfig = current ? current.config : { version: 1 };
+        const currentHash = current ? current.hash : null;
+
+        const preview = previewConfigChange({
+            project: dto.project,
+            currentConfig,
+            pendingChange: dto.pendingChange,
+        });
+
+        return {
+            ok: true,
+            current_hash: currentHash,
+            preview_hash: preview.preview_hash,
+            diff: { current: currentConfig, pending: dto.pendingChange },
+            ...preview,
+        };
+    }
+
+    saveConfig(dto: SaveConfigDto) {
+        if (!dto.preview_hash) {
+            throw new ConflictException({
+                type: 'https://eso.dev/errors/preview-required',
+                title: 'Conflict',
+                status: 409,
+                code: 'PREVIEW_REQUIRED',
+                error: 'PREVIEW_REQUIRED',
+                detail: 'preview_hash is mandatory before saving configuration',
+            });
+        }
+
+        const db = this.dbService.getDatabase();
+        try {
+            const saved = saveConfig(db, {
+                project: dto.project,
+                config: dto.config,
+                expectedHash: dto.current_hash,
+                operator: dto.operator || 'system',
+            });
+            return {
+                ok: true,
+                project: dto.project,
+                version: saved.version,
+                hash: saved.hash,
+                updated_at: saved.updated_at,
+            };
+        } catch (err: any) {
+            if (err?.code === 'STALE_VERSION' || err?.message?.includes('STALE_VERSION')) {
+                throw new ConflictException({
+                    type: 'https://eso.dev/errors/stale-version',
+                    title: 'Conflict',
+                    status: 409,
+                    code: 'STALE_VERSION',
+                    error: 'STALE_VERSION',
+                    detail: err.message,
+                });
+            }
+            if (err?.code === 'PREVIEW_REQUIRED') {
+                throw new ConflictException({
+                    type: 'https://eso.dev/errors/preview-required',
+                    title: 'Conflict',
+                    status: 409,
+                    code: 'PREVIEW_REQUIRED',
+                    error: 'PREVIEW_REQUIRED',
+                    detail: err.message,
+                });
+            }
+            throw err;
+        }
+    }
+}

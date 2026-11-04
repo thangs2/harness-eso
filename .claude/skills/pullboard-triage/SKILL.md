@@ -57,7 +57,7 @@ Every issue and pull request, open or closed, has at least one of these:
 ## 6. Credit
 
 - An item that came from an outside report keeps the issue or pull request and the handle in its brief.
-- Its changelog line ends with the credit: `(#<item>; reported in [GitHub #<n>](<url>), thanks @<handle>)`, or for the reporter's own pull request `(#<item>; [PR #<n>](<url>) by @<handle>)`.
+- Its changelog line ends with the credit: `(#<item>; reported in [GitHub #<n>](https://github.com/<repo>/issues/<n>), thanks @<handle>)`, or for the reporter's own pull request `(#<item>; [PR #<n>](https://github.com/<repo>/pull/<n>) by @<handle>)`.
 
 ## 7. Finish each one
 

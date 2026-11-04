@@ -14,6 +14,7 @@ export {
     recordTurnProviderAudit,
     queryTurnProviderAudit,
     queryBatchProviderAudit,
+    invokeCapabilityProvider,
 } from './election.mjs';
 
 export {

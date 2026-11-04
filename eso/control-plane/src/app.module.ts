@@ -1,13 +1,11 @@
 import { Module } from '@nestjs/common';
-import { HealthController } from './health.controller.js';
-import { ConfigController } from './config.controller.js';
-import { S1Controller } from './s1.controller.js';
-import { DatabaseService } from './database.service.js';
-import { AuthGuard } from './auth.guard.js';
+import { DatabaseModule } from './common/infrastructure/database.module.js';
+import { AuthModule } from './common/guards/auth.module.js';
+import { HealthModule } from './modules/health/health.module.js';
+import { ConfigModule } from './modules/config/config.module.js';
+import { S1Module } from './modules/s1/s1.module.js';
 
 @Module({
-    controllers: [HealthController, ConfigController, S1Controller],
-    providers: [DatabaseService, AuthGuard],
-    exports: [DatabaseService, AuthGuard],
+    imports: [DatabaseModule, AuthModule, HealthModule, ConfigModule, S1Module],
 })
 export class AppModule {}

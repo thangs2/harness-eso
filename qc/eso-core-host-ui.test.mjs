@@ -65,7 +65,7 @@ test('SCN-HOST-01 (DoD 8.1): Exactly 3 assurance levels and rejects invalid leve
 // WP 7.1 / ESO-216: Generic ST1..ST6 Frames
 // ==========================================
 
-test('SCN-UI-FRAME-01 (DoD 7.1): Generic ST1..ST6 state render frames; denied and empty share identical message when hidden', () => {
+test('SCN-UI-FRAME-01 (DoD 7.1): Generic ST1..ST6 state render frames; denied message identical for not-found and no-permission, distinct from empty', () => {
     const emptyFrame = renderStateFrame({
         state: UI_STATES.ST1_EMPTY,
         emptyMessage: 'chưa có dữ liệu nào',
@@ -73,14 +73,24 @@ test('SCN-UI-FRAME-01 (DoD 7.1): Generic ST1..ST6 state render frames; denied an
     assert.equal(emptyFrame.state, 'EMPTY');
     assert.equal(emptyFrame.message, 'chưa có dữ liệu nào');
 
-    // Denied with hideExistence=true uses distinct message from Empty (ESO-381)
-    const deniedHidden = renderStateFrame({
+    // Denied with hideExistence=true produces identical refusal message for not-found and no-permission, distinct from ST1 Empty
+    const deniedNotFound = renderStateFrame({
         state: UI_STATES.ST4_DENIED,
         hideExistence: true,
-        emptyMessage: 'chưa có dữ liệu nào',
+        reason: 'not-found',
     });
-    assert.equal(deniedHidden.state, 'DENIED');
-    assert.notEqual(deniedHidden.message, emptyFrame.message);
+    const deniedNoPermission = renderStateFrame({
+        state: UI_STATES.ST4_DENIED,
+        hideExistence: true,
+        reason: 'no-permission',
+    });
+    assert.equal(deniedNotFound.state, 'DENIED');
+    assert.equal(deniedNoPermission.state, 'DENIED');
+    // 1. Identical message for not-found and no-permission (security: does not leak existence)
+    assert.equal(deniedNotFound.message, deniedNoPermission.message);
+    assert.equal(deniedNotFound.message, 'Không có quyền truy cập hoặc dự án không tồn tại');
+    // 2. Distinct from ST1 empty
+    assert.notEqual(deniedNotFound.message, emptyFrame.message);
 
     // Loading skeleton
     const loadingFrame = renderStateFrame({ state: UI_STATES.ST2_LOADING });

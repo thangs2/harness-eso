@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
     handleMidTurnBranchFailure,
+    invokeCapabilityProvider,
     ERROR_SILENT_SWITCH,
     ERROR_SILENT_NONE,
 } from '../eso/adapters/src/election.mjs';
@@ -103,4 +104,89 @@ test('ESO-383 / B5: Non-silent mid-turn branch switch records record and reason 
     assert.equal(res.switch_record.reason, 'Host CLI crashed');
     assert.equal(res.switch_record.silent, false);
     assert.ok(res.history.some((h) => h.status === 'failed' && h.reason === 'Host CLI crashed'));
+});
+
+test('ESO-383: invokeCapabilityProvider on zero-source branch none throws SILENT_NONE', () => {
+    const noneElection = {
+        turn_id: 'turn-silent-1',
+        capability: 'codegraph_query',
+        branch: 'none',
+        provider_id: null,
+    };
+
+    assert.throws(
+        () => invokeCapabilityProvider(noneElection, () => {}),
+        (err) => {
+            assert.equal(err.code, 'SILENT_NONE');
+            return true;
+        }
+    );
+});
+
+test('ESO-382: election reads capability_pin from DB store and queryTurnProviderAudit reads evidence_item', async () => {
+    const { createDbAdapter } = await import('../eso/graph/src/db-adapter.mjs');
+    const {
+        electCapabilityProvider,
+        setCapabilityPin,
+        queryTurnProviderAudit,
+    } = await import('../eso/adapters/src/election.mjs');
+    const { ensureEvidenceSchema, recordTurnEvidence } = await import('../eso/adapters/src/host-bridge.mjs');
+
+    const db = createDbAdapter(':memory:');
+    ensureEvidenceSchema(db);
+
+    // 1. Set pin in DB
+    setCapabilityPin({
+        project: 'proj-pin-test',
+        capabilityKind: 'codegraph',
+        targetBranch: 'eso-native',
+        db,
+    });
+
+    // 2. Election without pins argument reads from DB
+    const election = electCapabilityProvider({
+        project: 'proj-pin-test',
+        turnId: 'turn-pin-1',
+        capabilityKind: 'codegraph',
+        host: 'cursor',
+        branches: {
+            'host-native': { available: true, provider_id: 'cursor-cg' },
+            'eso-native': { available: true, provider_id: 'eso-cg' },
+        },
+        db,
+    });
+    assert.equal(election.branch, 'eso-native', 'Must elect pinned branch from DB');
+    assert.equal(election.pinned, true);
+
+    // 3. Record election in evidence_item
+    db.run(
+        `INSERT INTO evidence_item (project, turn_id, seq, kind, payload, at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+            'proj-pin-test',
+            'turn-pin-1',
+            1,
+            'election',
+            JSON.stringify({
+                capability: 'codegraph',
+                branch: 'eso-native',
+                provider_id: 'eso-cg',
+                guarantee: 'G-FULL',
+                pinned: true,
+                reason: 'Elected via DB pin',
+            }),
+            new Date().toISOString(),
+        ]
+    );
+
+    // 4. queryTurnProviderAudit reads from evidence_item
+    const auditRes = queryTurnProviderAudit({
+        project: 'proj-pin-test',
+        turnId: 'turn-pin-1',
+        db,
+    });
+    assert.equal(auditRes.records.length, 1);
+    assert.equal(auditRes.records[0].capability, 'codegraph');
+    assert.equal(auditRes.records[0].branch, 'eso-native');
+    assert.equal(auditRes.records[0].provider_id, 'eso-cg');
 });

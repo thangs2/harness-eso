@@ -1,0 +1,27 @@
+======================================================================
+VERIFY LOG: ESO-382 — Capability pin DB election & turn provider audit reads evidence_item
+Timestamp: 2026-11-04T16:40:00.000Z
+======================================================================
+
+$ node --test qc/eso-host-silent.test.mjs
+Exit Code: 0
+Output:
+✔ ESO-382: election reads capability_pin from DB store and queryTurnProviderAudit reads evidence_item (11.958458ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+
+$ bun test qc/eso-host-silent.test.mjs
+Exit Code: 0
+Output:
+✓ ESO-382: election reads capability_pin from DB store and queryTurnProviderAudit reads evidence_item [4.47ms]
+
+6 pass
+0 fail
+======================================================================
+VERDICT: PASS
+======================================================================

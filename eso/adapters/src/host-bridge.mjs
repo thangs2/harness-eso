@@ -26,6 +26,16 @@ export function ensureEvidenceSchema(db) {
             payload      TEXT NOT NULL,
             PRIMARY KEY (project, turn_id)
         );
+
+        CREATE TABLE IF NOT EXISTS evidence_item (
+            project      TEXT NOT NULL,
+            turn_id      TEXT NOT NULL,
+            seq          INTEGER NOT NULL,
+            kind         TEXT NOT NULL,
+            payload      TEXT NOT NULL,
+            at           TEXT NOT NULL,
+            PRIMARY KEY (project, turn_id, seq)
+        );
     `;
 
     if (typeof db.exec === 'function') {
