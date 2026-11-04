@@ -36,13 +36,18 @@ test('ESO-378 / B3: Cursor host adapter dispatch applies real side effects (no s
     assert.equal(history[0].required_capability, 'file_tools');
     assert.equal(history[0].assurance, 'NATIVE');
 
-    // 3. Dispatch a second action (shell command)
+    // 3. Dispatch a second action without executor -> returns executed: false, error: 'NO_EXECUTOR'
     const cmdResult = cursor.dispatch({
         type: 'shell_command',
         payload: { cmd: 'bun test' },
     });
     assert.equal(cmdResult.seq, 2);
+    assert.equal(cmdResult.executed, false);
+    assert.equal(cmdResult.side_effect, null);
+    assert.equal(cmdResult.error, 'NO_EXECUTOR');
     assert.equal(cursor.getDispatchHistory().length, 2);
+    assert.equal(cursor.getDispatchHistory()[1].side_effect_applied, false);
+    assert.equal(cursor.getDispatchHistory()[1].error, 'NO_EXECUTOR');
 
     // 4. Invalid action throws INVALID_ACTION
     assert.throws(

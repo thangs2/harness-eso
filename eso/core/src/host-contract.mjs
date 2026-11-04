@@ -105,6 +105,34 @@ function createDispatcher(hostId, manifest) {
             const at = new Date().toISOString();
             const actionId = `act-${hostId}-${seq}-${Date.now()}`;
 
+            const hasExecutor = typeof actionObj.execute === 'function' || typeof actionObj.handler === 'function';
+            if (!hasExecutor) {
+                const record = {
+                    seq,
+                    action_id: actionId,
+                    host: hostId,
+                    type,
+                    payload: actionObj.payload || actionObj.data || null,
+                    required_capability: requiredCap,
+                    assurance: requiredCap ? manifest.capabilities[requiredCap] : 'NATIVE',
+                    dispatched_at: at,
+                    side_effect_applied: false,
+                    result: null,
+                    error: 'NO_EXECUTOR',
+                };
+                history.push(record);
+                return {
+                    action_id: actionId,
+                    host: hostId,
+                    type,
+                    executed: false,
+                    dispatched_at: at,
+                    seq,
+                    side_effect: null,
+                    error: 'NO_EXECUTOR',
+                };
+            }
+
             let sideEffectResult = null;
             if (typeof actionObj.execute === 'function') {
                 sideEffectResult = actionObj.execute();

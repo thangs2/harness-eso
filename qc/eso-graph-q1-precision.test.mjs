@@ -160,3 +160,44 @@ test('ESO-385: graph with actual classes and methods computes reasonable coverag
     assert.equal(partialResult.completeness.perKind.method.coverage, 1.0);
     assert.equal(partialResult.coverage, 0.5);
 });
+
+test('ESO-384: Q1 distinguishes absent vs unknown when symbol not found in graph', () => {
+    const db = createDb();
+    const project = 'proj-eso-384';
+
+    // Standalone node
+    db.run(
+        `INSERT INTO graph_node (id, project, kind, name, path, created_at, updated_at) VALUES
+         ('n_stand', ?, 'symbol', 'StandaloneUtil', 'src/util.ts', '2026-11-04', '2026-11-04')`,
+        [project]
+    );
+
+    // 1. Unknown symbol with incomplete coverage (< 1.0) -> unknown + reason
+    const resUnknown = queryReadSet(db, {
+        project,
+        symbolOrFile: 'NonExistentSymbol',
+        completeness: 0.85,
+    });
+    assert.equal(resUnknown.status, 'unknown');
+    assert.equal(resUnknown.reason, 'SYMBOL_NOT_FOUND_INCOMPLETE_COVERAGE');
+    assert.deepEqual(resUnknown.readSet, []);
+
+    // 2. Unknown symbol with full coverage (1.0) -> absent + reason
+    const resAbsent = queryReadSet(db, {
+        project,
+        symbolOrFile: 'NonExistentSymbol',
+        completeness: 1.0,
+    });
+    assert.equal(resAbsent.status, 'absent');
+    assert.equal(resAbsent.reason, 'SYMBOL_ABSENT');
+    assert.deepEqual(resAbsent.readSet, []);
+
+    // 3. Known isolated symbol with full coverage (1.0) -> ready + []
+    const resReady = queryReadSet(db, {
+        project,
+        symbolOrFile: 'StandaloneUtil',
+        completeness: 1.0,
+    });
+    assert.equal(resReady.status, 'ready');
+    assert.deepEqual(resReady.readSet, []);
+});

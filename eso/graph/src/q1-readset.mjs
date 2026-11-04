@@ -165,10 +165,12 @@ export function queryReadSet(db, options = {}) {
         [normProject, normTarget, normTarget, normTarget, strippedTarget]
     );
 
-    // AC-ARCH-02-04: Isolated symbol with 0 matches yields readSet: []
+    // AC-ARCH-02-04 & ESO-384: Target symbol/file not found in graph
     if (startNodes.length === 0) {
+        const isCoverageFull = compVal >= 1.0;
+        const status = isCoverageFull ? 'absent' : 'unknown';
         return {
-            status: isUnknown ? 'unknown' : 'ready',
+            status,
             project: normProject,
             symbolOrFile: normTarget,
             buildId: buildId || null,
@@ -178,6 +180,7 @@ export function queryReadSet(db, options = {}) {
             depth: 0,
             coverage: compVal,
             completeness: completenessObj,
+            reason: status === 'unknown' ? 'SYMBOL_NOT_FOUND_INCOMPLETE_COVERAGE' : 'SYMBOL_ABSENT',
         };
     }
 
