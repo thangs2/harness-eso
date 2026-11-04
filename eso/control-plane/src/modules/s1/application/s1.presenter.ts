@@ -1,6 +1,7 @@
-import { UI_STATES, renderStateFrame, projectS1WorkOverview } from '../../../core/src/ui-frames.mjs';
+// @ts-ignore - core domain is plain ESM during the migration
+import { UI_STATES, renderStateFrame, projectS1WorkOverview } from '../../../../../core/src/ui-frames.mjs';
 
-function escapeHtml(str) {
+function escapeHtml(str: any) {
     if (str === null || str === undefined) return '';
     return String(str)
         .replace(/&/g, '&amp;')
@@ -23,7 +24,7 @@ export function renderS1Page({
     isLoading = false,
     error = null,
     isStale = false,
-} = {}) {
+}: any = {}) {
     if (isLoading) {
         const frame = renderStateFrame({ state: UI_STATES.ST2_LOADING });
         return {
