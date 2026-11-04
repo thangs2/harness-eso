@@ -1,0 +1,34 @@
+======================================================================
+VERIFY LOG: ESO-389 — ticket_pack store tamper detection + append-only
+Timestamp: 2026-11-04T15:14:50.000Z
+======================================================================
+
+$ node --test qc/eso-ticket-pack-store.test.mjs
+Exit Code: 0
+Output:
+✔ ESO-389 / B11: In-memory ticket_pack store retains 2 packs history (append-only) (2.374708ms)
+✔ ESO-389 / B11: Tamper rejection at append and verification (0.573ms)
+✔ ESO-389 / B11: SQLite-backed ticket_pack store with dual engine and source none (1.875708ms)
+✔ ESO-389 / B11: Reading tampered row via getPacks throws PACK_TAMPERED (0.403916ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 88.496167
+
+$ bun test qc/eso-ticket-pack-store.test.mjs
+Exit Code: 0
+Output:
+✓ ESO-389 / B11: In-memory ticket_pack store retains 2 packs history (append-only) [1.38ms]
+✓ ESO-389 / B11: Tamper rejection at append and verification [0.59ms]
+✓ ESO-389 / B11: SQLite-backed ticket_pack store with dual engine and source none [2.72ms]
+✓ ESO-389 / B11: Reading tampered row via getPacks throws PACK_TAMPERED [0.33ms]
+
+4 pass
+0 fail
+======================================================================
+VERDICT: PASS
+======================================================================

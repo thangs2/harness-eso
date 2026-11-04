@@ -245,7 +245,17 @@ export function createTicketPackStore({ db = null } = {}) {
                 content_hash TEXT NOT NULL,
                 pack         TEXT NOT NULL,
                 PRIMARY KEY (project, source, fetched_at)
-            )
+            );
+            CREATE TRIGGER IF NOT EXISTS trg_ticket_pack_no_update
+            BEFORE UPDATE ON ticket_pack
+            BEGIN
+                SELECT RAISE(ABORT, 'FORBIDDEN_MUTATION: ticket_pack is strictly append-only (no UPDATE)');
+            END;
+            CREATE TRIGGER IF NOT EXISTS trg_ticket_pack_no_delete
+            BEFORE DELETE ON ticket_pack
+            BEGIN
+                SELECT RAISE(ABORT, 'FORBIDDEN_MUTATION: ticket_pack is strictly append-only (no DELETE)');
+            END;
         `;
         if (typeof db.exec === 'function') {
             db.exec(createTableSql);
@@ -352,15 +362,26 @@ export function createTicketPackStore({ db = null } = {}) {
                 } else if (typeof db.prepare === 'function') {
                     rows = db.prepare(sql).all(...params);
                 }
-                records = rows.map((r) => ({
-                    project: r.project,
-                    source: r.source,
-                    ticket_key: r.ticket_key,
-                    tried: JSON.parse(r.tried || '[]'),
-                    fetched_at: r.fetched_at,
-                    content_hash: r.content_hash,
-                    pack: JSON.parse(r.pack),
-                }));
+                records = rows.map((r) => {
+                    const packObj = JSON.parse(r.pack);
+                    const computed = computeHash(packObj);
+                    if (computed !== r.content_hash) {
+                        const err = new Error(`PACK_TAMPERED: Recorded hash '${r.content_hash}' does not match computed hash '${computed}'`);
+                        err.code = 'PACK_TAMPERED';
+                        err.recorded_hash = r.content_hash;
+                        err.computed_hash = computed;
+                        throw err;
+                    }
+                    return {
+                        project: r.project,
+                        source: r.source,
+                        ticket_key: r.ticket_key,
+                        tried: JSON.parse(r.tried || '[]'),
+                        fetched_at: r.fetched_at,
+                        content_hash: r.content_hash,
+                        pack: packObj,
+                    };
+                });
             } else {
                 records = memoryRecords
                     .filter((r) => {
@@ -369,7 +390,17 @@ export function createTicketPackStore({ db = null } = {}) {
                         if (source !== null && source !== undefined && r.source !== source) return false;
                         return true;
                     })
-                    .map((r) => JSON.parse(JSON.stringify(r)));
+                    .map((r) => {
+                        const computed = computeHash(r.pack);
+                        if (computed !== r.content_hash) {
+                            const err = new Error(`PACK_TAMPERED: Recorded hash '${r.content_hash}' does not match computed hash '${computed}'`);
+                            err.code = 'PACK_TAMPERED';
+                            err.recorded_hash = r.content_hash;
+                            err.computed_hash = computed;
+                            throw err;
+                        }
+                        return JSON.parse(JSON.stringify(r));
+                    });
             }
 
             return records;

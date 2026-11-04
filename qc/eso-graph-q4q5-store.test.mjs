@@ -34,11 +34,12 @@ test('ESO-386 (B8): Q4 queryEndpointPermissions reads from DB graph store', () =
         [project, project]
     );
 
-    // 3. Query endpoint permissions with db
+    // 3. Query endpoint permissions with db and coverage: 1.0
     const res = queryEndpointPermissions({
         db,
         endpointId: 'ep-1',
         project,
+        coverage: 1.0,
     });
 
     assert.equal(res.status, 'answered');
@@ -47,6 +48,16 @@ test('ESO-386 (B8): Q4 queryEndpointPermissions reads from DB graph store', () =
     assert.equal(res.grant, 'grant-1');
     assert.equal(res.granted_at, 'auth/roles.json');
     assert.deepEqual(res.path, ['ep-1', 'order:create', 'grant-1']);
+
+    // 3b. Missing coverage returns status: unknown + COVERAGE_REQUIRED (DoD B8 / ESO-386)
+    const missingCov = queryEndpointPermissions({
+        db,
+        endpointId: 'ep-1',
+        project,
+    });
+    assert.equal(missingCov.status, 'unknown');
+    assert.equal(missingCov.code, 'COVERAGE_REQUIRED');
+    assert.deepEqual(missingCov.unknowns, ['coverage_missing']);
 
     // 4. Undeclared endpoint in DB returns unknown (unknown != absent, BR-05)
     const undeclared = queryEndpointPermissions({
@@ -57,6 +68,55 @@ test('ESO-386 (B8): Q4 queryEndpointPermissions reads from DB graph store', () =
     assert.equal(undeclared.status, 'unknown');
     assert.equal(undeclared.code, 'PERM_UNDECLARED');
     assert.equal(undeclared.public, false);
+});
+
+test('ESO-386 (B8): Multi-project isolation in Q4 and Q5 queries', () => {
+    const db = createGraphDb();
+    const projA = 'project-alpha';
+    const projB = 'project-beta';
+
+    // Insert same endpoint id 'ep-common' into project-alpha and project-beta
+    db.run(
+        `INSERT INTO graph_node (id, project, kind, name, path, metadata_json, created_at, updated_at) VALUES
+         ('ep-common-a', ?, 'endpoint', 'ep-common', 'src/a.ts', '{}', '2026-11-04', '2026-11-04'),
+         ('perm-a', ?, 'permission', 'perm:alpha', '', '{\"dynamic\":false}', '2026-11-04', '2026-11-04'),
+         ('grant-a', ?, 'grant', 'grant:alpha', 'roles-a.json', '{\"deleted\":false}', '2026-11-04', '2026-11-04'),
+         ('ep-common-b', ?, 'endpoint', 'ep-common', 'src/b.ts', '{}', '2026-11-04', '2026-11-04'),
+         ('perm-b', ?, 'permission', 'perm:beta', '', '{\"dynamic\":false}', '2026-11-04', '2026-11-04'),
+         ('grant-b', ?, 'grant', 'grant:beta', 'roles-b.json', '{\"deleted\":false}', '2026-11-04', '2026-11-04')`,
+        [projA, projA, projA, projB, projB, projB]
+    );
+
+    db.run(
+        `INSERT INTO graph_edge (id, project, source_id, target_id, relation, created_at) VALUES
+         ('ea1', ?, 'ep-common-a', 'perm-a', 'requires', '2026-11-04'),
+         ('ea2', ?, 'perm-a', 'grant-a', 'granted_by', '2026-11-04'),
+         ('eb1', ?, 'ep-common-b', 'perm-b', 'requires', '2026-11-04'),
+         ('eb2', ?, 'perm-b', 'grant-b', 'granted_by', '2026-11-04')`,
+        [projA, projA, projB, projB]
+    );
+
+    // Querying project-alpha returns perm:alpha, never leaks perm:beta
+    const resA = queryEndpointPermissions({
+        db,
+        endpointId: 'ep-common',
+        project: projA,
+        coverage: 1.0,
+    });
+    assert.equal(resA.status, 'answered');
+    assert.equal(resA.permission, 'perm:alpha');
+    assert.equal(resA.grant, 'grant-a');
+
+    // Querying project-beta returns perm:beta
+    const resB = queryEndpointPermissions({
+        db,
+        endpointId: 'ep-common',
+        project: projB,
+        coverage: 1.0,
+    });
+    assert.equal(resB.status, 'answered');
+    assert.equal(resB.permission, 'perm:beta');
+    assert.equal(resB.grant, 'grant-b');
 });
 
 test('ESO-386 (B8): Q5 querySliceTenantBoundary reads from DB graph store', () => {
@@ -84,6 +144,7 @@ test('ESO-386 (B8): Q5 querySliceTenantBoundary reads from DB graph store', () =
     const res = querySliceTenantBoundary({
         db,
         sliceId: 'slice-billing',
+        project,
         coverage: 1.0,
     });
 
@@ -94,10 +155,32 @@ test('ESO-386 (B8): Q5 querySliceTenantBoundary reads from DB graph store', () =
     assert.equal(res.evidence[0].table, 'invoices');
     assert.equal(res.evidence[0].marker, 'tenant_id');
 
+    // 3b. Missing coverage returns status: unknown + COVERAGE_REQUIRED (DoD B8 / ESO-386)
+    const missingCov = querySliceTenantBoundary({
+        db,
+        sliceId: 'slice-billing',
+        project,
+    });
+    assert.equal(missingCov.status, 'unknown');
+    assert.equal(missingCov.code, 'COVERAGE_REQUIRED');
+    assert.deepEqual(missingCov.unknowns, ['coverage_missing']);
+
+    // 3c. Querying for another project returns EMPTY_SLICE because no tables belong to other project
+    const otherProj = querySliceTenantBoundary({
+        db,
+        sliceId: 'slice-billing',
+        project: 'different-project',
+        coverage: 1.0,
+    });
+    assert.equal(otherProj.status, 'unknown');
+    assert.equal(otherProj.code, 'EMPTY_SLICE');
+    assert.deepEqual(otherProj.unknowns, ['empty_slice']);
+
     // 4. Low coverage rejects claim of no-tenant with status: 'unknown' (unknown != absent)
     const lowCov = querySliceTenantBoundary({
         db,
         sliceId: 'slice-billing',
+        project,
         coverage: 0.50, // below floor 0.70
     });
     assert.equal(lowCov.status, 'unknown');

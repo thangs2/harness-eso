@@ -164,7 +164,59 @@ test('ESO-389 / B11: SQLite-backed ticket_pack store with dual engine and source
         }
     );
 
-    // 4. Update / Delete blocked
+    // 4. Update / Delete blocked via method calls and raw SQL triggers
     assert.throws(() => store.update(), (err) => err.code === 'FORBIDDEN_MUTATION');
     assert.throws(() => store.delete(), (err) => err.code === 'FORBIDDEN_MUTATION');
+
+    // 5. Raw SQL UPDATE is blocked by SQLite trigger
+    assert.throws(
+        () => {
+            db.run(`UPDATE ticket_pack SET source = 'tampered' WHERE project = 'p2'`);
+        },
+        (err) => {
+            assert.match(err.message, /FORBIDDEN_MUTATION/);
+            return true;
+        }
+    );
+
+    // 6. Raw SQL DELETE is blocked by SQLite trigger
+    assert.throws(
+        () => {
+            db.run(`DELETE FROM ticket_pack WHERE project = 'p2'`);
+        },
+        (err) => {
+            assert.match(err.message, /FORBIDDEN_MUTATION/);
+            return true;
+        }
+    );
+});
+
+test('ESO-389 / B11: Reading tampered row via getPacks throws PACK_TAMPERED', () => {
+    const db = createDbAdapter(':memory:');
+    const store = createTicketPackStore({ db });
+
+    store.appendPack({
+        project: 'p-tamper',
+        source: 'jira',
+        ticket_key: 'ESO-300',
+        fetched_at: '2026-11-04T12:00:00.000Z',
+        pack: { scope: ['src/safe.ts'] },
+    });
+
+    // Temporarily drop trigger to simulate direct DB tampering
+    db.run(`DROP TRIGGER IF EXISTS trg_ticket_pack_no_update`);
+    db.run(`UPDATE ticket_pack SET pack = '{"scope":["src/evil.ts"]}' WHERE project = 'p-tamper'`);
+
+    // Reading tampered pack via getPacks throws PACK_TAMPERED
+    assert.throws(
+        () => {
+            store.getPacks({ project: 'p-tamper' });
+        },
+        (err) => {
+            assert.equal(err.code, 'PACK_TAMPERED');
+            assert.ok(err.recorded_hash);
+            assert.ok(err.computed_hash);
+            return true;
+        }
+    );
 });

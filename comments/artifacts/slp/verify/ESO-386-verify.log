@@ -1,0 +1,52 @@
+======================================================================
+VERIFY LOG: ESO-386 — Q4/Q5 queries with project isolation + coverage
+Timestamp: 2026-11-04T15:14:40.000Z
+======================================================================
+
+$ node --test qc/eso-graph-q4-q5.test.mjs qc/eso-graph-q4q5-store.test.mjs
+Exit Code: 0
+Output:
+✔ SCN-ARCH-05-01 (AC-ARCH-05-01): Static permission resolves 2-tier path endpoint -> permission -> grant (2.758542ms)
+✔ SCN-ARCH-05-02 (AC-ARCH-05-02): Dynamic concatenated permission returns unknown + DYNAMIC_UNKNOWN (0.300083ms)
+✔ SCN-ARCH-05-03 (AC-ARCH-05-03): Permission stated without grant path is rejected with NO_GRANT_PATH (0.488166ms)
+✔ SCN-ARCH-05-04 (AC-ARCH-05-04 / ED1): Endpoint declaring no permission returns unknown + PERM_UNDECLARED, never public (0.195791ms)
+✔ SCN-ARCH-05-05 (AC-ARCH-05-05 / ED10): Deleted grant record surfaces DANGLING_GRANT, never claims valid grant (0.1145ms)
+✔ SCN-ARCH-06-01 (AC-ARCH-06-01): Coverage >= 0.95 answers with yes/no and evidence (0.307375ms)
+✔ SCN-ARCH-06-02 (AC-ARCH-06-02): Implicit tenant returns unknown + LOW_COVERAGE without claiming non-touching (0.12275ms)
+✔ SCN-ARCH-06-03 (AC-ARCH-06-03): Coverage < 0.70 rejects claim "không chạm tenant" with LOW_COVERAGE (0.486667ms)
+✔ SCN-ARCH-06-04 (AC-ARCH-06-04 / ED4): Coverage exactly 0.70 is answerable (boundary inclusive) (1.588916ms)
+✔ SCN-ARCH-06-05 (AC-ARCH-06-05 / ED1): Slice with 0 tables returns unknown + EMPTY_SLICE (0.269583ms)
+✔ ESO-386 (B8): Q4 queryEndpointPermissions reads from DB graph store (10.147ms)
+✔ ESO-386 (B8): Multi-project isolation in Q4 and Q5 queries (1.044666ms)
+✔ ESO-386 (B8): Q5 querySliceTenantBoundary reads from DB graph store (1.561792ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 211.389625
+
+$ bun test qc/eso-graph-q4-q5.test.mjs qc/eso-graph-q4q5-store.test.mjs
+Exit Code: 0
+Output:
+✓ SCN-ARCH-05-01 (AC-ARCH-05-01): Static permission resolves 2-tier path endpoint -> permission -> grant [0.54ms]
+✓ SCN-ARCH-05-02 (AC-ARCH-05-02): Dynamic concatenated permission returns unknown + DYNAMIC_UNKNOWN [0.21ms]
+✓ SCN-ARCH-05-03 (AC-ARCH-05-03): Permission stated without grant path is rejected with NO_GRANT_PATH [0.68ms]
+✓ SCN-ARCH-05-04 (AC-ARCH-05-04 / ED1): Endpoint declaring no permission returns unknown + PERM_UNDECLARED, never public [0.04ms]
+✓ SCN-ARCH-05-05 (AC-ARCH-05-05 / ED10): Deleted grant record surfaces DANGLING_GRANT, never claims valid grant [0.03ms]
+✓ SCN-ARCH-06-01 (AC-ARCH-06-01): Coverage >= 0.95 answers with yes/no and evidence [0.17ms]
+✓ SCN-ARCH-06-02 (AC-ARCH-06-02): Implicit tenant returns unknown + LOW_COVERAGE without claiming non-touching [0.03ms]
+✓ SCN-ARCH-06-03 (AC-ARCH-06-03): Coverage < 0.70 rejects claim "không chạm tenant" with LOW_COVERAGE [0.02ms]
+✓ SCN-ARCH-06-04 (AC-ARCH-06-04 / ED4): Coverage exactly 0.70 is answerable (boundary inclusive) [0.11ms]
+✓ SCN-ARCH-06-05 (AC-ARCH-06-05 / ED1): Slice with 0 tables returns unknown + EMPTY_SLICE [0.04ms]
+✓ ESO-386 (B8): Q4 queryEndpointPermissions reads from DB graph store [2.87ms]
+✓ ESO-386 (B8): Multi-project isolation in Q4 and Q5 queries [0.57ms]
+✓ ESO-386 (B8): Q5 querySliceTenantBoundary reads from DB graph store [0.63ms]
+
+13 pass
+0 fail
+======================================================================
+VERDICT: PASS
+======================================================================

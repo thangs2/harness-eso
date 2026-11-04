@@ -14,7 +14,7 @@ export function queryEndpointPermissions({
     graph = {},
     db = null,
     project = null,
-    coverage = 1.0,
+    coverage = null,
 } = {}) {
     if (!endpointId) throw new Error('endpointId is required');
 
@@ -25,22 +25,28 @@ export function queryEndpointPermissions({
     let perm = null;
 
     if (database) {
-        // Read endpoint from graph_node table
-        const epNode = database.get(
-            `SELECT id, name, metadata_json FROM graph_node WHERE (id = ? OR name = ?) AND kind = 'endpoint'`,
-            [endpointId, endpointId]
-        );
+        let epSql = `SELECT id, name, metadata_json, project FROM graph_node WHERE (id = ? OR name = ?) AND kind = 'endpoint'`;
+        const epParams = [endpointId, endpointId];
+        if (project) {
+            epSql += ` AND project = ?`;
+            epParams.push(project);
+        }
+        const epNode = database.get(epSql, epParams);
 
         if (epNode) {
             const meta = JSON.parse(epNode.metadata_json || '{}');
-            // Find edge to permission: relation = 'requires' or 'declares'
-            const permEdge = database.get(
-                `SELECT ge.target_id, gn.id, gn.name, gn.metadata_json
+            const targetProject = project || epNode.project;
+
+            let permSql = `SELECT ge.target_id, gn.id, gn.name, gn.metadata_json
                  FROM graph_edge ge
                  JOIN graph_node gn ON ge.target_id = gn.id
-                 WHERE ge.source_id = ? AND (ge.relation = 'requires' OR ge.relation = 'declares') AND gn.kind = 'permission'`,
-                [epNode.id]
-            );
+                 WHERE ge.source_id = ? AND (ge.relation = 'requires' OR ge.relation = 'declares') AND gn.kind = 'permission'`;
+            const permParams = [epNode.id];
+            if (targetProject) {
+                permSql += ` AND ge.project = ? AND gn.project = ?`;
+                permParams.push(targetProject, targetProject);
+            }
+            const permEdge = database.get(permSql, permParams);
 
             if (permEdge) {
                 const pMeta = JSON.parse(permEdge.metadata_json || '{}');
@@ -50,14 +56,16 @@ export function queryEndpointPermissions({
                     dynamic: pMeta.dynamic === true,
                 };
 
-                // Find edge from permission to grant
-                const grantEdge = database.get(
-                    `SELECT ge.target_id, gn.id, gn.name, gn.path, gn.metadata_json
+                let grantSql = `SELECT ge.target_id, gn.id, gn.name, gn.path, gn.metadata_json
                      FROM graph_edge ge
                      JOIN graph_node gn ON ge.target_id = gn.id
-                     WHERE ge.source_id = ? AND (ge.relation = 'granted_by' OR ge.relation = 'maps_to') AND gn.kind = 'grant'`,
-                    [permEdge.id]
-                );
+                     WHERE ge.source_id = ? AND (ge.relation = 'granted_by' OR ge.relation = 'maps_to') AND gn.kind = 'grant'`;
+                const grantParams = [permEdge.id];
+                if (targetProject) {
+                    grantSql += ` AND ge.project = ? AND gn.project = ?`;
+                    grantParams.push(targetProject, targetProject);
+                }
+                const grantEdge = database.get(grantSql, grantParams);
 
                 if (grantEdge) {
                     const gMeta = JSON.parse(grantEdge.metadata_json || '{}');
@@ -76,15 +84,16 @@ export function queryEndpointPermissions({
             endpoint = {
                 id: epNode.id,
                 permission: perm,
+                project: targetProject,
             };
         }
     } else {
         const endpoints = graph.endpoints || [];
-        endpoint = endpoints.find((e) => e.id === endpointId);
+        endpoint = endpoints.find((e) => (e.id === endpointId || e.name === endpointId) && (!project || !e.project || e.project === project));
         perm = endpoint?.permission;
         const grants = graph.grants || [];
         if (perm) {
-            grantRecord = grants.find((g) => g.permission_id === perm.id || g.permission_name === perm.name);
+            grantRecord = grants.find((g) => (g.permission_id === perm.id || g.permission_name === perm.name) && (!project || !g.project || g.project === project));
         }
     }
 
@@ -95,6 +104,7 @@ export function queryEndpointPermissions({
             code: 'PERM_UNDECLARED',
             endpoint: endpointId,
             public: false,
+            unknowns: ['PERM_UNDECLARED'],
             message: 'Endpoint không khai permission; không kết luận public',
             completeness: coverage,
         };
@@ -108,6 +118,7 @@ export function queryEndpointPermissions({
             status: 'unknown',
             code: 'DYNAMIC_UNKNOWN',
             endpoint: endpointId,
+            unknowns: ['DYNAMIC_UNKNOWN'],
             message: 'khai động',
             completeness: coverage,
         };
@@ -121,6 +132,7 @@ export function queryEndpointPermissions({
             endpoint: endpointId,
             permission: permObj.name || permObj.id,
             dangling_grant_id: grantRecord.id,
+            unknowns: ['DANGLING_GRANT'],
             message: 'grant treo; không nói có grant',
             completeness: coverage,
         };
@@ -133,6 +145,29 @@ export function queryEndpointPermissions({
         err.endpoint = endpointId;
         err.permission = permObj.name || permObj.id;
         throw err;
+    }
+
+    // Missing coverage or incomplete coverage returns unknown (DoD B8 / ESO-386)
+    if (coverage === null || coverage === undefined || typeof coverage !== 'number') {
+        return {
+            status: 'unknown',
+            code: 'COVERAGE_REQUIRED',
+            endpoint: endpointId,
+            unknowns: ['coverage_missing'],
+            message: 'Thiếu coverage; không đủ dữ liệu kết luận permission',
+            completeness: null,
+        };
+    }
+
+    if (coverage < 1.0) {
+        return {
+            status: 'unknown',
+            code: 'LOW_COVERAGE',
+            endpoint: endpointId,
+            unknowns: ['incomplete_coverage'],
+            message: 'Độ phủ < 1.0; không đủ dữ liệu kết luận permission',
+            completeness: coverage,
+        };
     }
 
     // AC-ARCH-05-01: Happy path: 2 tiers endpoint -> permission -> grant

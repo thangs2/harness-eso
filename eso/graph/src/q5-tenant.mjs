@@ -13,10 +13,11 @@ export const TENANT_COVERAGE_FLOOR = 0.70;
 
 export function querySliceTenantBoundary({
     sliceId,
+    project = null,
     tables = [],
     graph = null,
     db = null,
-    coverage = 1.0,
+    coverage = null,
     isImplicit = false,
 } = {}) {
     if (!sliceId) throw new Error('sliceId is required');
@@ -26,13 +27,16 @@ export function querySliceTenantBoundary({
 
     if (database && resolvedTables.length === 0) {
         // Read table nodes associated with slice
-        const rows = database.all(
-            `SELECT gn.id, gn.name, gn.metadata_json
+        let sql = `SELECT gn.id, gn.name, gn.metadata_json
              FROM graph_node gn
              JOIN graph_edge ge ON (ge.target_id = gn.id OR ge.source_id = gn.id)
-             WHERE (ge.source_id = ? OR ge.target_id = ?) AND gn.kind = 'table'`,
-            [sliceId, sliceId]
-        ) || [];
+             WHERE (ge.source_id = ? OR ge.target_id = ?) AND gn.kind = 'table'`;
+        const params = [sliceId, sliceId];
+        if (project) {
+            sql += ` AND gn.project = ? AND ge.project = ?`;
+            params.push(project, project);
+        }
+        const rows = database.all(sql, params) || [];
 
         resolvedTables = rows.map((r) => {
             const meta = JSON.parse(r.metadata_json || '{}');
@@ -52,6 +56,7 @@ export function querySliceTenantBoundary({
             status: 'unknown',
             code: 'EMPTY_SLICE',
             slice_id: sliceId,
+            unknowns: ['empty_slice'],
             message: 'slice rỗng; không kết luận không chạm',
             completeness: coverage,
         };
@@ -63,8 +68,21 @@ export function querySliceTenantBoundary({
             status: 'unknown',
             code: 'LOW_COVERAGE',
             slice_id: sliceId,
+            unknowns: ['implicit_tenant'],
             message: 'tenant ngầm; không kết luận không chạm',
             completeness: coverage,
+        };
+    }
+
+    // Missing coverage specification returns unknown (DoD B8 / ESO-386)
+    if (coverage === null || coverage === undefined || typeof coverage !== 'number') {
+        return {
+            status: 'unknown',
+            code: 'COVERAGE_REQUIRED',
+            slice_id: sliceId,
+            unknowns: ['coverage_missing'],
+            message: 'Thiếu coverage; không đủ dữ liệu kết luận tenant boundary',
+            completeness: null,
         };
     }
 
@@ -76,6 +94,7 @@ export function querySliceTenantBoundary({
             status: 'unknown',
             code: 'LOW_COVERAGE',
             slice_id: sliceId,
+            unknowns: ['low_tenant_coverage'],
             message: 'Độ phủ < 0.70: từ chối phát biểu không chạm tenant',
             completeness: coverage,
         };
