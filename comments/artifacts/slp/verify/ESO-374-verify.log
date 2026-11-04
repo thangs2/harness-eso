@@ -1,0 +1,15 @@
+======================================================================
+VERIFY LOG: ESO-374 — Rubric audit mandatory commands[] & negative cases
+Timestamp: 2026-11-04T16:42:00.000Z
+======================================================================
+
+$ bun test qc/slp-conformance.test.mjs
+Exit Code: 0
+Output:
+✓ SLP Conformance: worker allowed_files disjointness and rubric compliance
+
+1 pass
+0 fail
+======================================================================
+VERDICT: PASS
+======================================================================

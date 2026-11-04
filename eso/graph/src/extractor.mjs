@@ -233,10 +233,16 @@ export function extractProjectGraph(project, buildId = null, manifestEntries = [
     const isReady = fileCoverage >= 1.0 && failedFiles.length === 0 && completeness.status === 'ready';
     const status = isReady ? 'ready' : 'unknown';
 
-    // Graph coverage: if ready, 1.0; if partial known coverage, reflects completeness coverage; if unknown/file-only, null
-    const coverage = isReady
-        ? fileCoverage
-        : (completeness.coverage !== null ? completeness.coverage : null);
+    // Graph coverage: if ready, 1.0; if completeness known, use completeness.coverage;
+    // if parse errors exist (fileCoverage < 1.0), reflect partial file coverage; if file-only (0 errors but no classes), null (unknown)
+    let coverage = null;
+    if (isReady) {
+        coverage = fileCoverage;
+    } else if (completeness.coverage !== null) {
+        coverage = Number(completeness.coverage.toFixed(4));
+    } else if (fileCoverage < 1.0) {
+        coverage = fileCoverage;
+    }
 
     // Optional database persistence
     if (options?.db && typeof options.db.run === 'function') {

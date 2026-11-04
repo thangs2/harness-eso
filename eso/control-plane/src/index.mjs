@@ -38,4 +38,4 @@ export {
 
 export {
     DatabaseService,
-} from '../dist/database.service.js';
+} from '../dist/common/infrastructure/database.service.js';
