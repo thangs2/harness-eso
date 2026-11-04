@@ -29,3 +29,4 @@ __pycache__/
 
 # Machine-local MCP config (absolute paths, possibly credentials) — same rule as `.cursor/mcp.json`.
 .agents/mcp_config.json
+.claude/worktrees/
