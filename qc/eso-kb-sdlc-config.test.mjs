@@ -269,7 +269,7 @@ test('SCN-SDLC-01-07 (AC-SDLC-01-07 / ED10): Changing sdlc_root while artefacts 
     });
 });
 
-test('ESO-388 (B10): init writes real files to disk and upgrade supports revert', async () => {
+test('ESO-388 (B10): init writes real files to disk, second run is idempotent, upgrade writes disk and revert restores', async () => {
     const fs = await import('node:fs');
     const os = await import('node:os');
     const path = await import('node:path');
@@ -287,10 +287,18 @@ test('ESO-388 (B10): init writes real files to disk and upgrade supports revert'
         assert.ok(fs.existsSync(path.join(tempDir, 'sdlc', '01.architecture.md')));
         assert.ok(fs.existsSync(path.join(tempDir, 'sdlc', '02.backend-spec.md')));
 
-        // Test upgrade and revert
+        // Second run without isReInit flag is idempotent because files exist on disk
+        const initRes2 = initProjectSdlc({
+            project: 'real-fs-proj',
+            config: { sdlc_root: 'sdlc' },
+            consumerPath: tempDir,
+        });
+        assert.equal(initRes2.changed, false);
+        assert.equal(initRes2.files_created.length, 0);
+
+        // Test upgrade with disk write
         const projects = [
-            { id: 'p1', standard_version: '1.0.0' },
-            { id: 'p2', standard_version: '1.2.0' },
+            { id: 'p1', standard_version: '1.0.0', path: tempDir },
         ];
         const upg = upgradeProjectSdlcStandard({
             projects,
@@ -298,11 +306,17 @@ test('ESO-388 (B10): init writes real files to disk and upgrade supports revert'
         });
         assert.equal(upg.can_revert, true);
 
+        const versionFile = path.join(tempDir, '.sdlc-standard.json');
+        assert.ok(fs.existsSync(versionFile));
+        const upgContent = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
+        assert.equal(upgContent.standard_version, '2.0.0');
+
+        // Revert restores disk state (removes file because it didn't exist before)
         const rev = revertProjectSdlcStandard({ upgradeResult: upg });
         assert.equal(rev.success, true);
-        assert.equal(rev.reverted_count, 2);
+        assert.equal(rev.reverted_count, 1);
         assert.equal(rev.impact[0].restored_version, '1.0.0');
-        assert.equal(rev.impact[1].restored_version, '1.2.0');
+        assert.ok(!fs.existsSync(versionFile));
     } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
     }

@@ -180,13 +180,14 @@ export function initProjectSdlc({
         throw err;
     }
 
-    // AC-SDLC-01-01: Idempotency check on re-run
+    // AC-SDLC-01-01: Idempotency check on re-run (flag or disk check)
     if (isReInit) {
         return {
             changed: false,
             project,
             sdlc_root: config.sdlc_root,
             files_created: [],
+            existing: [],
             message: 'Idempotent re-run: 0 changes',
         };
     }
@@ -199,7 +200,7 @@ export function initProjectSdlc({
         { path: `${config.sdlc_root}/04.jira-integration.md`, tag: 'jira' },
     ];
 
-    const generatedFiles = [];
+    const targetTemplates = [];
     const outScope = [];
 
     // AC-SDLC-01-03: Filter by applies_when conditions
@@ -212,23 +213,43 @@ export function initProjectSdlc({
             outScope.push({ template: t.path, reason: 'project has no Jira integration (has_jira=false)' });
             continue;
         }
-        generatedFiles.push(t.path);
+        targetTemplates.push(t.path);
+    }
+
+    // Disk-based idempotency check when consumerPath is provided
+    if (consumerPath) {
+        const existingOnDisk = targetTemplates.filter((rel) => fs.existsSync(path.join(consumerPath, rel)));
+        if (existingOnDisk.length === targetTemplates.length) {
+            return {
+                changed: false,
+                project,
+                sdlc_root: config.sdlc_root,
+                files_created: [],
+                existing: existingOnDisk,
+                out_scope: outScope,
+                message: 'Idempotent re-run: 0 changes',
+            };
+        }
     }
 
     // Write real files to disk when consumerPath is provided (DoD B10 / ESO-388)
+    const generatedFiles = [];
     if (consumerPath) {
-        for (const rel of generatedFiles) {
+        for (const rel of targetTemplates) {
             const fullPath = path.join(consumerPath, rel);
             fs.mkdirSync(path.dirname(fullPath), { recursive: true });
             if (!fs.existsSync(fullPath)) {
                 fs.writeFileSync(fullPath, `# ${path.basename(rel)}\n\nAuto-generated SDLC template for ${project}\n`, 'utf8');
+                generatedFiles.push(rel);
             }
         }
+    } else {
+        generatedFiles.push(...targetTemplates);
     }
 
     // AC-SDLC-01-06 / ED1: Blank project with 0 existing folders inits full tree
     return {
-        changed: true,
+        changed: generatedFiles.length > 0,
         project,
         sdlc_root: config.sdlc_root,
         files_created: generatedFiles,
@@ -241,12 +262,40 @@ export function upgradeProjectSdlcStandard({
     projects = [],
     targetStandardVersion = '2.0.0',
     dryRun = false,
+    consumerPath = null,
 } = {}) {
     const upgradeId = `upg_${randomUUID()}`;
-    const snapshot = projects.map((p) => ({
-        id: p.id || p.project,
-        previous_version: p.standard_version || '1.0.0',
-    }));
+    const snapshot = projects.map((p) => {
+        const projDir = p.path || (consumerPath ? (projects.length === 1 && !p.path ? consumerPath : path.join(consumerPath, p.id || p.project)) : null);
+        let previousContent = null;
+        let versionFile = null;
+        if (projDir && fs.existsSync(projDir)) {
+            versionFile = path.join(projDir, '.sdlc-standard.json');
+            if (fs.existsSync(versionFile)) {
+                previousContent = fs.readFileSync(versionFile, 'utf8');
+            }
+        }
+        return {
+            id: p.id || p.project,
+            previous_version: p.standard_version || '1.0.0',
+            projDir,
+            versionFile,
+            previousContent,
+        };
+    });
+
+    if (!dryRun) {
+        for (const s of snapshot) {
+            if (s.projDir && fs.existsSync(s.projDir)) {
+                const targetFile = s.versionFile || path.join(s.projDir, '.sdlc-standard.json');
+                fs.writeFileSync(
+                    targetFile,
+                    JSON.stringify({ standard_version: targetStandardVersion, updated_at: new Date().toISOString() }, null, 2),
+                    'utf8'
+                );
+            }
+        }
+    }
 
     // AC-SDLC-01-05: Multi-project upgrade across >=2 projects
     const impact = projects.map((p) => ({
@@ -274,6 +323,16 @@ export function revertProjectSdlcStandard({
     const records = snapshot || upgradeResult?.revert_snapshot || [];
     if (!Array.isArray(records) || records.length === 0) {
         throw new Error('Valid revert snapshot is required to revert standard upgrade');
+    }
+
+    for (const r of records) {
+        if (r.projDir && r.versionFile) {
+            if (r.previousContent !== null) {
+                fs.writeFileSync(r.versionFile, r.previousContent, 'utf8');
+            } else if (fs.existsSync(r.versionFile)) {
+                fs.unlinkSync(r.versionFile);
+            }
+        }
     }
 
     const reverted = records.map((r) => ({

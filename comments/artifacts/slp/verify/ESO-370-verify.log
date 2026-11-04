@@ -1,0 +1,38 @@
+======================================================================
+VERIFY LOG: ESO-370 — Control plane server: preview->save + health + auth
+Timestamp: 2026-11-04T15:08:40.000Z
+======================================================================
+
+$ node --test qc/eso-cp-server.test.mjs
+Exit Code: 0
+Output:
+✔ ESO-370: GET /health returns 200 without token (29.995625ms)
+✔ ESO-370: protected endpoints return 401 when token is missing or invalid (5.19575ms)
+✔ ESO-370: GET /config reads from store with valid token (3.394041ms)
+✔ ESO-370: POST /config without preview hash returns 409 PREVIEW_REQUIRED (7.554125ms)
+✔ ESO-370: preview -> save with current_hash succeeds (version +1), stale hash returns 409 (10.7615ms)
+✔ ESO-370: GET /health returns 503 when store is broken (10.560958ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 204.466
+
+$ bun test qc/eso-cp-server.test.mjs
+Exit Code: 0
+Output:
+✓ ESO-370: GET /health returns 200 without token [3.19ms]
+✓ ESO-370: protected endpoints return 401 when token is missing or invalid [0.53ms]
+✓ ESO-370: GET /config reads from store with valid token [0.80ms]
+✓ ESO-370: POST /config without preview hash returns 409 PREVIEW_REQUIRED [0.71ms]
+✓ ESO-370: preview -> save with current_hash succeeds (version +1), stale hash returns 409 [1.30ms]
+✓ ESO-370: GET /health returns 503 when store is broken [5.44ms]
+
+6 pass
+0 fail
+======================================================================
+VERDICT: PASS
+======================================================================

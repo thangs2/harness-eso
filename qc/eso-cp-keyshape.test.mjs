@@ -158,7 +158,7 @@ test('ESO-387 / B9: Team role deletion with worker.mjs shape (role_name & role_i
         { id: 'w-2', role_name: 'scout', state: 'retired' }, // retired worker
     ];
 
-    // 1. Deleting role in use by active worker throws ROLE_IN_USE
+    // 1. Deleting role in use by active worker throws ROLE_IN_USE (by id)
     assert.throws(
         () => {
             deleteTeamRole({
@@ -176,6 +176,24 @@ test('ESO-387 / B9: Team role deletion with worker.mjs shape (role_name & role_i
         }
     );
 
+    // 1b. Deleting role by name when worker has role_id or role_name throws ROLE_IN_USE
+    assert.throws(
+        () => {
+            deleteTeamRole({
+                project: 'p1',
+                roleId: 'Lead Architect',
+                roles,
+                workers,
+            });
+        },
+        (err) => {
+            assert.equal(err.code, 'ROLE_IN_USE');
+            assert.equal(err.role_id, 'Lead Architect');
+            assert.deepEqual(err.assigned_workers, ['w-1']);
+            return true;
+        }
+    );
+
     // 2. Retired worker does not block role deletion
     const delResult = deleteTeamRole({
         project: 'p1',
@@ -186,4 +204,34 @@ test('ESO-387 / B9: Team role deletion with worker.mjs shape (role_name & role_i
     assert.equal(delResult.success, true);
     assert.equal(delResult.deleted_role, 'scout');
     assert.equal(delResult.roles.length, 1);
+});
+
+test('ESO-387 / B9: Bar strict rejects unverified or partial', () => {
+    const strictBar = [
+        { evidence_kind: 'test_pass', min_basis: 'strict' },
+    ];
+
+    assert.throws(
+        () => {
+            executeHandover({
+                fromRole: 'build',
+                toRole: 'verify',
+                targetRoleBar: strictBar,
+                carries: [{ evidence_kind: 'test_pass', basis: 'unverified' }],
+            });
+        },
+        (err) => {
+            assert.equal(err.code, 'HANDOFF_INCOMPLETE');
+            assert.match(err.missing[0], /min_basis: strict, got: unverified/);
+            return true;
+        }
+    );
+
+    const okResult = executeHandover({
+        fromRole: 'build',
+        toRole: 'verify',
+        targetRoleBar: strictBar,
+        carries: [{ evidence_kind: 'test_pass', basis: 'strict' }],
+    });
+    assert.equal(okResult.allowed, true);
 });

@@ -14,9 +14,24 @@ export async function handleControlPlaneRequest(req, res, { db, authToken = 'sec
 
     // 1. Unauthenticated health endpoint
     if (method === 'GET' && pathname === '/health') {
-        res.writeHead(200);
-        res.end(JSON.stringify({ status: 'ok', service: 'eso-control-plane', timestamp: new Date().toISOString() }));
-        return;
+        try {
+            if (db && typeof db.get === 'function') {
+                db.get('SELECT 1');
+            } else if (db && typeof db.all === 'function') {
+                db.all('SELECT 1');
+            } else if (db && typeof db.prepare === 'function') {
+                db.prepare('SELECT 1').get();
+            } else {
+                throw new Error('Database instance unavailable');
+            }
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'ok', service: 'eso-control-plane', timestamp: new Date().toISOString() }));
+            return;
+        } catch (err) {
+            res.writeHead(503);
+            res.end(JSON.stringify({ status: 'unhealthy', error: 'STORE_UNAVAILABLE', message: err.message }));
+            return;
+        }
     }
 
     // 2. Authentication check for protected endpoints
@@ -83,6 +98,7 @@ export async function handleControlPlaneRequest(req, res, { db, authToken = 'sec
 
         const current = readConfig(db, project);
         const currentConfig = current ? current.config : { version: 1 };
+        const currentHash = current ? current.hash : null;
         const preview = previewConfigChange({
             project,
             currentConfig,
@@ -90,14 +106,21 @@ export async function handleControlPlaneRequest(req, res, { db, authToken = 'sec
         });
 
         res.writeHead(200);
-        res.end(JSON.stringify({ ok: true, ...preview }));
+        res.end(JSON.stringify({
+            ok: true,
+            current_hash: currentHash,
+            preview_hash: preview.preview_hash,
+            diff: { current: currentConfig, pending: pendingChange },
+            ...preview,
+        }));
         return;
     }
 
     // 5. POST /config
     if (method === 'POST' && pathname === '/config') {
-        const { project, config, preview_hash, previewHash, operator } = body;
+        const { project, config, current_hash, currentHash, preview_hash, previewHash, operator } = body;
         const pHash = preview_hash || previewHash;
+        const cHash = current_hash !== undefined ? current_hash : (currentHash !== undefined ? currentHash : null);
 
         // DoD: POST /config thiếu preview hash -> 409
         if (!pHash) {
@@ -114,7 +137,7 @@ export async function handleControlPlaneRequest(req, res, { db, authToken = 'sec
             const saved = saveConfig(db, {
                 project,
                 config,
-                expectedHash: pHash,
+                expectedHash: cHash,
                 operator: operator || 'operator',
             });
             res.writeHead(200);

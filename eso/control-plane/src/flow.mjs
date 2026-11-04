@@ -173,12 +173,22 @@ export function executeHandover({
             missing.push(reqKind || (typeof req === 'string' ? req : JSON.stringify(req)));
         } else if (typeof req === 'object' && req.min_basis) {
             const carried = carriedMap.get(reqKind);
-            if (carried && carried.basis) {
-                const BASIS_RANK = { deterministic: 3, heuristic: 2, assumption: 1 };
-                const reqRank = BASIS_RANK[req.min_basis] || 0;
-                const carriedRank = BASIS_RANK[carried.basis] || 0;
+            if (carried && (carried.basis || carried.level)) {
+                const BASIS_RANK = {
+                    unverified: 0,
+                    none: 0,
+                    assumption: 1,
+                    partial: 1,
+                    heuristic: 2,
+                    full: 2,
+                    deterministic: 3,
+                    strict: 3,
+                };
+                const actualBasis = carried.basis || carried.level;
+                const reqRank = BASIS_RANK[req.min_basis] ?? 0;
+                const carriedRank = BASIS_RANK[actualBasis] ?? 0;
                 if (carriedRank < reqRank) {
-                    missing.push(`${reqKind} (min_basis: ${req.min_basis}, got: ${carried.basis})`);
+                    missing.push(`${reqKind} (min_basis: ${req.min_basis}, got: ${actualBasis})`);
                 }
             }
         }

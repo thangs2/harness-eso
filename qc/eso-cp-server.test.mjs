@@ -92,3 +92,91 @@ test('ESO-370: POST /config without preview hash returns 409 PREVIEW_REQUIRED', 
     assert.equal(body.error, 'PREVIEW_REQUIRED');
     assert.ok(body.message.includes('preview hash'));
 });
+
+test('ESO-370: preview -> save with current_hash succeeds (version +1), stale hash returns 409', async () => {
+    const project = 'proj-preview-save-flow';
+
+    // 1. Initial save
+    const initial = saveConfig(db, {
+        project,
+        config: { version: 1, setting: 'init' },
+        operator: 'alice',
+    });
+
+    // 2. Request preview
+    const prevRes = await fetch(`${baseUrl}/config/preview`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            project,
+            pendingChange: { setting: 'updated' },
+        }),
+    });
+    assert.equal(prevRes.status, 200);
+    const prevBody = await prevRes.json();
+    assert.ok(prevBody.preview_hash);
+    assert.equal(prevBody.current_hash, initial.hash);
+
+    // 3. Save with matching current_hash and preview_hash -> 200, version + 1
+    const saveRes = await fetch(`${baseUrl}/config`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            project,
+            config: { setting: 'updated' },
+            current_hash: prevBody.current_hash,
+            preview_hash: prevBody.preview_hash,
+            operator: 'alice',
+        }),
+    });
+    assert.equal(saveRes.status, 200);
+    const saveBody = await saveRes.json();
+    assert.equal(saveBody.ok, true);
+    assert.equal(saveBody.version, initial.version + 1);
+
+    // 4. Save with old/stale current_hash -> 409 STALE_VERSION
+    const staleRes = await fetch(`${baseUrl}/config`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            project,
+            config: { setting: 'attempt-stale' },
+            current_hash: initial.hash, // stale!
+            preview_hash: 'dummy_preview',
+            operator: 'alice',
+        }),
+    });
+    assert.equal(staleRes.status, 409);
+    const staleBody = await staleRes.json();
+    assert.equal(staleBody.error, 'STALE_VERSION');
+});
+
+test('ESO-370: GET /health returns 503 when store is broken', async () => {
+    // Create server with broken DB
+    const brokenDb = {
+        get() { throw new Error('DB connection failed'); },
+    };
+    const brokenServer = createControlPlaneServer({ db: brokenDb });
+    await new Promise((resolve) => {
+        brokenServer.listen(0, '127.0.0.1', () => resolve());
+    });
+    const addr = brokenServer.address();
+    try {
+        const res = await fetch(`http://127.0.0.1:${addr.port}/health`);
+        assert.equal(res.status, 503);
+        const body = await res.json();
+        assert.equal(body.status, 'unhealthy');
+        assert.equal(body.error, 'STORE_UNAVAILABLE');
+    } finally {
+        brokenServer.close();
+    }
+});

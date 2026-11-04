@@ -78,10 +78,14 @@ export function deleteTeamRole({
 } = {}) {
     if (!roleId) throw new Error('Role ID is required');
 
+    const targetRole = roles.find((r) => r.id === roleId || r.name === roleId);
+    const targetId = targetRole ? targetRole.id : roleId;
+    const targetName = targetRole ? targetRole.name : roleId;
+
     // AC-CFG-02-02: Role currently assigned to active workers cannot be deleted
     const assignedWorkers = workers.filter((w) => {
         const assigned = w.role_id || w.role_name || w.role;
-        return assigned === roleId && w.state !== 'retired';
+        return (assigned === targetId || assigned === targetName || assigned === roleId) && w.state !== 'retired';
     });
     if (assignedWorkers.length > 0) {
         const err = new Error(
@@ -93,7 +97,7 @@ export function deleteTeamRole({
         throw err;
     }
 
-    const remainingRoles = roles.filter((r) => r.id !== roleId);
+    const remainingRoles = roles.filter((r) => r.id !== targetId && r.name !== targetName);
 
     return {
         success: true,
