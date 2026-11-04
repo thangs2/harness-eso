@@ -43,7 +43,7 @@ export function checkFileWriteScope({
     allowedFiles,
     targetPath,
     dirExists = null,
-} = {}) {
+}: any = {}) {
     const normPath = (targetPath || '').replace(/\\/g, '/').trim();
 
     if (!normPath) {
@@ -117,7 +117,7 @@ export function executeFileWrite({
     writeFileFn,
     logRefusalFn = null,
     dirExists = null,
-} = {}) {
+}: any = {}) {
     const verdict = checkFileWriteScope({ allowedFiles, targetPath, dirExists });
 
     if (!verdict.allowed) {
@@ -132,7 +132,7 @@ export function executeFileWrite({
             logRefusalFn(refusal);
         }
 
-        const err = new Error(`${verdict.error}: ${verdict.message}`);
+        const err: any = new Error(`${verdict.error}: ${verdict.message}`);
         err.code = verdict.error;
         err.targetPath = verdict.targetPath;
         throw err;
@@ -168,7 +168,7 @@ export function transitionTaskStatus({
     newStatus,
     actorRole = 'agent',
     logRefusalFn = null,
-} = {}) {
+}: any = {}) {
     const normNew = (newStatus || '').toLowerCase().trim();
 
     if (actorRole !== 'human' && actorRole !== 'operator') {
@@ -186,7 +186,7 @@ export function transitionTaskStatus({
                 logRefusalFn(refusal);
             }
 
-            const err = new Error(`DONE_FORBIDDEN: Agents are forbidden from transitioning to ${newStatus}. Only human operator can sign Done.`);
+            const err: any = new Error(`DONE_FORBIDDEN: Agents are forbidden from transitioning to ${newStatus}. Only human operator can sign Done.`);
             err.code = 'DONE_FORBIDDEN';
             err.currentStatus = currentStatus;
             throw err;
@@ -216,7 +216,7 @@ export function queryTaskJudgement({
     taskId,
     taskStore = null,
     logRefusalFn = null,
-} = {}) {
+}: any = {}) {
     const isOwned = Array.isArray(agentScope) && agentScope.includes(taskId);
 
     if (!isOwned) {
@@ -230,7 +230,7 @@ export function queryTaskJudgement({
             logRefusalFn(refusal);
         }
 
-        const err = new Error('OUT_OF_SCOPE: Requested item is outside declared scope');
+        const err: any = new Error('OUT_OF_SCOPE: Requested item is outside declared scope');
         err.code = 'OUT_OF_SCOPE';
         throw err;
     }

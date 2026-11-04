@@ -20,21 +20,21 @@ export function validateAndCreateFlow({
     to,
     carries = [],
     existingFlows = [],
-} = {}) {
+}: any = {}) {
     if (!id || typeof id !== 'string') {
-        const err = new Error('Flow ID is required');
+        const err: any = new Error('Flow ID is required');
         err.code = 'INVALID_FLOW_ID';
         throw err;
     }
     if (!project || typeof project !== 'string') {
-        const err = new Error('Project is required');
+        const err: any = new Error('Project is required');
         err.code = 'INVALID_PROJECT';
         throw err;
     }
 
     // AC-IAM-04-05 / ED6: Duplicate ID in same project
     if (existingFlows.some((f) => f.id === id && f.project === project)) {
-        const err = new Error(`DUPLICATE_ID: Flow with id '${id}' already exists in project '${project}'`);
+        const err: any = new Error(`DUPLICATE_ID: Flow with id '${id}' already exists in project '${project}'`);
         err.code = 'DUPLICATE_ID';
         err.flow_id = id;
         throw err;
@@ -48,7 +48,7 @@ export function validateAndCreateFlow({
 
     // AC-IAM-04-04 / ED1: 0 steps
     if (flowSteps.length === 0) {
-        const err = new Error('EMPTY_FLOW: Flow must contain at least 1 step');
+        const err: any = new Error('EMPTY_FLOW: Flow must contain at least 1 step');
         err.code = 'EMPTY_FLOW';
         throw err;
     }
@@ -57,12 +57,12 @@ export function validateAndCreateFlow({
     const adj = new Map();
     for (const step of flowSteps) {
         if (!step.from || !step.to) {
-            const err = new Error('Each step must specify from and to');
+            const err: any = new Error('Each step must specify from and to');
             err.code = 'INVALID_STEP';
             throw err;
         }
         if (step.from === step.to) {
-            const err = new Error(`FLOW_CYCLE: Direct self-cycle detected from '${step.from}' to '${step.to}'`);
+            const err: any = new Error(`FLOW_CYCLE: Direct self-cycle detected from '${step.from}' to '${step.to}'`);
             err.code = 'FLOW_CYCLE';
             throw err;
         }
@@ -102,7 +102,7 @@ export function validateAndCreateFlow({
     for (const node of adj.keys()) {
         if (!visited.has(node)) {
             if (hasCycle(node)) {
-                const err = new Error('FLOW_CYCLE: Flow creation introduces a cyclic dependency');
+                const err: any = new Error('FLOW_CYCLE: Flow creation introduces a cyclic dependency');
                 err.code = 'FLOW_CYCLE';
                 throw err;
             }
@@ -129,7 +129,7 @@ export function executeHandover({
     carries = [],
     targetRoleBar = [],
     targetRoleBarVersion = 1,
-} = {}) {
+}: any = {}) {
     const from = fromRole || (flow && flow.from);
     const to = toRole || (flow && flow.to);
     const evidenceCarried = Array.isArray(carries) ? carries : [];
@@ -195,7 +195,7 @@ export function executeHandover({
     }
 
     if (missing.length > 0) {
-        const err = new Error(
+        const err: any = new Error(
             `HANDOFF_INCOMPLETE: Role '${from}' cannot hand over to '${to}'. Missing required evidence: ${missing.join(', ')} (bar of role '${to}')`
         );
         err.code = 'HANDOFF_INCOMPLETE';
@@ -225,7 +225,7 @@ export function executeHandover({
 export function inspectFlowWorkers({
     flow,
     workers = [],
-} = {}) {
+}: any = {}) {
     if (!flow) {
         throw new Error('Flow is required');
     }

@@ -19,21 +19,21 @@ export function acceptRisk({
     allowedKindsForRole = null,
     now = new Date().toISOString(),
     eventsLog = [],
-} = {}) {
+}: any = {}) {
     if (!risk || typeof risk !== 'object') {
-        const err = new Error('Risk object is required');
+        const err: any = new Error('Risk object is required');
         err.code = 'INVALID_RISK';
         throw err;
     }
     if (!by || typeof by !== 'string') {
-        const err = new Error('Assignee (by) is required');
+        const err: any = new Error('Assignee (by) is required');
         err.code = 'MISSING_ASSIGNEE';
         throw err;
     }
 
     // AC-IAM-05-02 / AC-IAM-08-02: Missing or empty due
     if (!due || typeof due !== 'string' || due.trim() === '') {
-        const err = new Error('ACCEPT_NO_DUE: accept requires explicit due date');
+        const err: any = new Error('ACCEPT_NO_DUE: accept requires explicit due date');
         err.code = 'ACCEPT_NO_DUE';
         err.alias = 'MISSING_DUE_DATE';
         throw err;
@@ -41,14 +41,14 @@ export function acceptRisk({
 
     const dueDate = new Date(due);
     if (isNaN(dueDate.getTime())) {
-        const err = new Error(`INVALID_DUE_DATE: '${due}' is not a valid date string`);
+        const err: any = new Error(`INVALID_DUE_DATE: '${due}' is not a valid date string`);
         err.code = 'INVALID_DUE_DATE';
         throw err;
     }
 
     // AC-IAM-05-05 / ED6: Duplicate accept
     if (risk.status === 'accepted') {
-        const err = new Error(`ALREADY_ACCEPTED: Risk '${risk.id || risk.risk_id}' has already been accepted by '${risk.accepted_by}'`);
+        const err: any = new Error(`ALREADY_ACCEPTED: Risk '${risk.id || risk.risk_id}' has already been accepted by '${risk.accepted_by}'`);
         err.code = 'ALREADY_ACCEPTED';
         err.risk_id = risk.id || risk.risk_id;
         err.current_assignee = risk.accepted_by;
@@ -59,7 +59,7 @@ export function acceptRisk({
     if (Array.isArray(allowedKindsForRole)) {
         const riskKind = risk.kind || 'generic';
         if (!allowedKindsForRole.includes(riskKind) && !allowedKindsForRole.includes('*')) {
-            const err = new Error(`FORBIDDEN_ACCEPT: Role '${role}' lacks permission to accept risk of kind '${riskKind}'`);
+            const err: any = new Error(`FORBIDDEN_ACCEPT: Role '${role}' lacks permission to accept risk of kind '${riskKind}'`);
             err.code = 'FORBIDDEN_ACCEPT';
             err.role = role;
             err.kind = riskKind;
@@ -81,7 +81,7 @@ export function acceptRisk({
 
     // AC-IAM-05-06 / ED8: If now > dueUtc, cannot accept an already-expired deadline
     if (nowUtc > dueUtc) {
-        const err = new Error(`EXPIRED_DUE_DATE: Due timestamp '${due}' is already in the past`);
+        const err: any = new Error(`EXPIRED_DUE_DATE: Due timestamp '${due}' is already in the past`);
         err.code = 'EXPIRED_DUE_DATE';
         throw err;
     }
@@ -114,7 +114,7 @@ export function inspectRiskStatus({
     risk,
     now = new Date().toISOString(),
     eventsLog = [],
-} = {}) {
+}: any = {}) {
     if (!risk || typeof risk !== 'object') {
         throw new Error('Risk is required');
     }

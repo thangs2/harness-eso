@@ -7,18 +7,18 @@ export {
     executeFileWrite,
     transitionTaskStatus,
     queryTaskJudgement,
-} from './scope-guard.mjs';
+} from './scope.ts';
 
 export {
     validateAndCreateFlow,
     executeHandover,
     inspectFlowWorkers,
-} from './flow.mjs';
+} from './flow.ts';
 
 export {
     acceptRisk,
     inspectRiskStatus,
-} from './debt.mjs';
+} from './debt.ts';
 
 export {
     previewConfigChange,

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { executeHandover } from '../eso/control-plane/src/flow.mjs';
+import { executeHandover } from '../eso/control-plane/src/flow.ts';
 import { previewAttributeChange, saveAttributeChange } from '../eso/control-plane/src/config-mgr.ts';
 import { deleteTeamRole, applyTeamPreset } from '../eso/core/src/team-tool-cfg.mjs';
 
