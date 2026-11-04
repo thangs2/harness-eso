@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const marker = fileURLToPath(new URL('../comments/artifacts/review-2026-11-04/MERGE_BLOCKED.md', import.meta.url));
+const marker = fileURLToPath(new URL('../MERGE_BLOCKED.md', import.meta.url));
 
 test('merge block: no open critical batch', () => {
     if (!existsSync(marker)) return;
