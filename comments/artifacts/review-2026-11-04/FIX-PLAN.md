@@ -23,6 +23,28 @@ merge_block: "comments/artifacts/review-2026-11-04/MERGE_BLOCKED.md"
 5. **Mỗi wave một commit** (hoặc một commit/ticket nếu nhỏ), header `type(scope): subject [ESO-xxx]`, thân ≤3 câu.
 6. **Bằng chứng:** mỗi ticket phải có `comments/artifacts/slp/verify/ESO-xxx-verify.log` chứa **command + exit code + output thật**; audit JSON phải có command, không chỉ prose.
 7. **Không xóa `MERGE_BLOCKED.md`** cho tới khi hết 10 critical + toàn bộ FAIL/PARTIAL dưới đây đã xanh.
+8. **Stack gate §0.1 chưa chốt** — `ESO-370` và `ESO-380` đang **PAUSED**.
+
+## 0.1 Stack gate — CHƯA CHỐT (chặn 2 ticket)
+
+**Đo 2026-11-04:** `eso/` là **plain Node ESM** — 77 `.mjs`, 0 `.ts`; HTTP bằng `node:http`;
+DB bằng SQLite; UI bằng chuỗi HTML. Không có NestJS, Fastify, Kysely, Angular, `eso/ui`.
+
+**Design law nói khác:**
+- `sdlc/07.technical/00.index.md:75-76`: BE = **NestJS + Fastify + Kysely**, FE = **Angular 22 (Fuse) monorepo** (`D-71`, `D-72`).
+- `D-73`: Postgres 3 database `cp · ctx · graph`.
+- `01.c4/04.code.md:26`: `eso/ui` = Angular 22.
+
+**Không có decision nào ghi đè** D-71/D-72/D-73 ⇒ đây là drift chưa được ghi, không phải "chỗ trống đã biết".
+
+**S phải chốt trước khi Gemini sửa 2 ticket stack-sensitive:**
+
+| Lựa chọn | Hệ quả |
+|---|---|
+| **A. Giữ D-71/D-72/D-73** | `ESO-370` (HTTP) và `ESO-380` (page) **viết lại** trên NestJS/Fastify/Kysely + Angular `eso/ui`; 10 critical vẫn sửa |
+| **B. Ghi decision mới** (plain Node + SQLite + HTML) | cập nhật C4/technical index; `ESO-370`/`ESO-380` sửa trên stack hiện tại |
+
+**Trong lúc chờ:** được sửa các critical **stack-agnostic** (smoke guard/hook, Q1/Q4/Q5, completeness, dispatch, SCN, links). **Không sửa `ESO-370`, `ESO-380`** — sửa bây giờ có thể là công cày đi.
 
 ## 1. Thứ tự thực hiện
 
@@ -47,7 +69,7 @@ merge_block: "comments/artifacts/review-2026-11-04/MERGE_BLOCKED.md"
 ### Wave C — sau 369
 | Ticket | Việc | Phụ thuộc |
 |---|---|---|
-| **ESO-370** | preview→save, `/health` 503 khi store hỏng | 369 |
+| **ESO-370** | ⏸ **PAUSED — stack gate §0.1**: preview→save, `/health` 503 | 369 |
 | **ESO-387** | key shape: bar vocabulary, role in-use | 369 |
 | **ESO-388** | SDLC init contract, idempotent, upgrade revert | 368, 369 |
 
@@ -61,7 +83,7 @@ merge_block: "comments/artifacts/review-2026-11-04/MERGE_BLOCKED.md"
 | Ticket | Việc | Phụ thuộc |
 |---|---|---|
 | **ESO-371** | hook thật, smoke qua hook, guard `rmSync` | 368, 370 |
-| **ESO-380** | route S1 trả HTML thật | 370 |
+| **ESO-380** | ⏸ **PAUSED — stack gate §0.1**: route S1 trả HTML thật | 370 |
 | **ESO-375** | SCN runner: chạy file test thật, không tự đánh dấu | 370 |
 
 ### Wave F — sau 371
@@ -226,4 +248,5 @@ Sau đó:
 > Đọc `comments/artifacts/review-2026-11-04/FIX-PLAN.md` và làm theo đúng thứ tự Wave A→H.
 > Không sửa ngoài 22 ticket ESO-368…389. Không chạm x79. Không `Done`.
 > Mỗi wave: commit `type(scope): subject [ESO-xxx]`, viết verify log, cập nhật audit.
+> Không sửa `ESO-370`/`ESO-380` khi §0.1 chưa chốt.
 > Kết thúc: `bun run test` xanh 3 lần, xóa `MERGE_BLOCKED.md` trong commit cuối, báo lại SHA để QC.
