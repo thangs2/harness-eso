@@ -1,0 +1,30 @@
+======================================================================
+VERIFY LOG: ESO-375 — SCN runner: real file check, report and no mutation
+Timestamp: 2026-11-04T15:24:15.000Z
+======================================================================
+
+$ node --test qc/scn-runner.test.mjs
+Exit Code: 0
+Output:
+✔ ESO-375 / DoD B7: SCN runner does not mark executed when test files missing and never mutates sdlc/ (2.167416ms)
+✔ ESO-375 / DoD B7: SCN runner executes real test when file exists (56.66475ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 122.780334
+
+$ bun test qc/scn-runner.test.mjs
+Exit Code: 0
+Output:
+✓ ESO-375 / DoD B7: SCN runner does not mark executed when test files missing and never mutates sdlc/ [7.93ms]
+✓ ESO-375 / DoD B7: SCN runner executes real test when file exists [974.13ms]
+
+2 pass
+0 fail
+======================================================================
+VERDICT: PASS
+======================================================================

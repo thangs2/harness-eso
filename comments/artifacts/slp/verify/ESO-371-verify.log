@@ -1,0 +1,38 @@
+======================================================================
+VERIFY LOG: ESO-371 — Smoke turn: real hook execution and path guard
+Timestamp: 2026-11-04T15:23:40.000Z
+======================================================================
+
+$ node scripts/eso-smoke-turn.mjs
+Exit Code: 0
+Output:
+[smoke-turn] Target consumer (guarded /tmp): /tmp/eso-smoke-turn-test
+[smoke-turn] Running provision for /tmp/eso-smoke-turn-test...
+[smoke-turn] Executing smoke turn via real hook: /tmp/eso-smoke-turn-test/.harness/hooks/turn.mjs...
+[smoke-turn] Recorded turn evidence: smoke-turn-verified
+[smoke-turn] Replaying turn evidence from database...
+[smoke-turn] Replay verified successfully!
+[smoke-turn] Removing sandbox cleanly...
+[smoke-turn] DoD VERIFIED: provision config+hook, smoke turn evidence_turn via real hook, replay, remove sạch!
+
+$ node scripts/eso-smoke-turn.mjs ../x79
+Exit Code: 2
+Output:
+❌ ACCESS_DENIED: Target directory "/Users/thangs2net/Workspaces/x79" must be strictly inside a temporary directory (/tmp)
+
+$ node eso/cli/init-profile.test.mjs
+Exit Code: 0
+Output:
+✔ assertWithinConsumer throws when path is outside consumer directory (3.095584ms)
+✔ assertWithinConsumer throws UNKNOWN_CONSUMER when consumer directory does not exist (1.490167ms)
+✔ symlink .harness pointing outside consumer directory throws OUTSIDE_CONSUMER (2.585042ms)
+✔ dry-run writes 0 files to disk and returns dryRun: true (2.991458ms)
+✔ idempotency: first run changed: true, second run changed: false (8.35275ms)
+✔ cli: unknown consumer exits with code 2 and writes 0 files (64.837125ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+======================================================================
+VERDICT: PASS
+======================================================================

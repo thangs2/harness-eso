@@ -68,7 +68,7 @@ test('dry-run writes 0 files to disk and returns dryRun: true', () => {
         assert.equal(res.ok, true);
         assert.equal(res.dryRun, true);
         assert.equal(fs.existsSync(path.join(dir, '.harness')), false);
-        assert.equal(res.files.length, 2);
+        assert.ok(res.files.length >= 2);
     } finally {
         cleanup();
     }

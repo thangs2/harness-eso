@@ -1,5 +1,7 @@
 import { readConfig, saveConfig } from './config-store.mjs';
 import { previewConfigChange } from './config-mgr.mjs';
+import { renderS1Page } from './page/index.mjs';
+import { listTurnEvidence } from '../../adapters/src/host-bridge.mjs';
 
 /**
  * Handle incoming HTTP request for ESO Control Plane.
@@ -158,6 +160,30 @@ export async function handleControlPlaneRequest(req, res, { db, authToken = 'sec
             res.end(JSON.stringify({ error: 'SAVE_FAILED', message: err.message }));
             return;
         }
+    }
+
+    // 5. GET /s1: S1 HTML Work Overview (ESO-380 / DoD B4)
+    if (method === 'GET' && pathname === '/s1') {
+        const project = url.searchParams.get('project') || 'default';
+        let turns = [];
+        if (db) {
+            try {
+                turns = listTurnEvidence({ db, project, limit: 50 });
+            } catch {
+                turns = [];
+            }
+        }
+
+        const page = renderS1Page({
+            project,
+            hasAccess: true,
+            turns,
+        });
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.writeHead(200);
+        res.end(page.html);
+        return;
     }
 
     // 404 for unknown endpoints

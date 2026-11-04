@@ -180,3 +180,38 @@ test('ESO-370: GET /health returns 503 when store is broken', async () => {
         brokenServer.close();
     }
 });
+
+test('ESO-380: GET /s1 returns text/html work overview page with auth', async () => {
+    const { ensureEvidenceSchema, recordTurnEvidence } = await import('../eso/adapters/src/host-bridge.mjs');
+    ensureEvidenceSchema(db);
+
+    recordTurnEvidence({
+        db,
+        project: 'p-s1-test',
+        turnId: 'turn-s1-42',
+        actorRole: 'lead',
+        actorStatus: 'FULL',
+        level: 'sufficient',
+        mode: 'do',
+        basis: 'verified',
+        payload: { task: 'UI rendering' },
+    });
+
+    // 1. Without token -> 401
+    const unauthRes = await fetch(`${baseUrl}/s1?project=p-s1-test`);
+    assert.equal(unauthRes.status, 401);
+
+    // 2. With token -> 200 text/html
+    const res = await fetch(`${baseUrl}/s1?project=p-s1-test`, {
+        headers: {
+            'Authorization': `Bearer ${AUTH_TOKEN}`,
+        },
+    });
+
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type'), /text\/html/);
+    const html = await res.text();
+    assert.match(html, /Dự án: p-s1-test/);
+    assert.match(html, /data-turn-id="turn-s1-42"/);
+    assert.match(html, /data-action="WHY"/);
+});
