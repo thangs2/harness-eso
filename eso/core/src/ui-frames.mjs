@@ -33,12 +33,26 @@ export const UI_STATES = Object.freeze({
 // 7.1 / ESO-216: Generic State Render Frame
 // ----------------------------------------------------
 
+/**
+ * The two causes of ST4 denial a caller may hold. They are the two halves of the
+ * one refusal sentence the surface may render while existence is hidden
+ * (sdlc/08.ui-design/03.states.md §2: "hai ca này **một** câu, vì phân biệt
+ * chúng là tiết lộ").
+ */
+export const DENIAL_REASONS = Object.freeze({
+    NOT_FOUND: 'not-found',
+    NO_PERMISSION: 'no-permission',
+});
+
+const DENIAL_REASON_SET = new Set(Object.values(DENIAL_REASONS));
+
 export function renderStateFrame({
     state,
     data = null,
     error = null,
     emptyMessage = 'chưa có dữ liệu nào',
     hideExistence = false,
+    reason = null,
 } = {}) {
     switch (state) {
         case UI_STATES.ST1_EMPTY:
@@ -55,7 +69,11 @@ export function renderStateFrame({
                 rendered: true,
                 skeleton: { blocks: 4 },
                 buttons_disabled: true,
-                active_requests: 1,
+                // ESO-379: this used to be the literal `1`. The frame has no
+                // request source, so a number here claimed a measurement nobody
+                // took. Unrecorded is `null`, like ST6 coverage and ST5
+                // completeness; a recorded count passes through unchanged.
+                active_requests: data && Number.isInteger(data.active_requests) ? data.active_requests : null,
             };
         case UI_STATES.ST3_FAILED:
             return {
@@ -64,13 +82,35 @@ export function renderStateFrame({
                 error: error || 'Hỏng kết nối hoặc lỗi dịch vụ',
                 actions: ['RETRY'],
             };
-        case UI_STATES.ST4_DENIED:
+        case UI_STATES.ST4_DENIED: {
+            // ESO-379: the renderer used to ignore `reason`, so a not-found and a
+            // no-permission frame were the same object and the equality test was
+            // guaranteed by the signature. It now reads the reason, but the
+            // security rule decides what it may say:
+            //   hideExistence  → one sentence and one frame for both causes, reason
+            //                    dropped, because a difference here discloses existence;
+            //   disclosure     → the reason is kept and the sentence splits into the
+            //                    two halves the hidden sentence already joins.
+            if (hideExistence) {
+                return {
+                    state: UI_STATES.ST4_DENIED,
+                    rendered: true,
+                    message: 'Không có quyền truy cập hoặc dự án không tồn tại',
+                    reason: null,
+                    actions: ['CHANGE_PROJECT'],
+                };
+            }
+            const disclosedReason = DENIAL_REASON_SET.has(reason) ? reason : null;
             return {
                 state: UI_STATES.ST4_DENIED,
                 rendered: true,
-                message: hideExistence ? 'Không có quyền truy cập hoặc dự án không tồn tại' : 'Không có quyền truy cập',
+                message: disclosedReason === DENIAL_REASONS.NOT_FOUND
+                    ? 'Dự án không tồn tại'
+                    : 'Không có quyền truy cập',
+                reason: disclosedReason,
                 actions: ['CHANGE_PROJECT'],
             };
+        }
         case UI_STATES.ST5_PARTIAL:
             return {
                 state: UI_STATES.ST5_PARTIAL,

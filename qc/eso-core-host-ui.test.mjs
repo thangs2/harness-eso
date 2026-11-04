@@ -65,7 +65,7 @@ test('SCN-HOST-01 (DoD 8.1): Exactly 3 assurance levels and rejects invalid leve
 // WP 7.1 / ESO-216: Generic ST1..ST6 Frames
 // ==========================================
 
-test('SCN-UI-FRAME-01 (DoD 7.1): Generic ST1..ST6 state render frames; denied message identical for not-found and no-permission, distinct from empty', () => {
+test('SCN-UI-FRAME-01 (DoD 7.1): ST4 hides existence while a refusal is hidden and distinguishes not-found from no-permission once disclosure is allowed', () => {
     const emptyFrame = renderStateFrame({
         state: UI_STATES.ST1_EMPTY,
         emptyMessage: 'chưa có dữ liệu nào',
@@ -73,7 +73,9 @@ test('SCN-UI-FRAME-01 (DoD 7.1): Generic ST1..ST6 state render frames; denied me
     assert.equal(emptyFrame.state, 'EMPTY');
     assert.equal(emptyFrame.message, 'chưa có dữ liệu nào');
 
-    // Denied with hideExistence=true produces identical refusal message for not-found and no-permission, distinct from ST1 Empty
+    // sdlc/08.ui-design/03.states.md §2: while existence is hidden the refusal must be the same sentence for
+    // "not found" and "no permission" — telling the two apart discloses existence by negation. The whole frame is
+    // identical, so the equality is a decision about the reason, not an accident of the renderer's signature.
     const deniedNotFound = renderStateFrame({
         state: UI_STATES.ST4_DENIED,
         hideExistence: true,
@@ -86,16 +88,46 @@ test('SCN-UI-FRAME-01 (DoD 7.1): Generic ST1..ST6 state render frames; denied me
     });
     assert.equal(deniedNotFound.state, 'DENIED');
     assert.equal(deniedNoPermission.state, 'DENIED');
-    // 1. Identical message for not-found and no-permission (security: does not leak existence)
     assert.equal(deniedNotFound.message, deniedNoPermission.message);
     assert.equal(deniedNotFound.message, 'Không có quyền truy cập hoặc dự án không tồn tại');
-    // 2. Distinct from ST1 empty
     assert.notEqual(deniedNotFound.message, emptyFrame.message);
+    assert.deepEqual(deniedNotFound, deniedNoPermission);
+    assert.equal(deniedNotFound.reason, null);
 
-    // Loading skeleton
+    // ESO-379: once the caller allows disclosure, ignoring `reason` is the bug — the two causes must be distinct in
+    // the frame data and in the copy. The two sentences are the halves the hidden sentence already joins.
+    const disclosedNotFound = renderStateFrame({
+        state: UI_STATES.ST4_DENIED,
+        hideExistence: false,
+        reason: 'not-found',
+    });
+    const disclosedNoPermission = renderStateFrame({
+        state: UI_STATES.ST4_DENIED,
+        hideExistence: false,
+        reason: 'no-permission',
+    });
+    assert.equal(disclosedNotFound.reason, 'not-found');
+    assert.equal(disclosedNoPermission.reason, 'no-permission');
+    assert.notEqual(disclosedNotFound.message, disclosedNoPermission.message);
+    assert.equal(disclosedNotFound.message, 'Dự án không tồn tại');
+    assert.equal(disclosedNoPermission.message, 'Không có quyền truy cập');
+    // An unrecorded or unknown reason never invents a distinction: the generic refusal and a null reason.
+    const disclosedUnknown = renderStateFrame({
+        state: UI_STATES.ST4_DENIED,
+        hideExistence: false,
+        reason: 'rate-limited',
+    });
+    assert.equal(disclosedUnknown.reason, null);
+    assert.equal(disclosedUnknown.message, 'Không có quyền truy cập');
+
+    // Loading skeleton. The request count is DATA, not a constant (ESO-379): a frame with no request source used to
+    // report exactly 1, which asserted a measurement nobody took. Unrecorded stays null; a recorded count is passed
+    // through as-is.
     const loadingFrame = renderStateFrame({ state: UI_STATES.ST2_LOADING });
     assert.equal(loadingFrame.buttons_disabled, true);
-    assert.equal(loadingFrame.active_requests, 1);
+    assert.equal(loadingFrame.active_requests, null);
+    const loadingWithRequests = renderStateFrame({ state: UI_STATES.ST2_LOADING, data: { active_requests: 2 } });
+    assert.equal(loadingWithRequests.active_requests, 2);
 });
 
 // ==========================================

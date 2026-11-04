@@ -74,7 +74,7 @@ export class S1WorkOverviewComponent {
         ).join('');
 
         return {
-            state: 'ST6_READY',
+            state: 'READY',
             html: `<div class="s1-page ready"><h1>Dự án: ${this.project}</h1><table class="turns-table"><thead><tr><th>Việc</th><th>Mức</th><th>Thiếu</th><th>Hành động</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`,
             actions: ['WHY'],
         };

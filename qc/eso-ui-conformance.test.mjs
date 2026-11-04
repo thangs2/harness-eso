@@ -11,8 +11,8 @@ import {
     S1WorkOverviewComponent,
     S1WorkOverviewClient,
     AuthService,
-    S1WorkStore,
-    S3ConfigPage,
+    WorkOverviewStore,
+    DeclarationPage,
     ControlPlaneApiClient,
 } from '../eso/ui/src/index.mjs';
 
@@ -61,7 +61,7 @@ test('INV-UI-01 & INV-UI-02 / D-72: S1WorkOverviewComponent renders frames and d
     assert.match(emptyView.html, /chưa có turn nào/);
     assert.deepEqual(emptyView.actions, ['CHANGE_PROJECT']);
 
-    // 5. Ready state (ST6_READY)
+    // 5. Ready state — `READY` is the content branch; ST6 is stale only (D-81 / ESO-381).
     comp.setState({
         project: 'baplatform',
         turns: [{ id: 't1' }],
@@ -76,7 +76,7 @@ test('INV-UI-01 & INV-UI-02 / D-72: S1WorkOverviewComponent renders frames and d
         ],
     });
     const readyView = comp.renderView();
-    assert.equal(readyView.state, 'ST6_READY');
+    assert.equal(readyView.state, 'READY');
     assert.match(readyView.html, /Dự án: baplatform/);
     assert.match(readyView.html, /data-turn-id="turn-999"/);
     assert.match(readyView.html, /Refactor Auth/);
@@ -109,8 +109,8 @@ test('SKILL.md §7: AuthService manages token in memory without localStorage', (
     assert.equal(auth.token(), null);
 });
 
-test('SKILL.md §3 & §5: S1WorkStore manages signal state and enforces read-only surface', () => {
-    const store = new S1WorkStore();
+test('SKILL.md §3 & §5: WorkOverviewStore manages signal state and enforces read-only surface', () => {
+    const store = new WorkOverviewStore();
 
     assert.equal(store.state(), 'ST2_LOADING');
     assert.equal(store.isReadOnly(), true);
@@ -126,7 +126,7 @@ test('SKILL.md §3 & §5: S1WorkStore manages signal state and enforces read-onl
         },
     ]);
 
-    assert.equal(store.state(), 'ST6_READY');
+    assert.equal(store.state(), 'READY');
     assert.equal(store.totalItems(), 1);
     assert.equal(store.hasItems(), true);
 
@@ -138,8 +138,8 @@ test('SKILL.md §3 & §5: S1WorkStore manages signal state and enforces read-onl
     assert.equal(store.state(), 'ST4_DENIED');
 });
 
-test('SKILL.md §5: S3ConfigPage enforces save disabled until preview exists and handles conflict', () => {
-    const page = new S3ConfigPage();
+test('SKILL.md §5: DeclarationPage enforces save disabled until preview exists and handles conflict', () => {
+    const page = new DeclarationPage();
 
     assert.equal(page.hasPreview(), false);
     assert.equal(page.canSave(), false);

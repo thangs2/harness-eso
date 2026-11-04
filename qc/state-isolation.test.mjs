@@ -83,8 +83,13 @@ test('portableStatePath collapses $HOME so consumer files carry no absolute host
     assert.equal(portableStatePath('/tmp/registry.json'), '/tmp/registry.json');
     assert.equal(portableStatePath('/opt/harness/registry.json'), '/opt/harness/registry.json');
     // A checkout under $HOME collapses too — which is exactly why the leak test below passes even
-    // though this repo lives inside the operator's home directory.
-    assert.equal(portableStatePath(ESO_ROOT), `~${ESO_ROOT.slice(os.homedir().length)}`);
+    // though this repo lives inside the operator's home directory. The synthetic path keeps the
+    // assertion true wherever the checkout lives; a clone in /tmp or on a CI runner is still a clone.
+    const underHome = path.join(os.homedir(), 'workspace', 'harness-eso');
+    assert.equal(portableStatePath(underHome), '~/workspace/harness-eso');
+    if (ESO_ROOT.startsWith(os.homedir() + path.sep)) {
+        assert.equal(portableStatePath(ESO_ROOT), `~${ESO_ROOT.slice(os.homedir().length)}`);
+    }
 });
 
 // ---------------------------------------------------------------------------
@@ -143,31 +148,61 @@ test('a consumer provisioned end to end has no absolute checkout path anywhere',
 // Migration of an install that predates the move
 // ---------------------------------------------------------------------------
 
-test('legacy product state is copied into ~/.harness once, and only once', () => {
-    const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-newstate-'));
+const LEGACY_DIR = path.join(ESO_ROOT, '.harness');
+const LEGACY_WORKSPACE = path.join(LEGACY_DIR, 'workspace.json');
+
+/**
+ * Create the pre-move `<checkout>/.harness` tree the migration reads, and take it away again.
+ *
+ * It used to be whatever the machine happened to have on disk. `.harness/` is gitignored, so a
+ * clean checkout has none and the test failed for the state of the machine rather than for the code
+ * — while on an operator's machine it passed for the same wrong reason. The product hardcodes the
+ * legacy location (`packages/harness-cli/src/workspace-env.mjs`), so the fixture has to be created
+ * there; when real state already exists it is used as-is and never modified or removed.
+ */
+function withLegacyStateFixture(fn) {
+    if (fs.existsSync(LEGACY_WORKSPACE)) return fn();
+    const hadDir = fs.existsSync(LEGACY_DIR);
+    fs.mkdirSync(LEGACY_DIR, { recursive: true });
+    fs.writeFileSync(
+        LEGACY_WORKSPACE,
+        JSON.stringify({ version: 1, defaultProjectId: 'legacy-fixture', projects: [] }, null, 2),
+    );
     try {
-        const result = withEnv({ [PRODUCT_STATE_ENV]: dest }, () => migrateLegacyProductState());
-        // The checkout does contain legacy state in this repo, so this migration is the real one.
-        assert.ok(result, 'migration must report what it did');
-        assert.equal(result.to, dest);
-        assert.ok(result.copied.length > 0);
-        assert.ok(fs.existsSync(path.join(dest, 'workspace.json')));
-
-        // The source is left intact: an operator who downgrades still has it.
-        assert.ok(fs.existsSync(path.join(ESO_ROOT, '.harness', 'workspace.json')));
-
-        // Second run is a no-op because the destination is now populated — it must not overwrite
-        // state that may have moved on since.
-        const second = withEnv({ [PRODUCT_STATE_ENV]: dest }, () => migrateLegacyProductState());
-        assert.equal(second, null);
+        return fn();
     } finally {
-        fs.rmSync(dest, { recursive: true, force: true });
+        fs.rmSync(LEGACY_WORKSPACE, { force: true });
+        if (!hadDir) fs.rmSync(LEGACY_DIR, { recursive: true, force: true });
     }
+}
+
+test('legacy product state is copied into ~/.harness once, and only once', () => {
+    withLegacyStateFixture(() => {
+        const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-newstate-'));
+        try {
+            const result = withEnv({ [PRODUCT_STATE_ENV]: dest }, () => migrateLegacyProductState());
+            assert.ok(result, 'migration must report what it did');
+            assert.equal(result.from, LEGACY_DIR);
+            assert.equal(result.to, dest);
+            assert.ok(result.copied.includes('workspace.json'), 'the legacy workspace file is what moves');
+            assert.ok(fs.existsSync(path.join(dest, 'workspace.json')));
+
+            // The source is left intact: an operator who downgrades still has it.
+            assert.ok(fs.existsSync(LEGACY_WORKSPACE));
+
+            // Second run is a no-op because the destination is now populated — it must not overwrite
+            // state that may have moved on since.
+            const second = withEnv({ [PRODUCT_STATE_ENV]: dest }, () => migrateLegacyProductState());
+            assert.equal(second, null);
+        } finally {
+            fs.rmSync(dest, { recursive: true, force: true });
+        }
+    });
 });
 
 test('migration is skipped when the destination is the legacy directory itself', () => {
-    const result = withEnv({ [PRODUCT_STATE_ENV]: path.join(ESO_ROOT, '.harness') }, () =>
-        migrateLegacyProductState(),
-    );
-    assert.equal(result, null);
+    withLegacyStateFixture(() => {
+        const result = withEnv({ [PRODUCT_STATE_ENV]: LEGACY_DIR }, () => migrateLegacyProductState());
+        assert.equal(result, null);
+    });
 });

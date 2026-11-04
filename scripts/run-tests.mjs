@@ -133,11 +133,21 @@ function main() {
     const fullRun = requested.length === 0;
 
     /*
-     * Builds that a test suite depends on. `qc/eso-cp-nestjs.test.mjs` imports
-     * `eso/control-plane/dist/server.js`, so a clean checkout must build it first.
-     * Keep this list explicit rather than hiding the dependency inside the test.
+     * Builds that a test suite depends on, all of which produce a gitignored `dist/` — so a clean
+     * checkout has none of them and the suites that need them fail for reasons that have nothing to
+     * do with the change under test. Keep this list explicit rather than hiding the dependency
+     * inside each test:
+     *   - `eso/control-plane` — `qc/eso-cp-nestjs.test.mjs` imports `dist/server.js`.
+     *   - `eso/ui` — `qc/eso-ui-conformance.test.mjs` imports `eso/ui/src/index.mjs`, whose every
+     *     path points into `eso/ui/dist`.
+     *   - host pack — `initProfile` / `applyHostProfiles` throw `host pack not built` without
+     *     `packages/harness-host-generic/dist/host-pack`, which every provisioning suite calls.
      */
-    const BUILDS = [{ rel: 'eso/control-plane', script: 'build' }];
+    const BUILDS = [
+        { rel: 'eso/control-plane', script: 'build' },
+        { rel: 'eso/ui', script: 'build' },
+        { rel: '.', script: 'build:host-pack' },
+    ];
     let buildFailed = false;
     for (const b of BUILDS) {
         const cwd = path.join(REPO, b.rel);

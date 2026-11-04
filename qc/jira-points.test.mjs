@@ -24,11 +24,15 @@ const load = () => {
 const FIB = new Set([1, 2, 3, 5, 8, 13]);
 const SP = 'customfield_10016';
 
-test('X33: story points — đủ, Fibonacci, và roll-up khớp', async (t) => {
-    if (!load()) {
-        t.skip('không có JIRA_* trong env — phép kiểm này cần Jira thật (standard 07 §10)');
-        return;
-    }
+/*
+ * Registered with `skip` up front rather than calling `t.skip()` inside the body: Bun's `node:test`
+ * shim throws `NotImplementedError: skip() is not yet implemented in Bun` (Bun 1.3.14), so the
+ * in-body form turned a credential-less machine into a red gate — which is how a check gets deleted.
+ * The option form both skips and reports the reason under Bun.
+ */
+test('X33: story points — đủ, Fibonacci, và roll-up khớp', {
+    skip: load() ? false : 'không có JIRA_* trong env — phép kiểm này cần Jira thật (standard 07 §10)',
+}, async () => {
     const base = process.env.JIRA_BASE_URL.replace(/\/$/, '');
     const auth = 'Basic ' + Buffer.from(`${process.env.JIRA_USER_EMAIL}:${process.env.JIRA_API_TOKEN}`).toString('base64');
 

@@ -38,23 +38,76 @@ const IGNORED = /^(https?:|mailto:|tel:|#|file:)/;
 // A placeholder used in prose to show what a *missing* reference looks like. It is documented as nonexistent.
 const SENTINEL = 'khong-co';
 
+/**
+ * Every markdown target in one document, judged against `base`.
+ *
+ * Fenced blocks are code samples, not links. Inline code is the opposite: ESO-379 — stripping it here hid three real
+ * references under `sdlc/`, and a scan whose scope is narrower than the error reports success. `comments/` and the
+ * archive stay out of scope through `SKIP_PATHS`, so a dated record keeps saying what it said.
+ */
+function scanTargets(text, base) {
+    const prose = text.replace(/```[\s\S]*?```/g, '');
+    const out = [];
+    for (const m of prose.matchAll(LINK)) {
+        const url = m[1];
+        if (IGNORED.test(url) || url.includes(SENTINEL)) continue;
+        const lineStart = prose.lastIndexOf('\n', m.index) + 1;
+        const inline = (prose.slice(lineStart, m.index).match(/`/g) || []).length % 2 === 1;
+        out.push({ url, inline, exists: existsSync(resolve(base, decodeURI(url.split('#')[0]))) });
+    }
+    return out;
+}
+
 test('X1: every link resolves to a file that exists', () => {
     const files = walk(ROOT);
     assert.ok(files.length > 300, `walked only ${files.length} documents — the scan is not covering the repo`);
 
+    const documents = files.map((file) => ({
+        label: relative(ROOT, file),
+        text: readFileSync(file, 'utf8'),
+        base: dirname(file),
+    }));
+    // Audit fixture (ESO-379): `LINK_SCAN_BROKEN=1` appends one known-broken inline reference. The same check must then
+    // exit non-zero, which is how "this scan can fail" is measured instead of asserted. The default run is untouched.
+    if (process.env.LINK_SCAN_BROKEN === '1') {
+        documents.push({
+            label: '<negative-case>',
+            text: 'Xem `[hỏng](./task4-negative-case-missing.md)` để thấy.',
+            base: ROOT,
+        });
+    }
+
     const broken = [];
-    for (const file of files) {
-        const text = readFileSync(file, 'utf8')
-            .replace(/```[\s\S]*?```/g, '');   // links in fenced code blocks are not links
-        const base = dirname(file);
-        for (const m of text.matchAll(LINK)) {
-            const url = m[1];
-            if (IGNORED.test(url) || url.includes(SENTINEL)) continue;
-            const target = resolve(base, decodeURI(url.split('#')[0]));
-            if (!existsSync(target)) broken.push(`${relative(ROOT, file)} → ${url}`);
+    let seen = 0;
+    let inline = 0;
+    for (const doc of documents) {
+        for (const hit of scanTargets(doc.text, doc.base)) {
+            seen++;
+            if (hit.inline) inline++;
+            if (!hit.exists) broken.push(`${doc.label} → ${hit.url}`);
         }
     }
+    assert.ok(seen > 1000, `scanned only ${seen} links — the scan is not covering the repo`);
+    assert.ok(inline > 0, 'no link inside inline code was scanned — the ESO-379 scope was lost again');
     assert.deepEqual(broken.sort(), [], 'references to files that do not exist');
+});
+
+test('X1: the scan can fail — a broken link in inline code is reported (negative control)', () => {
+    /*
+     * ESO-379. The scanner this file replaced stripped inline code along with fenced blocks, so a reference written as
+     * prose inside backticks could never break the check. This control runs both scanners on one fixture and asserts
+     * they disagree: the current one reports the broken inline link, the weakened one reports nothing. Without the
+     * second assertion the first would be a constant — true whether or not the scope was restored.
+     */
+    const fixture = 'Xem `[hỏng](./task4-nonexistent-inline.md)` và\n\n```md\n[fenced](./task4-nonexistent-fenced.md)\n```\n';
+    assert.deepEqual(
+        scanTargets(fixture, ROOT).map((hit) => [hit.url, hit.inline, hit.exists]),
+        [['./task4-nonexistent-inline.md', true, false]],
+        'inline code must be prose; fenced code must not be read as a link',
+    );
+
+    const weakened = fixture.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '');
+    assert.deepEqual(scanTargets(weakened, ROOT), [], 'the weakened input must hide the link, or this control proves nothing');
 });
 
 // X28 — every repository path written in prose or in code points at something that exists.

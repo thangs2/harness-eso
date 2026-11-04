@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync, rmSync, mkdirSync } from 'node:fs';
+import { existsSync, rmSync, mkdirSync, cpSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve, join, basename } from 'node:path';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import assert from 'node:assert/strict';
 
@@ -11,9 +12,40 @@ import {
     readTurnEvidence,
 } from '../eso/adapters/src/host-bridge.mjs';
 
-const rawTarget = process.argv[2] || join(os.tmpdir(), `eso-smoke-${Date.now()}`);
+// ESO-371: the run used to delete the only copy of the evidence with the sandbox, so QC could never open the DB a
+// PASS referred to. The evidence is now copied out first and the copy is re-read before the sandbox is removed.
+// `--evidence-out <dir>` names the destination; the default is a sibling of the sandbox under the OS temp dir.
+const argv = process.argv.slice(2);
+let rawTarget = null;
+let evidenceOutFlag = null;
+for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--evidence-out') {
+        evidenceOutFlag = argv[i + 1] ?? null;
+        if (!evidenceOutFlag) {
+            console.error('❌ --evidence-out needs a directory');
+            process.exit(2);
+        }
+        i += 1;
+    } else if (arg.startsWith('--evidence-out=')) {
+        evidenceOutFlag = arg.slice('--evidence-out='.length) || null;
+        if (!evidenceOutFlag) {
+            console.error('❌ --evidence-out needs a directory');
+            process.exit(2);
+        }
+    } else if (arg.startsWith('--')) {
+        console.error(`❌ Unknown option: ${arg}`);
+        process.exit(2);
+    } else if (rawTarget === null) {
+        rawTarget = arg;
+    } else {
+        console.error(`❌ Unexpected argument: ${arg}`);
+        process.exit(2);
+    }
+}
+
+const targetDir = resolve(rawTarget || join(os.tmpdir(), `eso-smoke-${Date.now()}`));
 const rootDir = process.cwd();
-const targetDir = resolve(rawTarget);
 
 // CRITICAL-1: Guard path BEFORE any rmSync or mutations
 const tmpRoot = os.tmpdir();
@@ -29,7 +61,17 @@ if (isForbiddenTarget) {
     process.exit(2);
 }
 
+// The retained evidence must outlive the sandbox: a destination inside it would be deleted with it.
+const evidenceDir = resolve(evidenceOutFlag || join(os.tmpdir(), 'eso-smoke-evidence', basename(targetDir)));
+const isInside = (child, parent) => child === parent || child.startsWith(parent.endsWith('/') ? parent : `${parent}/`);
+
+if (isInside(evidenceDir, targetDir)) {
+    console.error(`❌ ACCESS_DENIED: Evidence directory "${evidenceDir}" must not be inside the sandbox "${targetDir}" — it is removed at the end of the run`);
+    process.exit(2);
+}
+
 console.log(`[smoke-turn] Target consumer (guarded /tmp): ${targetDir}`);
+console.log(`[smoke-turn] Evidence destination: ${evidenceDir}`);
 
 // 0. Ensure clean initial state (ONLY after validation)
 if (existsSync(targetDir)) {
@@ -112,11 +154,59 @@ assert.equal(replayed.payload.result, 'PASS');
 
 console.log(`[smoke-turn] Replay verified successfully!`);
 
-// 4. Remove sạch
+// 4. Retain the evidence BEFORE the sandbox is removed (ESO-371). A PASS whose DB is deleted with the sandbox is
+//    unreviewable; QC needs the row, not the claim that the row existed.
 db.close();
+mkdirSync(evidenceDir, { recursive: true });
+
+const retainedDb = join(evidenceDir, 'eso.sqlite');
+cpSync(dbPath, retainedDb);
+const dbBytes = readFileSync(retainedDb);
+const dbSha256 = createHash('sha256').update(dbBytes).digest('hex');
+
+// The retained copy is opened and read, not merely written: a copy nobody can query is not evidence.
+const retained = createDbAdapter(retainedDb);
+const retainedRecord = readTurnEvidence({ db: retained, project: projectName, turnId: smokeTurnId });
+assert.ok(retainedRecord, 'The retained evidence DB must hold the smoke turn');
+assert.equal(retainedRecord.turn_id, smokeTurnId);
+assert.equal(retainedRecord.payload.command, 'bun test');
+assert.equal(retainedRecord.payload.result, 'PASS');
+retained.close();
+
+const evidenceLog = [
+    'ESO-371 smoke-turn evidence',
+    '===========================',
+    `timestamp: ${new Date().toISOString()}`,
+    `cwd: ${rootDir}`,
+    `sandbox (removed after retention): ${targetDir}`,
+    `project: ${projectName}`,
+    `turn_id: ${smokeTurnId}`,
+    'actor_role: peer-dev; actor_status: FULL',
+    'level: sufficient; mode: do; basis: verified; rule_version: 2.0.0',
+    `payload: ${JSON.stringify(replayed.payload)}`,
+    `db file: ${retainedDb}`,
+    `db bytes: ${dbBytes.byteLength}`,
+    `db sha256: ${dbSha256}`,
+    'replay of the retained copy:',
+    `  turn_id: ${retainedRecord.turn_id}`,
+    `  project: ${retainedRecord.project}`,
+    `  actor_role: ${retainedRecord.actor_role}; actor_status: ${retainedRecord.actor_status}`,
+    `  level: ${retainedRecord.level}; mode: ${retainedRecord.mode}; basis: ${retainedRecord.basis}`,
+    `  payload.command: ${retainedRecord.payload.command}; payload.result: ${retainedRecord.payload.result}`,
+    '',
+].join('\n');
+const evidenceLogPath = join(evidenceDir, 'eso-smoke-turn.log');
+writeFileSync(evidenceLogPath, evidenceLog);
+
+console.log(`[smoke-turn] Evidence retained before cleanup: ${retainedDb} (sha256 ${dbSha256.slice(0, 12)}…)`);
+
+// 5. Remove sạch — the sandbox only; the evidence above lives outside it.
 console.log(`[smoke-turn] Removing sandbox cleanly...`);
 rmSync(targetDir, { recursive: true, force: true });
 assert.equal(existsSync(targetDir), false, 'targetDir must be completely removed');
+assert.equal(existsSync(retainedDb), true, 'retained evidence DB must survive the sandbox removal');
+assert.equal(existsSync(evidenceLogPath), true, 'retained evidence log must survive the sandbox removal');
 
-console.log(`[smoke-turn] DoD VERIFIED: provision config+hook, smoke turn evidence_turn via real hook, replay, remove sạch!`);
+console.log(`[smoke-turn] Evidence kept at: ${evidenceDir} (eso.sqlite + eso-smoke-turn.log)`);
+console.log(`[smoke-turn] DoD VERIFIED: provision config+hook, smoke turn evidence_turn via real hook, replay, evidence retained, remove sạch!`);
 process.exit(0);

@@ -50,9 +50,14 @@ export function renderWorkOverviewPage({
     error = null,
     isStale = false,
     coverage = null,
+    activeRequests = null,
 }: any = {}) {
     if (isLoading) {
-        const frame = renderStateFrame({ state: UI_STATES.ST2_LOADING });
+        // Slice H (ESO-379 family): the request count is DATA. This used to be the literal `1`, which reported a
+        // measurement nobody took; an unrecorded count is null. The frame is the single source, so the page cannot
+        // disagree with the frame it carries.
+        const recordedRequests = Number.isInteger(activeRequests) ? activeRequests : null;
+        const frame = renderStateFrame({ state: UI_STATES.ST2_LOADING, data: { active_requests: recordedRequests } });
         return {
             title: `S1 — Work Overview: ${project}`,
             state: UI_STATES.ST2_LOADING,
@@ -60,7 +65,7 @@ export function renderWorkOverviewPage({
             html: '<div class="s1-page loading" data-state="ST2_LOADING"><div class="skeleton">Đang nạp dữ liệu...</div></div>',
             actions: [],
             buttons_disabled: true,
-            active_requests: 1,
+            active_requests: frame.active_requests,
         };
     }
 
