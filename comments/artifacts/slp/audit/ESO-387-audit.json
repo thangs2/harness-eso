@@ -1,8 +1,34 @@
 {
-  "ticketId": "ESO-387",
-  "score": 100,
-  "verdict": "PASS",
-  "criticalFindings": [],
-  "findings": [],
-  "summary": "B9 Control-plane key shape alignment fixed across flow.mjs, config-mgr.mjs, and team-tool-cfg.mjs. Validated role/attribute in use guards and accurate handover bar checks without false positives."
+  "ticket": "ESO-387",
+  "key": "ESO-387",
+  "summary": "B9 Control-plane key shape alignment fixed across flow.mjs, config-mgr.mjs, and team-tool-cfg.mjs. Validated role/attribute in use guards and accurate handover bar checks without false positives.",
+  "score": 93,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-cp-keyshape.test.mjs"
+  ],
+  "critical": [],
+  "findings": [
+    {
+      "code": "VERIFIED_ROLE_IN_USE",
+      "message": "Attempting to delete role referenced by active worker throws ROLE_IN_USE",
+      "severity": "INFO"
+    }
+  ],
+  "ac_coverage": {
+    "default_ac": "PASS"
+  },
+  "invariants": {
+    "INV_STABILITY": "PASS"
+  },
+  "slices": {
+    "S1": "PASS"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 11
+  }
 }

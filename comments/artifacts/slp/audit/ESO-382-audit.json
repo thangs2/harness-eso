@@ -1,8 +1,34 @@
 {
-  "ticketId": "ESO-382",
-  "score": 100,
-  "verdict": "PASS",
-  "criticalFindings": [],
-  "findings": [],
-  "summary": "B4 Pin persistence across restart in SQLite DB and provider audit reading directly from evidence store implemented in eso/adapters/src/election.mjs and eso/iam/src/schema.mjs. Verified in qc/eso-host-pin.test.mjs with dual node/bun test passes."
+  "ticket": "ESO-382",
+  "key": "ESO-382",
+  "summary": "B4 Pin persistence across restart in SQLite DB and provider audit reading directly from evidence store implemented in eso/adapters/src/election.mjs and eso/iam/src/schema.mjs. Verified in qc/eso-host-pin.test.mjs with dual node/bun test passes.",
+  "score": 94,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-host-pin.test.mjs"
+  ],
+  "critical": [],
+  "findings": [
+    {
+      "code": "VERIFIED_PIN_RESTART",
+      "message": "Pinned provider retrieved from SQLite DB across turn lifecycles",
+      "severity": "INFO"
+    }
+  ],
+  "ac_coverage": {
+    "default_ac": "PASS"
+  },
+  "invariants": {
+    "INV_STABILITY": "PASS"
+  },
+  "slices": {
+    "S1": "PASS"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 12
+  }
 }

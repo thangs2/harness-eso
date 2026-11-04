@@ -61,5 +61,8 @@
       "status": "PASS",
       "evidence": "initSchema() uses IF NOT EXISTS for all tables, indexes, and triggers; verified by executing initSchema twice consecutively"
     }
+  ],
+  "commands": [
+    "bun test qc/eso-graph-q1.test.mjs"
   ]
 }

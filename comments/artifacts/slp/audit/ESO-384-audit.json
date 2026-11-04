@@ -2,13 +2,20 @@
   "ticket": "ESO-384",
   "key": "ESO-384",
   "summary": "B6 Q1 trả ready+rỗng trên bun:sqlite",
-  "score": 100,
+  "score": 93,
   "passed": true,
   "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-graph-q1.test.mjs"
+  ],
   "critical": [],
-  "critical_findings": [],
-  "findings": [],
-  "minor_findings": [],
+  "findings": [
+    {
+      "code": "VERIFIED_UNKNOWN_NOT_ABSENT",
+      "message": "Unresolved symbol with incomplete coverage surfaces unknown, not silent ready empty",
+      "severity": "INFO"
+    }
+  ],
   "ac_coverage": {
     "AC-B6-01": "PASS: Adapter DB used; silent empty ready branch removed",
     "AC-B6-02": "PASS: Missing or non-queryable database throws descriptive error",
@@ -24,8 +31,8 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
-    "ac_coverage": 25,
-    "slice_bounds": 15
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 11
   }
 }

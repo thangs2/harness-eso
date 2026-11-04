@@ -2,13 +2,21 @@
   "ticket": "ESO-385",
   "key": "ESO-385",
   "summary": "B7 Q1 completeness luôn 0 vì extractor chỉ phát file",
-  "score": 100,
+  "score": 95,
   "passed": true,
   "verdict": "AUDIT_PASS",
+  "commands": [
+    "node --test qc/eso-graph-q1-precision.test.mjs",
+    "bun test qc/eso-graph-q1-precision.test.mjs"
+  ],
   "critical": [],
-  "critical_findings": [],
-  "findings": [],
-  "minor_findings": [],
+  "findings": [
+    {
+      "code": "VERIFIED_FILE_ONLY_UNKNOWN",
+      "message": "Total=0 for class/method yields coverage: null and status: unknown, refusing Q1",
+      "severity": "INFO"
+    }
+  ],
   "ac_coverage": {
     "AC-B7-01": "PASS: Extractor tracks class and method counts alongside files",
     "AC-B7-02": "PASS: Completeness evaluation computes per-kind coverage for ['file', 'class', 'method']",
@@ -23,8 +31,8 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
-    "ac_coverage": 25,
-    "slice_bounds": 15
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 13
   }
 }

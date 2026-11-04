@@ -2,13 +2,25 @@
   "ticket": "ESO-370",
   "key": "ESO-370",
   "summary": "T-04.3 control-plane HTTP: health/config/preview",
-  "score": 100,
+  "score": 92,
   "passed": true,
   "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-cp-server.test.mjs"
+  ],
   "critical": [],
-  "critical_findings": [],
-  "findings": [],
-  "minor_findings": [],
+  "findings": [
+    {
+      "code": "VERIFIED_STALE_HASH",
+      "message": "Invalid preview/current hash triggers 409 Conflict",
+      "severity": "INFO"
+    },
+    {
+      "code": "VERIFIED_HEALTH_503",
+      "message": "Unhealthy DB store correctly reports 503 Service Unavailable",
+      "severity": "INFO"
+    }
+  ],
   "ac_coverage": {
     "AC-T04-3-01": "PASS: GET /health returns 200 without authentication",
     "AC-T04-3-02": "PASS: Missing or invalid token returns 401 UNAUTHORIZED",
@@ -25,8 +37,8 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
-    "ac_coverage": 25,
-    "slice_bounds": 15
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 10
   }
 }

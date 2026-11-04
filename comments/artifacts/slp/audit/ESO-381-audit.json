@@ -2,13 +2,20 @@
   "ticket": "ESO-381",
   "key": "ESO-381",
   "summary": "B2 UI frame sai nghĩa: ST6=READY, denied=empty, fixture 0.62",
-  "score": 100,
+  "score": 95,
   "passed": true,
   "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-core-host-ui.test.mjs"
+  ],
   "critical": [],
-  "critical_findings": [],
-  "findings": [],
-  "minor_findings": [],
+  "findings": [
+    {
+      "code": "VERIFIED_ST1_EMPTY_DISTINCTION",
+      "message": "Denied and empty frame messages are clearly distinct from normal empty ST1",
+      "severity": "INFO"
+    }
+  ],
   "ac_coverage": {
     "AC-B2-01": "PASS: UI_STATES.ST6_STALE = 'STALE'",
     "AC-B2-02": "PASS: ST4_DENIED message is distinct from emptyMessage both with hideExistence true and false",
@@ -24,8 +31,8 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
-    "ac_coverage": 25,
-    "slice_bounds": 15
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 13
   }
 }

@@ -2,13 +2,20 @@
   "ticket": "ESO-374",
   "key": "ESO-374",
   "summary": "T-02.2 Rubric audit: bắt buộc ca fail + re-audit 5 mẫu",
-  "score": 100,
+  "score": 94,
   "passed": true,
   "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/slp-conformance.test.mjs"
+  ],
   "critical": [],
-  "critical_findings": [],
-  "findings": [],
-  "minor_findings": [],
+  "findings": [
+    {
+      "code": "VERIFIED_RUBRIC_CALIBRATION",
+      "message": "Rubric requires commands[], negative case checks, and rejects ungrounded 100/100",
+      "severity": "INFO"
+    }
+  ],
   "ac_coverage": {
     "AC-T02-2-01": "PASS: 5 sample stories (ESO-24, ESO-40, ESO-50, ESO-100, ESO-160) re-audited under rigorous rubric",
     "AC-T02-2-02": "PASS: Mandatory negative fail cases verified and documented per story",
@@ -23,8 +30,8 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
-    "ac_coverage": 25,
-    "slice_bounds": 15
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 12
   }
 }

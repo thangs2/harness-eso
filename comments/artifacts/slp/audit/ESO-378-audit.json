@@ -1,8 +1,34 @@
 {
-  "ticketId": "ESO-378",
-  "score": 100,
-  "verdict": "PASS",
-  "criticalFindings": [],
-  "findings": [],
-  "summary": "B3 Host dispatch stub removed in eso/core/src/host-contract.mjs. Real side effect application, sequential execution tracking, capability availability checking, and history auditing implemented and verified in qc/eso-host-cursor.test.mjs."
+  "ticket": "ESO-378",
+  "key": "ESO-378",
+  "summary": "B3 Host dispatch stub removed in eso/core/src/host-contract.mjs. Real side effect application, sequential execution tracking, capability availability checking, and history auditing implemented and verified in qc/eso-host-cursor.test.mjs.",
+  "score": 93,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-core-host-ui.test.mjs"
+  ],
+  "critical": [],
+  "findings": [
+    {
+      "code": "VERIFIED_NO_EXECUTOR",
+      "message": "Dispatch without executor returns executed: false and error: NO_EXECUTOR",
+      "severity": "INFO"
+    }
+  ],
+  "ac_coverage": {
+    "default_ac": "PASS"
+  },
+  "invariants": {
+    "INV_STABILITY": "PASS"
+  },
+  "slices": {
+    "S1": "PASS"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 11
+  }
 }

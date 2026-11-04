@@ -61,5 +61,8 @@
     ],
     "forbidden_edits_detected": false,
     "packages_or_sdlc_touched": false
-  }
+  },
+  "commands": [
+    "bun test qc/eso-core-host-ui.test.mjs"
+  ]
 }

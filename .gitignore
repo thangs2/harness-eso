@@ -1,6 +1,7 @@
 node_modules/
 .DS_Store
 *.log
+!comments/artifacts/slp/verify/*.log
 .harness/
 .cursor/mcp/node_modules/
 dist/

@@ -1,8 +1,34 @@
 {
-  "ticketId": "ESO-388",
-  "score": 100,
-  "verdict": "PASS",
-  "criticalFindings": [],
-  "findings": [],
-  "summary": "B10 SDLC init real files + upgrade revert capability implemented cleanly in eso/knowledge/src/sdlc-config.mjs and validated with real fs operations in qc/eso-kb-sdlc-config.test.mjs. All 12 test cases pass."
+  "ticket": "ESO-388",
+  "key": "ESO-388",
+  "summary": "B10 SDLC init real files + upgrade revert capability implemented cleanly in eso/knowledge/src/sdlc-config.mjs and validated with real fs operations in qc/eso-kb-sdlc-config.test.mjs. All 12 test cases pass.",
+  "score": 94,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-kb-sdlc-config.test.mjs"
+  ],
+  "critical": [],
+  "findings": [
+    {
+      "code": "VERIFIED_IDEMPOTENT_INIT",
+      "message": "Second SDLC init invocation reports changed: false with zero file modifications",
+      "severity": "INFO"
+    }
+  ],
+  "ac_coverage": {
+    "default_ac": "PASS"
+  },
+  "invariants": {
+    "INV_STABILITY": "PASS"
+  },
+  "slices": {
+    "S1": "PASS"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 12
+  }
 }

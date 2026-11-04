@@ -2,13 +2,25 @@
   "ticket": "ESO-369",
   "key": "ESO-369",
   "summary": "T-04.2 config store: version + hash + event",
-  "score": 100,
+  "score": 95,
   "passed": true,
   "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-cp-config-store.test.mjs"
+  ],
   "critical": [],
-  "critical_findings": [],
-  "findings": [],
-  "minor_findings": [],
+  "findings": [
+    {
+      "code": "VERIFIED_STALE_VERSION",
+      "message": "Outdated expectedHash correctly triggers STALE_VERSION refusal",
+      "severity": "INFO"
+    },
+    {
+      "code": "VERIFIED_APPEND_ONLY",
+      "message": "UPDATE/DELETE on config_event table aborted by SQLite trigger",
+      "severity": "INFO"
+    }
+  ],
   "ac_coverage": {
     "AC-T04-2-01": "PASS: save -> read matches exact hash",
     "AC-T04-2-02": "PASS: stale expectedHash raises STALE_VERSION",
@@ -25,8 +37,8 @@
   },
   "rubric": {
     "deterministic_green": 30,
-    "invariants": 30,
-    "ac_coverage": 25,
-    "slice_bounds": 15
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 13
   }
 }

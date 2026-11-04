@@ -47,5 +47,8 @@
     "invariants": 29,
     "ac_coverage": 25,
     "slice_bounds": 13
-  }
+  },
+  "commands": [
+    "bun test qc/eso-iam-empty-team.test.mjs"
+  ]
 }

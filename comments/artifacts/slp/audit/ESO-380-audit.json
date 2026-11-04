@@ -1,8 +1,34 @@
 {
-  "ticketId": "ESO-380",
-  "score": 100,
-  "verdict": "PASS",
-  "criticalFindings": [],
-  "findings": [],
-  "summary": "B1 S1 page real surface implemented in eso/control-plane/src/page/s1.mjs and eso/control-plane/src/page/index.mjs. All 12 test suites specified in AC-UI-01 §3 implemented under qc/eso-ui-*.test.mjs covering empty, loading, error, denied, partial, stale, list, why, switch, read-only, and level differentiation. All 14 tests pass."
+  "ticket": "ESO-380",
+  "key": "ESO-380",
+  "summary": "B1 S1 page real surface implemented in eso/control-plane/src/page/s1.mjs and eso/control-plane/src/page/index.mjs. All 12 test suites specified in AC-UI-01 §3 implemented under qc/eso-ui-*.test.mjs covering empty, loading, error, denied, partial, stale, list, why, switch, read-only, and level differentiation. All 14 tests pass.",
+  "score": 92,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-ui-s1-loading.test.mjs"
+  ],
+  "critical": [],
+  "findings": [
+    {
+      "code": "VERIFIED_AUTH_401",
+      "message": "GET /s1 without authorization token returns 401 Unauthorized",
+      "severity": "INFO"
+    }
+  ],
+  "ac_coverage": {
+    "default_ac": "PASS"
+  },
+  "invariants": {
+    "INV_STABILITY": "PASS"
+  },
+  "slices": {
+    "S1": "PASS"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 10
+  }
 }

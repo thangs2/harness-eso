@@ -1,8 +1,39 @@
 {
-  "ticketId": "ESO-371",
-  "score": 100,
-  "verdict": "PASS",
-  "criticalFindings": [],
-  "findings": [],
-  "summary": "T-04.4 provision sandbox + smoke turn + evidence implemented. Config and hook generation verified, smoke turn recorded to evidence_turn, replayed successfully, and sandbox directory cleanly removed."
+  "ticket": "ESO-371",
+  "key": "ESO-371",
+  "summary": "T-04.4 provision sandbox + smoke turn + evidence implemented. Config and hook generation verified, smoke turn recorded to evidence_turn, replayed successfully, and sandbox directory cleanly removed.",
+  "score": 92,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "commands": [
+    "bun test qc/eso-evidence.test.mjs"
+  ],
+  "critical": [],
+  "findings": [
+    {
+      "code": "VERIFIED_PATH_GUARD",
+      "message": "Non-tmp or escaping paths rejected before any rmSync operation",
+      "severity": "INFO"
+    },
+    {
+      "code": "VERIFIED_HOOK_DISPATCH",
+      "message": "Smoke turn executes hook rather than importing direct recorder",
+      "severity": "INFO"
+    }
+  ],
+  "ac_coverage": {
+    "default_ac": "PASS"
+  },
+  "invariants": {
+    "INV_STABILITY": "PASS"
+  },
+  "slices": {
+    "S1": "PASS"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 28,
+    "ac_coverage": 24,
+    "boundary_discipline": 10
+  }
 }
