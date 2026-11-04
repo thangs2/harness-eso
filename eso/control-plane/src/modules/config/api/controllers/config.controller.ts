@@ -19,8 +19,11 @@ export class ConfigController {
     constructor(private readonly configService: ConfigService) {}
 
     @Get()
-    getConfig(@Query('project') project: string) {
-        return this.configService.getConfig(project);
+    getConfig(
+        @Query('project') project: string,
+        @Query('version') version?: string
+    ) {
+        return this.configService.getConfig(project, version);
     }
 
     @Post('preview')

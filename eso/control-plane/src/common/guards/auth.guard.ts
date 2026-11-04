@@ -13,7 +13,14 @@ export class AuthGuard implements CanActivate {
     canActivate(context: ExecutionContext): boolean {
         const expectedToken = this.authConfig.token;
         if (!expectedToken) {
-            return true;
+            throw new UnauthorizedException({
+                type: 'https://eso.dev/errors/unauthorized',
+                title: 'Unauthorized',
+                status: 401,
+                code: 'UNAUTHORIZED',
+                error: 'UNAUTHORIZED',
+                detail: 'Authentication required: server authentication token not configured or missing',
+            });
         }
 
         const request = context.switchToHttp().getRequest();

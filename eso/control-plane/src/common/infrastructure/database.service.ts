@@ -23,7 +23,11 @@ export class DatabaseService implements OnModuleDestroy {
                 this.db.all('SELECT 1');
                 return true;
             }
-            return true;
+            if (typeof this.db.prepare === 'function') {
+                this.db.prepare('SELECT 1').get?.();
+                return true;
+            }
+            return false;
         } catch {
             return false;
         }

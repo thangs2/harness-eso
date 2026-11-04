@@ -31,4 +31,21 @@ export class HealthController {
             timestamp: new Date().toISOString(),
         };
     }
+
+    @Get('live')
+    @HttpCode(HttpStatus.OK)
+    live() {
+        return {
+            status: 'ok',
+            service: 'eso-control-plane',
+            check: 'live',
+            timestamp: new Date().toISOString(),
+        };
+    }
+
+    @Get('ready')
+    @HttpCode(HttpStatus.OK)
+    ready() {
+        return this.check();
+    }
 }
