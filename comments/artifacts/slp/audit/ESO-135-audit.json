@@ -1,0 +1,37 @@
+{
+  "ticket": "ESO-135",
+  "key": "ESO-135",
+  "verdict": "AUDIT_PASS",
+  "score": 100,
+  "passed": true,
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "summary": "Ticket ESO-135 (US-KB-03: Shared Knowledge Promotion) passes audit with score 100/100 and 0 CRITICAL. All 7 ACs (AC-KB-03-01..07) are fully satisfied with dual coverage across unit tests (eso/knowledge/test/knowledge.test.mjs) and QC scenarios (qc/eso-kb-promote.test.mjs). Invariants INV-KB-02 (human approval requirement), INV-KB-03 (override preservation & overridden_by reporting), and BR-10 (status pointer transitions: current -> superseded, revert to revoked and restore to current) are strictly verified. Slices S1 and S2 strictly respected allowed_files boundaries.",
+  "ac_coverage": {
+    "AC-KB-03-01": "PASS",
+    "AC-KB-03-02": "PASS",
+    "AC-KB-03-03": "PASS",
+    "AC-KB-03-04": "PASS",
+    "AC-KB-03-05": "PASS",
+    "AC-KB-03-06": "PASS",
+    "AC-KB-03-07": "PASS"
+  },
+  "invariants": {
+    "INV-KB-02": "PASS",
+    "INV-KB-03": "PASS",
+    "BR-10": "PASS",
+    "ED6": "PASS"
+  },
+  "slices": {
+    "S1": "eso/knowledge/src/promotion.mjs, eso/knowledge/src/index.mjs, eso/knowledge/test/knowledge.test.mjs",
+    "S2": "qc/eso-kb-promote.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

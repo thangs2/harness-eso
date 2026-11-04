@@ -1,0 +1,45 @@
+{
+  "ticket": "ESO-145",
+  "summary": "US-KB-04 — Viết một declaration đúng định dạng, hoặc bị từ chối",
+  "domain": "eso/knowledge",
+  "spec": "sdlc/01.agent-manifests/01.domains/eso-knowledge.spec.md",
+  "invariants": [
+    "INV-KB-01: Mỗi kind đúng một người chịu",
+    "INV-KB-02: Tri thức bền chỉ vào KB qua quyết định của người: máy không tự duyệt",
+    "DM-DECL: Định dạng declaration chuẩn theo 03.declaration-format.md",
+    "AC-KB-04-01: Đủ trường, thuộc tính đóng => lưu được, version tăng",
+    "AC-KB-04-02: Thuộc tính lạ trong declaration/applies_when => từ chối với UNKNOWN_ATTRIBUTE (0 ghi)",
+    "AC-KB-04-03: Dùng thuộc tính phải khai mà project chưa khai => cảnh báo chưa khai, không mặc định",
+    "AC-KB-04-04: Nội dung đổi mà version không đổi => từ chối với VERSION_REQUIRED (0 ghi)",
+    "AC-KB-04-05: id unicode hoặc dài nhất cho phép => lưu được, id không chuẩn hoá ngầm",
+    "AC-KB-04-06: override trỏ declaration đã mất/xoá => nêu DANGLING_OVERRIDE, không im lặng rơi về shared"
+  ],
+  "slices": [
+    {
+      "slice_id": "S1",
+      "name": "Declaration Authoring Validator & Implementation",
+      "allowed_files": [
+        "eso/knowledge/src/author.mjs",
+        "eso/knowledge/src/resolver.mjs",
+        "eso/knowledge/src/index.mjs",
+        "eso/knowledge/test/knowledge.test.mjs"
+      ],
+      "deliverables": [
+        "Implement validateDeclarationFormat with closed attributes check (UNKNOWN_ATTRIBUTE), version bump check (VERSION_REQUIRED), project attributes check, and unicode preservation",
+        "Implement checkDanglingOverrides to detect dangling overrides (DANGLING_OVERRIDE)",
+        "Add unit test suite in eso/knowledge/test/knowledge.test.mjs covering all 6 ACs"
+      ]
+    },
+    {
+      "slice_id": "S2",
+      "name": "QC Test Scenarios",
+      "allowed_files": [
+        "qc/eso-kb-author.test.mjs"
+      ],
+      "deliverables": [
+        "SCN-KB-12..15, 25, 30 covering AC-KB-04-01..06"
+      ]
+    }
+  ],
+  "verify_command": "bun test qc/eso-kb-*"
+}

@@ -1,0 +1,49 @@
+{
+  "ticket": "ESO-170",
+  "summary": "US-LEARN-05 — Lùi một đề xuất đã áp, trong một hành động",
+  "domain": "eso/learn",
+  "spec": "sdlc/06.analysis/03.acceptance-criteria/26.learn-us-05-revert.md",
+  "invariants": [
+    "INV-KB-02: Tri thức bền chỉ vào KB qua quyết định của người: máy không tự duyệt (và máy không tự lùi)",
+    "DM-PROPOSAL: Đề xuất không bị xoá khi lùi, vẫn giữ làm bằng chứng",
+    "AC-LEARN-05-01: Lùi đề xuất applied => về bản trước trong 1 hành động, status reverted, ghi ai/cái gì",
+    "AC-LEARN-05-02: Lùi đề xuất proposed => từ chối với NOT_APPLIED (0 thay đổi)",
+    "AC-LEARN-05-03: Lùi xong => cửa sổ đo đóng, measurement_state = 'halted'/'concluded', không đo tiếp",
+    "AC-LEARN-05-04: Agent gọi lùi => từ chối với APPLY_FORBIDDEN (0 thay đổi)",
+    "AC-LEARN-05-05: ED6 — Đã lùi mà lùi lại => từ chối với NOT_APPLIED (0 thay đổi)",
+    "AC-LEARN-05-06: ED8 — Lùi sau khi cửa sổ đóng có kết luận => về bản trước, giữ nguyên kết luận cũ",
+    "AC-LEARN-05-07: Version giảm đúng một; đề xuất vẫn đọc được (không xoá dòng)"
+  ],
+  "slices": [
+    {
+      "slice_id": "S1",
+      "name": "Proposal Reversion Implementation",
+      "allowed_files": [
+        "eso/learn/src/revert.mjs",
+        "eso/learn/src/index.mjs",
+        "eso/learn/test/learn.test.mjs"
+      ],
+      "deliverables": [
+        "Implement revertProposal verifying status === 'applied' (rejecting proposed or reverted with NOT_APPLIED), RBAC enforcement (APPLY_FORBIDDEN on agent), atomic single-action restoration to previous version, closing measurement window, preserving history and conclusions",
+        "Update eso/learn/test/learn.test.mjs covering AC-LEARN-05-01..07"
+      ]
+    },
+    {
+      "slice_id": "S2",
+      "name": "QC Test Scenarios",
+      "allowed_files": [
+        "qc/eso-learn-revert.test.mjs",
+        "qc/eso-learn-revert-notapplied.test.mjs",
+        "qc/eso-learn-revert-window.test.mjs",
+        "qc/eso-learn-revert-rbac.test.mjs",
+        "qc/eso-learn-revert-twice.test.mjs",
+        "qc/eso-learn-revert-after.test.mjs",
+        "qc/eso-learn-revert-07.test.mjs"
+      ],
+      "deliverables": [
+        "SCN-LEARN-10, 17, 18, 19, 28, 29, 33 covering AC-LEARN-05-01..07"
+      ]
+    }
+  ],
+  "verify_command": "bun test qc/eso-learn-*"
+}

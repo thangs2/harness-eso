@@ -1,0 +1,37 @@
+{
+  "ticket": "ESO-65",
+  "key": "ESO-65",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "summary": "Ticket ESO-65 passes audit with score 100/100. All 7 ACs (AC-EV-01-01..07) are fully implemented and verified with dual test coverage (unit test in eso/evidence/test/evidence.test.mjs and QC integration in qc/eso-ev-tables.test.mjs). Invariants BR-06 (append-only database triggers blocking UPDATE and DELETE), INV-EV-01 (idempotency on repeated batch submissions), INV-EV-02 (strict project tenant boundary isolation), and INV-EV-03 (runtime-only write access with DIRECT_WRITE_FORBIDDEN) are rigorously satisfied. Disjoint slice boundaries were perfectly respected.",
+  "ac_coverage": {
+    "AC-EV-01-01": "PASS",
+    "AC-EV-01-02": "PASS",
+    "AC-EV-01-03": "PASS",
+    "AC-EV-01-04": "PASS",
+    "AC-EV-01-05": "PASS",
+    "AC-EV-01-06": "PASS",
+    "AC-EV-01-07": "PASS"
+  },
+  "invariants": {
+    "BR-06": "PASS",
+    "INV-EV-01": "PASS",
+    "INV-EV-02": "PASS",
+    "INV-EV-03": "PASS"
+  },
+  "slices": {
+    "S1": "eso/evidence/** (schema.mjs, recorder.mjs, index.mjs, test/evidence.test.mjs)",
+    "S2": "qc/eso-ev-*.test.mjs (qc/eso-ev-tables.test.mjs)"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

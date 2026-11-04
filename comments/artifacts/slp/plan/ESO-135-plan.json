@@ -1,0 +1,47 @@
+{
+  "ticket": "ESO-135",
+  "summary": "US-KB-03 — Nâng shared một lần cho tất cả",
+  "domain": "eso/knowledge",
+  "spec": "sdlc/01.agent-manifests/01.domains/eso-knowledge.spec.md",
+  "invariants": [
+    "INV-KB-01: Mỗi kind đúng một người chịu",
+    "INV-KB-02: Tri thức bền chỉ vào KB qua quyết định của người: máy không tự duyệt (APPROVAL_REQUIRED)",
+    "INV-KB-03: Nâng shared => mọi project theo, trừ project đã đè, và việc đè phải hiện ra",
+    "D-31: Nâng shared là nâng cho tất cả; không còn ghim trong uses; opt-out bằng override",
+    "BR-10: pool/shared append-only; revert dời con trỏ (status superseded/revoked), không xoá bản",
+    "AC-KB-03-01: all projects without override adopt new version on next turn",
+    "AC-KB-03-02: project with override does not change, surfaces overridden_by",
+    "AC-KB-03-03: promotion without human approval rejected with APPROVAL_REQUIRED (0 changes)",
+    "AC-KB-03-04: returns impact list; revert is a single atomic action",
+    "AC-KB-03-05: duplicate promotion with same version/hash is no-op with impact: []",
+    "AC-KB-03-06: consistent snapshot reads, zero hybrid states",
+    "AC-KB-03-07: multi-item / multi-project update in single promotion"
+  ],
+  "slices": [
+    {
+      "slice_id": "S1",
+      "name": "Shared Promotion Implementation & Unit Tests",
+      "allowed_files": [
+        "eso/knowledge/src/promotion.mjs",
+        "eso/knowledge/src/index.mjs",
+        "eso/knowledge/test/knowledge.test.mjs"
+      ],
+      "deliverables": [
+        "Implement promoteToShared with approval check (APPROVAL_REQUIRED), idempotency (impact: []), impact calculation, and atomic status transition",
+        "Implement revertSharedPromotion for single-action revert (BR-10 pointer transition)",
+        "Add unit test suite in eso/knowledge/test/knowledge.test.mjs covering all 7 ACs"
+      ]
+    },
+    {
+      "slice_id": "S2",
+      "name": "QC Test Scenarios",
+      "allowed_files": [
+        "qc/eso-kb-promote.test.mjs"
+      ],
+      "deliverables": [
+        "SCN-KB-08..11, 23..24 covering AC-KB-03-01..07"
+      ]
+    }
+  ],
+  "verify_command": "bun test qc/eso-kb-*"
+}

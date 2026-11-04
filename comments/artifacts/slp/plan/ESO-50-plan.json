@@ -1,0 +1,51 @@
+{
+  "key": "ESO-50",
+  "slices": [
+    {
+      "id": "S1",
+      "role": "pkg-core",
+      "ac": [
+        "AC-ARCH-02-01",
+        "AC-ARCH-02-02",
+        "AC-ARCH-02-03",
+        "AC-ARCH-02-04",
+        "AC-ARCH-02-05"
+      ],
+      "inv": [
+        "INV-GR-01",
+        "INV-GR-02",
+        "INV-GR-03",
+        "BR-05"
+      ],
+      "allowed_files": [
+        "eso/graph/**"
+      ],
+      "depends_on": [],
+      "verify": "bun test qc/eso-graph-*"
+    },
+    {
+      "id": "S2",
+      "role": "pkg-qc",
+      "ac": [
+        "AC-ARCH-02-01",
+        "AC-ARCH-02-02",
+        "AC-ARCH-02-03",
+        "AC-ARCH-02-04",
+        "AC-ARCH-02-05"
+      ],
+      "inv": [
+        "INV-GR-01",
+        "INV-GR-02",
+        "INV-GR-03",
+        "BR-05"
+      ],
+      "allowed_files": [
+        "qc/eso-graph-*.test.mjs"
+      ],
+      "depends_on": [
+        "S1"
+      ],
+      "verify": "bun test qc/eso-graph-*"
+    }
+  ]
+}

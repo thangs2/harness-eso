@@ -1,0 +1,50 @@
+{
+  "key": "ESO-40",
+  "verdict": "AUDIT_PASS",
+  "score": 100,
+  "critical": [],
+  "findings": [],
+  "ac_coverage": {
+    "AC-ARCH-01-01": "FULL",
+    "AC-ARCH-01-02": "FULL",
+    "AC-ARCH-01-03": "FULL"
+  },
+  "rubric_breakdown": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "boundary_discipline": 15
+  },
+  "invariants_checked": [
+    {
+      "id": "INV-GR-01",
+      "status": "PASS",
+      "evidence": "Heavy queries detected via isTurnSafe() and pushed off-path via dispatchQuery() into async queue without blocking turn; verified in qc/eso-graph-offpath.test.mjs"
+    },
+    {
+      "id": "INV-GR-02",
+      "status": "PASS",
+      "evidence": "AST nodes (graph_node) and static edges (graph_edge) serve as single source of truth in eso/graph/src/schema.mjs"
+    },
+    {
+      "id": "INV-GR-03",
+      "status": "PASS",
+      "evidence": "All tables (graph_node, graph_edge, source_claim, completeness) include project NOT NULL; PostgreSQL RLS policies defined in POSTGRES_RLS_SQL; queryGraphFiles enforces project parameter and isolation is verified in qc/eso-graph-schema.test.mjs"
+    },
+    {
+      "id": "BR-05",
+      "status": "PASS",
+      "evidence": "Completeness value is always numeric NOT NULL; incomplete coverage yields status 'unknown' with coverage ratio, never 'absent'; verified in qc/eso-graph-completeness.test.mjs"
+    },
+    {
+      "id": "BR-06",
+      "status": "PASS",
+      "evidence": "source_claim table has NO parallel sources column; SQLite triggers trg_prevent_source_claim_update and trg_prevent_source_claim_delete reject UPDATE and DELETE; verified in qc/eso-graph-completeness.test.mjs"
+    },
+    {
+      "id": "DDL-IDEMPOTENT",
+      "status": "PASS",
+      "evidence": "initSchema() uses IF NOT EXISTS for all tables, indexes, and triggers; verified by executing initSchema twice consecutively in qc/eso-graph-schema.test.mjs"
+    }
+  ]
+}

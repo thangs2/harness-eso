@@ -1,0 +1,49 @@
+{
+  "ticket": "ESO-160",
+  "summary": "US-LEARN-03 — Áp một đề xuất, và mở cửa sổ đo",
+  "domain": "eso/learn",
+  "spec": "sdlc/06.analysis/03.acceptance-criteria/24.learn-us-03-apply.md",
+  "invariants": [
+    "INV-KB-02: Tri thức bền chỉ vào KB qua quyết định của người: máy không tự duyệt",
+    "DM-PROPOSAL: proposal table with measure_window and status",
+    "AC-LEARN-03-01: Áp đề xuất => version tăng, trạng thái applied, measure_from, measure_to mở cửa sổ đo",
+    "AC-LEARN-03-02: Agent gọi áp => từ chối với APPLY_FORBIDDEN (0 thay đổi)",
+    "AC-LEARN-03-03: Áp lại đề xuất đã applied => từ chối với ALREADY_APPLIED (chỉ 1 cửa sổ đo duy nhất)",
+    "AC-LEARN-03-04: Vừa áp xong => trạng thái đo là measuring, KHÔNG BAO GIỜ có effective: true",
+    "AC-LEARN-03-05: ED8 — áp đúng lúc => measure_from = now",
+    "AC-LEARN-03-06: ED7 — 2 request đồng thời => 1 thành công, 1 ALREADY_APPLIED",
+    "AC-LEARN-03-07: Áp lần 2 (idempotent query) => giữ nguyên version, hash, artifact"
+  ],
+  "slices": [
+    {
+      "slice_id": "S1",
+      "name": "Proposal Apply & Window Management",
+      "allowed_files": [
+        "eso/learn/src/apply.mjs",
+        "eso/learn/src/index.mjs",
+        "eso/learn/test/learn.test.mjs"
+      ],
+      "deliverables": [
+        "Implement applyProposalToSystem handling version bump, window calculation (measure_from, measure_to), RBAC (APPLY_FORBIDDEN), concurrency locking / ALREADY_APPLIED, and idempotent mode",
+        "Update eso/learn/test/learn.test.mjs covering AC-LEARN-03-01..07"
+      ]
+    },
+    {
+      "slice_id": "S2",
+      "name": "QC Test Scenarios",
+      "allowed_files": [
+        "qc/eso-learn-apply.test.mjs",
+        "qc/eso-learn-apply-twice.test.mjs",
+        "qc/eso-learn-apply-rbac2.test.mjs",
+        "qc/eso-learn-apply-measuring.test.mjs",
+        "qc/eso-learn-window-start.test.mjs",
+        "qc/eso-learn-apply-race.test.mjs",
+        "qc/eso-learn-apply-07.test.mjs"
+      ],
+      "deliverables": [
+        "SCN-LEARN-07, 08, 12, 13, 24, 25, 31 covering AC-LEARN-03-01..07"
+      ]
+    }
+  ],
+  "verify_command": "bun test qc/eso-learn-*"
+}

@@ -1,0 +1,37 @@
+{
+  "ticket": "ESO-90",
+  "key": "ESO-90",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "summary": "AUDIT_PASS with score 100/100 and 0 critical findings. All invariants (BLOCKED_SCOPE with zero disk modification, DONE_FORBIDDEN role gating, OUT_OF_SCOPE query without existence leakage, EMPTY_SCOPE, DANGLING_SCOPE) are strictly implemented and verified by both unit and QC test suites. Slice boundaries S1 (eso/control-plane/**) and S2 (qc/eso-cp-*.test.mjs) are fully respected.",
+  "ac_coverage": {
+    "AC-AGENT-01-01": "PASS",
+    "AC-AGENT-01-02": "PASS",
+    "AC-AGENT-01-03": "PASS",
+    "AC-AGENT-01-04": "PASS",
+    "AC-AGENT-01-05": "PASS",
+    "AC-AGENT-01-06": "PASS"
+  },
+  "invariants": {
+    "BLOCKED_SCOPE": "PASS",
+    "DONE_FORBIDDEN": "PASS",
+    "OUT_OF_SCOPE": "PASS",
+    "EMPTY_SCOPE": "PASS",
+    "DANGLING_SCOPE": "PASS"
+  },
+  "slices": {
+    "S1": "eso/control-plane/** (scope-guard.mjs, index.mjs, test/control-plane.test.mjs)",
+    "S2": "qc/eso-cp-*.test.mjs (qc/eso-cp-scope.test.mjs)"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "key": "ESO-24",
+  "summary": "US-KB-01 — Project mới không thấy tri thức của project khác",
+  "slices": [
+    {
+      "id": "S1",
+      "role": "pkg-core",
+      "ac": [
+        "AC-KB-01-01",
+        "AC-KB-01-02",
+        "AC-KB-01-03",
+        "AC-KB-01-04",
+        "AC-KB-01-05"
+      ],
+      "inv": [
+        "INV-KB-01",
+        "INV-KB-02",
+        "INV-KB-03"
+      ],
+      "allowed_files": [
+        "eso/knowledge/**"
+      ],
+      "depends_on": [],
+      "verify": "bun test eso/knowledge"
+    },
+    {
+      "id": "S2",
+      "role": "pkg-qc",
+      "ac": [
+        "AC-KB-01-01",
+        "AC-KB-01-02",
+        "AC-KB-01-03",
+        "AC-KB-01-04",
+        "AC-KB-01-05"
+      ],
+      "inv": [
+        "INV-KB-01",
+        "INV-KB-02",
+        "INV-KB-03"
+      ],
+      "allowed_files": [
+        "qc/eso-kb-*.test.mjs"
+      ],
+      "depends_on": [
+        "S1"
+      ],
+      "verify": "bun test qc/eso-kb-isolation.test.mjs qc/eso-kb-nofound.test.mjs qc/eso-kb-inherit.test.mjs qc/eso-kb-empty.test.mjs qc/eso-kb-outofzone.test.mjs"
+    }
+  ]
+}

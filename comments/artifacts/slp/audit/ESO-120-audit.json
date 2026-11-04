@@ -1,0 +1,39 @@
+{
+  "ticket": "ESO-120",
+  "key": "ESO-120",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "summary": "Ticket ESO-120 (US-SUF-06: cannot-judge không tự thành permitted; đi tiếp phải bypassed + người + hạn) passes audit with score 100/100 and 0 CRITICAL. All 6 ACs (AC-SUF-06-01..06) are fully satisfied with dual coverage across unit tests (eso/core/test/core.test.mjs) and QC scenarios (qc/eso-core-suf-06.test.mjs). Invariants INV-ESO-02, BIP-4_6, AC-SUF-06-02..06, and BR-06 (read-time calculation of effective mode, immutable record) are strictly respected. Slices S1 and S2 boundaries strictly adhered to allowed_files.",
+  "ac_coverage": {
+    "AC-SUF-06-01": "PASS",
+    "AC-SUF-06-02": "PASS",
+    "AC-SUF-06-03": "PASS",
+    "AC-SUF-06-04": "PASS",
+    "AC-SUF-06-05": "PASS",
+    "AC-SUF-06-06": "PASS"
+  },
+  "invariants": {
+    "INV-ESO-02": "PASS",
+    "BIP-4_6": "PASS",
+    "BR-06": "PASS",
+    "BYPASS_NO_OWNER": "PASS",
+    "BYPASS_NO_EXPIRY": "PASS",
+    "BYPASS_ALREADY_ACTIVE": "PASS",
+    "CLOCK_EXACT_MATCH_EXPIRED": "PASS"
+  },
+  "slices": {
+    "S1": "eso/core/** (bypass.mjs, index.mjs, test/core.test.mjs)",
+    "S2": "qc/eso-core-suf-06.test.mjs"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

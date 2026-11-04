@@ -1,0 +1,41 @@
+{
+  "ticket": "ESO-95",
+  "key": "ESO-95",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "summary": "Ticket ESO-95 (US-SUF-01: Agent Pre-dispatch Sufficiency) passes audit with score 100/100 and 0 CRITICAL. All 8 ACs (AC-SUF-01-01..08) are fully satisfied with dual coverage across unit tests (eso/core/test/core.test.mjs) and QC scenarios (qc/eso-core-suf-01.test.mjs). Invariants INV-ESO-01 (never sufficient without basis), INV-ESO-02 (cannot-judge never becomes permitted without bypass), INV-ESO-03 (every requirement must name closed source), BR-04 (source validation with SOURCE_MISSING), BR-05 (unknown != absent), and Section 6.2 (per-requirement min_basis) are strictly verified. Slices S1 (eso/core/**) and S2 (qc/eso-core-*.test.mjs) strictly respected allowed_files boundaries.",
+  "ac_coverage": {
+    "AC-SUF-01-01": "PASS",
+    "AC-SUF-01-02": "PASS",
+    "AC-SUF-01-03": "PASS",
+    "AC-SUF-01-04": "PASS",
+    "AC-SUF-01-05": "PASS",
+    "AC-SUF-01-06": "PASS",
+    "AC-SUF-01-07": "PASS",
+    "AC-SUF-01-08": "PASS"
+  },
+  "invariants": {
+    "INV-ESO-01": "PASS",
+    "INV-ESO-02": "PASS",
+    "INV-ESO-03": "PASS",
+    "BR-04": "PASS",
+    "BR-05": "PASS",
+    "BR-07": "PASS",
+    "PER_REQUIREMENT_MIN_BASIS": "PASS"
+  },
+  "slices": {
+    "S1": "eso/core/** (types.mjs, derive.mjs, judge.mjs, index.mjs, test/core.test.mjs)",
+    "S2": "qc/eso-core-*.test.mjs (qc/eso-core-suf-01.test.mjs)"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

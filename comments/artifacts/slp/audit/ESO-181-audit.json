@@ -1,0 +1,41 @@
+{
+  "ticket": "ESO-181",
+  "verdict": "AUDIT_PASS",
+  "score": 100,
+  "breakdown": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_discipline": 15
+  },
+  "findings_summary": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "critical": [],
+  "findings": [],
+  "ac_coverage": {
+    "AC-IAM-02-01": "PASS",
+    "AC-IAM-02-02": "PASS",
+    "AC-IAM-02-03": "PASS",
+    "AC-IAM-02-04": "PASS",
+    "AC-IAM-02-05": "PASS",
+    "AC-IAM-02-06": "PASS",
+    "AC-IAM-02-07": "PASS"
+  },
+  "invariants_compliance": {
+    "DM-ROLE": "PASS",
+    "DM-ROLE-SCOPE": "PASS",
+    "DM-VERB": "PASS"
+  },
+  "slice_discipline": {
+    "s1_s2_disjoint": true,
+    "packages_untouched": true,
+    "sdlc_untouched": true
+  },
+  "verification_status": {
+    "qc_suite": "12 pass, 0 fail",
+    "unit_suite": "13 pass, 0 fail"
+  }
+}

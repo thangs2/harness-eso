@@ -1,0 +1,47 @@
+{
+  "ticket": "ESO-130",
+  "summary": "US-KB-02 — Biết vì sao một tri thức được áp — và vì sao không",
+  "domain": "eso/knowledge",
+  "spec": "sdlc/01.agent-manifests/01.domains/eso-knowledge.spec.md",
+  "invariants": [
+    "INV-KB-01: Mỗi kind đúng một người chịu",
+    "INV-KB-02: Tri thức bền chỉ vào KB qua quyết định của người: máy không tự duyệt (RULE_CHANGE_FORBIDDEN)",
+    "INV-KB-03: Nâng shared => mọi project theo, trừ project đã đè, và việc đè phải hiện ra",
+    "AC-KB-02-01: selected item records from = project / shared / pool",
+    "AC-KB-02-02: unselected item returns why not (applies_when_mismatch, superseded, overridden, etc.)",
+    "AC-KB-02-03: project override wins over shared/pool, records overridden_by list",
+    "AC-KB-02-04: agent modifying applies_when/declaration is rejected with RULE_CHANGE_FORBIDDEN (0 changes)",
+    "AC-KB-02-05: 0 declarations match returns empty resolved [] with reasons, 0 errors",
+    "AC-KB-02-06: deterministic ordering: same input => same output order",
+    "AC-KB-02-07: removing project override unmasks currently active shared version, never empty"
+  ],
+  "slices": [
+    {
+      "slice_id": "S1",
+      "name": "Backend Implementation & Unit Tests",
+      "allowed_files": [
+        "eso/knowledge/src/resolver.mjs",
+        "eso/knowledge/src/guard.mjs",
+        "eso/knowledge/src/index.mjs",
+        "eso/knowledge/test/knowledge.test.mjs"
+      ],
+      "deliverables": [
+        "Add guardDeclarationWrite to reject agent modifications with RULE_CHANGE_FORBIDDEN",
+        "Add explainKnowledgeResolution to answer why an item was applied or rejected",
+        "Enhance resolveDeclarations with applies_when evaluation (paths/globs, always, context)",
+        "Add unit test suite in eso/knowledge/test/knowledge.test.mjs covering all 7 ACs"
+      ]
+    },
+    {
+      "slice_id": "S2",
+      "name": "QC Test Scenarios",
+      "allowed_files": [
+        "qc/eso-kb-why.test.mjs"
+      ],
+      "deliverables": [
+        "SCN-KB-04..07, 21..22 covering AC-KB-02-01..07"
+      ]
+    }
+  ],
+  "verify_command": "bun test qc/eso-kb-*"
+}

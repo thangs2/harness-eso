@@ -1,0 +1,21 @@
+{
+  "key": "ESO-24",
+  "verdict": "AUDIT_PASS",
+  "score": 100,
+  "critical": [],
+  "findings": [],
+  "ac_coverage": {
+    "AC-KB-01-01": "FULL",
+    "AC-KB-01-02": "FULL",
+    "AC-KB-01-03": "FULL",
+    "AC-KB-01-04": "FULL",
+    "AC-KB-01-05": "FULL"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "boundary_discipline": 15
+  },
+  "artifact_path": "comments/artifacts/slp/audit/ESO-24-audit.json"
+}

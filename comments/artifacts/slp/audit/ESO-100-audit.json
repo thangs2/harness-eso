@@ -1,0 +1,38 @@
+{
+  "ticket": "ESO-100",
+  "key": "ESO-100",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "summary": "Ticket ESO-100 (US-SUF-02: Operator Sufficiency) passes audit with score 100/100 and 0 CRITICAL. All 7 ACs (AC-SUF-02-01..07) are fully satisfied with dual coverage across unit tests (eso/core/test/core.test.mjs) and QC scenarios (qc/eso-core-suf-02.test.mjs). Invariants BR-01 (pure function across actors), BR-02 (sufficient guaranteed basis), BR-09 (no profile threshold dependencies), INV-ESO-01 (never sufficient without basis), and INV-ESO-02 (operator bypass preserves verdict level, enforces operator + deadline) are strictly satisfied. Slices S1 (eso/core/**) and S2 (qc/eso-core-*.test.mjs) strictly respected allowed_files boundaries.",
+  "ac_coverage": {
+    "AC-SUF-02-01": "PASS",
+    "AC-SUF-02-02": "PASS",
+    "AC-SUF-02-03": "PASS",
+    "AC-SUF-02-04": "PASS",
+    "AC-SUF-02-05": "PASS",
+    "AC-SUF-02-06": "PASS",
+    "AC-SUF-02-07": "PASS"
+  },
+  "invariants": {
+    "BR-01": "PASS",
+    "BR-02": "PASS",
+    "BR-09": "PASS",
+    "INV-ESO-01": "PASS",
+    "INV-ESO-02": "PASS"
+  },
+  "slices": {
+    "S1": "eso/core/** (types.mjs, derive.mjs, judge.mjs, operator.mjs, bypass.mjs, index.mjs, test/core.test.mjs)",
+    "S2": "qc/eso-core-*.test.mjs (qc/eso-core-suf-02.test.mjs)"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

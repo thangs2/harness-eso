@@ -1,0 +1,45 @@
+{
+  "ticket": "ESO-120",
+  "summary": "US-SUF-06 — cannot-judge không tự thành permitted; đi tiếp phải bypassed + người + hạn",
+  "domain": "eso/core",
+  "spec": "sdlc/01.agent-manifests/01.domains/eso-core.spec.md",
+  "invariants": [
+    "INV-ESO-02: cannot-judge NEVER becomes permitted automatically",
+    "BIP-4_6: bypass requires both owner (by) and deadline (expires_at)",
+    "AC-SUF-06-02: missing or empty by -> reject with BYPASS_NO_OWNER, 0 tasks run",
+    "AC-SUF-06-03: missing or empty expires_at -> reject with BYPASS_NO_EXPIRY, 0 tasks run",
+    "AC-SUF-06-04: past expiration deadline -> mode reverts to ask, never permitted",
+    "AC-SUF-06-05: exact clock match now == expires_at -> considered expired immediately (>= convention)",
+    "AC-SUF-06-06: duplicate bypass when first is still active is rejected, preserves original by and expires_at",
+    "BR-06: read-time calculation of effective mode, no mutation of immutable turn record"
+  ],
+  "slices": [
+    {
+      "slice_id": "S1",
+      "name": "Backend Implementation & Unit Tests",
+      "allowed_files": [
+        "eso/core/src/bypass.mjs",
+        "eso/core/src/index.mjs",
+        "eso/core/test/core.test.mjs"
+      ],
+      "deliverables": [
+        "Enhance applyOperatorBypass to reject missing by with BYPASS_NO_OWNER",
+        "Enhance applyOperatorBypass to reject missing expires_at with BYPASS_NO_EXPIRY",
+        "Enforce AC-SUF-06-06: reject second bypass if existing bypass is still active, keeping first",
+        "Implement getEffectiveMode(verdict, now) and evaluateEffectiveVerdict(verdict, now) with >= convention (AC-SUF-06-05) reverting to ask (AC-SUF-06-04)",
+        "Add unit test suite in eso/core/test/core.test.mjs covering all 6 ACs"
+      ]
+    },
+    {
+      "slice_id": "S2",
+      "name": "QC Test Scenarios",
+      "allowed_files": [
+        "qc/eso-core-suf-06.test.mjs"
+      ],
+      "deliverables": [
+        "SCN-SUF-22..25, 36..37 covering AC-SUF-06-01..06 with simulated fake clocks (T-1, T, T+1)"
+      ]
+    }
+  ],
+  "verify_command": "bun test qc/eso-core-*"
+}

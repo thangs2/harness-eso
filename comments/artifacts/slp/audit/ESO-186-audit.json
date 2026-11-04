@@ -1,0 +1,37 @@
+{
+  "ticket": "ESO-186",
+  "verdict": "AUDIT_PASS",
+  "score": 100,
+  "breakdown": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_completeness": 25,
+    "boundary_discipline": 15
+  },
+  "critical": [],
+  "major": [],
+  "minor": [],
+  "findings": [],
+  "ac_coverage": {
+    "AC-IAM-03-01": "PASS",
+    "AC-IAM-03-02": "PASS",
+    "AC-IAM-03-03": "PASS",
+    "AC-IAM-03-04": "PASS",
+    "AC-IAM-03-05": "PASS",
+    "AC-IAM-03-06": "PASS",
+    "AC-IAM-03-07": "PASS"
+  },
+  "invariants_checked": {
+    "DM-POLICY": "PASS",
+    "DM-ATTRIBUTE-DEF": "PASS",
+    "B1_fail_closed": "PASS",
+    "B2_trusted_records_unwritable": "PASS",
+    "A1_single_source_of_truth": "PASS"
+  },
+  "slices_evaluated": {
+    "S1": "PASS",
+    "S2": "PASS",
+    "disjoint_check": "PASS"
+  },
+  "summary": "Ticket ESO-186 (US-IAM-03) achieves full compliance across all criteria. S1 and S2 file sets are strictly disjoint. Zero forbidden edits outside eso/iam and qc. All 7 ACs have 100% test coverage matching exact error codes and combining logic. 0 CRITICAL, 0 MAJOR, 0 MINOR findings."
+}

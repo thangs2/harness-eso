@@ -1,0 +1,35 @@
+{
+  "ticket": "ESO-55",
+  "key": "ESO-55",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "summary": "ESO-55 (US-ARCH-03: Q2 Column Impact) implementation strictly satisfies all acceptance criteria (AC-ARCH-03-01 through AC-ARCH-03-05) and architectural invariants (INV-GR-01, INV-GR-02, INV-GR-03, BR-05). Traversal enforces reverse-dependency order (table -> entity -> dto -> app_service) with 0 forward relations, strictly validates relations against ALLOWED_RELATIONS_Q2 without fabrication, computes question completeness against threshold/floor refusing when coverage is sub-floor or missing, reports status 'unknown' with LOW_COVERAGE instead of 'absent' when coverage is below threshold, rejects candidate overreach with REFUSED OVERREACH, correctly returns empty impact sets for unread tables, detects dangling table references in entity claims/metadata with status unknown and DANGLING_TABLE, and strictly enforces project isolation. All changes remain strictly within allowed_files bounds for S1 (eso/graph/**) and S2 (qc/eso-graph-*.test.mjs). 0 critical, 0 minor findings.",
+  "ac_coverage": {
+    "AC-ARCH-03-01": "PASS",
+    "AC-ARCH-03-02": "PASS",
+    "AC-ARCH-03-03": "PASS",
+    "AC-ARCH-03-04": "PASS",
+    "AC-ARCH-03-05": "PASS"
+  },
+  "invariants": {
+    "INV-GR-01": "PASS",
+    "INV-GR-02": "PASS",
+    "INV-GR-03": "PASS",
+    "BR-05": "PASS"
+  },
+  "slices": {
+    "S1": "eso/graph/** (q2-impact.mjs, index.mjs, test/graph.test.mjs)",
+    "S2": "qc/eso-graph-*.test.mjs (qc/eso-graph-q2.test.mjs)"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "ticket": "ESO-176",
+  "summary": "US-IAM-01 — Thêm/bớt worker, và việc đang dở đi đâu",
+  "domain": "eso/iam",
+  "spec": "sdlc/06.analysis/03.acceptance-criteria/05.iam-us-01-workers.md",
+  "invariants": [
+    "DM-WORKER: Bảng worker (project, worker_id, role_name, harness_source, state)",
+    "D-33: Nghỉ không xoá dòng — state = retired, dòng vẫn còn",
+    "AC-IAM-01-01: Khai worker với role + project => worker ở active, giữ đúng 1 role",
+    "AC-IAM-01-02: Worker active giữ việc dở khi retired => việc dở thành risk OPEN có owner + review_by; worker thành retired",
+    "AC-IAM-01-03: Role không có trong catalog => từ chối với UNKNOWN_ROLE (0 worker được tạo)",
+    "AC-IAM-01-04: ED1 — Đội 0 worker => mở danh sách rỗng, không lỗi",
+    "AC-IAM-01-05: ED6 — Tạo worker trùng id => từ chối với DUPLICATE_ID (1 worker tồn tại)"
+  ],
+  "slices": [
+    {
+      "slice_id": "S1",
+      "name": "Worker Domain & Lifecycle Implementation",
+      "allowed_files": [
+        "eso/iam/src/schema.mjs",
+        "eso/iam/src/worker.mjs",
+        "eso/iam/src/index.mjs",
+        "eso/iam/test/iam.test.mjs"
+      ],
+      "deliverables": [
+        "Implement worker schema DDL (SQLite & Postgres compatible) with closed states (declared, active, paused, retired)",
+        "Implement createWorker with role verification (UNKNOWN_ROLE), duplicate check (DUPLICATE_ID), and default state active",
+        "Implement retireWorker routing pending work to OPEN risk entries and updating state to retired without deleting row",
+        "Implement listWorkers supporting empty team without error",
+        "Unit test suite in eso/iam/test/iam.test.mjs covering AC-IAM-01-01..05"
+      ]
+    },
+    {
+      "slice_id": "S2",
+      "name": "QC Test Scenarios",
+      "allowed_files": [
+        "qc/eso-iam-worker.test.mjs",
+        "qc/eso-iam-retire.test.mjs",
+        "qc/eso-iam-role-unknown.test.mjs",
+        "qc/eso-iam-empty-team.test.mjs",
+        "qc/eso-iam-duplicate-id.test.mjs"
+      ],
+      "deliverables": [
+        "SCN-IAM-01..03, 34, 35 covering AC-IAM-01-01..05"
+      ]
+    }
+  ],
+  "verify_command": "bun test qc/eso-iam-*"
+}

@@ -1,0 +1,35 @@
+{
+  "ticket": "ESO-50",
+  "key": "ESO-50",
+  "score": 100,
+  "passed": true,
+  "verdict": "AUDIT_PASS",
+  "critical": [],
+  "critical_findings": [],
+  "findings": [],
+  "minor_findings": [],
+  "summary": "ESO-50 implementation strictly satisfies all acceptance criteria (AC-ARCH-02-01 through AC-ARCH-02-05) and architectural invariants (INV-GR-01, INV-GR-02, INV-GR-03, BR-05). Traversal enforces BFS depth <= 2, pure graph relationships without fabrication, per-question completeness with threshold >= floor validation, refusal on sub-floor/missing coverage, safe empty set handling for isolated symbols, and fanout capping. All modifications remain within the allowed_files bounds for S1 and S2. 0 critical, 0 minor findings.",
+  "ac_coverage": {
+    "AC-ARCH-02-01": "PASS",
+    "AC-ARCH-02-02": "PASS",
+    "AC-ARCH-02-03": "PASS",
+    "AC-ARCH-02-04": "PASS",
+    "AC-ARCH-02-05": "PASS"
+  },
+  "invariants": {
+    "INV-GR-01": "PASS",
+    "INV-GR-02": "PASS",
+    "INV-GR-03": "PASS",
+    "BR-05": "PASS"
+  },
+  "slices": {
+    "S1": "eso/graph/** (q1-readset.mjs, index.mjs, test/graph.test.mjs)",
+    "S2": "qc/eso-graph-*.test.mjs (qc/eso-graph-q1.test.mjs)"
+  },
+  "rubric": {
+    "deterministic_green": 30,
+    "invariants": 30,
+    "ac_coverage": 25,
+    "slice_bounds": 15
+  }
+}
