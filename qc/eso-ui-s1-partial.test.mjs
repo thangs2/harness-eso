@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderS1Page } from '../eso/control-plane/src/page/s1.mjs';
+import { renderS1Page } from '../eso/control-plane/src/modules/s1/application/s1.presenter.ts';
 
 test('AC-UI-01-05 / ED5: S1 partial turn displays warning badge with missing count on exact row', () => {
     const turns = [

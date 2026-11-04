@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderS1Page } from '../eso/control-plane/src/page/s1.mjs';
+import { renderS1Page } from '../eso/control-plane/src/modules/s1/application/s1.presenter.ts';
 
 test('AC-UI-01-07: S1 renders list of 3 turns sorted newest first with work, level, missing count', () => {
     const turns = [

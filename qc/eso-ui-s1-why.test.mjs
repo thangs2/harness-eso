@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderS1Page } from '../eso/control-plane/src/page/s1.mjs';
+import { renderS1Page } from '../eso/control-plane/src/modules/s1/application/s1.presenter.ts';
 
 test('AC-UI-01-08: S1 row provides WHY action button with exact turn_id linking to S2', () => {
     const turns = [

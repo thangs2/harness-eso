@@ -4,7 +4,7 @@ import { createDbAdapter } from '../eso/graph/src/db-adapter.mjs';
 import { createNestFastifyControlPlane } from '../eso/control-plane/dist/server.js';
 import { initSchema } from '../eso/graph/src/schema.mjs';
 
-import { initConfigSchema } from '../eso/control-plane/src/config-schema.mjs';
+import { initConfigSchema } from '../eso/control-plane/src/config-schema.ts';
 
 function createTestDb() {
     const db = createDbAdapter(':memory:');
@@ -40,7 +40,7 @@ test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite'
         assert.equal(unauthRes.status, 401);
 
         // 3. GET /config reads config with valid token
-        const { saveConfig } = await import('../eso/control-plane/src/config-store.mjs');
+        const { saveConfig } = await import('../eso/control-plane/src/config-store.ts');
         const savedInitial = saveConfig(db, {
             project: 'p1',
             config: { setting: 'initial' },

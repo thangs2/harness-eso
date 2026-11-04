@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderS1Page } from '../eso/control-plane/src/page/s1.mjs';
+import { renderS1Page } from '../eso/control-plane/src/modules/s1/application/s1.presenter.ts';
 
 test('AC-UI-01-03: S1 fetch failure reports error and provides RETRY action', () => {
     const page = renderS1Page({ project: 'p1', error: 'UI_FETCH_FAILED' });

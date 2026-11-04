@@ -2,10 +2,10 @@
   "name": "@mu/eso-control-plane",
   "version": "0.1.0",
   "type": "module",
-  "main": "src/index.mjs",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "test": "node --test test/*.test.mjs"
+    "test": "bun test test/"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
     acceptRisk,
     inspectRiskStatus,
-} from '../eso/control-plane/src/index.mjs';
+} from '../eso/control-plane/src/debt.ts';
 
 test('SCN-IAM-05-01 (AC-IAM-05-01 & AC-IAM-08-01): Open risk accepted with by + due appends event and recalculates status = accepted', () => {
     const risk = {
