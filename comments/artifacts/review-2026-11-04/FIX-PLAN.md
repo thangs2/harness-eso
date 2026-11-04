@@ -1,0 +1,229 @@
+---
+id: FIX-PLAN-2026-11-04
+type: fix-plan
+status: ACTIVE
+date: 2026-11-04
+for: Gemini (build role)
+scope: "22 ticket ESO-368…389 — batch bị QC REJECT"
+merge_block: "comments/artifacts/review-2026-11-04/MERGE_BLOCKED.md"
+---
+
+# FIX PLAN — batch ESO-368…389
+
+> **Đọc hết file này trước khi sửa một dòng.** Batch đã bị QC độc lập **REJECT**: 4 PASS · 9 PARTIAL · 9 FAIL.
+> Code đã được commit làm snapshot tại **`42711d0`**; cổng merge đỏ tại **`35457bd`**.
+> Merge bị chặn bởi `qc/merge-block.test.mjs` chừng nào `MERGE_BLOCKED.md` còn tồn tại.
+
+## 0. Luật cứng
+
+1. **Không thêm feature.** Chỉ sửa đúng 22 ticket trong file này.
+2. **Không `Done`.** Kết thúc bằng `Human In Review` + verify log + audit; QC độc lập sẽ chấm lại.
+3. **Không sửa test để pass.** Nếu test sai, sửa test theo AC và ghi lý do; cấm `equal`→`notEqual` không ràng buộc, cấm bỏ qua link, cấm nới timeout mù.
+4. **Không chạm x79.** Không chạy `scripts/eso-smoke-turn.mjs` với path thật. Mọi thử nghiệm trong `/tmp`.
+5. **Mỗi wave một commit** (hoặc một commit/ticket nếu nhỏ), header `type(scope): subject [ESO-xxx]`, thân ≤3 câu.
+6. **Bằng chứng:** mỗi ticket phải có `comments/artifacts/slp/verify/ESO-xxx-verify.log` chứa **command + exit code + output thật**; audit JSON phải có command, không chỉ prose.
+7. **Không xóa `MERGE_BLOCKED.md`** cho tới khi hết 10 critical + toàn bộ FAIL/PARTIAL dưới đây đã xanh.
+
+## 1. Thứ tự thực hiện
+
+### Wave A — chạy ngay (song song)
+| Ticket | Việc | Phụ thuộc |
+|---|---|---|
+| **ESO-368** | init profile: `UNKNOWN_CONSUMER`, chặn symlink escape | — |
+| **ESO-372** | DB adapter: readonly, named params, bigint | — |
+| **ESO-381** | PASS — chỉ cần verify log | — |
+| **ESO-373** | PASS — bổ sung log cho 12 ticket thiếu | — |
+| **ESO-376** | PASS — giữ | — |
+| **ESO-377** | flaky: timeout tường minh, bỏ `Promise.all` tranh chấp | — |
+| **ESO-385** | extractor kinds + completeness `total=0` | — |
+
+### Wave B — sau 368
+| Ticket | Việc | Phụ thuộc |
+|---|---|---|
+| **ESO-369** | PASS — verify log | 368 |
+| **ESO-374** | audit rubric: command + mã lỗi thật, re-audit 22 ticket | 373 |
+| **ESO-385** | (nếu chưa xong ở A) | — |
+
+### Wave C — sau 369
+| Ticket | Việc | Phụ thuộc |
+|---|---|---|
+| **ESO-370** | preview→save, `/health` 503 khi store hỏng | 369 |
+| **ESO-387** | key shape: bar vocabulary, role in-use | 369 |
+| **ESO-388** | SDLC init contract, idempotent, upgrade revert | 368, 369 |
+
+### Wave D — sau 372 + 385
+| Ticket | Việc | Phụ thuộc |
+|---|---|---|
+| **ESO-386** | Q4/Q5 lọc `project`, coverage không default 1.0 | 372, 385 |
+| **ESO-389** | ticket_pack: verify hash khi đọc, append-only thật | 369 |
+
+### Wave E — sau 370
+| Ticket | Việc | Phụ thuộc |
+|---|---|---|
+| **ESO-371** | hook thật, smoke qua hook, guard `rmSync` | 368, 370 |
+| **ESO-380** | route S1 trả HTML thật | 370 |
+| **ESO-375** | SCN runner: chạy file test thật, không tự đánh dấu | 370 |
+
+### Wave F — sau 371
+| Ticket | Việc | Phụ thuộc |
+|---|---|---|
+| **ESO-378** | dispatch: không execute ⇒ không báo side effect | 371 |
+| **ESO-384** | Q1: unknown ≠ absent | 372 |
+| **ESO-375** | execute 20 SCN thật | 371 |
+
+### Wave G — sau 378
+| Ticket | Việc | Phụ thuộc |
+|---|---|---|
+| **ESO-382** | pin được election đọc lại; audit đọc evidence store | 378 |
+| **ESO-383** | `SILENT_NONE` trên đường không-nguồn thật | 378 |
+| **ESO-379** | hoàn rubric + phục hồi test bị làm yếu | 374 |
+
+### Wave H — đóng batch
+- `bun run test` xanh **3 lần liên tiếp**.
+- Xóa `MERGE_BLOCKED.md` trong commit cuối.
+- QC lại độc lập; chỉ sau verdict mới chuyển `Human In Review`.
+
+## 2. Spec sửa từng ticket
+
+### ESO-368 — init profile (PARTIAL)
+- **Lỗi:** không có `UNKNOWN_CONSUMER`; `assertWithinConsumer` chỉ so chuỗi, symlink `.harness` thoát ra ngoài (`eso/cli/init-profile.mjs:7-13,98-101`).
+- **Sửa:** resolve `realpath` của consumer và của target trước khi so; nếu consumer không tồn tại/không có `harness.config.json`/không có trong registry ⇒ `UNKNOWN_CONSUMER`, exit 2, **0 file**.
+- **Verify:** `node eso/cli/cli.mjs init profile /tmp/khong-ton-tai --dry-run` → exit 2, 0 file; symlink `.harness` → `OUTSIDE_CONSUMER`; chạy 2 lần → `changed:false`.
+
+### ESO-369 — config store (PASS)
+- Giữ nguyên. Viết `ESO-369-verify.log` với `bun test qc/eso-cp-config-store.test.mjs` + exit code.
+
+### ESO-370 — control-plane HTTP (FAIL)
+- **Lỗi 1:** `POST /config/preview` trả hash của **config mới**, `saveConfig` so với hash **config hiện tại** ⇒ flow chuẩn luôn `STALE_VERSION` (`routes.mjs:75-120` vs `config-store.mjs:38-50`).
+- **Lỗi 2:** `/health` luôn 200 kể cả store hỏng.
+- **Sửa:** preview trả `{current_hash, preview_hash, diff}`; save nhận `current_hash` (không phải preview hash) và `preview_hash` để kiểm toàn vẹn; `/health` thử `SELECT 1` — lỗi ⇒ 503.
+- **Verify:** preview → save với `current_hash` → 200, version +1; hash cũ → 409 `STALE_VERSION`; store hỏng → `/health` 503.
+
+### ESO-371 — provision + smoke (FAIL)
+- **Lỗi:** `provision.sh --eso-v2` không ghi hook; smoke tự tạo `hook.mjs` stub rồi gọi thẳng `recordTurnEvidence`; `rmSync` không guard (`scripts/eso-smoke-turn.mjs:14-22,43-59`).
+- **Sửa:**
+  1. `provision.sh` ghi hook thật vào `.harness/hooks/turn.mjs` (gọi control-plane/recorder), và ghi entry vào config.
+  2. Smoke **gọi hook** với payload turn; hook mới là đường ghi evidence. Cấm import `recordTurnEvidence` trong smoke.
+  3. Guard path: chỉ chấp nhận path dưới `/tmp` hoặc consumer đã đăng ký; từ chối `..`, path tuyệt đối ngoài `/tmp`; không `rmSync` trước khi validate.
+  4. Giữ DB evidence lại để QC đọc (hoặc copy ra `comments/artifacts/slp/qc/`), đừng xóa ngay.
+- **Verify:** provision sandbox `/tmp/...` → hook file tồn tại và **không** do smoke tạo; smoke exit 0; evidence có `turn_id` do hook ghi; chạy `../x79` → từ chối, x79 nguyên vẹn.
+
+### ESO-372 — DB adapter (PARTIAL)
+- **Lỗi:** `{readonly:true}` bị bỏ qua trên node; named `:n` khác nhau node/bun; bigint làm tròn trên bun (`db-adapter.mjs:27-30`).
+- **Sửa:** mở read-only đúng cách trên `node:sqlite`; chuẩn hoá named params sang positional; trả bigint nhất quán.
+- **Verify:** cùng một test pass trên `node --test` và `bun test`; ghi read-only → throw; named param trả cùng row.
+
+### ESO-373 — verify backfill (PASS)
+- Giữ 32 log cũ; **bổ sung log cho 12 ticket thiếu**: 368, 369, 370, 372, 373, 374, 376, 377, 381, 384, 385, 386.
+
+### ESO-374 — audit rubric (PARTIAL)
+- **Lỗi:** 5 audit re-score chỉ có prose, 0 command; 2/5 nêu mã lỗi không tồn tại; 21/22 audit mới vẫn 100/0.
+- **Sửa:** rubric bắt buộc `commands[]` + `findings[]`; audit mới phải chạy lại 22 ticket, mỗi audit có ít nhất 1 negative case hoặc chứng minh không có.
+- **Verify:** `jq '.commands|length'` ≥1 cho mỗi audit; 0 mã lỗi bịa.
+
+### ESO-375 — SCN harness (FAIL)
+- **Lỗi:** tự đánh dấu 24 SCN `executed`; 24/24 file test được nêu tên không tồn tại; test ghi vào file tracked (`qc/scn-runner.test.mjs:351-381`).
+- **Sửa:** runner đọc cột `automated`, chạy **đúng file test đó**, chỉ ghi `executed` nếu file tồn tại và pass; ghi report vào `comments/artifacts/slp/qc/`, **không** sửa `sdlc/` trong test. Với 24 SCN chưa có file: tạo file thật hoặc để `planned`.
+- **Verify:** chạy runner → 0 SCN `executed` nếu file thiếu; registry không bị sửa bởi test; `git status` sạch sau test.
+
+### ESO-376 — CI (PASS)
+- Giữ; xác nhận 7 suite + 210 test trong `scripts/run-tests.mjs`.
+
+### ESO-377 — flaky hook (PARTIAL)
+- **Lỗi:** pass riêng 2.2–4.4s nhưng fail dưới tải vì cap 5s; `Promise.all` làm tranh chấp.
+- **Sửa:** chạy tuần tự hoặc `test(..., { timeout: 15000 })` tường minh; không tăng mù.
+- **Verify:** `bun run test` 3 lần liên tiếp xanh, kể cả khi chạy song song 2 suite khác.
+
+### ESO-378 — host dispatch (FAIL)
+- **Lỗi:** `dispatch` không có `execute` vẫn trả `executed:true`, `side_effect_applied:true` (`host-contract.mjs:105-140`).
+- **Sửa:** không có executor ⇒ `executed:false`, `side_effect:null`, `error:'NO_EXECUTOR'`; chỉ set `side_effect_applied:true` sau khi executor chạy xong.
+- **Verify:** `dispatch({type:'file_write'})` không execute → `executed:false`; có execute → true + history ghi kết quả thật.
+
+### ESO-379 — test constants / audit (FAIL)
+- **Lỗi:** `qc/links.test.mjs:47` bỏ qua link trong inline code; `qc/eso-core-host-ui.test.mjs` đổi `equal`→`notEqual` không ràng buộc; không có rubric mới.
+- **Sửa:** phục hồi scan inline code và sửa 2 link hỏng; test denied phải khẳng định **câu từ chối giống nhau cho not-found/no-permission** và **khác ST1 empty**; không chỉ `notEqual`.
+- **Verify:** `bun test qc/links.test.mjs qc/eso-core-host-ui.test.mjs` xanh; X1 bắt lại được link hỏng.
+
+### ESO-380 — S1 page (FAIL)
+- **Lỗi:** không có route `/s1` hay `text/html`; `renderS1Page` chỉ là hàm (`routes.mjs`).
+- **Sửa:** thêm `GET /s1?project=...` trả `text/html` từ `renderS1Page`, có auth; HTML chứa rows/actions như AC.
+- **Verify:** `curl -H "Authorization: Bearer ..." /s1?project=p1` → 200 `text/html`, chứa turn mới nhất; thiếu token → 401.
+
+### ESO-381 — UI frames (PASS)
+- Giữ; viết verify log 12 file AC §3.
+
+### ESO-382 — pin + audit (PARTIAL)
+- **Lỗi:** pin persist nhưng election không đọc lại (`election.mjs:52`); audit đọc `provider_audit`, không đọc `evidence_item` (`:415`).
+- **Sửa:** election đọc `capability_pin` từ store mỗi lần; audit join `evidence_item` kind=`election`.
+- **Verify:** ghi pin → restart process → election dùng pin; audit trả record từ evidence store.
+
+### ESO-383 — SILENT codes (PARTIAL)
+- **Lỗi:** `SILENT_NONE` chỉ khi caller truyền cờ (`election.mjs:203`).
+- **Sửa:** phát `SILENT_NONE` trên đường không có nguồn thật; `SILENT_SWITCH` khi đổi nhánh giữa turn có reason.
+- **Verify:** gọi không nguồn → `SILENT_NONE`; đổi nhánh không reason → `SILENT_SWITCH`.
+
+### ESO-384 — Q1 (FAIL)
+- **Lỗi:** symbol không tồn tại → `{status:'ready', readSet:[]}` (`q1-readset.mjs:169-182`).
+- **Sửa:** phân biệt `absent` (chứng minh bằng coverage) và `unknown` (không đủ dữ liệu); không start node + coverage không đủ ⇒ `unknown`, không `ready`.
+- **Verify:** symbol lạ → `unknown` + reason; symbol cô lập thật (coverage đủ) → `ready + []`.
+
+### ESO-385 — completeness/extractor (FAIL)
+- **Lỗi:** extractor trên path thật chỉ phát `file`; `total=0` cho class/method ⇒ coverage 1.0 (`completeness.mjs:74-84`).
+- **Sửa:** `total=0` ⇒ `coverage:null/unknown`, không 1.0; extractor phải phát class/method từ symbol thật hoặc khai báo kind không hỗ trợ; Q1 refuse khi coverage unknown.
+- **Verify:** graph file-only → Q1 `REFUSED/unknown`, không `ready`; graph có class/method → coverage hợp lý.
+
+### ESO-386 — Q4/Q5 (FAIL)
+- **Lỗi:** SQL thiếu `project` trong `WHERE`; coverage default 1.0 (`q4-permissions.mjs`, `q5-tenant.mjs`).
+- **Sửa:** thêm `project = ?` vào mọi query; `coverage` bắt buộc, không default 1.0; unknown → `unknowns[]`.
+- **Verify:** cùng endpoint ở 2 project → chỉ trả project được hỏi; coverage thiếu → unknown.
+
+### ESO-387 — key shape (PARTIAL)
+- **Lỗi:** bar `min_basis` dùng `BASIS_RANK {deterministic,heuristic,assumption}` vs `role.mjs {unverified,partial,full,strict}`; role-in-use so id với name (`team-tool-cfg.mjs:83`).
+- **Sửa:** một vocabulary duy nhất; so role theo `role_id` hoặc map name→id.
+- **Verify:** bar `strict` từ chối `unverified`; xoá role đang dùng (id lẫn name) → `ROLE_IN_USE`.
+
+### ESO-388 — SDLC init/upgrade (PARTIAL)
+- **Lỗi:** init nhận `consumerPath` ngoài contract; re-run vẫn `changed`; upgrade no-op; revert echo snapshot (`sdlc-config.mjs:270-289`).
+- **Sửa:** dùng contract hiện có; idempotent thật; upgrade ghi file; revert có handle file/db.
+- **Verify:** init 2 lần → lần 2 `changed:false`; upgrade → file đổi; revert → file về trước.
+
+### ESO-389 — ticket_pack (PARTIAL)
+- **Lỗi:** query path trả row đã sửa mà không `PACK_TAMPERED`; append-only không enforce (`ticket-pack.mjs:333-382,404-410`).
+- **Sửa:** verify hash khi đọc; storage chặn UPDATE/DELETE (trigger hoặc bảng immutable).
+- **Verify:** sửa row trực tiếp → đọc lên `PACK_TAMPERED`; UPDATE/DELETE → bị chặn.
+
+## 3. 10 critical — điều kiện gỡ merge
+
+Chỉ xóa `MERGE_BLOCKED.md` khi **tất cả** đã xanh:
+
+1. `scripts/eso-smoke-turn.mjs` — guard path, không `rmSync` trước validate.
+2. `scripts/eso-smoke-turn.mjs` — hook thật, không tự tạo stub/không gọi thẳng recorder.
+3. `q4-permissions.mjs` + `q5-tenant.mjs` — `project` trong mọi `WHERE`.
+4. `completeness.mjs` — `total=0` không còn 1.0.
+5. `q1-readset.mjs` — unknown ≠ absent.
+6. `routes.mjs` + `config-store.mjs` — preview→save chạy đúng.
+7. `host-contract.mjs` — không execute ⇒ không báo side effect.
+8. `routes.mjs` — có route S1 HTML.
+9. `qc/scn-runner.test.mjs` — không tự đánh dấu, không ghi file tracked.
+10. `qc/links.test.mjs` — phục hồi scan inline code.
+
+## 4. Đóng batch
+
+```bash
+bun run test            # phải xanh 3 lần liên tiếp
+bun test qc/merge-block.test.mjs   # xanh sau khi xóa marker
+git status              # sạch (trừ file pre-existing)
+```
+
+Sau đó:
+1. Commit cuối **xóa `MERGE_BLOCKED.md`** + toàn bộ fix.
+2. Ghi verify log + audit cho 22 ticket.
+3. Chuyển ticket về `Human In Review` **chỉ khi** có log + audit.
+4. Yêu cầu QC độc lập; không tự `Done`.
+
+## 5. Prompt gửi Gemini
+
+> Đọc `comments/artifacts/review-2026-11-04/FIX-PLAN.md` và làm theo đúng thứ tự Wave A→H.
+> Không sửa ngoài 22 ticket ESO-368…389. Không chạm x79. Không `Done`.
+> Mỗi wave: commit `type(scope): subject [ESO-xxx]`, viết verify log, cập nhật audit.
+> Kết thúc: `bun run test` xanh 3 lần, xóa `MERGE_BLOCKED.md` trong commit cuối, báo lại SHA để QC.
