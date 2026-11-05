@@ -32,3 +32,6 @@ __pycache__/
 # Machine-local MCP config (absolute paths, possibly credentials) — same rule as `.cursor/mcp.json`.
 .agents/mcp_config.json
 .claude/worktrees/
+
+# Generated FE preview bundle (local inspection only; not shipped)
+eso/ui/preview/
