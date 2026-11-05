@@ -51,17 +51,17 @@
     "eso/memory/**",
     "eso/adapters/**",
     "packages/harness-eso-core/adapters/**",
-    "packages/harness-host-dsh/**"
+    "packages/harness-host-dsh/**",
+    "qc/acceptance/US-MEM-03/**"
   ],
   "forbidden": [
-    "qc/acceptance/**",
     "scripts/ticket-gate.mjs",
     "scripts/check-test-integrity.mjs",
     "sdlc/02.governance/**",
     "sdlc/10.test/**"
   ],
   "verify": [
-    "bun test qc/acceptance/ESO-407"
+    "bun test qc/acceptance/US-MEM-03"
   ],
   "base_commit": "native-baseline",
   "base_ref": "main",

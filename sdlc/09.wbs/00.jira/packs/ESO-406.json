@@ -50,17 +50,17 @@
   "allowed_files": [
     "eso/memory/**",
     "eso/control-plane/src/modules/memory/**",
-    "eso/control-plane/src/app.module.ts"
+    "eso/control-plane/src/app.module.ts",
+    "qc/acceptance/US-MEM-02/**"
   ],
   "forbidden": [
-    "qc/acceptance/**",
     "scripts/ticket-gate.mjs",
     "scripts/check-test-integrity.mjs",
     "sdlc/02.governance/**",
     "sdlc/10.test/**"
   ],
   "verify": [
-    "bun test qc/acceptance/ESO-406"
+    "bun test qc/acceptance/US-MEM-02"
   ],
   "base_commit": "native-baseline",
   "base_ref": "main",

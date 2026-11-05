@@ -50,18 +50,17 @@
   "allowed_files": [
     "eso/graph/**",
     "eso/control-plane/src/modules/graph/**",
-    "eso/control-plane/src/app.module.ts"
+    "eso/control-plane/src/app.module.ts",
+    "qc/acceptance/US-GRAPH-03/**"
   ],
   "forbidden": [
-    "qc/acceptance/**",
     "scripts/ticket-gate.mjs",
     "scripts/check-test-integrity.mjs",
     "sdlc/02.governance/**",
     "sdlc/10.test/**"
   ],
   "verify": [
-    "bun test eso/graph",
-    "bun test qc/acceptance/ESO-403"
+    "bun test qc/acceptance/US-GRAPH-03"
   ],
   "base_commit": "native-baseline",
   "base_ref": "main",

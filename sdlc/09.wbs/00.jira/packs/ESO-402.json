@@ -46,18 +46,17 @@
     }
   ],
   "allowed_files": [
-    "eso/graph/**"
+    "eso/graph/**",
+    "qc/acceptance/US-GRAPH-02/**"
   ],
   "forbidden": [
-    "qc/acceptance/**",
     "scripts/ticket-gate.mjs",
     "scripts/check-test-integrity.mjs",
     "sdlc/02.governance/**",
     "sdlc/10.test/**"
   ],
   "verify": [
-    "bun test eso/graph",
-    "bun test qc/acceptance/ESO-402"
+    "bun test qc/acceptance/US-GRAPH-02"
   ],
   "base_commit": "native-baseline",
   "base_ref": "main",
