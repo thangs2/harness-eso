@@ -67,5 +67,5 @@
   "base_ref": "main",
   "owner": "graph",
   "allow_dependency": false,
-  "notes": "C# Roslyn extractor; no microservices; no synthetic edges. D-92/D-93: Postgres graph only; no SQLite; blocked by ESO-447; BIP READY-SPLIT."
+  "notes": "D-92/D-93: Postgres graph only; no SQLite. ESO-447 migrated code/test/demo; HIR. BIP READY."
 }
