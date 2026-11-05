@@ -63,7 +63,7 @@ Thiếu một phần ⇒ worker **hỏi lại**, **không đoán**. `plan` phát
 4. **Thứ tự gate** — build → verify PASS → `AUDIT_PASS` (**≥85**, **0 CRITICAL**) → `Human In Review`. QC **chỉ** khi operator yêu cầu.
 5. **Trần vòng lặp** — cùng một lỗi gốc **3** lần ⇒ dừng, liệt kê `OPEN`, escalate **lên S** (không lên agent khác).
 6. **Không tự chấm** — `verify`/`audit`/`qc` không sửa code; `build`/`fixbug` không tuyên bố PASS cuối.
-7. **Không `Done`, không commit/push/PR** trừ khi S yêu cầu. Không `In Progress` hộ ticket người khác.
+7. **Không `Done`, không commit/push/PR** trừ khi S yêu cầu. Không `In Progress` hộ ticket người khác. Sau mỗi child transition, rollup parent: child `In Progress` ⇒ parent `In Progress`; tất cả child `Human In Review`/`Done` ⇒ parent `Human In Review`; không auto `Done` (rule: `delivery.jira-agent-execution`).
 8. **Ticket nhỏ** — Lead được làm **inline** (không spawn) nhưng **vẫn** chạy verify **và** audit.
 9. **Trung thực khi thiếu** — codegraph/docgraph không có ⇒ nói ra + fallback `grep`/`read`; MCP Brain down ⇒ `BRAIN_UNAVAILABLE`,
    dừng. **Không** claim success.

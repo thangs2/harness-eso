@@ -94,6 +94,8 @@ Request cần sửa nhiều package hoặc nhiều tầng ⇒ chạy **SLP**, kh
 | 7 worker | `.cursor/agents/{scout,plan,build,verify,audit,fixbug,qc}-runtime.md` (Cursor) · `.agents/agents/` (Antigravity) |
 | Bằng chứng | `comments/artifacts/slp/{recon,plan,verify,audit}/` |
 
+**Jira parent-child rollup:** sau mỗi child transition, chạy `node scripts/jira-rollup.mjs <STORY-KEY>` — child `In Progress` ⇒ Story `In Progress`; tất cả child `Human In Review`/`Done` ⇒ Story `Human In Review`; **không auto `Done`**. Rule: [`delivery.jira-agent-execution`](.agents/rules/delivery.jira-agent-execution.md).
+
 **Bốn lớp:** **S** = người (duyệt plan · xử escalation · **ký `Done`** — không bao giờ là agent) · **L** = agent chat chính ·
 **P** = `scout` · `plan` · `build` (mỗi slice) · `fixbug` · **A** = `verify` · `audit` · `qc` (độc lập, không sửa code sản phẩm).
 `allowed_files` của 7 worker **rời nhau từng cặp** — kiểm bằng `qc/slp-conformance.test.mjs`.

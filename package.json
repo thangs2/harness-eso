@@ -25,7 +25,8 @@
     "dev:observatory": "bun run --filter @mu/harness-observatory dev",
     "observe:server": "node packages/harness-observe-server/src/server.mjs",
     "dev:observe": "./scripts/dev-observe.sh",
-    "gate": "node scripts/ticket-gate.mjs"
+    "gate": "node scripts/ticket-gate.mjs",
+    "jira:rollup": "node scripts/jira-rollup.mjs"
   },
   "dependencies": {
     "@mu/harness-decision": "workspace:*",
