@@ -27,7 +27,7 @@ const BASE_PROFILE = {
   protectedPaths: ['AGENTS.md', '.cursor/rules/', 'sdlc/'],
 };
 
-test('ESO-390: consumer profile create/list/get/update persists versions', async () => {
+test('Consumer profile: consumer profile create/list/get/update persists versions', async () => {
   const db = createDbAdapter(':memory:');
   const app = await createNestFastifyControlPlane({ db, authToken: TOKEN });
   await app.listen(0, '127.0.0.1');

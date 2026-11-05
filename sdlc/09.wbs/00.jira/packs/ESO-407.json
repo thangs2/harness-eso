@@ -1,0 +1,71 @@
+{
+  "ticket": "ESO-407",
+  "epic": "ESO-400",
+  "bip": {
+    "id": "BIP-9_3",
+    "file": "sdlc/09.wbs/01.packets/01.bip/52.memory-migrate.md"
+  },
+  "technical": false,
+  "inv": [],
+  "ac": [
+    "AC-MEM-03-01",
+    "AC-MEM-03-02",
+    "AC-MEM-03-03",
+    "AC-MEM-03-04",
+    "AC-MEM-03-05"
+  ],
+  "scn": [
+    "SCN-MEM-11",
+    "SCN-MEM-12",
+    "SCN-MEM-13",
+    "SCN-MEM-14",
+    "SCN-MEM-15"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/25.memory-migrate.tdd-unit.md",
+      "test_file": "qc/acceptance/US-MEM-03/AC-MEM-03-01.test.mjs",
+      "test_name": "SCN-MEM-11 · AC-MEM-03-01 — migrate đủ 12 trường",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-11`: **actual** map thiếu `concepts`/`sessionIds` ⇒ chiều recall và trace mất âm thầm · **expected** đủ 12 trường + `migrated-from`/`migrated-at`, đọc lại như record native"
+    },
+    {
+      "packet": "sdlc/10.test/26.memory-migrate.tdd-impl.md",
+      "test_file": "qc/acceptance/US-MEM-03/AC-MEM-03-02.test.mjs",
+      "test_name": "SCN-MEM-12 · AC-MEM-03-02 — save host A, đọc host B",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-12`: **actual** mỗi host một file store ⇒ test xanh trên **hai** store khác nhau · **expected** **cùng một** record qua hai host"
+    },
+    {
+      "packet": "sdlc/10.test/27.memory-migrate.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-MEM-03/AC-MEM-03-03.test.mjs",
+      "test_name": "SCN-MEM-13 · AC-MEM-03-03 — adapter copy per-host ⇒ PER_HOST_COPY",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-13`: **actual** chấp nhận `source.kind='cursor'` ⇒ *\"portable\"* chỉ đúng trên giấy · **expected** `PER_HOST_COPY`, không ghi"
+    },
+    {
+      "packet": "sdlc/10.test/28.memory-migrate.tdd-qc.md",
+      "test_file": "qc/acceptance/US-MEM-03/AC-MEM-03-04.test.mjs",
+      "test_name": "SCN-MEM-14 · AC-MEM-03-04 — merge hai nguồn xung đột",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-14`: **actual** last-write-wins ⇒ mất một nguồn, không trace được · **expected** giữ **provenance** và **conflict**"
+    }
+  ],
+  "allowed_files": [
+    "eso/memory/**",
+    "eso/adapters/**",
+    "packages/harness-eso-core/adapters/**",
+    "packages/harness-host-dsh/**"
+  ],
+  "forbidden": [
+    "qc/acceptance/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test qc/acceptance/ESO-407"
+  ],
+  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_ref": "main",
+  "owner": "memory",
+  "allow_dependency": false,
+  "notes": "Migrate agentmemory + host adapters; one SoT."
+}

@@ -1,0 +1,71 @@
+{
+  "ticket": "ESO-403",
+  "epic": "ESO-12",
+  "bip": {
+    "id": "BIP-2_7",
+    "file": "sdlc/09.wbs/01.packets/01.bip/47.graph-store-api.md"
+  },
+  "technical": false,
+  "inv": [],
+  "ac": [
+    "AC-GRAPH-03-01",
+    "AC-GRAPH-03-02",
+    "AC-GRAPH-03-03",
+    "AC-GRAPH-03-04",
+    "AC-GRAPH-03-05"
+  ],
+  "scn": [
+    "SCN-GRAPH-11",
+    "SCN-GRAPH-12",
+    "SCN-GRAPH-13",
+    "SCN-GRAPH-14",
+    "SCN-GRAPH-15"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/09.graph-store-api.tdd-unit.md",
+      "test_file": "qc/acceptance/US-GRAPH-03/AC-GRAPH-03-01.test.mjs",
+      "test_name": "SCN-GRAPH-11 · AC-GRAPH-03-01 — completeness theo từng câu",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-11`: **actual** một `completeness` cho mọi câu ⇒ Q2 xanh trên `entity` phủ 30% · **expected** `completeness` **của chính câu** Q1…Q5"
+    },
+    {
+      "packet": "sdlc/10.test/10.graph-store-api.tdd-impl.md",
+      "test_file": "qc/acceptance/US-GRAPH-03/AC-GRAPH-03-02.test.mjs",
+      "test_name": "SCN-GRAPH-12 · AC-GRAPH-03-02 — rebuild cùng build_id",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-12`: **actual** `INSERT` không khoá ⇒ số dòng **gấp đôi** · **expected** cùng số node/edge, không duplicate"
+    },
+    {
+      "packet": "sdlc/10.test/11.graph-store-api.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-GRAPH-03/AC-GRAPH-03-03.test.mjs",
+      "test_name": "SCN-GRAPH-13 · AC-GRAPH-03-03 — query chéo project ⇒ OUT_OF_SCOPE",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-13`: **actual** `project` lấy từ body ⇒ rò dòng của B · **expected** từ chối/0 dòng + `OUT_OF_SCOPE`"
+    },
+    {
+      "packet": "sdlc/10.test/12.graph-store-api.tdd-qc.md",
+      "test_file": "qc/acceptance/US-GRAPH-03/AC-GRAPH-03-04.test.mjs",
+      "test_name": "SCN-GRAPH-14 · AC-GRAPH-03-04 — coverage dưới floor ⇒ unknown",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-14`: **actual** `coverage = 0.3` vẫn trả `sufficient` · **expected** `unknown` + `unknowns[]` + `LOW_COVERAGE`"
+    }
+  ],
+  "allowed_files": [
+    "eso/graph/**",
+    "eso/control-plane/src/modules/graph/**",
+    "eso/control-plane/src/app.module.ts"
+  ],
+  "forbidden": [
+    "qc/acceptance/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test eso/graph",
+    "bun test qc/acceptance/ESO-403"
+  ],
+  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_ref": "main",
+  "owner": "graph",
+  "allow_dependency": false,
+  "notes": "Graph store/index/API; D-73; off-path."
+}

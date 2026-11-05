@@ -1,0 +1,70 @@
+{
+  "ticket": "ESO-406",
+  "epic": "ESO-400",
+  "bip": {
+    "id": "BIP-9_2",
+    "file": "sdlc/09.wbs/01.packets/01.bip/51.memory-store.md"
+  },
+  "technical": false,
+  "inv": [],
+  "ac": [
+    "AC-MEM-02-01",
+    "AC-MEM-02-02",
+    "AC-MEM-02-03",
+    "AC-MEM-02-04",
+    "AC-MEM-02-05"
+  ],
+  "scn": [
+    "SCN-MEM-06",
+    "SCN-MEM-07",
+    "SCN-MEM-08",
+    "SCN-MEM-09",
+    "SCN-MEM-10"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/21.memory-store.tdd-unit.md",
+      "test_file": "qc/acceptance/US-MEM-02/AC-MEM-02-01.test.mjs",
+      "test_name": "SCN-MEM-06 · AC-MEM-02-01 — save rồi fetch khớp",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-06`: **actual** `fetch` đọc cache trong bộ nhớ ⇒ restart là mất, provenance không kiểm được · **expected** nội dung **và** `provenance` khớp sau khi đọc lại (kể cả sau restart)"
+    },
+    {
+      "packet": "sdlc/10.test/22.memory-store.tdd-impl.md",
+      "test_file": "qc/acceptance/US-MEM-02/AC-MEM-02-02.test.mjs",
+      "test_name": "SCN-MEM-07 · AC-MEM-02-02 — consolidate ⇒ promote long-term",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-07`: **actual** `UPDATE tier='long'` ⇒ `APPEND_ONLY` chặn, hoặc lịch sử tier mất · **expected** `tier` đổi **và được ghi lại**, `strength`/decay đúng"
+    },
+    {
+      "packet": "sdlc/10.test/23.memory-store.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-MEM-02/AC-MEM-02-03.test.mjs",
+      "test_name": "SCN-MEM-08 · AC-MEM-02-03 — hit/weak/miss phân biệt",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-08`: **actual** `top-k` trả mảng rỗng cho cả *\"không có\"* và *\"yếu\"* ⇒ `unknown = absent` · **expected** **ba** trạng thái phân biệt"
+    },
+    {
+      "packet": "sdlc/10.test/24.memory-store.tdd-qc.md",
+      "test_file": "qc/acceptance/US-MEM-02/AC-MEM-02-04.test.mjs",
+      "test_name": "SCN-MEM-09 · AC-MEM-02-04 — traversal trả fact + đường đi",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-09`: **actual** trả fact rời, `path` rỗng · **expected** fact **và** path/edge"
+    }
+  ],
+  "allowed_files": [
+    "eso/memory/**",
+    "eso/control-plane/src/modules/memory/**",
+    "eso/control-plane/src/app.module.ts"
+  ],
+  "forbidden": [
+    "qc/acceptance/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test qc/acceptance/ESO-406"
+  ],
+  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_ref": "main",
+  "owner": "memory",
+  "allow_dependency": false,
+  "notes": "Native memory store/consolidation; save/fetch; hit/weak/miss."
+}

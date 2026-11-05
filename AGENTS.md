@@ -83,6 +83,8 @@ Agent **được phép và nên** dùng các MCP / tool sau khi tra cứu code, 
 
 ## SLP — chia việc khi task chạm >1 tầng
 
+**Build enforcement law:** [`sdlc/02.governance/01.standard/09.build-enforcement.md`](sdlc/02.governance/01.standard/09.build-enforcement.md) — pack đủ 4 phần · test-first · gate máy · verify/audit độc lập · chỉ người ký `Done`. Không có ngoại lệ cho agent.
+
 Request cần sửa nhiều package hoặc nhiều tầng ⇒ chạy **SLP**, không tự làm tuần tự.
 
 | Thành phần | Ở đâu |

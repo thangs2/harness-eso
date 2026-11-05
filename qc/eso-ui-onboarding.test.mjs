@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { OnboardingStore } from '../eso/ui/apps/control-plane/src/app/features/onboarding/state/onboarding.store.ts';
 import { DEFAULT_PROFILE } from '../eso/ui/apps/control-plane/src/app/features/onboarding/models/onboarding.model.ts';
 
-test('ESO-390 UI: profile-first steps validate profile, consumer and configuration', () => {
+test('UI onboarding: profile-first steps validate profile, consumer and configuration', () => {
   const store = new OnboardingStore();
   assert.equal(store.step(), 1);
   assert.deepEqual(store.profile().zones.map((z) => z.name), ['human', 'agent']);
@@ -28,7 +28,7 @@ test('ESO-390 UI: profile-first steps validate profile, consumer and configurati
   assert.equal(store.step(), 4);
 });
 
-test('ESO-390 UI: profile recipe drives evidence sources', () => {
+test('UI onboarding: profile recipe drives evidence sources', () => {
   const store = new OnboardingStore();
   assert.equal(store.profile().profile.recipe, 'pro');
   store.selectRecipe('lite');
@@ -41,7 +41,7 @@ test('ESO-390 UI: profile recipe drives evidence sources', () => {
   assert.equal(store.profile().integration.consent, false);
 });
 
-test('ESO-390 UI: roles, gates, sources and protected paths are editable data', () => {
+test('UI onboarding: roles, gates, sources and protected paths are editable data', () => {
   const store = new OnboardingStore();
   const roleCount = store.profile().team.roles.length;
   store.toggleRole('operator');

@@ -1,0 +1,72 @@
+{
+  "ticket": "ESO-401",
+  "epic": "ESO-12",
+  "bip": {
+    "id": "BIP-2_9",
+    "file": "sdlc/09.wbs/01.packets/01.bip/49.roslyn-csharp.md"
+  },
+  "technical": false,
+  "inv": [],
+  "ac": [
+    "AC-GRAPH-01-01",
+    "AC-GRAPH-01-02",
+    "AC-GRAPH-01-03",
+    "AC-GRAPH-01-04",
+    "AC-GRAPH-01-05",
+    "AC-GRAPH-01-06"
+  ],
+  "scn": [
+    "SCN-GRAPH-01",
+    "SCN-GRAPH-02",
+    "SCN-GRAPH-03",
+    "SCN-GRAPH-04",
+    "SCN-GRAPH-05",
+    "SCN-GRAPH-06"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/01.graph-roslyn.tdd-unit.md",
+      "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-01.test.mjs",
+      "test_name": "SCN-GRAPH-01 · AC-GRAPH-01-01 — node/edge canonical + logical_id",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-01`: **actual** `logical_id` sinh từ số thứ tự ⇒ hai lần chạy hai graph khác nhau, `source_claim` rỗng · **expected** cùng `logical_id` sau hai lần chạy, mỗi dòng có `source_claim`"
+    },
+    {
+      "packet": "sdlc/10.test/02.graph-roslyn.tdd-impl.md",
+      "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-02.test.mjs",
+      "test_name": "SCN-GRAPH-02 · AC-GRAPH-01-02 — parse lỗi ⇒ failed_file + unknown",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-02`: **actual** `catch` rồi `continue` ⇒ `failed_files = []`, coverage **1.0**, câu trả lời `sufficient` · **expected** `failed_files = ['Broken.cs']`, mẫu số coverage **2/3**, câu trả lời `unknown`"
+    },
+    {
+      "packet": "sdlc/10.test/03.graph-roslyn.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-03.test.mjs",
+      "test_name": "SCN-GRAPH-03 · AC-GRAPH-01-03 — cùng build_id ⇒ id ổn định",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-03`: **actual** `INSERT` không `ON CONFLICT` ⇒ số dòng **gấp đôi** · **expected** số node/edge **không đổi** sau lần chạy thứ hai"
+    },
+    {
+      "packet": "sdlc/10.test/04.graph-roslyn.tdd-qc.md",
+      "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-04.test.mjs",
+      "test_name": "SCN-GRAPH-04 · AC-GRAPH-01-04 — gọi trên turn ⇒ HEAVY_ON_TURN",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-04`: **actual** chạy đồng bộ ⇒ trả kết quả, ghi dòng, turn **chờ** build · **expected** `HEAVY_ON_TURN`, **0** dòng ghi, việc xếp off-path"
+    }
+  ],
+  "allowed_files": [
+    "eso/graph/**",
+    "packages/harness-eso-core/**"
+  ],
+  "forbidden": [
+    "qc/acceptance/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test eso/graph",
+    "bun test qc/acceptance/ESO-401"
+  ],
+  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_ref": "main",
+  "owner": "graph",
+  "allow_dependency": false,
+  "notes": "C# Roslyn extractor; no microservices; no synthetic edges."
+}

@@ -1,0 +1,35 @@
+{
+  "ticket": "ESO-401",
+  "epic": "ESO-12",
+  "bip": {
+    "id": "BIP-2_9",
+    "file": "sdlc/09.wbs/01.packets/01.bip/49.roslyn-csharp.md"
+  },
+  "technical": false,
+  "inv": ["INV-GR-01", "INV-GR-02", "INV-GR-03", "BR-05"],
+  "ac": ["AC-GRAPH-01-01", "AC-GRAPH-01-02"],
+  "scn": ["SCN-GRAPH-01", "SCN-GRAPH-02"],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/01.graph-roslyn.tdd-unit.md",
+      "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-01.test.mjs",
+      "test_name": "SCN-GRAPH-01 · AC-GRAPH-01-01 — node/edge canonical + logical_id",
+      "expected_failure": "<nguyên văn ô `phải thấy` của dòng `R2` trong packet>"
+    }
+  ],
+  "allowed_files": ["eso/graph/**", "packages/harness-eso-core/**"],
+  "forbidden": [
+    "qc/acceptance/**",
+    "sdlc/10.test/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**"
+  ],
+  "verify": [
+    "bun test eso/graph",
+    "bun test qc/acceptance/ESO-401"
+  ],
+  "base_commit": "<sha-at-ticket-start>",
+  "owner": "graph",
+  "notes": "Monolith baplatform only; microservices out of scope (D-90)."
+}

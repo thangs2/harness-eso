@@ -1,0 +1,70 @@
+{
+  "ticket": "ESO-405",
+  "epic": "ESO-400",
+  "bip": {
+    "id": "BIP-9_1",
+    "file": "sdlc/09.wbs/01.packets/01.bip/50.memory-contract.md"
+  },
+  "technical": false,
+  "inv": [],
+  "ac": [
+    "AC-MEM-01-01",
+    "AC-MEM-01-02",
+    "AC-MEM-01-03",
+    "AC-MEM-01-04",
+    "AC-MEM-01-05"
+  ],
+  "scn": [
+    "SCN-MEM-01",
+    "SCN-MEM-02",
+    "SCN-MEM-03",
+    "SCN-MEM-04",
+    "SCN-MEM-05"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/17.memory-contract.tdd-unit.md",
+      "test_file": "qc/acceptance/US-MEM-01/AC-MEM-01-01.test.mjs",
+      "test_name": "SCN-MEM-01 · AC-MEM-01-01 — đủ 12 trường + provenance",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-01`: **actual** `concepts`/`files` gộp vào blob ⇒ đọc lại thiếu, không lọc được · **expected** đọc lại đủ 12 chiều + `provenance` + `topology` + `scope`"
+    },
+    {
+      "packet": "sdlc/10.test/18.memory-contract.tdd-impl.md",
+      "test_file": "qc/acceptance/US-MEM-01/AC-MEM-01-02.test.mjs",
+      "test_name": "SCN-MEM-02 · AC-MEM-01-02 — record sai ⇒ INVALID_RECORD",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-02`: **actual** thiếu `CHECK` ⇒ `type` tự do lọt vào, record được ghi · **expected** `INVALID_RECORD`, **0** record ghi"
+    },
+    {
+      "packet": "sdlc/10.test/19.memory-contract.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-MEM-01/AC-MEM-01-03.test.mjs",
+      "test_name": "SCN-MEM-03 · AC-MEM-01-03 — memory project B không lộ",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-03`: **actual** RLS bật nhưng thiếu `FORCE` ⇒ test dưới role migration xanh giả · **expected** **0** dòng của B khi đọc từ A"
+    },
+    {
+      "packet": "sdlc/10.test/20.memory-contract.tdd-qc.md",
+      "test_file": "qc/acceptance/US-MEM-01/AC-MEM-01-04.test.mjs",
+      "test_name": "SCN-MEM-04 · AC-MEM-01-04 — save bản sửa ⇒ version mới",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-04`: **actual** `UPDATE` tại chỗ ⇒ lịch sử mất, `isLatest` không kiểm được · **expected** version mới + bản cũ **còn** + `isLatest` đúng **một** dòng"
+    }
+  ],
+  "allowed_files": [
+    "eso/memory/**",
+    "eso/control-plane/src/modules/memory/**",
+    "eso/control-plane/src/app.module.ts"
+  ],
+  "forbidden": [
+    "qc/acceptance/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test qc/acceptance/ESO-405"
+  ],
+  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_ref": "main",
+  "owner": "memory",
+  "allow_dependency": false,
+  "notes": "Memory contract/schema; append-only; project isolation."
+}

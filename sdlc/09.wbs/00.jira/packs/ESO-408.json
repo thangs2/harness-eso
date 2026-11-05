@@ -1,0 +1,66 @@
+{
+  "ticket": "ESO-408",
+  "epic": "ESO-400",
+  "bip": {
+    "id": "BIP-9_4",
+    "file": "sdlc/09.wbs/01.packets/01.bip/53.memory-acceptance.md"
+  },
+  "technical": false,
+  "inv": [],
+  "ac": [
+    "AC-MEM-04-01",
+    "AC-MEM-04-02",
+    "AC-MEM-04-03",
+    "AC-MEM-04-04"
+  ],
+  "scn": [
+    "SCN-MEM-16",
+    "SCN-MEM-17",
+    "SCN-MEM-18",
+    "SCN-MEM-19"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/29.memory-acceptance.tdd-unit.md",
+      "test_file": "qc/acceptance/US-MEM-04/AC-MEM-04-01.test.mjs",
+      "test_name": "SCN-MEM-16 · AC-MEM-04-01 — fact thật + đường đi + số đo",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-16`: **actual** report ghi *\"đạt\"* không kèm số ⇒ không phân biệt được với bịa · **expected** recall/traversal trả đúng fact **và** path, report có số đo"
+    },
+    {
+      "packet": "sdlc/10.test/30.memory-acceptance.tdd-impl.md",
+      "test_file": "qc/acceptance/US-MEM-04/AC-MEM-04-02.test.mjs",
+      "test_name": "SCN-MEM-17 · AC-MEM-04-02 — hit/weak/miss trên store thật",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-17`: **actual** `weak` bị gộp vào `miss` ⇒ nói *\"không có\"* khi thực ra *\"có nhưng yếu\"* · **expected** **ba** trạng thái đúng"
+    },
+    {
+      "packet": "sdlc/10.test/31.memory-acceptance.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-MEM-04/AC-MEM-04-03.test.mjs",
+      "test_name": "SCN-MEM-18 · AC-MEM-04-03 — đổi host ⇒ cùng memory",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-18`: **actual** hai host đọc hai store ⇒ *\"portable\"* chỉ đúng trên giấy · **expected** **cùng** memory (same SoT) sau khi đổi host"
+    },
+    {
+      "packet": "sdlc/10.test/32.memory-acceptance.tdd-qc.md",
+      "test_file": "qc/acceptance/US-MEM-04/AC-MEM-04-04.test.mjs",
+      "test_name": "SCN-MEM-19 · AC-MEM-04-04 — synthetic ⇒ SYNTHETIC_ACCEPTANCE",
+      "expected_failure": "`AssertionError` ở assert của `SCN-MEM-19`: **actual** chạy trên fixture ⇒ xanh giả (`G-02`) · **expected** **fail** + `SYNTHETIC_ACCEPTANCE`"
+    }
+  ],
+  "allowed_files": [
+    "sdlc/11.delivery/**"
+  ],
+  "forbidden": [
+    "qc/acceptance/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test qc/acceptance/ESO-408"
+  ],
+  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_ref": "main",
+  "owner": "memory",
+  "allow_dependency": false,
+  "notes": "Portable memory acceptance; report only."
+}

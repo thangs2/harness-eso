@@ -43,6 +43,19 @@ Thân bài:
 | [`US-IAM-06`](10.config.md) | đổi config: **preview** · một lần · **revert** | A-01 | UC-05 | P3 | ✅ 4 AC |
 | [`US-CFG-01`](11.config-page.md) | **một page config**: SDLC · đội · tool · project | A-01 | UC-05 | P3 | ✅ 4 AC |
 | [`US-SDLC-01`](12.setup.md) | **thiết lập SDLC** vào project: init · check · upgrade | A-01 | UC-05 | P3 | ✅ 5 AC |
+### Native harness (2026-11-05)
+
+| ID | Story | Actor | UC | P | AC |
+|---|---|---|---|---|---|
+| [`US-GRAPH-01`](55.graph-roslyn.md) | C# Roslyn extractor cho monolith | A-01 | UC-12 | P2 | ✅ 6 AC |
+| [`US-GRAPH-02`](56.graph-docs.md) | Docs graph specific-relative | A-01 | UC-12 | P2 | ✅ 4 AC |
+| [`US-GRAPH-03`](57.graph-store-api.md) | Graph store + indexing + API | A-01 | UC-12 | P2 | ✅ 5 AC |
+| [`US-GRAPH-04`](58.graph-acceptance.md) | Graph acceptance trên baplatform | A-01 | UC-12 | P2 | ✅ 3 AC |
+| [`US-MEM-01`](59.memory-contract.md) | Memory contract + schema | A-01 | UC-05 | P3 | ✅ 5 AC |
+| [`US-MEM-02`](60.memory-store.md) | Native memory store + consolidation | A-01 | UC-05 | P3 | ✅ 5 AC |
+| [`US-MEM-03`](61.memory-migrate.md) | Migrate agentmemory + host adapters | A-01 | UC-05 | P3 | ✅ 5 AC |
+| [`US-MEM-04`](62.memory-acceptance.md) | Portable memory acceptance | A-01 | UC-05 | P3 | ✅ 4 AC |
+
 
 ⬜ = AC **chưa viết**; đây là bước kế tiếp của Stage 2, không được coi là Ready.
 

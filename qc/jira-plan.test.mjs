@@ -7,8 +7,8 @@ import { loadWps, loadUs2F, parseDeps, planLinks, subtaskPlan, mdToWiki, laneOf,
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const wps = loadWps(ROOT);
 
-test('dictionary: 56 work package, id + cột DoD/Ước lượng parse được', () => {
-    assert.equal(wps.size, 56);
+test('dictionary: 64 work package, id + cột DoD/Ước lượng parse được', () => {
+    assert.equal(wps.size, 64);
     const w = wps.get('1.1');
     assert.equal(w.title, 'Luật SLP cho repo này');
     assert.equal(w.days, 0.5);

@@ -1,0 +1,64 @@
+{
+  "ticket": "ESO-404",
+  "epic": "ESO-12",
+  "bip": {
+    "id": "BIP-2_8",
+    "file": "sdlc/09.wbs/01.packets/01.bip/48.graph-acceptance.md"
+  },
+  "technical": false,
+  "inv": [],
+  "ac": [
+    "AC-GRAPH-04-01",
+    "AC-GRAPH-04-02",
+    "AC-GRAPH-04-03"
+  ],
+  "scn": [
+    "SCN-GRAPH-16",
+    "SCN-GRAPH-17",
+    "SCN-GRAPH-18"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/13.graph-acceptance.tdd-unit.md",
+      "test_file": "qc/acceptance/US-GRAPH-04/AC-GRAPH-04-01.test.mjs",
+      "test_name": "SCN-GRAPH-16 · AC-GRAPH-04-01 — Q1 recall/precision ghi số đo",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-16`: **actual** report ghi *\"đạt\"* mà **không** có số · **expected** report có **recall** và **precision** dạng số, tái lập được"
+    },
+    {
+      "packet": "sdlc/10.test/14.graph-acceptance.tdd-impl.md",
+      "test_file": "qc/acceptance/US-GRAPH-04/AC-GRAPH-04-02.test.mjs",
+      "test_name": "SCN-GRAPH-17 · AC-GRAPH-04-02 — coverage thấp ⇒ unknown không absent",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-17`: **actual** `coverage = 0.2` vẫn trả danh sách rỗng như *\"không có\"* · **expected** `unknown` + `LOW_COVERAGE`"
+    },
+    {
+      "packet": "sdlc/10.test/15.graph-acceptance.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-GRAPH-04/AC-GRAPH-04-03.test.mjs",
+      "test_name": "SCN-GRAPH-18 · AC-GRAPH-04-03 — FABRICATED_EDGE ⇒ fail",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-18`: **actual** acceptance pass trên fixture ⇒ xanh giả (`G-02`) · **expected** **fail** + `FABRICATED_EDGE`, epic **không** đóng"
+    },
+    {
+      "packet": "sdlc/10.test/16.graph-acceptance.tdd-qc.md",
+      "test_file": "qc/acceptance/US-GRAPH-04/AC-GRAPH-04-01.test.mjs",
+      "test_name": "SCN-GRAPH-16 · AC-GRAPH-04-01 — qc: chạy SCN trên dữ liệu thật, ghi run id",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-16`: **actual** report ghi *\"đạt\"* mà **không** có số · **expected** report có **recall** và **precision** dạng số, tái lập được"
+    }
+  ],
+  "allowed_files": [
+    "sdlc/11.delivery/**"
+  ],
+  "forbidden": [
+    "qc/acceptance/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test qc/acceptance/ESO-404"
+  ],
+  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_ref": "main",
+  "owner": "graph",
+  "allow_dependency": false,
+  "notes": "Graph acceptance on real baplatform; report only."
+}

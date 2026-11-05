@@ -204,7 +204,8 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
 
     const leaves = new Set();
     for (const dir of ['04.deliverable-1.md', '05.deliverable-2.md', '06.deliverable-3.md', '07.deliverable-4.md',
-        '08.deliverable-5.md', '09.deliverable-6.md', '10.deliverable-7.md', '11.deliverable-8.md']) {
+        '08.deliverable-5.md', '09.deliverable-6.md', '10.deliverable-7.md', '11.deliverable-8.md',
+        '14.deliverable-9.md']) {
         let t = '';
         try { t = readFileSync(join(WBS_DIR, dir), 'utf8'); } catch { assert.fail(`X8: thiếu dictionary ${dir} — không suy được leaf`); }
         for (const m of t.matchAll(/^### `(\d+\.\d+)` · /gm)) leaves.add(m[1]);
@@ -303,7 +304,7 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
 
     assert.deepEqual(unknownLeaf, [], 'a packet names a leaf the tree does not contain');
     const missing = [...leaves].filter((l) => !claimed.has(l)).sort();
-    assert.equal(leaves.size, 56, `tree should have 56 leaves, saw ${leaves.size}`);
+    assert.equal(leaves.size, 64, `tree should have 64 leaves, saw ${leaves.size}`);
 
     // The gap is real, so it is asserted as an allowance rather than ignored: the number must
     // match the recorded debt. Writing the count here means the test fails the moment a packet is
@@ -364,9 +365,9 @@ test('X8: a slice may be OUT only when it owns no criterion', () => {
 // scenario row marked as a gate.
 test('X3b: every gate in the tree has a scenario (X3 cannot see this)', () => {
     const tree = readFileSync(join(WBS_DIR, '02.wbs-tree.md'), 'utf8');
-    // the gate column carries the deliverable's definition of done; deliveries are numbered 1..8
+    // the gate column carries the deliverable's definition of done; deliveries are numbered 1..9
     const gateRows = [...tree.matchAll(/^\| \*\*(\d)\*\* \|.+?\|$/gm)].length;
-    assert.equal(gateRows, 8, `expected 8 deliverable rows, saw ${gateRows}`);
+    assert.equal(gateRows, 9, `expected 9 deliverable rows, saw ${gateRows}`);
 
     // Discover by declared type, not by filename: a file's name is a label, its `type` is a contract. Filtering on
     // the name made this test silently vacuous the moment the files were renamed to drop the redundant suffix.

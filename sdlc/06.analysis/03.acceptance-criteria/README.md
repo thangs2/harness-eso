@@ -58,8 +58,16 @@ postcondition: phán quyết có được ghi, `basis` có được giữ, `unkn
 | `US-HOST-01` | `AC-HOST-01-01`…`4` | [`20.host-us-01-election.md`](20.host-us-01-election.md) | ✅ |
 | `US-ARCH-01` | `AC-ARCH-01-01`…`4` | [`21.arch-us-01-graph.md`](21.arch-us-01-graph.md) | ✅ |
 | `US-TICKET-01` | `AC-TICKET-01-01`…`4` | [`22.ticket-us-01-integration.md`](22.ticket-us-01-integration.md) | ✅ |
+| `US-GRAPH-01` | `AC-GRAPH-01-01`…`06` | [`55.graph-roslyn.md`](55.graph-roslyn.md) | ✅ |
+| `US-GRAPH-02` | `AC-GRAPH-02-01`…`04` | [`56.graph-docs.md`](56.graph-docs.md) | ✅ |
+| `US-GRAPH-03` | `AC-GRAPH-03-01`…`05` | [`57.graph-store-api.md`](57.graph-store-api.md) | ✅ |
+| `US-GRAPH-04` | `AC-GRAPH-04-01`…`03` | [`58.graph-acceptance.md`](58.graph-acceptance.md) | ✅ |
+| `US-MEM-01` | `AC-MEM-01-01`…`05` | [`59.memory-contract.md`](59.memory-contract.md) | ✅ |
+| `US-MEM-02` | `AC-MEM-02-01`…`05` | [`60.memory-store.md`](60.memory-store.md) | ✅ |
+| `US-MEM-03` | `AC-MEM-03-01`…`05` | [`61.memory-migrate.md`](61.memory-migrate.md) | ✅ |
+| `US-MEM-04` | `AC-MEM-04-01`…`04` | [`62.memory-acceptance.md`](62.memory-acceptance.md) | ✅ |
 
-**Tổng: 349 AC** (đếm bằng id, không bằng ước lượng).
+**Tổng: 386 AC** (đếm bằng id, không bằng ước lượng).
 
 **37 AC.** Mỗi file có ba phần bắt buộc ngoài bảng: **điều kiện sau** (ghi gì), **test sẽ chứng minh** (tên test cụ thể), và
 **AC này KHÔNG kiểm** (ranh giới — để không phình).

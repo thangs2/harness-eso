@@ -1,0 +1,67 @@
+{
+  "ticket": "ESO-402",
+  "epic": "ESO-12",
+  "bip": {
+    "id": "BIP-2_6",
+    "file": "sdlc/09.wbs/01.packets/01.bip/46.docs-graph.md"
+  },
+  "technical": false,
+  "inv": [],
+  "ac": [
+    "AC-GRAPH-02-01",
+    "AC-GRAPH-02-02",
+    "AC-GRAPH-02-03",
+    "AC-GRAPH-02-04"
+  ],
+  "scn": [
+    "SCN-GRAPH-07",
+    "SCN-GRAPH-08",
+    "SCN-GRAPH-09",
+    "SCN-GRAPH-10"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/05.graph-docs.tdd-unit.md",
+      "test_file": "qc/acceptance/US-GRAPH-02/AC-GRAPH-02-01.test.mjs",
+      "test_name": "SCN-GRAPH-07 · AC-GRAPH-02-01 — doc + relation specifies/constrains",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-07`: **actual** xếp hạng theo similarity ⇒ 0 relation, anchor không cưỡng chế gì · **expected** doc + relation + `path`, relation **được ghi**"
+    },
+    {
+      "packet": "sdlc/10.test/06.graph-docs.tdd-impl.md",
+      "test_file": "qc/acceptance/US-GRAPH-02/AC-GRAPH-02-02.test.mjs",
+      "test_name": "SCN-GRAPH-08 · AC-GRAPH-02-02 — doc không anchor ⇒ unknown",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-08`: **actual** rỗng bị đọc là *\"không có doc\"* thay vì *\"doc chưa liên kết\"* · **expected** `unlinked`/`unknown` + `UNLINKED_DOC`"
+    },
+    {
+      "packet": "sdlc/10.test/07.graph-docs.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-GRAPH-02/AC-GRAPH-02-03.test.mjs",
+      "test_name": "SCN-GRAPH-09 · AC-GRAPH-02-03 — supersede ⇒ không trả bản cũ",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-09`: **actual** `ORDER BY at DESC` không lọc `supersedes` ⇒ **hai** bản cùng \"hiện hành\" · **expected** **một** bản hiện hành, `supersedes` trace được"
+    },
+    {
+      "packet": "sdlc/10.test/08.graph-docs.tdd-qc.md",
+      "test_file": "qc/acceptance/US-GRAPH-02/AC-GRAPH-02-04.test.mjs",
+      "test_name": "SCN-GRAPH-10 · AC-GRAPH-02-04 — doc project B không lộ",
+      "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-10`: **actual** `project` từ tham số ⇒ trả doc của B · **expected** **0** doc của B khi query từ A"
+    }
+  ],
+  "allowed_files": [
+    "eso/graph/**"
+  ],
+  "forbidden": [
+    "qc/acceptance/**",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test eso/graph",
+    "bun test qc/acceptance/ESO-402"
+  ],
+  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_ref": "main",
+  "owner": "graph",
+  "allow_dependency": false,
+  "notes": "Docs graph specific-relative."
+}

@@ -24,7 +24,8 @@
     "test:observatory": "bun run --filter @mu/harness-observatory test",
     "dev:observatory": "bun run --filter @mu/harness-observatory dev",
     "observe:server": "node packages/harness-observe-server/src/server.mjs",
-    "dev:observe": "./scripts/dev-observe.sh"
+    "dev:observe": "./scripts/dev-observe.sh",
+    "gate": "node scripts/ticket-gate.mjs"
   },
   "dependencies": {
     "@mu/harness-decision": "workspace:*",
