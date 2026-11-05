@@ -15,12 +15,12 @@ for arg in "$@"; do
   esac
 done
 if [ -z "$BATCH" ]; then
-  BATCH="$(ls -1 "$ROOT/sdlc/delivery/demo" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-' | sort | tail -1)"
+  BATCH="$(ls -1 "$ROOT/sdlc/11.delivery/demo" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-' | sort | tail -1)"
 fi
-if [ ! -f "$ROOT/sdlc/delivery/demo/$BATCH/00.index.md" ]; then
+if [ ! -f "$ROOT/sdlc/11.delivery/demo/$BATCH/00.index.md" ]; then
   echo "unknown demo batch: $BATCH" >&2
   echo "available:" >&2
-  ls -1 "$ROOT/sdlc/delivery/demo" | grep -E '^[0-9]{4}-' >&2 || true
+  ls -1 "$ROOT/sdlc/11.delivery/demo" | grep -E '^[0-9]{4}-' >&2 || true
   exit 2
 fi
 echo "[be-demo] batch=$BATCH mode=$MODE"

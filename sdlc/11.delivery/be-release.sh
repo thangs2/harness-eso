@@ -12,9 +12,9 @@ for arg in "$@"; do
   esac
 done
 if [ -z "$BATCH" ]; then
-  BATCH="$(ls -1 "$ROOT/sdlc/delivery/release" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-' | sort | tail -1)"
+  BATCH="$(ls -1 "$ROOT/sdlc/11.delivery/release" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-' | sort | tail -1)"
 fi
-if [ ! -f "$ROOT/sdlc/delivery/release/$BATCH/00.index.md" ]; then
+if [ ! -f "$ROOT/sdlc/11.delivery/release/$BATCH/00.index.md" ]; then
   echo "unknown release batch: $BATCH" >&2
   exit 2
 fi

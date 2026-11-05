@@ -44,6 +44,7 @@ mạch, **không trùng số**, và **không mang nghĩa "stage"**.
 08.ui-design         **thiết kế giao diện** — chuẩn riêng (Figma · Penpot · guideline)
 09.wbs               WBS duy nhất — Feature → Epic → Story → Task
 10.test              phép thử nói "done" nghĩa là gì
+11.delivery          demo/release theo đợt · script stable · bằng chứng bàn giao
 ```
 
 **Vì sao `07.technical` là một nhóm, không phải ba folder:** C4 → data → API là **một chuỗi lập luận** — container tồn tại, nó lưu
