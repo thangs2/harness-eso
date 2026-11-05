@@ -18,19 +18,22 @@ export interface EvidenceTurnRow {
 export class EvidenceRepository {
     constructor(private readonly dbService: DatabaseService) {}
 
-    list(project: string, limit = 50): EvidenceTurnRow[] {
+    /**
+     * D-93: the control plane talks to PostgreSQL through the async Bun.SQL adapter. A synchronous
+     * `list()` would hand callers a promise instead of rows, so the read is awaited here and the
+     * callers (the S1 page + the JSON surface) await this method in turn.
+     */
+    async list(project: string, limit = 50): Promise<EvidenceTurnRow[]> {
         const db = this.dbService.getDatabase();
-        if (!db) return [];
+        if (!db || typeof db.all !== 'function') return [];
 
-        const sql = 'SELECT * FROM evidence_turn WHERE project = ? ORDER BY at DESC LIMIT ?';
-        let rows: any[] = [];
-        if (typeof db.all === 'function') {
-            rows = db.all(sql, project, limit);
-        } else if (typeof db.prepare === 'function') {
-            rows = db.prepare(sql).all(project, limit);
-        }
+        const rows = await db.all(
+            'SELECT * FROM evidence_turn WHERE project = ? ORDER BY at DESC LIMIT ?',
+            project,
+            limit,
+        );
 
-        return rows.map((row) => ({
+        return rows.map((row: any) => ({
             project: row.project,
             turn_id: row.turn_id,
             at: row.at,
@@ -42,7 +45,7 @@ export class EvidenceRepository {
             rule_version: row.rule_version,
             payload: (() => {
                 try {
-                    return JSON.parse(row.payload || '{}');
+                    return typeof row.payload === 'string' ? JSON.parse(row.payload || '{}') : row.payload || {};
                 } catch {
                     return {};
                 }

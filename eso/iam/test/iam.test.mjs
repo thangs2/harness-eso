@@ -18,40 +18,25 @@ import {
     CLOSED_ATTRIBUTES,
 } from '../src/index.mjs';
 
+import { createTestPgDb } from '../../../qc/helpers/test-pg-db.mjs';
+
 async function createTestDb() {
-    if (typeof Bun !== 'undefined') {
-        const { Database } = await import('bun:sqlite');
-        const db = new Database(':memory:');
-        return {
-            exec: (sql) => db.exec(sql),
-            all: (sql, params = []) => db.query(sql).all(...params),
-            run: (sql, params = []) => db.query(sql).run(...params),
-            get: (sql, params = []) => db.query(sql).get(...params),
-        };
-    } else {
-        const { DatabaseSync } = await import('node:sqlite');
-        const db = new DatabaseSync(':memory:');
-        return {
-            exec: (sql) => db.exec(sql),
-            all: (sql, params = []) => db.prepare(sql).all(...params),
-            run: (sql, params = []) => db.prepare(sql).run(...params),
-            get: (sql, params = []) => db.prepare(sql).get(...params),
-        };
-    }
+    return (await createTestPgDb()).db;
 }
+
 
 describe('ESO IAM Worker Domain (Slice S1 / ESO-176 / US-IAM-01)', () => {
     it('Schema: creates worker and role tables and enforces schema constraints', async () => {
         const db = await createTestDb();
-        initIamSchema(db);
+        await initIamSchema(db);
 
-        db.run(
+        await db.run(
             `INSERT INTO worker (project, worker_id, role_name, harness_source, state)
              VALUES (?, ?, ?, ?, ?)`,
             ['proj-1', 'worker-01', 'build', 'eso-native', 'active']
         );
 
-        const row = db.get(`SELECT * FROM worker WHERE project = ? AND worker_id = ?`, ['proj-1', 'worker-01']);
+        const row = await db.get(`SELECT * FROM worker WHERE project = ? AND worker_id = ?`, ['proj-1', 'worker-01']);
         assert.ok(row);
         assert.equal(row.project, 'proj-1');
         assert.equal(row.state, 'active');

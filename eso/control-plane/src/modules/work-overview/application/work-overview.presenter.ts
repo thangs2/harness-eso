@@ -173,15 +173,33 @@ export function renderS1Request({
         return { ...s1HttpResult(page), page };
     }
 
-    let turns: any[];
-    try {
-        turns = loadTurns(project);
-    } catch {
+    const failed = () => {
         // AC-UI-01-03: a failed read is ST3 + retry — never ST1 "empty".
         const page = renderWorkOverviewPage({ project, error: 'UI_FETCH_FAILED' });
         return { ...s1HttpResult(page), page };
+    };
+
+    let loaded: any;
+    try {
+        loaded = loadTurns(project);
+    } catch {
+        return failed();
     }
 
-    const page = renderWorkOverviewPage({ project, hasAccess: true, turns });
+    /*
+     * D-93: the evidence store is PostgreSQL behind an async adapter, so `loadTurns` may hand back a
+     * promise. The synchronous path is kept for the existing frame tests and for any in-memory caller;
+     * an async caller gets the same denial/read-failure contract, just one microtask later.
+     */
+    if (loaded && typeof loaded.then === 'function') {
+        return Promise.resolve(loaded)
+            .then((turns: any[]) => {
+                const page = renderWorkOverviewPage({ project, hasAccess: true, turns: turns ?? [] });
+                return { ...s1HttpResult(page), page };
+            })
+            .catch(() => failed());
+    }
+
+    const page = renderWorkOverviewPage({ project, hasAccess: true, turns: loaded });
     return { ...s1HttpResult(page), page };
 }

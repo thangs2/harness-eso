@@ -1,7 +1,11 @@
 /**
- * @mu/eso-graph — Q1 Read-Set Query Implementation (ESO-50 / US-ARCH-02 / Slice S1)
+ * @mu/eso-graph — Q1 Read-Set Query Implementation (ESO-50 / US-ARCH-02 / Slice S1 / ESO-447)
  *
  * Invariants:
+ * - D-92 / D-93 / 26.graph-schema.md: Queries PostgreSQL target schema columns:
+ *     graph_node(project, build_id, node_id, kind, node_key, path)
+ *     graph_edge(project, build_id, edge_id, from_node_id, to_node_id, kind, conflict)
+ *     completeness(project, build_id, question, per_kind, value, measured_at)
  * - INV-GR-01: Không bịa cạnh, chỉ duyệt theo quan hệ thật trong graph_edge (references, maps_to, declares).
  * - INV-GR-02: Completeness tính theo câu hỏi (K(Q1)), threshold >= floor (mặc định threshold = 0.90, floor = 0.80).
  * - INV-GR-03 / BR-05: Khi completeness < threshold, cấm kết luận absent hoặc trả [], phải trả status: 'unknown' kèm độ phủ.
@@ -34,9 +38,9 @@ export const ALLOWED_RELATIONS = Object.freeze(['references', 'maps_to', 'declar
  * @param {number} [options.floor=0.80] - Minimum completeness floor
  * @param {number} [options.maxFanout=50] - Maximum fanout cap
  * @param {number|object} [options.completeness=null] - Completeness value or object
- * @returns {object}
+ * @returns {Promise<object>}
  */
-export function queryReadSet(db, options = {}) {
+export async function queryReadSet(db, options = {}) {
     const {
         project,
         symbolOrFile,
@@ -93,18 +97,18 @@ export function queryReadSet(db, options = {}) {
         }
     }
 
-    // If not provided in options, attempt to read from database completeness table
+    // If not provided in options, attempt to read from target completeness table (26.graph-schema.md)
     if (compVal === null && db && typeof db.all === 'function') {
         try {
-            const rows = db.all(
-                "SELECT value, status FROM completeness WHERE project = ? AND question_id = 'Q1' ORDER BY calculated_at DESC LIMIT 1",
+            const rows = await db.all(
+                "SELECT value FROM completeness WHERE project = ? AND question = 'Q1' ORDER BY measured_at DESC LIMIT 1",
                 [normProject]
             );
             if (rows && rows.length > 0 && typeof rows[0].value === 'number') {
                 compVal = Math.max(0, Math.min(1, rows[0].value));
             }
         } catch {
-            // DB table might not have records or error querying
+            // DB table might not have records
         }
     }
 
@@ -128,8 +132,6 @@ export function queryReadSet(db, options = {}) {
         };
     }
 
-    // Completeness status determination
-    // AC-ARCH-02-02 & INV-GR-03 / BR-05: unknown + độ phủ khi completeness < threshold
     const isUnknown = compVal < effThreshold;
     const completenessObj = {
         question: 'Q1',
@@ -154,13 +156,13 @@ export function queryReadSet(db, options = {}) {
         throw new Error('Database instance must provide .all() method (use db-adapter)');
     }
 
-    // 1. Find initial nodes matching target symbol or file (INV-GR-01, INV-GR-03)
+    // 1. Find initial nodes matching target symbol or file (target columns: node_id, node_key, path)
     const strippedTarget = normTarget.replace(/^\.\//, '');
-    const startNodes = db.all(
-        `SELECT id, project, kind, name, path
+    const startNodes = await db.all(
+        `SELECT node_id AS id, node_id, project, kind, node_key AS name, node_key, path
          FROM graph_node
          WHERE project = ? AND (
-             id = ? OR name = ? OR path = ? OR path = ?
+             node_id = ? OR node_key = ? OR path = ? OR path = ?
          )`,
         [normProject, normTarget, normTarget, normTarget, strippedTarget]
     );
@@ -188,16 +190,16 @@ export function queryReadSet(db, options = {}) {
     const originPaths = new Set();
 
     for (const node of startNodes) {
-        startNodeIds.add(node.id);
+        startNodeIds.add(node.node_id);
         if (node.path) originPaths.add(node.path.replace(/\\/g, '/'));
 
-        // If start node is a file, also include symbols declared by this file in the initial set
-        if (node.kind === 'file') {
+        // If start node is module/file, also include symbols declared by it
+        if (node.kind === 'module' || node.kind === 'file') {
             try {
-                const declaredEdges = db.all(
-                    `SELECT target_id FROM graph_edge
-                     WHERE project = ? AND source_id = ? AND relation = 'declares'`,
-                    [normProject, node.id]
+                const declaredEdges = await db.all(
+                    `SELECT to_node_id AS target_id FROM graph_edge
+                     WHERE project = ? AND from_node_id = ? AND kind = 'defines'`,
+                    [normProject, node.node_id]
                 );
                 for (const edge of declaredEdges) {
                     startNodeIds.add(edge.target_id);
@@ -218,13 +220,13 @@ export function queryReadSet(db, options = {}) {
         const placeholders = currentLevelIds.map(() => '?').join(',');
         const queryParams = [normProject, ...currentLevelIds, ...currentLevelIds];
 
-        // INV-GR-01: Chỉ duyệt theo quan hệ thật trong graph_edge (references, maps_to, declares)
-        const edges = db.all(
-            `SELECT source_id, target_id, relation
+        // INV-GR-01: Chỉ duyệt theo quan hệ thật trong graph_edge (references, maps_to, defines)
+        const edges = await db.all(
+            `SELECT from_node_id AS source_id, to_node_id AS target_id, kind AS relation
              FROM graph_edge
              WHERE project = ?
-               AND relation IN ('references', 'maps_to', 'declares')
-               AND (source_id IN (${placeholders}) OR target_id IN (${placeholders}))`,
+               AND kind IN ('references', 'maps_to', 'defines')
+               AND (from_node_id IN (${placeholders}) OR to_node_id IN (${placeholders}))`,
             queryParams
         );
 
@@ -246,15 +248,15 @@ export function queryReadSet(db, options = {}) {
 
         // Fetch neighbor node details to extract files
         const neighborPlaceholders = nextLevelIds.map(() => '?').join(',');
-        const neighborNodes = db.all(
-            `SELECT id, kind, name, path
+        const neighborNodes = await db.all(
+            `SELECT node_id AS id, kind, node_key AS name, path
              FROM graph_node
-             WHERE project = ? AND id IN (${neighborPlaceholders})`,
+             WHERE project = ? AND node_id IN (${neighborPlaceholders})`,
             [normProject, ...nextLevelIds]
         );
 
         for (const node of neighborNodes) {
-            const filePath = (node.path || (node.kind === 'file' ? node.name : ''))
+            const filePath = (node.path || (node.kind === 'module' || node.kind === 'file' ? node.name : ''))
                 .replace(/\\/g, '/')
                 .trim();
             if (filePath && !originPaths.has(filePath)) {

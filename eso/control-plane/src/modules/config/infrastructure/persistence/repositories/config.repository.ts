@@ -18,7 +18,7 @@ export function computeConfigHash(content) {
  * - version +1 mỗi save
  * - event append-only
  */
-export function saveConfig(db, {
+export async function saveConfig(db, {
     project,
     config,
     expectedHash = null,
@@ -32,7 +32,7 @@ export function saveConfig(db, {
     }
 
     const normProject = project.trim();
-    const current = getLatestConfig(db, normProject);
+    const current = await getLatestConfig(db, normProject);
 
     if (current) {
         if (expectedHash !== null && expectedHash !== current.hash) {
@@ -57,14 +57,14 @@ export function saveConfig(db, {
     const newHash = computeConfigHash(contentToStore);
     const now = new Date().toISOString();
 
-    db.run(
+    await db.run(
         `INSERT INTO config_record (project, version, hash, content_json, operator, saved_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [normProject, newVersion, newHash, JSON.stringify(contentToStore), operator, now]
     );
 
     const eventId = `ev_${randomUUID()}`;
-    db.run(
+    await db.run(
         `INSERT INTO config_event (id, project, version, hash, event_type, payload_json, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [eventId, normProject, newVersion, newHash, 'SAVE', JSON.stringify({ operator, previous_version: current?.version ?? null }), now]
@@ -82,7 +82,7 @@ export function saveConfig(db, {
 /**
  * Retrieve configuration for project, either at specific version or latest.
  */
-export function readConfig(db, project, version = null) {
+export async function readConfig(db, project, version = null) {
     if (!project || typeof project !== 'string' || !project.trim()) {
         throw new Error('Project is required');
     }
@@ -90,14 +90,14 @@ export function readConfig(db, project, version = null) {
 
     let row;
     if (version !== null) {
-        row = db.get(
+        row = await db.get(
             `SELECT project, version, hash, content_json, operator, saved_at
              FROM config_record
              WHERE project = ? AND version = ?`,
             [normProject, Number(version)]
         );
     } else {
-        row = db.get(
+        row = await db.get(
             `SELECT project, version, hash, content_json, operator, saved_at
              FROM config_record
              WHERE project = ?
@@ -121,19 +121,19 @@ export function readConfig(db, project, version = null) {
     };
 }
 
-export function getLatestConfig(db, project) {
+export async function getLatestConfig(db, project) {
     return readConfig(db, project);
 }
 
 /**
  * List audit events for project configuration (append-only).
  */
-export function listConfigEvents(db, project) {
+export async function listConfigEvents(db, project) {
     if (!project || typeof project !== 'string' || !project.trim()) {
         throw new Error('Project is required');
     }
     const normProject = project.trim();
-    const rows = db.all(
+    const rows = await db.all(
         `SELECT id, project, version, hash, event_type, payload_json, created_at
          FROM config_event
          WHERE project = ?

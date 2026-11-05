@@ -90,7 +90,7 @@ export class OutboxBuffer {
  * @param {boolean} [options.isRuntime=true]
  * @returns {object} Flush summary
  */
-export function flushOutbox(outbox, db, { batchSize = 50, isRuntime = true } = {}) {
+export async function flushOutbox(outbox, db, { batchSize = 50, isRuntime = true } = {}) {
     if (!outbox || typeof outbox.peek !== 'function') {
         throw new Error('Valid outbox buffer is required');
     }
@@ -111,7 +111,7 @@ export function flushOutbox(outbox, db, { batchSize = 50, isRuntime = true } = {
     for (const item of batch) {
         try {
             // Ingest into evidence tables (idempotent: AC-EV-01-06)
-            recordTurn(db, item.data, { isRuntime });
+            await recordTurn(db, item.data, { isRuntime });
             ackedIds.push(item.id);
         } catch (err) {
             // If DB is offline, connection fails, or unexpected error occurs:
@@ -151,7 +151,7 @@ export class IngestWorker {
         if (this.running) return;
         this.running = true;
         this.timer = setInterval(() => {
-            this.tick();
+            this.tick().catch(() => {});
         }, this.intervalMs);
         if (this.timer.unref) this.timer.unref();
     }
@@ -164,7 +164,7 @@ export class IngestWorker {
         }
     }
 
-    tick() {
-        return flushOutbox(this.outbox, this.db, { batchSize: this.batchSize, isRuntime: true });
+    async tick() {
+        return await flushOutbox(this.outbox, this.db, { batchSize: this.batchSize, isRuntime: true });
     }
 }

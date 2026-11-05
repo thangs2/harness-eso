@@ -19,25 +19,22 @@
 
 import crypto from 'node:crypto';
 
-function queryGet(db, sql, params = []) {
-    if (typeof db.get === 'function') return db.get(sql, params);
-    return db.prepare(sql).get(...params);
+async function queryGet(db, sql, params = []) {
+    return await db.get(sql, params);
 }
 
-function queryAll(db, sql, params = []) {
-    if (typeof db.all === 'function') return db.all(sql, params);
-    return db.prepare(sql).all(...params);
+async function queryAll(db, sql, params = []) {
+    return await db.all(sql, params);
 }
 
-function queryRun(db, sql, params = []) {
-    if (typeof db.run === 'function') return db.run(sql, params);
-    return db.prepare(sql).run(...params);
+async function queryRun(db, sql, params = []) {
+    return await db.run(sql, params);
 }
 
 /**
  * Record a configuration save event.
  */
-export function recordConfigSave(db, { project, event_id, version, actor = 'operator', at = new Date().toISOString() }) {
+export async function recordConfigSave(db, { project, event_id, version, actor = 'operator', at = new Date().toISOString() }) {
     if (!project || !event_id || version === undefined) {
         throw new Error('project, event_id, and version are required for config save');
     }
@@ -45,7 +42,7 @@ export function recordConfigSave(db, { project, event_id, version, actor = 'oper
     const normProject = project.trim();
     const normEventId = event_id.trim();
 
-    queryRun(
+    await queryRun(
         db,
         `INSERT INTO config_event (project, event_id, version, kind, marked, actor, at)
          VALUES (?, ?, ?, 'save', '[]', ?, ?)
@@ -75,7 +72,7 @@ export function recordConfigSave(db, { project, event_id, version, actor = 'oper
  * @param {string} [params.at] Revert timestamp (defaults to now)
  * @param {number} [params.target_version] Optional target version to revert to
  */
-export function revertConfig(db, {
+export async function revertConfig(db, {
     project,
     event_id,
     revert_event_id,
@@ -92,7 +89,7 @@ export function revertConfig(db, {
     const revertId = revert_event_id || crypto.randomUUID();
 
     // Check if this exact revert has already been processed (idempotency)
-    const existingRevert = queryGet(
+    const existingRevert = await queryGet(
         db,
         `SELECT * FROM config_event WHERE project = ? AND event_id = ? AND kind = 'revert'`,
         [normProject, revertId]
@@ -108,11 +105,11 @@ export function revertConfig(db, {
     }
 
     // 1. Validate that event_id is the latest save event for project
-    const latestSave = queryGet(
+    const latestSave = await queryGet(
         db,
         `SELECT * FROM config_event
          WHERE project = ? AND kind = 'save'
-         ORDER BY at DESC, rowid DESC
+         ORDER BY at DESC, version DESC
          LIMIT 1`,
         [normProject]
     );
@@ -129,11 +126,11 @@ export function revertConfig(db, {
     // 2. Determine target version to revert to
     let revertedTo = target_version;
     if (revertedTo === undefined) {
-        const priorSave = queryGet(
+        const priorSave = await queryGet(
             db,
             `SELECT version FROM config_event
              WHERE project = ? AND kind = 'save' AND at < ?
-             ORDER BY at DESC, rowid DESC
+             ORDER BY at DESC, version DESC
              LIMIT 1`,
             [normProject, latestSave.at]
         );
@@ -148,7 +145,7 @@ export function revertConfig(db, {
     const revertAt = at;
 
     // 4. Discover artefacts created in this window
-    const turns = queryAll(
+    const turns = await queryAll(
         db,
         `SELECT turn_id, at, payload
          FROM evidence_turn
@@ -188,7 +185,7 @@ export function revertConfig(db, {
     const marked_artifacts = Array.from(markedMap.values());
 
     // 5. Atomic recording of revert event in config_event (BR-06: append-only)
-    queryRun(
+    await queryRun(
         db,
         `INSERT INTO config_event (project, event_id, version, kind, marked, actor, at)
          VALUES (?, ?, ?, 'revert', ?, ?, ?)
@@ -210,13 +207,13 @@ export function revertConfig(db, {
  * Re-evaluate marked artefacts for a given revert event at read time.
  * This guarantees late-arriving outbox evidence turns are included dynamically (BIP-11 lines 80-83).
  */
-export function computeMarkedArtefacts(db, { project, revert_event_id }) {
+export async function computeMarkedArtefacts(db, { project, revert_event_id }) {
     if (!project || !revert_event_id) {
         throw new Error('project and revert_event_id are required');
     }
 
     const normProject = project.trim();
-    const revertEvent = queryGet(
+    const revertEvent = await queryGet(
         db,
         `SELECT * FROM config_event
          WHERE project = ? AND event_id = ? AND kind = 'revert'`,
@@ -228,7 +225,7 @@ export function computeMarkedArtefacts(db, { project, revert_event_id }) {
     }
 
     // Find the save event that was reverted (the latest save prior to revert)
-    const saveEvent = queryGet(
+    const saveEvent = await queryGet(
         db,
         `SELECT * FROM config_event
          WHERE project = ? AND kind = 'save' AND at < ?
@@ -244,7 +241,7 @@ export function computeMarkedArtefacts(db, { project, revert_event_id }) {
     const publishAt = saveEvent.at;
     const revertAt = revertEvent.at;
 
-    const turns = queryAll(
+    const turns = await queryAll(
         db,
         `SELECT turn_id, at, payload
          FROM evidence_turn

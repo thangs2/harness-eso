@@ -1,5 +1,5 @@
 /**
- * @mu/eso-graph — ESO Graph Architecture Domain (Slice S1)
+ * @mu/eso-graph — ESO Graph Architecture Domain (Slice S1 / ESO-447)
  */
 
 import { initSchema, SCHEMA_SQL, POSTGRES_RLS_SQL, TABLES } from './schema.mjs';
@@ -17,13 +17,11 @@ import {
     queryColumnImpact,
     DEFAULT_THRESHOLD_Q2,
     DEFAULT_FLOOR_Q2,
-    ALLOWED_RELATIONS_Q2,
 } from './q2-impact.mjs';
 import {
     queryCircularDependencies,
     DEFAULT_THRESHOLD_Q3,
     DEFAULT_FLOOR_Q3,
-    ALLOWED_RELATIONS_Q3,
 } from './q3-cycles.mjs';
 import {
     queryEndpointPermissions,
@@ -53,11 +51,9 @@ export {
     queryColumnImpact,
     DEFAULT_THRESHOLD_Q2,
     DEFAULT_FLOOR_Q2,
-    ALLOWED_RELATIONS_Q2,
     queryCircularDependencies,
     DEFAULT_THRESHOLD_Q3,
     DEFAULT_FLOOR_Q3,
-    ALLOWED_RELATIONS_Q3,
     queryEndpointPermissions,
     querySliceTenantBoundary,
     TENANT_COVERAGE_FLOOR,
@@ -65,20 +61,21 @@ export {
 
 /**
  * Helper to query files for a warm graph and attach question completeness (AC-ARCH-01-01).
+ * Target schema: graph_node(project, build_id, node_id, kind, node_key, path)
  */
-export function queryGraphFiles(db, { project, question = 'Q1', perKindCoverage = {} }) {
+export async function queryGraphFiles(db, { project, question = 'Q1', perKindCoverage = {} }) {
     if (!project) {
         throw new Error('project is required (INV-GR-03)');
     }
 
     const sql = `
-        SELECT id, project, kind, name, path, metadata_json, created_at, updated_at
+        SELECT node_id AS id, node_id, project, kind, node_key AS name, node_key, path
         FROM graph_node
-        WHERE project = ? AND kind = 'file'
-        ORDER BY path ASC, name ASC
+        WHERE project = ? AND (kind = 'module' OR kind = 'doc' OR kind = 'file')
+        ORDER BY path ASC, node_key ASC
     `;
 
-    const files = db.all(sql, [project]);
+    const files = await db.all(sql, [project]);
     const completeness = calculateCompleteness(question, perKindCoverage);
 
     return {

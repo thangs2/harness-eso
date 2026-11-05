@@ -14,7 +14,7 @@ import { SaveConfigDto } from '../../api/dto/save-config.dto.js';
 export class ConfigService {
     constructor(private readonly dbService: DatabaseService) {}
 
-    getConfig(project: string, version?: any) {
+    async getConfig(project: string, version?: any) {
         if (!project) {
             throw new BadRequestException({
                 type: 'https://eso.dev/errors/missing-project',
@@ -43,7 +43,7 @@ export class ConfigService {
         }
 
         const db = this.dbService.getDatabase();
-        const record = readConfig(db, project, parsedVersion);
+        const record = await readConfig(db, project, parsedVersion);
         if (!record) {
             throw new NotFoundException({
                 type: 'https://eso.dev/errors/config-not-found',
@@ -60,9 +60,9 @@ export class ConfigService {
         };
     }
 
-    previewConfig(dto: PreviewConfigDto) {
+    async previewConfig(dto: PreviewConfigDto) {
         const db = this.dbService.getDatabase();
-        const current = readConfig(db, dto.project);
+        const current = await readConfig(db, dto.project);
         const currentConfig = current ? current.config : { version: 1 };
         const currentHash = current ? current.hash : null;
 
@@ -81,7 +81,7 @@ export class ConfigService {
         };
     }
 
-    saveConfig(dto: SaveConfigDto) {
+    async saveConfig(dto: SaveConfigDto) {
         if (!dto.preview_hash || typeof dto.preview_hash !== 'string' || dto.preview_hash.trim() === '') {
             throw new ConflictException({
                 type: 'https://eso.dev/errors/preview-required',
@@ -94,7 +94,7 @@ export class ConfigService {
         }
 
         const db = this.dbService.getDatabase();
-        const current = readConfig(db, dto.project);
+        const current = await readConfig(db, dto.project);
 
         if (current) {
             if (!dto.current_hash || dto.current_hash !== current.hash) {
@@ -136,7 +136,7 @@ export class ConfigService {
         }
 
         try {
-            const saved = saveConfig(db, {
+            const saved = await saveConfig(db, {
                 project: dto.project,
                 config: dto.config,
                 expectedHash: dto.current_hash || null,

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDbAdapter } from '../eso/graph/src/db-adapter.mjs';
+import { createTestPgDb } from './helpers/test-pg-db.mjs';
 import { createNestFastifyControlPlane } from '../eso/control-plane/dist/main.js';
 
 const TOKEN = 'consumer-test-token';
@@ -28,7 +28,8 @@ const BASE_PROFILE = {
 };
 
 test('Consumer profile: consumer profile create/list/get/update persists versions', async () => {
-  const db = createDbAdapter(':memory:');
+  const pg = await createTestPgDb();
+  const db = pg.db;
   const app = await createNestFastifyControlPlane({ db, authToken: TOKEN });
   await app.listen(0, '127.0.0.1');
   const port = app.getHttpAdapter().getInstance().server.address().port;
@@ -95,9 +96,9 @@ test('Consumer profile: consumer profile create/list/get/update persists version
     assert.equal(updated.version, 2);
     assert.equal(updated.name, 'Acme Platform v2');
 
-    const old = db.get('SELECT status FROM sdlc_profile WHERE project = ? AND version = ?', ['acme', 1]);
+    const old = await db.get('SELECT status FROM sdlc_profile WHERE project = ? AND version = ?', ['acme', 1]);
     assert.equal(old.status, 'superseded');
-    const latest = db.get('SELECT status, version FROM sdlc_profile WHERE project = ? ORDER BY version DESC', ['acme']);
+    const latest = await db.get('SELECT status, version FROM sdlc_profile WHERE project = ? ORDER BY version DESC', ['acme']);
     assert.equal(latest.version, 2);
     assert.equal(latest.status, 'current');
 
@@ -106,6 +107,6 @@ test('Consumer profile: consumer profile create/list/get/update persists version
     assert.equal((await get.json()).version, 2);
   } finally {
     await app.close();
-    try { db.close(); } catch {}
+    await pg.cleanup();
   }
 });

@@ -8,9 +8,11 @@ export class WorkOverviewApiController {
     constructor(private readonly evidence: EvidenceRepository) {}
 
     @Get()
-    list(@Query('project') project: string) {
+    async list(@Query('project') project: string) {
         const selected = project || 'default';
-        const items = this.evidence.list(selected).map((row) => {
+        // D-93: PostgreSQL read is async; await before shaping the response.
+        const rows = await this.evidence.list(selected);
+        const items = rows.map((row) => {
             const payload: any = row.payload || {};
             const level =
                 row.level === 'sufficient'

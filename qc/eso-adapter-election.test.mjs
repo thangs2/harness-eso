@@ -9,13 +9,13 @@ import {
     queryBatchProviderAudit,
 } from '../eso/adapters/src/index.mjs';
 
-test('SCN-HOST-01 (AC-HOST-01-01..08): Elects in exact branch order, records reason, enforces tenant isolation and known hosts', () => {
+test('SCN-HOST-01 (AC-HOST-01-01..08): Elects in exact branch order, records reason, enforces tenant isolation and known hosts', async () => {
     // 1. Exact branch order check (AC-HOST-01-04)
     assert.deepEqual(BRANCH_ORDER, ['host-native', 'eso-native', 'external', 'none']);
 
     // 2. Host-native elected when available (AC-HOST-01-01)
     const turnAuditLog = [];
-    const election1 = electCapabilityProvider({
+    const election1 = await electCapabilityProvider({
         project: 'project-A',
         turnId: 'turn-1',
         capabilityKind: 'file_tools',
@@ -31,7 +31,7 @@ test('SCN-HOST-01 (AC-HOST-01-01..08): Elects in exact branch order, records rea
     assert.ok(election1.reason.includes('host-native'));
 
     // 3. Fallback down to external if host-native and eso-native are absent
-    const election2 = electCapabilityProvider({
+    const election2 = await electCapabilityProvider({
         project: 'project-A',
         turnId: 'turn-2',
         capabilityKind: 'codegraph',
@@ -47,7 +47,7 @@ test('SCN-HOST-01 (AC-HOST-01-01..08): Elects in exact branch order, records rea
     assert.equal(election2.provider_id, 'mcp-codegraph');
 
     // 4. Tenant isolation (AC-HOST-01-05): Project A configuration does not apply to Project B
-    const electionB = electCapabilityProvider({
+    const electionB = await electCapabilityProvider({
         project: 'project-B',
         turnId: 'turn-3',
         capabilityKind: 'codegraph',
@@ -63,22 +63,20 @@ test('SCN-HOST-01 (AC-HOST-01-01..08): Elects in exact branch order, records rea
     assert.equal(electionB.branch, 'none');
 
     // 5. Undeclared host rejected (AC-HOST-01-08)
-    assert.throws(() => {
-        electCapabilityProvider({
+    await assert.rejects(() => electCapabilityProvider({
             project: 'project-A',
             turnId: 'turn-4',
             capabilityKind: 'file_tools',
             host: 'unregistered-ide',
-        });
-    }, (err) => {
+        }), (err) => {
         assert.equal(err.code, 'HOST_NOT_DECLARED');
         return true;
     });
 });
 
-test('SCN-HOST-02 (AC-HOST-02-01..05): None election still allows task to run with degraded guarantee; multi-capability support', () => {
+test('SCN-HOST-02 (AC-HOST-02-01..05): None election still allows task to run with degraded guarantee; multi-capability support', async () => {
     const turnAuditLog = [];
-    const election = electCapabilityProvider({
+    const election = await electCapabilityProvider({
         project: 'project-A',
         turnId: 'turn-10',
         capabilityKind: 'deepseek_direct',
@@ -92,7 +90,7 @@ test('SCN-HOST-02 (AC-HOST-02-01..05): None election still allows task to run wi
     assert.ok(election.reason.includes('G-DEGRADED'));
 
     // AC-HOST-02-05 / ED6: Idempotent election within same turn
-    const secondElection = electCapabilityProvider({
+    const secondElection = await electCapabilityProvider({
         project: 'project-A',
         turnId: 'turn-10',
         capabilityKind: 'deepseek_direct',
@@ -102,7 +100,7 @@ test('SCN-HOST-02 (AC-HOST-02-01..05): None election still allows task to run wi
     assert.equal(secondElection, election);
 
     // AC-HOST-02-04 / ED3: Multi-capability turn where all drop to none
-    const electionCap2 = electCapabilityProvider({
+    const electionCap2 = await electCapabilityProvider({
         project: 'project-A',
         turnId: 'turn-10',
         capabilityKind: 'codegraph',
@@ -115,7 +113,7 @@ test('SCN-HOST-02 (AC-HOST-02-01..05): None election still allows task to run wi
     assert.notEqual(electionCap2.reason, election.reason);
 });
 
-test('SCN-HOST-03 (AC-HOST-03-01..05): Mid-turn branch failure switches branch and records trial history', () => {
+test('SCN-HOST-03 (AC-HOST-03-01..05): Mid-turn branch failure switches branch and records trial history', async () => {
     const initial = {
         project: 'project-A',
         turn_id: 'turn-20',
@@ -148,9 +146,9 @@ test('SCN-HOST-03 (AC-HOST-03-01..05): Mid-turn branch failure switches branch a
     assert.ok(replay.message.includes('nguồn đã mất'));
 });
 
-test('SCN-HOST-04 (AC-HOST-04-01..05): Pinning elects target branch directly; rejects missing pin with PIN_UNAVAILABLE', () => {
+test('SCN-HOST-04 (AC-HOST-04-01..05): Pinning elects target branch directly; rejects missing pin with PIN_UNAVAILABLE', async () => {
     // 1. Pinned to external directly bypasses host-native (AC-HOST-04-01)
-    const election = electCapabilityProvider({
+    const election = await electCapabilityProvider({
         project: 'project-A',
         turnId: 'turn-30',
         capabilityKind: 'graph',
@@ -166,8 +164,7 @@ test('SCN-HOST-04 (AC-HOST-04-01..05): Pinning elects target branch directly; re
     assert.equal(election.pinned, true);
 
     // 2. Pin unavailable on host throws PIN_UNAVAILABLE (AC-HOST-04-03)
-    assert.throws(() => {
-        electCapabilityProvider({
+    await assert.rejects(() => electCapabilityProvider({
             project: 'project-A',
             turnId: 'turn-31',
             capabilityKind: 'agentmemory',
@@ -177,27 +174,24 @@ test('SCN-HOST-04 (AC-HOST-04-01..05): Pinning elects target branch directly; re
                 'external': { available: false }, // pinned branch unavailable
             },
             pins: { agentmemory: 'external' },
-        });
-    }, (err) => {
+        }), (err) => {
         assert.equal(err.code, 'PIN_UNAVAILABLE');
         assert.equal(err.pinned_branch, 'external');
         return true;
     });
 
     // 3. Agent role modifying pin is rejected (AC-HOST-04-02 / RBAC)
-    assert.throws(() => {
-        setCapabilityPin({
+    await assert.rejects(() => setCapabilityPin({
             capabilityKind: 'graph',
             targetBranch: 'external',
             actorRole: 'build', // agent role build
-        });
-    }, (err) => {
+        }), (err) => {
         assert.equal(err.code, 'FORBIDDEN_MUTATION');
         return true;
     });
 
     // 4. Empty pin unpins (AC-HOST-04-05 / ED1)
-    const pins = setCapabilityPin({
+    const pins = await setCapabilityPin({
         capabilityKind: 'graph',
         targetBranch: '',
         actorRole: 'operator',
@@ -206,7 +200,7 @@ test('SCN-HOST-04 (AC-HOST-04-01..05): Pinning elects target branch directly; re
     assert.equal(pins.graph, undefined);
 });
 
-test('SCN-HOST-05 (AC-HOST-05-01..05): Audit query retrieves branch provenance, handles empty turns and batch sorting', () => {
+test('SCN-HOST-05 (AC-HOST-05-01..05): Audit query retrieves branch provenance, handles empty turns and batch sorting', async () => {
     const auditLog = [
         { turn_id: 'turn-50', capability: 'file_tools', branch: 'host-native', provider_id: 'p1' },
         { turn_id: 'turn-50', capability: 'graph', branch: 'none', guarantee: 'G-DEGRADED' },
@@ -214,12 +208,12 @@ test('SCN-HOST-05 (AC-HOST-05-01..05): Audit query retrieves branch provenance, 
     ];
 
     // Single turn audit (AC-HOST-05-01 & AC-HOST-05-03)
-    const audit50 = queryTurnProviderAudit({ turnId: 'turn-50', auditLog });
+    const audit50 = await queryTurnProviderAudit({ turnId: 'turn-50', auditLog });
     assert.equal(audit50.records.length, 2);
     assert.equal(audit50.has_degraded, true);
 
     // Turn with 0 capabilities (AC-HOST-05-04 / ED1)
-    const emptyAudit = queryTurnProviderAudit({ turnId: 'turn-empty', auditLog });
+    const emptyAudit = await queryTurnProviderAudit({ turnId: 'turn-empty', auditLog });
     assert.equal(emptyAudit.records.length, 0);
     assert.ok(emptyAudit.message.includes('turn không dùng năng lực nào'));
 
@@ -230,7 +224,7 @@ test('SCN-HOST-05 (AC-HOST-05-01..05): Audit query retrieves branch provenance, 
         { turn_id: tid, capability: 'a_cap', branch: 'host-native' },
     ]);
 
-    const batchRes = queryBatchProviderAudit({ turnIds: batchTurns, auditLog: largeLog });
+    const batchRes = await queryBatchProviderAudit({ turnIds: batchTurns, auditLog: largeLog });
     assert.equal(batchRes.length, 100);
     // Verifying sorted order: turn_id ascending, capability ascending
     assert.equal(batchRes[0].turn_id, 'turn-100');

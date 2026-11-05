@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Database } from 'bun:sqlite';
-import { initSchema, calculateCompleteness, QUESTION_KIND_MAP } from '../eso/graph/src/index.mjs';
+import { calculateCompleteness, QUESTION_KIND_MAP } from '../eso/graph/src/index.mjs';
+import { createTestPgGraph } from './helpers/test-pg-graph.mjs';
 
 test('SCN-ARCH-02 (AC-ARCH-01-02 & BR-05): Incomplete graph returns unknown with coverage ratio, never absent', () => {
     // 1. Partial coverage on Q1
@@ -31,31 +31,30 @@ test('SCN-ARCH-02 (AC-ARCH-01-02 & BR-05): Incomplete graph returns unknown with
     assert.deepEqual(QUESTION_KIND_MAP.Q3, ['module', 'package']);
 });
 
-test('BR-06: source_claim is append-only, UPDATE/DELETE rejected by DB triggers', () => {
-    const rawDb = new Database(':memory:');
-    const db = {
-        exec: (sql) => rawDb.exec(sql),
-        run: (sql, params = []) => rawDb.query(sql).run(...params),
-    };
+test('BR-06: source_claim is append-only, UPDATE/DELETE rejected by DB triggers on PostgreSQL (D-92 / D-93)', async () => {
+    const pg = await createTestPgGraph();
+    const { db } = pg;
 
-    initSchema(db);
+    try {
+        await db.run(
+            `INSERT INTO graph_node (project, build_id, node_id, kind, node_key, path)
+             VALUES ('proj-1', 'b1', 'n1', 'module', 'a.ts', 'src/a.ts')`
+        );
+        await db.run(
+            `INSERT INTO source_claim (project, build_id, edge_id, seq, source_kind, claim)
+             VALUES ('proj-1', 'b1', 'edge-1', 1, 'roslyn', 'claim test')`
+        );
 
-    db.run(
-        `INSERT INTO graph_node (id, project, kind, name, path, created_at, updated_at)
-         VALUES ('n1', 'proj-1', 'file', 'a.ts', 'src/a.ts', '2026-11-03', '2026-11-03')`
-    );
-    db.run(
-        `INSERT INTO source_claim (id, project, node_id, claim_type, claim_payload, created_at)
-         VALUES ('sc-1', 'proj-1', 'n1', 'ast_call', '{}', '2026-11-03')`
-    );
+        // UPDATE must fail with BR-06 error
+        await assert.rejects(async () => {
+            await db.run("UPDATE source_claim SET claim = 'hacked' WHERE edge_id = 'edge-1' AND seq = 1");
+        }, /(BR-06|APPEND_ONLY)/);
 
-    // UPDATE must fail with BR-06 error
-    assert.throws(() => {
-        db.run("UPDATE source_claim SET claim_type = 'hacked' WHERE id = 'sc-1'");
-    }, /BR-06/);
-
-    // DELETE must fail with BR-06 error
-    assert.throws(() => {
-        db.run("DELETE FROM source_claim WHERE id = 'sc-1'");
-    }, /BR-06/);
+        // DELETE must fail with BR-06 error
+        await assert.rejects(async () => {
+            await db.run("DELETE FROM source_claim WHERE edge_id = 'edge-1' AND seq = 1");
+        }, /(BR-06|APPEND_ONLY)/);
+    } finally {
+        await pg.cleanup();
+    }
 });

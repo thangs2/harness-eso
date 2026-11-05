@@ -1,49 +1,52 @@
 /**
- * @mu/eso-graph — Q2 Column Impact Query Implementation (ESO-55 / US-ARCH-03 / Slice S1)
+ * @mu/eso-graph — Q2 Column Impact Query (ESO-55 / US-ARCH-03 / Slice S1 / ESO-447)
  *
  * Invariants:
- * - INV-GR-01: Không bịa cạnh, chỉ duyệt theo quan hệ thật trong graph_edge (maps_to, references, declares).
- *   Traversal ngược chiều: table -> entity -> dto -> app_service. 0 chiều xuôi.
- * - INV-GR-02: Completeness theo câu hỏi K(Q2) = [table, entity, column], threshold >= floor.
- * - INV-GR-03 / BR-05: Khi completeness < threshold, cấm kết luận "không gãy gì" (absent); phải trả status: 'unknown'.
- * - AC-ARCH-03-01: Happy path: chuỗi ngược chiều entity -> dto -> app_service.
- * - AC-ARCH-03-02: Edge: coverage thấp -> unknown, error: 'LOW_COVERAGE'.
- * - AC-ARCH-03-03: Failure: Cấm liệt kê file thừa không dùng bảng; thừa là OVERREACH -> từ chối.
- * - AC-ARCH-03-04: Edge: Bảng không ai đọc -> danh sách rỗng, không OVERREACH.
- * - AC-ARCH-03-05: Edge: Entity trỏ bảng đã xóa / không tồn tại -> unknowns có mục DANGLING_TABLE, status: 'unknown'.
+ * - D-92 / D-93 / 26.graph-schema.md: Target PostgreSQL columns:
+ *     graph_node(project, build_id, node_id, kind, node_key, path)
+ *     graph_edge(project, build_id, edge_id, from_node_id, to_node_id, kind, conflict)
+ *     source_claim(project, build_id, edge_id, seq, source_kind, claim, at)
+ *     completeness(project, build_id, question, per_kind, value, measured_at)
+ * - INV-GR-01: Reverse-dependency impact chain strictly: entity -> dto -> app_service.
+ * - INV-GR-02: Completeness tính theo K(Q2), floor = 0.80, threshold = 0.90.
+ * - BR-05: Khi completeness < threshold (nhưng >= floor), trả status: 'unknown' và LOW_COVERAGE, cấm "không gãy gì".
+ * - AC-ARCH-03-03: Kiểm tra candidates; nếu chứa file không phụ thuộc table -> từ chối với OVERREACH.
+ * - AC-ARCH-03-04: Bảng không ai đọc -> danh sách rỗng, 0 file bịa.
+ * - AC-ARCH-03-05: Entity trỏ tới bảng đã xoá -> trả unknown + DANGLING_TABLE.
  */
 
 import { calculateCompleteness } from './completeness.mjs';
 
 export const DEFAULT_THRESHOLD_Q2 = 0.90;
 export const DEFAULT_FLOOR_Q2 = 0.80;
-export const ALLOWED_RELATIONS_Q2 = ['maps_to', 'references', 'declares'];
 
 /**
- * Query column impact (Q2)
+ * Query column impact for Q2: "đổi cột bảng thì cái gì gãy"
  *
- * @param {object} db Database handle (exec, all, run, get)
- * @param {object} params
- * @param {string} params.project Project identifier (INV-GR-03)
- * @param {string} params.table Table name to analyze
- * @param {string} [params.column] Specific column name (optional)
- * @param {number|object} [params.completeness] Explicit completeness or overrides
- * @param {number} [params.threshold] Minimum threshold (defaults to 0.90)
- * @param {number} [params.floor] Refusal floor (defaults to 0.80)
- * @param {string} [params.buildId] Optional build identifier
- * @param {Array<string>} [params.candidates] If provided, validates against candidate list to check for OVERREACH (AC-ARCH-03-03)
- * @returns {object} Query result
+ * @param {object} db - Database adapter instance
+ * @param {object} options
+ * @param {string} options.project - Project identifier (required)
+ * @param {string} options.table - Target table name (required)
+ * @param {string} [options.column=null] - Column being modified
+ * @param {Array<string>} [options.candidates=null] - Candidate files to validate
+ * @param {number|object} [options.completeness=null] - Completeness override
+ * @param {number} [options.threshold=0.90] - Target threshold
+ * @param {number} [options.floor=0.80] - Refusal floor
+ * @param {string} [options.buildId=null] - Build identifier
+ * @returns {Promise<object>}
  */
-export function queryColumnImpact(db, {
-    project,
-    table,
-    column,
-    completeness,
-    threshold = DEFAULT_THRESHOLD_Q2,
-    floor = DEFAULT_FLOOR_Q2,
-    buildId = null,
-    candidates = null,
-} = {}) {
+export async function queryColumnImpact(db, options = {}) {
+    const {
+        project,
+        table,
+        column = null,
+        candidates = null,
+        completeness = null,
+        threshold = DEFAULT_THRESHOLD_Q2,
+        floor = DEFAULT_FLOOR_Q2,
+        buildId = null,
+    } = options;
+
     const normProject = (project || '').trim();
     const normTable = (table || '').trim();
 
@@ -75,10 +78,17 @@ export function queryColumnImpact(db, {
     } else if (completeness && typeof completeness.value === 'number') {
         compVal = completeness.value;
         completenessObj = completeness;
-    } else {
-        const computed = calculateCompleteness(db, normProject, 'Q2');
-        compVal = computed.value;
-        completenessObj = computed;
+    } else if (db && typeof db.all === 'function') {
+        try {
+            const rows = await db.all(
+                "SELECT value FROM completeness WHERE project = ? AND question = 'Q2' ORDER BY measured_at DESC LIMIT 1",
+                [normProject]
+            );
+            if (rows && rows.length > 0 && typeof rows[0].value === 'number') {
+                compVal = rows[0].value;
+                completenessObj = { question: 'Q2', value: compVal, status: compVal >= threshold ? 'ready' : 'unknown' };
+            }
+        } catch {}
     }
 
     // Refusal when coverage is null or below floor
@@ -101,62 +111,42 @@ export function queryColumnImpact(db, {
     const isUnknown = compVal < threshold;
     const unknowns = [];
 
-    // 2. Locate Table Node in Graph
-    const tableNodes = db.all(
-        `SELECT id, project, kind, name, path, metadata_json
+    // 2. Locate Table Node in Graph (target columns: node_id, node_key, path)
+    const tableNodes = await db.all(
+        `SELECT node_id AS id, node_id, project, kind, node_key AS name, path
          FROM graph_node
-         WHERE project = ? AND (name = ? OR path = ?) AND kind = 'table'`,
+         WHERE project = ? AND (node_key = ? OR path = ?) AND kind = 'table'`,
         [normProject, normTable, normTable]
     );
 
-    // Check if table node is marked as deleted (AC-ARCH-03-05)
-    let isTableDeleted = false;
-    if (tableNodes.length > 0) {
-        const meta = tableNodes[0].metadata_json;
-        if (meta && (meta.includes('"deleted":true') || meta.includes('"status":"deleted"'))) {
-            isTableDeleted = true;
-        }
-    }
-
     // AC-ARCH-03-05: Check for entities referencing a deleted or missing table
     // 1. Via source_claim
-    const danglingClaims = db.all(
-        `SELECT c.id, c.node_id, n.name AS entity_name, n.path AS entity_path
+    const danglingClaims = await db.all(
+        `SELECT c.edge_id, c.claim
          FROM source_claim c
-         JOIN graph_node n ON c.node_id = n.id AND n.project = ?
-         WHERE c.project = ? AND c.claim_payload LIKE ?`,
-        [normProject, normProject, `%"${normTable}"%`]
-    );
-
-    // 2. Via entity metadata_json
-    const danglingEntities = db.all(
-        `SELECT id, name, path
-         FROM graph_node
-         WHERE project = ? AND kind = 'entity' AND metadata_json LIKE ?`,
+         WHERE c.project = ? AND c.claim LIKE ?`,
         [normProject, `%"${normTable}"%`]
     );
 
-    // 3. Via graph_edge if table was soft-deleted or exists
+    // 2. Via graph_edge if table is absent
     let danglingEdges = [];
-    if (tableNodes.length > 0 && isTableDeleted) {
-        danglingEdges = db.all(
-            `SELECT e.id, e.source_id, n.name AS entity_name, n.path AS entity_path
+    if (tableNodes.length === 0) {
+        danglingEdges = await db.all(
+            `SELECT e.edge_id, e.from_node_id, n.node_key AS entity_name, n.path AS entity_path
              FROM graph_edge e
-             JOIN graph_node n ON e.source_id = n.id AND n.project = ?
-             WHERE e.project = ? AND e.target_id = ? AND e.relation = 'maps_to'`,
-            [normProject, normProject, tableNodes[0].id]
+             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?
+             WHERE e.project = ? AND (e.to_node_id = ? OR e.to_node_id LIKE ?) AND e.kind = 'maps_to'`,
+            [normProject, normProject, normTable, `%${normTable}%`]
         );
     }
 
     const referencingNames = new Set([
-        ...danglingClaims.map((c) => c.entity_name),
-        ...danglingEntities.map((e) => e.name),
+        ...danglingClaims.map((c) => normTable),
         ...danglingEdges.map((e) => e.entity_name),
     ]);
 
-    if (tableNodes.length === 0 || isTableDeleted) {
-        if (referencingNames.size > 0) {
-            // AC-ARCH-03-05: Dangling table reference detected
+    if (tableNodes.length === 0) {
+        if (referencingNames.size > 0 || danglingClaims.length > 0) {
             unknowns.push({
                 type: 'DANGLING_TABLE',
                 table: normTable,
@@ -178,7 +168,7 @@ export function queryColumnImpact(db, {
             };
         }
 
-        // Table simply not found and not referenced by anything
+        // Table simply not found and not referenced
         return {
             status: isUnknown ? 'unknown' : 'ready',
             project: normProject,
@@ -196,14 +186,14 @@ export function queryColumnImpact(db, {
     const tableNode = tableNodes[0];
 
     // 3. Reverse Traversal: table -> entity -> dto -> app_service (AC-ARCH-03-01 & INV-GR-01)
-    // Step 3a: table <- entity (via maps_to or declares or references)
-    const entityEdges = db.all(
-        `SELECT e.source_id, n.id, n.kind, n.name, n.path
+    // Step 3a: table <- entity (via maps_to or references or defines)
+    const entityEdges = await db.all(
+        `SELECT e.from_node_id AS source_id, n.node_id AS id, n.kind, n.node_key AS name, n.path
          FROM graph_edge e
-         JOIN graph_node n ON e.source_id = n.id AND n.project = ?
-         WHERE e.project = ? AND e.target_id = ? AND e.relation IN ('maps_to', 'references', 'declares')
+         JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?
+         WHERE e.project = ? AND e.to_node_id = ? AND e.kind IN ('maps_to', 'references', 'defines')
            AND n.kind = 'entity'`,
-        [normProject, normProject, tableNode.id]
+        [normProject, normProject, tableNode.node_id]
     );
 
     // AC-ARCH-03-04: If no entity or consumer reads this table -> empty list, ready
@@ -243,11 +233,11 @@ export function queryColumnImpact(db, {
 
     if (entityIds.length > 0) {
         const entityPlaceholders = entityIds.map(() => '?').join(',');
-        const dtoEdges = db.all(
-            `SELECT e.source_id, n.id, n.kind, n.name, n.path
+        const dtoEdges = await db.all(
+            `SELECT e.from_node_id AS source_id, n.node_id AS id, n.kind, n.node_key AS name, n.path
              FROM graph_edge e
-             JOIN graph_node n ON e.source_id = n.id AND n.project = ?
-             WHERE e.project = ? AND e.target_id IN (${entityPlaceholders}) AND e.relation IN ('references', 'maps_to')
+             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?
+             WHERE e.project = ? AND e.to_node_id IN (${entityPlaceholders}) AND e.kind IN ('references', 'maps_to')
                AND n.kind = 'dto'`,
             [normProject, normProject, ...entityIds]
         );
@@ -266,15 +256,15 @@ export function queryColumnImpact(db, {
 
     // Step 3c: dto <- app_service (via references)
     const appServices = [];
-    const nextHopIds = [...dtoIds, ...entityIds]; // Services might reference DTO or Entity directly
+    const nextHopIds = [...dtoIds, ...entityIds];
 
     if (nextHopIds.length > 0) {
         const hopPlaceholders = nextHopIds.map(() => '?').join(',');
-        const serviceEdges = db.all(
-            `SELECT e.source_id, n.id, n.kind, n.name, n.path
+        const serviceEdges = await db.all(
+            `SELECT e.from_node_id AS source_id, n.node_id AS id, n.kind, n.node_key AS name, n.path
              FROM graph_edge e
-             JOIN graph_node n ON e.source_id = n.id AND n.project = ?
-             WHERE e.project = ? AND e.target_id IN (${hopPlaceholders}) AND e.relation IN ('references')
+             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?
+             WHERE e.project = ? AND e.to_node_id IN (${hopPlaceholders}) AND e.kind IN ('references')
                AND n.kind IN ('app_service', 'service')`,
             [normProject, normProject, ...nextHopIds]
         );
@@ -311,7 +301,6 @@ export function queryColumnImpact(db, {
         }
     }
 
-    // Return reverse-chain: entity -> dto -> app_service
     const impactChain = [
         ...entities.map((e) => ({ ...e, step: 1, role: 'entity' })),
         ...dtos.map((d) => ({ ...d, step: 2, role: 'dto' })),

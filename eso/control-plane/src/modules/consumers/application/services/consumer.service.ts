@@ -11,14 +11,15 @@ import { ConsumerRepository, ConsumerProfileInput } from '../../infrastructure/p
 export class ConsumerService {
     constructor(private readonly repository: ConsumerRepository) {}
 
-    list() {
+    async list() {
+        const rows = await this.repository.list();
         return {
-            items: this.repository.list().map((row) => this.toSummary(row)),
+            items: rows.map((row) => this.toSummary(row)),
         };
     }
 
-    get(project: string) {
-        const row = this.repository.get(project);
+    async get(project: string) {
+        const row = await this.repository.get(project);
         if (!row) {
             throw new NotFoundException({
                 code: 'CONSUMER_NOT_FOUND',
@@ -28,18 +29,18 @@ export class ConsumerService {
         return this.toResponse(row);
     }
 
-    create(dto: ConsumerProfileDto) {
+    async create(dto: ConsumerProfileDto) {
         this.validate(dto);
-        if (this.repository.get(dto.id)) {
+        if (await this.repository.get(dto.id)) {
             throw new ConflictException({
                 code: 'CONSUMER_EXISTS',
                 detail: `Consumer "${dto.id}" already has a profile`,
             });
         }
-        return this.toResponse(this.repository.create(dto as ConsumerProfileInput));
+        return this.toResponse(await this.repository.create(dto as ConsumerProfileInput));
     }
 
-    update(project: string, dto: ConsumerProfileDto) {
+    async update(project: string, dto: ConsumerProfileDto) {
         if (dto.id !== project) {
             throw new BadRequestException({
                 code: 'CONSUMER_ID_MISMATCH',
@@ -47,13 +48,13 @@ export class ConsumerService {
             });
         }
         this.validate(dto);
-        if (!this.repository.get(project)) {
+        if (!(await this.repository.get(project))) {
             throw new NotFoundException({
                 code: 'CONSUMER_NOT_FOUND',
                 detail: `No consumer profile for project "${project}"`,
             });
         }
-        return this.toResponse(this.repository.update(project, dto as ConsumerProfileInput));
+        return this.toResponse(await this.repository.update(project, dto as ConsumerProfileInput));
     }
 
 

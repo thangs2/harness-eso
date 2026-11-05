@@ -13,41 +13,26 @@ import {
     decrementVersion,
 } from '../src/index.mjs';
 
+import { createTestPgDb } from '../../../qc/helpers/test-pg-db.mjs';
+
 async function createTestDb() {
-    if (typeof Bun !== 'undefined') {
-        const { Database } = await import('bun:sqlite');
-        const db = new Database(':memory:');
-        return {
-            exec: (sql) => db.exec(sql),
-            all: (sql, params = []) => db.query(sql).all(...params),
-            run: (sql, params = []) => db.query(sql).run(...params),
-            get: (sql, params = []) => db.query(sql).get(...params),
-        };
-    } else {
-        const { DatabaseSync } = await import('node:sqlite');
-        const db = new DatabaseSync(':memory:');
-        return {
-            exec: (sql) => db.exec(sql),
-            all: (sql, params = []) => db.prepare(sql).all(...params),
-            run: (sql, params = []) => db.prepare(sql).run(...params),
-            get: (sql, params = []) => db.prepare(sql).get(...params),
-        };
-    }
+    return (await createTestPgDb()).db;
 }
+
 
 describe('ESO Learning Proposal Domain (Slice S1 / ESO-150 / US-LEARN-01)', () => {
     it('Schema: creates proposal table and enforces schema constraints', async () => {
         const db = await createTestDb();
-        initProposalSchema(db);
+        await initProposalSchema(db);
 
         // Insert valid proposal
-        db.run(
+        await db.run(
             `INSERT INTO proposal (project, proposal_id, version, risk_kind, evidence, expected_effect, revert, status)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             ['proj-1', 'prop-001', 1, 'missing-evidence', JSON.stringify(['gap-1', 'gap-2']), 'unsat_rate down', JSON.stringify({ action: 'rollback_rule' }), 'proposed']
         );
 
-        const row = db.get(`SELECT * FROM proposal WHERE project = ? AND proposal_id = ?`, ['proj-1', 'prop-001']);
+        const row = await db.get(`SELECT * FROM proposal WHERE project = ? AND proposal_id = ?`, ['proj-1', 'prop-001']);
         assert.ok(row);
         assert.equal(row.project, 'proj-1');
         assert.equal(row.status, 'proposed');

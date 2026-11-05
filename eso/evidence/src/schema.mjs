@@ -113,7 +113,40 @@ CREATE TABLE IF NOT EXISTS evidence_risk (
 
 CREATE INDEX IF NOT EXISTS idx_evidence_risk_project_id ON evidence_risk(project, risk_id);
 
--- 4. config_event: configuration save and revert history (API-14 / US-EV-02 / DM-CONFIG-EVENT)
+-- Append-Only Triggers (BR-06) — PostgreSQL trigger function, D-93.
+CREATE OR REPLACE FUNCTION raise_evidence_append_only()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'BR-06: % is append-only. % is forbidden.', TG_TABLE_NAME, TG_OP;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_evidence_turn_no_change ON evidence_turn;
+CREATE TRIGGER trg_evidence_turn_no_change
+BEFORE UPDATE OR DELETE ON evidence_turn
+FOR EACH ROW EXECUTE FUNCTION raise_evidence_append_only();
+
+DROP TRIGGER IF EXISTS trg_evidence_item_no_change ON evidence_item;
+CREATE TRIGGER trg_evidence_item_no_change
+BEFORE UPDATE OR DELETE ON evidence_item
+FOR EACH ROW EXECUTE FUNCTION raise_evidence_append_only();
+
+DROP TRIGGER IF EXISTS trg_evidence_risk_no_change ON evidence_risk;
+CREATE TRIGGER trg_evidence_risk_no_change
+BEFORE UPDATE OR DELETE ON evidence_risk
+FOR EACH ROW EXECUTE FUNCTION raise_evidence_append_only();
+
+`;
+
+/**
+ * The evidence plane's own config_event. D-73 gives control plane and ctx separate stores, but a
+ * single PostgreSQL schema holds one `config_event` name: the control plane's row shape
+ * (id/event_type/created_at) and the evidence row shape (event_id/kind/marked/at) cannot share a
+ * table. `initEvidenceSchema` therefore creates this table only when the name is free; when a
+ * control-plane store already owns `config_event`, the evidence tables still come up and the
+ * evidence revert API is simply not part of that database.
+ */
+export const CONFIG_EVENT_SQL = `
 CREATE TABLE IF NOT EXISTS config_event (
     project TEXT NOT NULL,
     event_id TEXT NOT NULL,
@@ -127,85 +160,55 @@ CREATE TABLE IF NOT EXISTS config_event (
 
 CREATE INDEX IF NOT EXISTS idx_config_event_project_at ON config_event(project, at DESC);
 
--- Append-Only Triggers (BR-06)
-CREATE TRIGGER IF NOT EXISTS trg_evidence_turn_no_update
-BEFORE UPDATE ON evidence_turn
-BEGIN
-    SELECT RAISE(ABORT, 'BR-06: evidence_turn is append-only. UPDATE is forbidden.');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_evidence_turn_no_delete
-BEFORE DELETE ON evidence_turn
-BEGIN
-    SELECT RAISE(ABORT, 'BR-06: evidence_turn is append-only. DELETE is forbidden.');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_evidence_item_no_update
-BEFORE UPDATE ON evidence_item
-BEGIN
-    SELECT RAISE(ABORT, 'BR-06: evidence_item is append-only. UPDATE is forbidden.');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_evidence_item_no_delete
-BEFORE DELETE ON evidence_item
-BEGIN
-    SELECT RAISE(ABORT, 'BR-06: evidence_item is append-only. DELETE is forbidden.');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_evidence_risk_no_update
-BEFORE UPDATE ON evidence_risk
-BEGIN
-    SELECT RAISE(ABORT, 'BR-06: evidence_risk is append-only. UPDATE is forbidden.');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_evidence_risk_no_delete
-BEFORE DELETE ON evidence_risk
-BEGIN
-    SELECT RAISE(ABORT, 'BR-06: evidence_risk is append-only. DELETE is forbidden.');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_config_event_no_update
-BEFORE UPDATE ON config_event
-BEGIN
-    SELECT RAISE(ABORT, 'BR-06: config_event is append-only. UPDATE is forbidden.');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_config_event_no_delete
-BEFORE DELETE ON config_event
-BEGIN
-    SELECT RAISE(ABORT, 'BR-06: config_event is append-only. DELETE is forbidden.');
-END;
+DROP TRIGGER IF EXISTS trg_config_event_no_change ON config_event;
+CREATE TRIGGER trg_config_event_no_change
+BEFORE UPDATE OR DELETE ON config_event
+FOR EACH ROW EXECUTE FUNCTION raise_evidence_append_only();
 `;
 
 export const POSTGRES_RLS_SQL = `
 ALTER TABLE evidence_turn ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_turn FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS turn_project_only ON evidence_turn;
 CREATE POLICY turn_project_only ON evidence_turn
     FOR ALL
     USING (project = current_setting('eso.project', true));
 
 ALTER TABLE evidence_item ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_item FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS item_project_only ON evidence_item;
 CREATE POLICY item_project_only ON evidence_item
     FOR ALL
     USING (project = current_setting('eso.project', true));
 
 ALTER TABLE evidence_risk ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_risk FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS risk_project_only ON evidence_risk;
 CREATE POLICY risk_project_only ON evidence_risk
     FOR ALL
     USING (project = current_setting('eso.project', true));
 
 ALTER TABLE config_event ENABLE ROW LEVEL SECURITY;
 ALTER TABLE config_event FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS config_event_project_only ON config_event;
 CREATE POLICY config_event_project_only ON config_event
     FOR ALL
     USING (project = current_setting('eso.project', true));
 `;
 
-export function initEvidenceSchema(db) {
+/**
+ * Create the evidence tables. PostgreSQL only (D-93): the SQLite trigger syntax this
+ * module carried until the D-93 migration is gone, so an old SQLite handle cannot pass.
+ *
+ * RLS is opt-in: enabling it requires every session to set `eso.project`, which belongs to
+ * the adapter that opens the connection (see eso/graph/src/schema.mjs for the pattern).
+ */
+export async function initEvidenceSchema(db, { enableRls = false } = {}) {
     if (!db || typeof db.exec !== 'function') {
-        throw new Error('Database handle with exec() is required');
+        throw new Error('Database handle with async exec() is required (PostgreSQL, D-93)');
     }
-    db.exec(SCHEMA_SQL);
+    await db.exec(SCHEMA_SQL);
+    const configEvent = await db.get(`SELECT to_regclass('config_event') AS oid`);
+    if (!configEvent || !configEvent.oid) await db.exec(CONFIG_EVENT_SQL);
+    if (enableRls) await db.exec(POSTGRES_RLS_SQL);
 }

@@ -1,53 +1,26 @@
 import { randomUUID } from 'node:crypto';
 
+import { initEvidenceSchema } from '../../evidence/src/schema.mjs';
+
 /**
- * @mu/eso-adapters — Host Bridge & Evidence Turn Ingestion
+ * @mu/eso-adapters — Host Bridge & Evidence Turn Ingestion (D-93: PostgreSQL only)
  *
  * Implements:
- * - Table schema creation for `evidence_turn` (DM-EVIDENCE-TURN)
+ * - Table schema creation for `evidence_turn` — delegated to the canonical
+ *   `eso/evidence/src/schema.mjs` so the host bridge and the recorder cannot drift.
  * - Turn evidence recording (append-only)
  * - Replay & querying of historical turn evidence
+ *
+ * Every function is async: the store is PostgreSQL via `createDbAdapter`, whose
+ * run/get/all/exec are promises. There is no SQLite branch and no fallback.
  */
 
-export function ensureEvidenceSchema(db) {
+export async function ensureEvidenceSchema(db) {
     if (!db) throw new Error('Database instance required');
-
-    const ddl = `
-        CREATE TABLE IF NOT EXISTS evidence_turn (
-            project      TEXT NOT NULL,
-            turn_id      TEXT NOT NULL,
-            at           TEXT NOT NULL,
-            actor_role   TEXT NOT NULL,
-            actor_status TEXT NOT NULL,
-            level        TEXT NOT NULL,
-            mode         TEXT NOT NULL,
-            basis        TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
-            payload      TEXT NOT NULL,
-            PRIMARY KEY (project, turn_id)
-        );
-
-        -- Must match eso/evidence/src/schema.mjs: the canonical recorder inserts items
-        -- without a timestamp (the turn row carries the only at). An extra NOT NULL
-        -- at column here rejected every canonical recordTurn on adapter-created stores.
-        CREATE TABLE IF NOT EXISTS evidence_item (
-            project      TEXT NOT NULL,
-            turn_id      TEXT NOT NULL,
-            seq          INTEGER NOT NULL,
-            kind         TEXT NOT NULL,
-            payload      TEXT NOT NULL,
-            PRIMARY KEY (project, turn_id, seq)
-        );
-    `;
-
-    if (typeof db.exec === 'function') {
-        db.exec(ddl);
-    } else if (typeof db.run === 'function') {
-        db.run(ddl);
-    }
+    await initEvidenceSchema(db);
 }
 
-export function recordTurnEvidence({
+export async function recordTurnEvidence({
     db,
     project,
     turnId = randomUUID(),
@@ -63,7 +36,7 @@ export function recordTurnEvidence({
     if (!db) throw new Error('db is required');
     if (!project) throw new Error('project is required');
 
-    ensureEvidenceSchema(db);
+    await ensureEvidenceSchema(db);
 
     const validLevels = ['insufficient', 'partial', 'sufficient', 'cannot-judge', 'unsurfaced'];
     if (!validLevels.includes(level)) {
@@ -87,29 +60,11 @@ export function recordTurnEvidence({
 
     const payloadJson = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
-    const sql = `
-        INSERT INTO evidence_turn (project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const params = [
-        project,
-        turnId,
-        at,
-        actorRole,
-        actorStatus,
-        level,
-        mode,
-        basis,
-        ruleVersion,
-        payloadJson,
-    ];
-
-    if (typeof db.run === 'function') {
-        db.run(sql, ...params);
-    } else if (typeof db.prepare === 'function') {
-        db.prepare(sql).run(...params);
-    }
+    await db.run(
+        `INSERT INTO evidence_turn (project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version, payload)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [project, turnId, at, actorRole, actorStatus, level, mode, basis, ruleVersion, payloadJson],
+    );
 
     return {
         project,
@@ -125,7 +80,7 @@ export function recordTurnEvidence({
     };
 }
 
-export function readTurnEvidence({
+export async function readTurnEvidence({
     db,
     project,
     turnId,
@@ -134,16 +89,12 @@ export function readTurnEvidence({
     if (!project) throw new Error('project is required');
     if (!turnId) throw new Error('turnId is required');
 
-    ensureEvidenceSchema(db);
+    await ensureEvidenceSchema(db);
 
-    const sql = `SELECT * FROM evidence_turn WHERE project = ? AND turn_id = ? LIMIT 1`;
-    let row = null;
-
-    if (typeof db.get === 'function') {
-        row = db.get(sql, project, turnId);
-    } else if (typeof db.prepare === 'function') {
-        row = db.prepare(sql).get(project, turnId);
-    }
+    const row = await db.get(
+        'SELECT * FROM evidence_turn WHERE project = ? AND turn_id = ? LIMIT 1',
+        [project, turnId],
+    );
 
     if (!row) return null;
 
@@ -161,7 +112,7 @@ export function readTurnEvidence({
     };
 }
 
-export function listTurnEvidence({
+export async function listTurnEvidence({
     db,
     project,
     limit = 50,
@@ -169,16 +120,12 @@ export function listTurnEvidence({
     if (!db) throw new Error('db is required');
     if (!project) throw new Error('project is required');
 
-    ensureEvidenceSchema(db);
+    await ensureEvidenceSchema(db);
 
-    const sql = `SELECT * FROM evidence_turn WHERE project = ? ORDER BY at DESC LIMIT ?`;
-    let rows = [];
-
-    if (typeof db.all === 'function') {
-        rows = db.all(sql, project, limit);
-    } else if (typeof db.prepare === 'function') {
-        rows = db.prepare(sql).all(project, limit);
-    }
+    const rows = await db.all(
+        'SELECT * FROM evidence_turn WHERE project = ? ORDER BY at DESC LIMIT ?',
+        [project, limit],
+    );
 
     return rows.map((row) => ({
         project: row.project,

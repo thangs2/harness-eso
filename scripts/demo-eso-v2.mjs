@@ -1,9 +1,9 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * ESO v2 demo — control plane end-to-end.
  *
- *   node scripts/demo-eso-v2.mjs --check     # run assertions, exit 0/1
- *   node scripts/demo-eso-v2.mjs --serve     # seed and keep the server on :8787
+ *   bun scripts/demo-eso-v2.mjs --check     # run assertions, exit 0/1
+ *   bun scripts/demo-eso-v2.mjs --serve     # seed and keep the server on :8787
  *
  * Everything is written under /tmp. It never touches a real consumer, x79 or
  * comments/artifacts. The only repo write is `npm run build` in
@@ -30,9 +30,9 @@ const NEW_CONFIG = {
 };
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`Usage: node scripts/demo-eso-v2.mjs [--check|--serve] [--no-build] [--port=8787]
+  console.log(`Usage: bun scripts/demo-eso-v2.mjs [--check|--serve] [--no-build] [--port=8787]
 
-  --check      run the 10 demo assertions (default), exit 0/1
+  --check      run the 11 demo assertions (default), exit 0/1
   --serve      seed a file DB and keep the control plane running on 127.0.0.1:8787
   --no-build   reuse the current eso/control-plane/dist
   --port=N     port for --serve (default 8787)`);
@@ -54,10 +54,12 @@ if (!existsSync(join(CP, 'dist/main.js'))) {
   fail('dist/main.js is missing — run without --no-build');
 }
 
-const { createDbAdapter } = await import(pathToFileURL(join(REPO, 'eso/graph/src/db-adapter.mjs')).href);
-const { initSchema } = await import(pathToFileURL(join(REPO, 'eso/graph/src/schema.mjs')).href);
-const { ensureEvidenceSchema, recordTurnEvidence } = await import(
-  pathToFileURL(join(REPO, 'eso/adapters/src/host-bridge.mjs')).href
+// Graph database layer is PostgreSQL ONLY (D-92 / D-93 / ESO-447).
+const { createDbAdapter: createGraphDbAdapter } = await import(
+  pathToFileURL(join(REPO, 'eso/graph/src/db-adapter.mjs')).href
+);
+const { initSchema: initGraphSchema } = await import(
+  pathToFileURL(join(REPO, 'eso/graph/src/schema.mjs')).href
 );
 const { createNestFastifyControlPlane } = await import(
   pathToFileURL(join(CP, 'dist/main.js')).href
@@ -70,6 +72,9 @@ const { saveConfig } = await import(
     join(CP, 'dist/modules/config/infrastructure/persistence/repositories/config.repository.js')
   ).href
 );
+const { ensureEvidenceSchema, recordTurnEvidence } = await import(
+  pathToFileURL(join(REPO, 'eso/adapters/src/host-bridge.mjs')).href
+);
 const { queryEndpointPermissions } = await import(
   pathToFileURL(join(REPO, 'eso/graph/src/q4-permissions.mjs')).href
 );
@@ -77,14 +82,19 @@ const { querySliceTenantBoundary } = await import(
   pathToFileURL(join(REPO, 'eso/graph/src/q5-tenant.mjs')).href
 );
 
-const workDir = mkdtempSync(join(tmpdir(), 'eso-demo-'));
-const dbFile = MODE === 'serve' ? join(workDir, 'demo.sqlite') : ':memory:';
-const db = createDbAdapter(dbFile);
-initSchema(db);
-initConfigSchema(db);
-ensureEvidenceSchema(db);
+const dbUrl = process.env.ESO_DEMO_DB_URL || process.env.ESO_GRAPH_DB_URL || process.env.GRAPH_DATABASE_URL;
+if (!dbUrl) fail('PostgreSQL URL required: set ESO_DEMO_DB_URL (D-93: no SQLite)');
+const demoSchema = `eso_demo_${process.pid}_${Date.now()}`;
+const schemaAdmin = new Bun.SQL(dbUrl);
+await schemaAdmin.unsafe(`CREATE SCHEMA ${demoSchema}`);
+await schemaAdmin.close();
+const db = createGraphDbAdapter(dbUrl, { schema: demoSchema });
+const graphDb = db;
+await initGraphSchema(graphDb);
+await initConfigSchema(db);
+await ensureEvidenceSchema(db);
 
-saveConfig(db, {
+await saveConfig(db, {
   project: PROJECT,
   config: {
     team: { name: 'demo-team', size: 3 },
@@ -93,7 +103,7 @@ saveConfig(db, {
   },
   operator: 'demo',
 });
-recordTurnEvidence({
+await recordTurnEvidence({
   db,
   project: PROJECT,
   turnId: 'demo-turn-001',
@@ -102,7 +112,7 @@ recordTurnEvidence({
   basis: 'verified',
   payload: { work: 'sửa cột tenants', gaps: 2 },
 });
-recordTurnEvidence({
+await recordTurnEvidence({
   db,
   project: PROJECT,
   turnId: 'demo-turn-002',
@@ -142,7 +152,6 @@ if (MODE === 'serve') {
   console.log(`\n[demo] control plane: ${base}`);
   console.log(`[demo] token:         ${TOKEN}`);
   console.log(`[demo] project:       ${PROJECT}`);
-  console.log(`[demo] DB:            ${dbFile}`);
   console.log('\nOpen:');
   console.log(`  ${base}/work-overview?project=${PROJECT}`);
   console.log('\nCurl:');
@@ -155,8 +164,8 @@ if (MODE === 'serve') {
     process.once('SIGTERM', resolvePromise);
   });
   await app.close();
-  try { if (typeof db.close === 'function') db.close(); } catch {}
-  console.log('[demo] stopped; DB kept at', dbFile);
+  try { if (typeof db.close === 'function') await db.close(); } catch {}
+  console.log('[demo] stopped');
   process.exit(0);
 }
 
@@ -265,7 +274,7 @@ await check('S1 without token -> 401', async () => {
 await check('Q4 project is mandatory', async () => {
   let code = null;
   try {
-    queryEndpointPermissions({ endpointId: 'GET /demo' });
+    await queryEndpointPermissions({ endpointId: 'GET /demo', db: graphDb });
   } catch (error) {
     code = error.code;
   }
@@ -276,7 +285,7 @@ await check('Q4 project is mandatory', async () => {
 await check('Q5 project is mandatory', async () => {
   let code = null;
   try {
-    querySliceTenantBoundary({ sliceId: 'demo' });
+    await querySliceTenantBoundary({ sliceId: 'demo', db: graphDb });
   } catch (error) {
     code = error.code;
   }
@@ -285,12 +294,17 @@ await check('Q5 project is mandatory', async () => {
 });
 
 await app.close();
-try { if (typeof db.close === 'function') db.close(); } catch {}
+try { if (typeof db.close === 'function') await db.close(); } catch {}
 
 console.log(`\n[demo] ${checks.length} checks`);
+let failed = 0;
 for (const c of checks) {
-  console.log(`${c.ok ? 'PASS' : 'FAIL'}  ${c.name} — ${c.detail}`);
+  if (c.ok) {
+    console.log(`PASS  ${c.name} — ${c.detail}`);
+  } else {
+    failed++;
+    console.log(`FAIL  ${c.name} — ${c.detail}`);
+  }
 }
-const failed = checks.filter((c) => !c.ok).length;
 console.log(`\n[demo] ${checks.length - failed} pass, ${failed} fail`);
-process.exit(failed ? 1 : 0);
+if (failed > 0) process.exit(1);

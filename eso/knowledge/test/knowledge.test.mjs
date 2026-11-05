@@ -1,27 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { createTestPgDb } from '../../../qc/helpers/test-pg-db.mjs';
+
 async function createTestDb() {
-  if (typeof Bun !== 'undefined') {
-    const { Database } = await import('bun:sqlite');
-    const db = new Database(':memory:');
-    return {
-      exec: (sql) => db.exec(sql),
-      all: (sql, params = []) => db.query(sql).all(...params),
-      run: (sql, params = []) => db.query(sql).run(...params),
-      get: (sql, params = []) => db.query(sql).get(...params),
-    };
-  } else {
-    const { DatabaseSync } = await import('node:sqlite');
-    const db = new DatabaseSync(':memory:');
-    return {
-      exec: (sql) => db.exec(sql),
-      all: (sql, params = []) => db.prepare(sql).all(...params),
-      run: (sql, params = []) => db.prepare(sql).run(...params),
-      get: (sql, params = []) => db.prepare(sql).get(...params),
-    };
-  }
+    return (await createTestPgDb()).db;
 }
+
 
 import {
   resolveEffectiveKnowledge,
@@ -179,15 +164,15 @@ describe('ESO Knowledge Isolation & Resolver (Slice S1 / ESO-24)', () => {
   describe('5.1 / ESO-125: Declaration Table DDL & Resolved[] (Slice S1)', () => {
     it('DDL: declaration table initializes with primary key (project, kind, path, version)', async () => {
       const db = await createTestDb();
-      initDeclarationSchema(db);
+      await initDeclarationSchema(db);
 
       // Insert valid row
-      db.exec(`
+      await db.exec(`
         INSERT INTO declaration (project, kind, path, applies_when, content_hash, overrides, proposal_id, version, status)
         VALUES ('proj-alpha', 'skill', 'skills/auth.md', '{"globs":["src/**"]}', 'hash123', '{}', NULL, '1.0', 'current');
       `);
 
-      const rows = db.all('SELECT * FROM declaration WHERE project = ?', ['proj-alpha']);
+      const rows = await db.all('SELECT * FROM declaration WHERE project = ?', ['proj-alpha']);
       assert.equal(rows.length, 1);
       assert.equal(rows[0].kind, 'skill');
       assert.equal(rows[0].version, '1.0');
@@ -196,16 +181,14 @@ describe('ESO Knowledge Isolation & Resolver (Slice S1 / ESO-24)', () => {
 
     it('BR-10: declaration is append-only, DELETE is forbidden via trigger', async () => {
       const db = await createTestDb();
-      initDeclarationSchema(db);
+      await initDeclarationSchema(db);
 
-      db.exec(`
+      await db.exec(`
         INSERT INTO declaration (project, kind, path, applies_when, content_hash, overrides, proposal_id, version, status)
         VALUES ('proj-alpha', 'skill', 'skills/auth.md', '{}', 'hash123', '{}', NULL, '1.0', 'current');
       `);
 
-      assert.throws(() => {
-        db.exec("DELETE FROM declaration WHERE project = 'proj-alpha'");
-      }, (err) => {
+      await assert.rejects(() => db.exec("DELETE FROM declaration WHERE project = 'proj-alpha'"), (err) => {
         assert(err.message.includes('BR-10: declaration is append-only. DELETE is forbidden.'));
         return true;
       });

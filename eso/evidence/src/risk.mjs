@@ -21,7 +21,7 @@
  * @param {string} [params.at] Timestamp
  * @returns {object} Open risk event summary
  */
-export function openRisk(db, {
+export async function openRisk(db, {
     project,
     risk_id,
     actor,
@@ -36,7 +36,7 @@ export function openRisk(db, {
     const normRiskId = risk_id.trim();
 
     // Check if risk already has an open event
-    const existing = db.get(
+    const existing = await db.get(
         `SELECT seq, event FROM evidence_risk WHERE project = ? AND risk_id = ? AND seq = 1`,
         [normProject, normRiskId]
     );
@@ -52,7 +52,7 @@ export function openRisk(db, {
         };
     }
 
-    db.run(
+    await db.run(
         `INSERT INTO evidence_risk (project, risk_id, seq, at, event, actor, payload)
          VALUES (?, ?, 1, ?, 'opened', ?, ?)`,
         [normProject, normRiskId, at, actor || 'system', JSON.stringify(payload)]
@@ -80,7 +80,7 @@ export function openRisk(db, {
  * @param {string} [params.at] Timestamp
  * @returns {object} Close event summary
  */
-export function closeRisk(db, {
+export async function closeRisk(db, {
     project,
     risk_id,
     actor,
@@ -102,7 +102,7 @@ export function closeRisk(db, {
     const normRiskId = risk_id.trim();
 
     // Fetch latest event for this risk
-    const latest = db.get(
+    const latest = await db.get(
         `SELECT seq, event
          FROM evidence_risk
          WHERE project = ? AND risk_id = ?
@@ -131,7 +131,7 @@ export function closeRisk(db, {
         by: actor.trim(),
     };
 
-    db.run(
+    await db.run(
         `INSERT INTO evidence_risk (project, risk_id, seq, at, event, actor, payload)
          VALUES (?, ?, ?, ?, 'closed', ?, ?)`,
         [normProject, normRiskId, nextSeq, at, actor.trim(), JSON.stringify(closurePayload)]
@@ -157,8 +157,8 @@ export function closeRisk(db, {
  * @param {string} params.risk_id Risk identifier
  * @returns {Array<object>} History of events
  */
-export function getRiskHistory(db, { project, risk_id } = {}) {
-    const rows = db.all(
+export async function getRiskHistory(db, { project, risk_id } = {}) {
+    const rows = await db.all(
         `SELECT project, risk_id, seq, at, event, actor, payload
          FROM evidence_risk
          WHERE project = ? AND risk_id = ?
@@ -186,11 +186,11 @@ export function getRiskHistory(db, { project, risk_id } = {}) {
  * @param {string} params.project Project identifier
  * @returns {Array<object>} List of active risks
  */
-export function listActiveRisks(db, { project } = {}) {
+export async function listActiveRisks(db, { project } = {}) {
     if (!project) throw new Error('project is required');
 
     // Subquery getting the latest event for each risk in this project
-    const rows = db.all(
+    const rows = await db.all(
         `SELECT r.project, r.risk_id, r.seq, r.at, r.event, r.actor, r.payload
          FROM evidence_risk r
          INNER JOIN (

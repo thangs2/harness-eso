@@ -20,7 +20,7 @@
  * @param {function} [params.fsExists] Optional filesystem verification callback
  * @returns {object|null} Replay record or null if not found/out of scope
  */
-export function replayTurn(db, { project, turn_id, fsExists = null } = {}) {
+export async function replayTurn(db, { project, turn_id, fsExists = null } = {}) {
     if (!project || !turn_id) {
         throw new Error('project and turn_id are required');
     }
@@ -29,7 +29,7 @@ export function replayTurn(db, { project, turn_id, fsExists = null } = {}) {
     const normTurnId = turn_id.trim();
 
     // AC-EV-03-03: Project isolation query
-    const row = db.get(
+    const row = await db.get(
         `SELECT project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version, payload
          FROM evidence_turn
          WHERE project = ? AND turn_id = ?`,
@@ -43,7 +43,7 @@ export function replayTurn(db, { project, turn_id, fsExists = null } = {}) {
     const payload = JSON.parse(row.payload || '{}');
 
     // Fetch elections / items in sequence
-    const itemRows = db.all(
+    const itemRows = await db.all(
         `SELECT seq, kind, payload
          FROM evidence_item
          WHERE project = ? AND turn_id = ?

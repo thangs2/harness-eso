@@ -116,7 +116,51 @@ export function coverageShortfall({ esoRan, floor = ESO_TEST_FLOOR }) {
     return typeof esoRan === 'number' && esoRan < floor ? { esoRan, floor } : null;
 }
 
+
+/**
+ * Test suites need PostgreSQL (D-93). If the caller did not provide one, start a disposable
+ * postgres:17-alpine container and export the same URL under every test DB name.
+ * No SQLite fallback: if Docker is unavailable, fail before running suites.
+ */
+function ensureTestDatabase() {
+    if (process.env.ESO_TEST_DB_URL || process.env.ESO_GRAPH_DB_URL || process.env.ESO_CTX_DB_URL) return;
+    const info = spawnSync('docker', ['info'], { encoding: 'utf8' });
+    if (info.status !== 0) {
+        console.error('TEST_DB_UNAVAILABLE: set ESO_TEST_DB_URL / ESO_GRAPH_DB_URL or make Docker available');
+        process.exit(2);
+    }
+    const name = `eso-test-pg-${process.pid}-${Date.now()}`;
+    const password = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    const run = spawnSync('docker', ['run', '--rm', '-d', '--name', name,
+        '-e', 'POSTGRES_USER=eso', '-e', `POSTGRES_PASSWORD=${password}`, '-e', 'POSTGRES_DB=eso',
+        '--health-cmd', 'pg_isready -U eso -d eso', '--health-interval', '1s', '--health-retries', '20',
+        '-p', '127.0.0.1::5432', 'postgres:17-alpine'], { encoding: 'utf8' });
+    if (run.status !== 0) {
+        console.error('TEST_DB_START_FAILED:', run.stderr || run.stdout);
+        process.exit(2);
+    }
+    const portOut = spawnSync('docker', ['port', name, '5432/tcp'], { encoding: 'utf8' });
+    const port = (portOut.stdout || '').trim().split(':').pop();
+    let healthy = false;
+    for (let i = 0; i < 60 && port; i++) {
+        const health = spawnSync('docker', ['inspect', '--format', '{{.State.Health.Status}}', name], { encoding: 'utf8' });
+        if ((health.stdout || '').trim() === 'healthy') { healthy = true; break; }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+    }
+    if (!healthy || !port) {
+        spawnSync('docker', ['rm', '-f', name]);
+        console.error('TEST_DB_NOT_READY');
+        process.exit(2);
+    }
+    const url = `postgres://eso:${password}@127.0.0.1:${port}/eso`;
+    process.env.ESO_TEST_DB_URL = url;
+    process.env.ESO_GRAPH_DB_URL = url;
+    process.env.ESO_CTX_DB_URL = url;
+    process.on('exit', () => { spawnSync('docker', ['rm', '-f', name]); });
+}
+
 function main() {
+    ensureTestDatabase();
     /*
      * Positional arguments restrict the run to named suites, for a targeted check; `bun run test`
      * passes none and stays the full gate. The coverage ratchet only applies to the full run, since a

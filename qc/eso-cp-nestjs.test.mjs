@@ -1,22 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDbAdapter } from '../eso/graph/src/db-adapter.mjs';
+import { createTestPgDb } from './helpers/test-pg-db.mjs';
 import { createNestFastifyControlPlane } from '../eso/control-plane/dist/main.js';
 import { initSchema } from '../eso/graph/src/schema.mjs';
 
 import { initConfigSchema } from '../eso/control-plane/src/modules/config/infrastructure/persistence/config.schema.ts';
 
-function createTestDb() {
-    const db = createDbAdapter(':memory:');
-    initSchema(db);
-    initConfigSchema(db);
-    return db;
+async function createTestDb() {
+    const pg = await createTestPgDb();
+    await initSchema(pg.db);
+    await initConfigSchema(pg.db);
+    return pg;
 }
 
 const BEARER_SAMPLE = 'synthetic-bearer-sample';
 
 test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite', async () => {
-    const db = createTestDb();
+    const pg = await createTestDb();
+    const db = pg.db;
     const app = await createNestFastifyControlPlane({
         db,
         authToken: BEARER_SAMPLE,
@@ -41,7 +42,7 @@ test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite'
 
         // 3. GET /config reads config with valid token
         const { saveConfig } = await import('../eso/control-plane/src/modules/config/infrastructure/persistence/repositories/config.repository.ts');
-        const savedInitial = saveConfig(db, {
+        const savedInitial = await saveConfig(db, {
             project: 'p1',
             config: { setting: 'initial' },
             operator: 'setup',
@@ -137,8 +138,9 @@ test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite'
 
         // 8. GET /work-overview returns text/html work overview
         const { ensureEvidenceSchema, recordTurnEvidence } = await import('../eso/adapters/src/host-bridge.mjs');
-        ensureEvidenceSchema(db);
-        recordTurnEvidence({
+        // D-93: the host bridge is async now — the fixture must finish before the endpoint reads.
+        await ensureEvidenceSchema(db);
+        await recordTurnEvidence({
             db,
             project: 'p1',
             turnId: 'turn-nest-1',
@@ -162,6 +164,7 @@ test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite'
         assert.match(s1Html, /data-turn-id="turn-nest-1"/);
     } finally {
         await app.close();
+        await pg.cleanup();
     }
 });
 

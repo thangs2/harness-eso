@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDbAdapter } from '../eso/graph/src/db-adapter.mjs';
+import { createTestPgDb } from './helpers/test-pg-db.mjs';
 import { initSchema } from '../eso/graph/src/schema.mjs';
 import { initConfigSchema } from '../eso/control-plane/src/modules/config/infrastructure/persistence/config.schema.ts';
 import { ensureEvidenceSchema, recordTurnEvidence } from '../eso/adapters/src/host-bridge.mjs';
@@ -8,12 +8,13 @@ import { createNestFastifyControlPlane } from '../eso/control-plane/dist/main.js
 import { queryEndpointPermissions } from '../eso/graph/src/q4-permissions.mjs';
 import { querySliceTenantBoundary } from '../eso/graph/src/q5-tenant.mjs';
 
-function createTestDb() {
-    const db = createDbAdapter(':memory:');
-    initSchema(db);
-    initConfigSchema(db);
-    ensureEvidenceSchema(db);
-    return db;
+async function createTestDb() {
+    const pg = await createTestPgDb();
+    const db = pg.db;
+    await initSchema(db);
+    await initConfigSchema(db);
+    await ensureEvidenceSchema(db);
+    return pg;
 }
 
 const BEARER = ['synthetic', 'qc', 'adversarial', 'token'].join('-');
@@ -23,7 +24,8 @@ const REQUEST_HEADERS = {
 };
 
 test('ADVERSARIAL QC 1: Auth Fail-Closed — server with NO authToken rejects protected endpoints', async () => {
-    const db = createTestDb();
+    const pg = await createTestDb();
+    const db = pg.db;
     const app = await createNestFastifyControlPlane({ db });
     await app.listen(0, '127.0.0.1');
     const port = app.getHttpAdapter().getInstance().server.address().port;
@@ -66,15 +68,17 @@ test('ADVERSARIAL QC 1: Auth Fail-Closed — server with NO authToken rejects pr
         assert.equal(sv.status, 401);
     } finally {
         await app.close();
+        await pg.cleanup();
     }
 });
 
 test('ADVERSARIAL QC 2: Stored XSS Prevention in /s1 endpoint', async () => {
-    const db = createTestDb();
+    const pg = await createTestDb();
+    const db = pg.db;
     const maliciousTurnId = 'turn<script>alert("xss")</script>';
     const maliciousProject = 'proj<img src=x onerror=alert(1)>';
 
-    recordTurnEvidence({
+    await recordTurnEvidence({
         db,
         project: maliciousProject,
         turnId: maliciousTurnId,
@@ -107,11 +111,13 @@ test('ADVERSARIAL QC 2: Stored XSS Prevention in /s1 endpoint', async () => {
         assert.ok(html.includes('&lt;img'));
     } finally {
         await app.close();
+        await pg.cleanup();
     }
 });
 
 test('ADVERSARIAL QC 3: Concurrency & Preview Hash verification', async () => {
-    const db = createTestDb();
+    const pg = await createTestDb();
+    const db = pg.db;
     const app = await createNestFastifyControlPlane({ db, authToken: BEARER });
     await app.listen(0, '127.0.0.1');
     const port = app.getHttpAdapter().getInstance().server.address().port;
@@ -187,11 +193,13 @@ test('ADVERSARIAL QC 3: Concurrency & Preview Hash verification', async () => {
         assert.equal(staleBody.code, 'STALE_VERSION');
     } finally {
         await app.close();
+        await pg.cleanup();
     }
 });
 
 test('ADVERSARIAL QC 4: Strict validation, error masking, and health duck-typing', async () => {
-    const db = createTestDb();
+    const pg = await createTestDb();
+    const db = pg.db;
     const app = await createNestFastifyControlPlane({ db, authToken: BEARER });
     await app.listen(0, '127.0.0.1');
     const port = app.getHttpAdapter().getInstance().server.address().port;
@@ -250,10 +258,11 @@ test('ADVERSARIAL QC 4: Strict validation, error masking, and health duck-typing
         assert.equal(JSON.stringify(boomBody).includes('SQLITE_ERROR'), false);
     } finally {
         await boomApp.close();
+        await pg.cleanup();
     }
 });
 
-test('ADVERSARIAL QC 5: Q4/Q5 Tenant Boundary & Mandatory Project Enforcement', () => {
+test('ADVERSARIAL QC 5: Q4/Q5 Tenant Boundary & Mandatory Project Enforcement', async () => {
     // Missing project throws INVALID_PROJECT
     assert.throws(
         () => queryEndpointPermissions({ endpoint: '/test' }),
@@ -266,19 +275,20 @@ test('ADVERSARIAL QC 5: Q4/Q5 Tenant Boundary & Mandatory Project Enforcement', 
     );
 
     // Isolated projects have 0 cross-project leakage
-    const db = createTestDb();
+    const pg = await createTestDb();
+    const db = pg.db;
     try {
         // Verify functions run cleanly when project is supplied
-        const q4A = queryEndpointPermissions({ db, project: 'tenant-a', endpointId: 'e1', coverage: 0.5 });
-        const q4B = queryEndpointPermissions({ db, project: 'tenant-b', endpointId: 'e1', coverage: 0.5 });
+        const q4A = await queryEndpointPermissions({ db, project: 'tenant-a', endpointId: 'e1', coverage: 0.5 });
+        const q4B = await queryEndpointPermissions({ db, project: 'tenant-b', endpointId: 'e1', coverage: 0.5 });
         assert.equal(q4A.status, 'unknown');
         assert.equal(q4B.status, 'unknown');
 
-        const q5A = querySliceTenantBoundary({ db, project: 'tenant-a', sliceId: 's1' });
-        const q5B = querySliceTenantBoundary({ db, project: 'tenant-b', sliceId: 's1' });
+        const q5A = await querySliceTenantBoundary({ db, project: 'tenant-a', sliceId: 's1' });
+        const q5B = await querySliceTenantBoundary({ db, project: 'tenant-b', sliceId: 's1' });
         assert.equal(q5A.status, 'unknown');
         assert.equal(q5B.status, 'unknown');
     } finally {
-        db.close();
+        await pg.cleanup();
     }
 });

@@ -43,11 +43,16 @@ CREATE INDEX IF NOT EXISTS idx_declaration_path
 ON declaration(project, path, version);
 
 -- Triggers: BR-10 immutability enforcement
-CREATE TRIGGER IF NOT EXISTS trg_declaration_no_delete
-BEFORE DELETE ON declaration
+CREATE OR REPLACE FUNCTION declaration_append_only()
+RETURNS TRIGGER AS $$
 BEGIN
-    SELECT RAISE(ABORT, 'BR-10: declaration is append-only. DELETE is forbidden.');
+    RAISE EXCEPTION 'BR-10: declaration is append-only. DELETE is forbidden.';
 END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_declaration_no_delete ON declaration;
+CREATE TRIGGER trg_declaration_no_delete
+BEFORE DELETE ON declaration
+FOR EACH ROW EXECUTE FUNCTION declaration_append_only();
 `;
 
 export const DECLARATION_POSTGRES_RLS_SQL = `
@@ -58,9 +63,9 @@ CREATE POLICY declaration_project_only ON declaration
     USING (project = current_setting('eso.project', true) OR project = 'shared' OR project = 'pool');
 `;
 
-export function initDeclarationSchema(db) {
+export async function initDeclarationSchema(db) {
     if (!db || typeof db.exec !== 'function') {
         throw new Error('Database handle with exec() is required');
     }
-    db.exec(DECLARATION_SCHEMA_SQL);
+    await db.exec(DECLARATION_SCHEMA_SQL);
 }

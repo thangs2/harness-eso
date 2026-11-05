@@ -1,61 +1,11 @@
 /**
- * Unified SQLite DB adapter compatible with both Node.js (node:sqlite) and Bun (bun:sqlite).
+ * Unified PostgreSQL DB adapter using Bun.SQL (D-92/D-93 / ESO-447).
  *
- * Implements T-04.5 (ESO-372): Single contract for Node + Bun without `typeof db.all` branching.
+ * Invariants:
+ * - D-92 / D-93: Graph database is PostgreSQL ONLY. SQLite is strictly prohibited.
+ * - INV-GR-03: Multi-tenant project isolation with PostgreSQL RLS.
+ * - Single contract providing exec, run, all, get, begin, close without SQLite dependencies.
  */
-const isBun = typeof process !== 'undefined' && Boolean(process.versions?.bun);
-
-let DatabaseSyncClass;
-let BunDatabaseClass;
-
-if (isBun) {
-    const { Database } = await import('bun:sqlite');
-    BunDatabaseClass = Database;
-} else {
-    const { DatabaseSync } = await import('node:sqlite');
-    DatabaseSyncClass = DatabaseSync;
-}
-
-function normalizeOptions(options) {
-    const opts = options ? { ...options } : {};
-    const isReadOnly = Boolean(opts.readonly || opts.readOnly);
-    if (isBun) {
-        opts.safeIntegers = true;
-        if (isReadOnly) {
-            opts.readonly = true;
-            delete opts.readOnly;
-        }
-    } else {
-        if (isReadOnly) {
-            opts.readOnly = true;
-            delete opts.readonly;
-        }
-    }
-    return opts;
-}
-
-function normalizeQuery(sql, args) {
-    if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null && !Array.isArray(args[0])) {
-        const paramObj = args[0];
-        const positionalParams = [];
-        const transformedSql = sql.replace(/([:@$][a-zA-Z0-9_]+)/g, (match, paramName) => {
-            const keyWithoutPrefix = paramName.slice(1);
-            if (paramName in paramObj) {
-                positionalParams.push(paramObj[paramName]);
-                return '?';
-            } else if (keyWithoutPrefix in paramObj) {
-                positionalParams.push(paramObj[keyWithoutPrefix]);
-                return '?';
-            }
-            return match;
-        });
-        return { sql: transformedSql, params: positionalParams };
-    }
-    if (args.length === 1 && Array.isArray(args[0])) {
-        return { sql, params: args[0] };
-    }
-    return { sql, params: args };
-}
 
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
@@ -68,67 +18,129 @@ function normalizeRow(row) {
             if (val >= MIN_SAFE_BIGINT && val <= MAX_SAFE_BIGINT) {
                 row[key] = Number(val);
             }
+        } else if (typeof val === 'string' && /^-?\d+$/.test(val) && val.length >= 16) {
+            try {
+                const b = BigInt(val);
+                if (b > MAX_SAFE_BIGINT || b < MIN_SAFE_BIGINT) {
+                    row[key] = b;
+                }
+            } catch {}
         }
     }
     return row;
 }
 
-export function createDbAdapter(filename = ':memory:', options) {
-    const normOptions = normalizeOptions(options);
-    const rawDb = isBun
-        ? new BunDatabaseClass(filename, normOptions)
-        : new DatabaseSyncClass(filename, normOptions);
+export function normalizeQuery(sql, args) {
+    if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null && !Array.isArray(args[0])) {
+        const paramObj = args[0];
+        const positionalParams = [];
+        let index = 1;
+        const transformedSql = sql.replace(/([:@$][a-zA-Z0-9_]+)/g, (match, paramName) => {
+            const keyWithoutPrefix = paramName.slice(1);
+            if (paramName in paramObj) {
+                positionalParams.push(paramObj[paramName]);
+                return `$${index++}`;
+            } else if (keyWithoutPrefix in paramObj) {
+                positionalParams.push(paramObj[keyWithoutPrefix]);
+                return `$${index++}`;
+            }
+            return match;
+        });
+        return { sql: transformedSql, params: positionalParams };
+    }
 
+    const flatParams = (args.length === 1 && Array.isArray(args[0])) ? args[0] : args;
+
+    if (sql.includes('?')) {
+        let index = 1;
+        const transformedSql = sql.replace(/\?/g, () => `$${index++}`);
+        return { sql: transformedSql, params: flatParams };
+    }
+
+    return { sql, params: flatParams };
+}
+
+function wrapClient(raw, options = {}) {
     return {
-        raw: rawDb,
-        isBun,
+        raw,
+        isBun: false,
+        isPostgres: true,
 
-        exec(sql) {
-            return rawDb.exec(sql);
+        async exec(sql) {
+            return await raw.unsafe(sql);
         },
 
-        run(sql, ...params) {
+        async run(sql, ...params) {
             const { sql: normSql, params: normParams } = normalizeQuery(sql, params);
-            if (isBun) {
-                const query = rawDb.query(normSql);
-                return query.run(...normParams);
-            }
-            const stmt = rawDb.prepare(normSql);
-            return stmt.run(...normParams);
+            const res = await raw.unsafe(normSql, normParams);
+            return {
+                changes: res.count !== null && res.count !== undefined ? Number(res.count) : (res.affectedRows || 0),
+                lastInsertRowid: res.lastInsertRowid,
+            };
         },
 
-        all(sql, ...params) {
+        async all(sql, ...params) {
             const { sql: normSql, params: normParams } = normalizeQuery(sql, params);
-            if (isBun) {
-                const query = rawDb.query(normSql);
-                const rows = query.all(...normParams);
-                return rows.map(normalizeRow);
-            }
-            const stmt = rawDb.prepare(normSql);
-            if (typeof stmt.setReadBigInts === 'function') {
-                stmt.setReadBigInts(true);
-            }
-            const rows = stmt.all(...normParams);
-            return rows.map(normalizeRow);
+            const rows = await raw.unsafe(normSql, normParams);
+            return Array.from(rows).map(normalizeRow);
         },
 
-        get(sql, ...params) {
-            const { sql: normSql, params: normParams } = normalizeQuery(sql, params);
-            if (isBun) {
-                const query = rawDb.query(normSql);
-                const res = query.get(...normParams);
-                return res === null || res === undefined ? undefined : normalizeRow(res);
-            }
-            const stmt = rawDb.prepare(normSql);
-            if (typeof stmt.setReadBigInts === 'function') {
-                stmt.setReadBigInts(true);
-            }
-            const res = stmt.get(...normParams);
-            return res === null || res === undefined ? undefined : normalizeRow(res);
+        async get(sql, ...params) {
+            const rows = await this.all(sql, ...params);
+            return rows.length > 0 ? rows[0] : undefined;
         },
 
-        close() {
-            return rawDb.close();
+        async begin(fn) {
+            return await raw.begin(async (tx) => {
+                const txAdapter = wrapClient(tx, options);
+                return await fn(txAdapter);
+            });
+        },
+
+        async close() {
+            if (typeof raw.close === 'function') {
+                return await raw.close();
+            }
         },
     };
+}
+
+export function createDbAdapter(urlOrConfig, options = {}) {
+    if (typeof Bun === 'undefined' || typeof Bun.SQL !== 'function') {
+        throw new Error('Bun runtime with Bun.SQL is required for PostgreSQL graph database adapter (D-92/D-93)');
+    }
+
+    let rawUrl = null;
+    if (typeof urlOrConfig === 'string') {
+        const trimmed = urlOrConfig.trim();
+        if (trimmed.startsWith('postgres://') || trimmed.startsWith('postgresql://')) {
+            rawUrl = trimmed;
+        } else {
+            throw new Error('PostgreSQL connection URL required for graph database (D-92/D-93). SQLite is prohibited.');
+        }
+    } else if (urlOrConfig && typeof urlOrConfig === 'object') {
+        if (typeof urlOrConfig.url === 'string') {
+            rawUrl = urlOrConfig.url.trim();
+        }
+    }
+
+    if (!rawUrl) {
+        rawUrl = process.env.ESO_GRAPH_DB_URL || process.env.GRAPH_DATABASE_URL || process.env.DATABASE_URL;
+    }
+
+    if (!rawUrl || (!rawUrl.startsWith('postgres://') && !rawUrl.startsWith('postgresql://'))) {
+        throw new Error('PostgreSQL connection URL required for graph database (D-92/D-93). SQLite is prohibited.');
+    }
+
+    const opts = (urlOrConfig && typeof urlOrConfig === 'object' && !urlOrConfig.url) ? urlOrConfig : options;
+    const targetSchema = opts?.schema || opts?.searchPath;
+
+    let connUrl = rawUrl;
+    if (targetSchema) {
+        const sep = connUrl.includes('?') ? '&' : '?';
+        connUrl = `${connUrl}${sep}options=-csearch_path%3D${encodeURIComponent(targetSchema)}`;
+    }
+
+    const rawDb = new Bun.SQL(connUrl);
+    return wrapClient(rawDb, opts);
 }

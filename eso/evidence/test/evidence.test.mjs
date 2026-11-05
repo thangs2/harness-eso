@@ -2,8 +2,9 @@
  * Unit tests for @mu/eso-evidence (Ticket ESO-65 / Slice S1)
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { createTestPgDb } from '../../../qc/helpers/test-pg-db.mjs';
 
 import {
     initEvidenceSchema,
@@ -25,39 +26,30 @@ import {
 } from '../src/index.mjs';
 
 async function createTestDb() {
-    if (typeof Bun !== 'undefined') {
-        const { Database } = await import('bun:sqlite');
-        const db = new Database(':memory:');
-        return {
-            exec: (sql) => db.exec(sql),
-            all: (sql, params = []) => db.query(sql).all(...params),
-            run: (sql, params = []) => db.query(sql).run(...params),
-            get: (sql, params = []) => db.query(sql).get(...params),
-        };
-    } else {
-        const { DatabaseSync } = await import('node:sqlite');
-        const db = new DatabaseSync(':memory:');
-        return {
-            exec: (sql) => db.exec(sql),
-            all: (sql, params = []) => db.prepare(sql).all(...params),
-            run: (sql, params = []) => db.prepare(sql).run(...params),
-            get: (sql, params = []) => db.prepare(sql).get(...params),
-        };
-    }
+    const pg = await createTestPgDb();
+    await initEvidenceSchema(pg.db);
+    return pg;
 }
 
 describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
     let db;
+    let pg;
 
     beforeEach(async () => {
-        db = await createTestDb();
-        initEvidenceSchema(db);
+        pg = await createTestDb();
+        db = pg.db;
+    });
+
+    afterEach(async () => {
+        if (pg) await pg.cleanup();
+        pg = null;
+        db = null;
     });
 
     describe('Schema DDL & Idempotency', () => {
-        it('creates 3 evidence tables and is idempotent when re-run', () => {
-            assert.doesNotThrow(() => initEvidenceSchema(db));
-            const rows = db.all("SELECT name FROM sqlite_master WHERE type='table'");
+        it('creates 3 evidence tables and is idempotent when re-run', async () => {
+            await assert.doesNotReject(() => initEvidenceSchema(db));
+            const rows = await db.all("SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema()");
             const tableNames = rows.map((r) => r.name);
 
             for (const tbl of EVIDENCE_TABLES) {
@@ -67,55 +59,55 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
     });
 
     describe('BR-06: Append-only enforcement on all evidence tables', () => {
-        it('allows INSERT but aborts UPDATE on evidence_turn', () => {
-            db.run(`INSERT INTO evidence_turn (project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version)
+        it('allows INSERT but aborts UPDATE on evidence_turn', async () => {
+            await db.run(`INSERT INTO evidence_turn (project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version)
                     VALUES ('p1', 't1', '2026-11-03', 'agent', 'FULL', 'sufficient', 'do', 'verified', '1.0')`);
 
-            assert.throws(() => {
-                db.run(`UPDATE evidence_turn SET level = 'partial' WHERE turn_id = 't1'`);
+            await assert.rejects(async () => {
+                await db.run(`UPDATE evidence_turn SET level = 'partial' WHERE turn_id = 't1'`);
             }, /BR-06/);
         });
 
-        it('aborts DELETE on evidence_turn', () => {
-            db.run(`INSERT INTO evidence_turn (project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version)
+        it('aborts DELETE on evidence_turn', async () => {
+            await db.run(`INSERT INTO evidence_turn (project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version)
                     VALUES ('p1', 't1', '2026-11-03', 'agent', 'FULL', 'sufficient', 'do', 'verified', '1.0')`);
 
-            assert.throws(() => {
-                db.run(`DELETE FROM evidence_turn WHERE turn_id = 't1'`);
+            await assert.rejects(async () => {
+                await db.run(`DELETE FROM evidence_turn WHERE turn_id = 't1'`);
             }, /BR-06/);
         });
 
-        it('allows INSERT but aborts UPDATE and DELETE on evidence_item', () => {
-            db.run(`INSERT INTO evidence_turn (project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version)
+        it('allows INSERT but aborts UPDATE and DELETE on evidence_item', async () => {
+            await db.run(`INSERT INTO evidence_turn (project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version)
                     VALUES ('p1', 't1', '2026-11-03', 'agent', 'FULL', 'sufficient', 'do', 'verified', '1.0')`);
-            db.run(`INSERT INTO evidence_item (project, turn_id, seq, kind, payload)
+            await db.run(`INSERT INTO evidence_item (project, turn_id, seq, kind, payload)
                     VALUES ('p1', 't1', 1, 'claim', '{"test":true}')`);
 
-            assert.throws(() => {
-                db.run(`UPDATE evidence_item SET kind = 'election' WHERE turn_id = 't1'`);
+            await assert.rejects(async () => {
+                await db.run(`UPDATE evidence_item SET kind = 'election' WHERE turn_id = 't1'`);
             }, /BR-06/);
 
-            assert.throws(() => {
-                db.run(`DELETE FROM evidence_item WHERE turn_id = 't1'`);
+            await assert.rejects(async () => {
+                await db.run(`DELETE FROM evidence_item WHERE turn_id = 't1'`);
             }, /BR-06/);
         });
 
-        it('allows INSERT but aborts UPDATE and DELETE on evidence_risk', () => {
-            db.run(`INSERT INTO evidence_risk (project, risk_id, seq, at, event, actor, payload)
+        it('allows INSERT but aborts UPDATE and DELETE on evidence_risk', async () => {
+            await db.run(`INSERT INTO evidence_risk (project, risk_id, seq, at, event, actor, payload)
                     VALUES ('p1', 'r1', 1, '2026-11-03', 'open', 'operator', '{"desc":"debt"}')`);
 
-            assert.throws(() => {
-                db.run(`UPDATE evidence_risk SET event = 'close' WHERE risk_id = 'r1'`);
+            await assert.rejects(async () => {
+                await db.run(`UPDATE evidence_risk SET event = 'close' WHERE risk_id = 'r1'`);
             }, /BR-06/);
 
-            assert.throws(() => {
-                db.run(`DELETE FROM evidence_risk WHERE risk_id = 'r1'`);
+            await assert.rejects(async () => {
+                await db.run(`DELETE FROM evidence_risk WHERE risk_id = 'r1'`);
             }, /BR-06/);
         });
     });
 
     describe('AC-EV-01 Acceptance Criteria & Invariants', () => {
-        it('AC-EV-01-01: records turn with level, mode, basis, Resolved[], and FileUse', () => {
+        it('AC-EV-01-01: records turn with level, mode, basis, Resolved[], and FileUse', async () => {
             const turnPayload = {
                 project: 'proj-ac1',
                 turn_id: 'turn-101',
@@ -131,10 +123,10 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 ],
             };
 
-            const recResult = recordTurn(db, turnPayload, { isRuntime: true });
+            const recResult = await recordTurn(db, turnPayload, { isRuntime: true });
             assert.equal(recResult.ok, true);
 
-            const readBack = readTurn(db, { project: 'proj-ac1', turn_id: 'turn-101' });
+            const readBack = await readTurn(db, { project: 'proj-ac1', turn_id: 'turn-101' });
             assert.equal(readBack.project, 'proj-ac1');
             assert.equal(readBack.turn_id, 'turn-101');
             assert.equal(readBack.level, 'sufficient');
@@ -147,7 +139,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(readBack.files_used[0].dirty, false);
         });
 
-        it('AC-EV-01-03: uncommitted file is flagged dirty: true with unreproducible note', () => {
+        it('AC-EV-01-03: uncommitted file is flagged dirty: true with unreproducible note', async () => {
             const turnPayload = {
                 project: 'proj-ac3',
                 turn_id: 'turn-103',
@@ -159,15 +151,15 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 ],
             };
 
-            recordTurn(db, turnPayload, { isRuntime: true });
+            await recordTurn(db, turnPayload, { isRuntime: true });
 
-            const readBack = readTurn(db, { project: 'proj-ac3', turn_id: 'turn-103' });
+            const readBack = await readTurn(db, { project: 'proj-ac3', turn_id: 'turn-103' });
             assert.equal(readBack.files_used[0].dirty, true);
             assert.ok(readBack.files_used[0].note.includes('nội dung không lấy lại được'));
         });
 
-        it('AC-EV-01-04: enforces tenant isolation, returning null for cross-project queries', () => {
-            recordTurn(db, {
+        it('AC-EV-01-04: enforces tenant isolation, returning null for cross-project queries', async () => {
+            await recordTurn(db, {
                 project: 'project-A',
                 turn_id: 'turn-common',
                 level: 'sufficient',
@@ -176,40 +168,40 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             }, { isRuntime: true });
 
             // Project B queries turn-common
-            const readCross = readTurn(db, { project: 'project-B', turn_id: 'turn-common' });
+            const readCross = await readTurn(db, { project: 'project-B', turn_id: 'turn-common' });
             assert.equal(readCross, null, 'Must NOT return record belonging to project-A');
         });
 
-        it('AC-EV-01-05: rejects direct write attempt from non-runtime caller with DIRECT_WRITE_FORBIDDEN', () => {
-            assert.throws(() => {
-                recordTurn(db, {
+        it('AC-EV-01-05: rejects direct write attempt from non-runtime caller with DIRECT_WRITE_FORBIDDEN', async () => {
+            await assert.rejects(async () => {
+                await recordTurn(db, {
                     project: 'p1',
                     turn_id: 't-unauth',
                 }, { isRuntime: false });
             }, /DIRECT_WRITE_FORBIDDEN/);
         });
 
-        it('AC-EV-01-06 / ED6: idempotent submission: duplicate batch does not create duplicate rows', () => {
+        it('AC-EV-01-06 / ED6: idempotent submission: duplicate batch does not create duplicate rows', async () => {
             const payload = {
                 project: 'proj-idemp',
                 turn_id: 'turn-idemp-1',
                 resolved: [{ elected: true }],
             };
 
-            const first = recordTurn(db, payload, { isRuntime: true });
+            const first = await recordTurn(db, payload, { isRuntime: true });
             assert.equal(first.ok, true);
 
             // Re-submit identical batch
-            const second = recordTurn(db, payload, { isRuntime: true });
+            const second = await recordTurn(db, payload, { isRuntime: true });
             assert.equal(second.ok, true);
             assert.equal(second.idempotentReplay, true);
 
-            const items = db.all(`SELECT * FROM evidence_item WHERE project = 'proj-idemp' AND turn_id = 'turn-idemp-1'`);
+            const items = await db.all(`SELECT * FROM evidence_item WHERE project = 'proj-idemp' AND turn_id = 'turn-idemp-1'`);
             assert.equal(items.length, 1, 'Items must not be duplicated');
         });
 
-        it('AC-EV-01-07 / ED10: flags gone: true when FileUse references a deleted file while keeping hash and commit', () => {
-            recordTurn(db, {
+        it('AC-EV-01-07 / ED10: flags gone: true when FileUse references a deleted file while keeping hash and commit', async () => {
+            await recordTurn(db, {
                 project: 'proj-gone',
                 turn_id: 'turn-gone-1',
                 files_used: [
@@ -221,7 +213,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             // Mock filesystem check
             const mockFsExists = (path) => path === 'src/existing_file.ts';
 
-            const res = readTurn(db, {
+            const res = await readTurn(db, {
                 project: 'proj-gone',
                 turn_id: 'turn-gone-1',
                 fsExists: mockFsExists,
@@ -239,7 +231,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
     });
 
     describe('Ticket ESO-70: Outbox Ingest Pipeline (US-EV-01 / Slice S1)', () => {
-        it('D-20: outbox enqueues synchronously without blocking on database', () => {
+        it('D-20: outbox enqueues synchronously without blocking on database', async () => {
             const outbox = new OutboxBuffer();
             const res = outbox.write({
                 project: 'p-outbox-1',
@@ -253,7 +245,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(outbox.size(), 1);
         });
 
-        it('flushOutbox ships entries into target database idempotently and acks them', () => {
+        it('flushOutbox ships entries into target database idempotently and acks them', async () => {
             const outbox = new OutboxBuffer();
             outbox.write({
                 project: 'p-outbox-2',
@@ -264,18 +256,18 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 resolved: [{ rule: 'LAW-1', elected: true }],
             });
 
-            const flushResult = flushOutbox(outbox, db);
+            const flushResult = await flushOutbox(outbox, db);
             assert.equal(flushResult.shippedCount, 1);
             assert.equal(flushResult.failedCount, 0);
             assert.equal(outbox.size(), 0);
 
             // Verify in db
-            const read = readTurn(db, { project: 'p-outbox-2', turn_id: 't-outbox-2' });
+            const read = await readTurn(db, { project: 'p-outbox-2', turn_id: 't-outbox-2' });
             assert.equal(read.turn_id, 't-outbox-2');
             assert.equal(read.resolved.length, 1);
         });
 
-        it('retains entries in outbox for retry if database operation fails', () => {
+        it('retains entries in outbox for retry if database operation fails', async () => {
             const outbox = new OutboxBuffer();
             outbox.write({
                 project: 'p-failing',
@@ -292,28 +284,28 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 all: () => [],
             };
 
-            const flushResult = flushOutbox(outbox, failingDb);
+            const flushResult = await flushOutbox(outbox, failingDb);
             assert.equal(flushResult.shippedCount, 0);
             assert.equal(flushResult.failedCount, 1);
             assert.equal(outbox.size(), 1, 'Item must NOT be removed from outbox on DB failure');
 
             // Now flush with real working db -> succeeds
-            const retryResult = flushOutbox(outbox, db);
+            const retryResult = await flushOutbox(outbox, db);
             assert.equal(retryResult.shippedCount, 1);
             assert.equal(outbox.size(), 0);
         });
     });
 
     describe('Ticket ESO-75: Risk Lifecycle (US-EV-04 / Slice S1)', () => {
-        it('AC-EV-04-01: closing a risk appends closed event with actor and reason, preserving opened history', () => {
-            openRisk(db, {
+        it('AC-EV-04-01: closing a risk appends closed event with actor and reason, preserving opened history', async () => {
+            await openRisk(db, {
                 project: 'proj-r1',
                 risk_id: 'risk-101',
                 actor: 'scanner',
                 payload: { debt: 'AST missing' },
             });
 
-            const closeRes = closeRisk(db, {
+            const closeRes = await closeRisk(db, {
                 project: 'proj-r1',
                 risk_id: 'risk-101',
                 actor: 'lead-dev',
@@ -325,56 +317,56 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(closeRes.event, 'closed');
             assert.equal(closeRes.by, 'lead-dev');
 
-            const history = getRiskHistory(db, { project: 'proj-r1', risk_id: 'risk-101' });
+            const history = await getRiskHistory(db, { project: 'proj-r1', risk_id: 'risk-101' });
             assert.equal(history.length, 2);
             assert.equal(history[0].event, 'opened');
             assert.equal(history[1].event, 'closed');
             assert.equal(history[1].payload.reason, 'Refactored AST extractor to cover missing symbols');
         });
 
-        it('AC-EV-04-03: closed risks are excluded from listActiveRisks (proposals)', () => {
-            openRisk(db, { project: 'proj-r3', risk_id: 'risk-open', actor: 'scanner' });
-            openRisk(db, { project: 'proj-r3', risk_id: 'risk-to-close', actor: 'scanner' });
+        it('AC-EV-04-03: closed risks are excluded from listActiveRisks (proposals)', async () => {
+            await openRisk(db, { project: 'proj-r3', risk_id: 'risk-open', actor: 'scanner' });
+            await openRisk(db, { project: 'proj-r3', risk_id: 'risk-to-close', actor: 'scanner' });
 
-            closeRisk(db, {
+            await closeRisk(db, {
                 project: 'proj-r3',
                 risk_id: 'risk-to-close',
                 actor: 'operator',
                 reason: 'Mitigated in production',
             });
 
-            const active = listActiveRisks(db, { project: 'proj-r3' });
+            const active = await listActiveRisks(db, { project: 'proj-r3' });
             assert.equal(active.length, 1);
             assert.equal(active[0].risk_id, 'risk-open');
         });
 
-        it('AC-EV-04-04 / ED6: closing an already closed risk throws ALREADY_CLOSED and does not append event', () => {
-            openRisk(db, { project: 'proj-r4', risk_id: 'risk-twice', actor: 'scanner' });
-            closeRisk(db, { project: 'proj-r4', risk_id: 'risk-twice', actor: 'lead', reason: 'Fixed' });
+        it('AC-EV-04-04 / ED6: closing an already closed risk throws ALREADY_CLOSED and does not append event', async () => {
+            await openRisk(db, { project: 'proj-r4', risk_id: 'risk-twice', actor: 'scanner' });
+            await closeRisk(db, { project: 'proj-r4', risk_id: 'risk-twice', actor: 'lead', reason: 'Fixed' });
 
-            assert.throws(() => {
-                closeRisk(db, { project: 'proj-r4', risk_id: 'risk-twice', actor: 'lead', reason: 'Fixed again' });
+            await assert.rejects(async () => {
+                await closeRisk(db, { project: 'proj-r4', risk_id: 'risk-twice', actor: 'lead', reason: 'Fixed again' });
             }, (err) => {
                 return err.code === 'ALREADY_CLOSED' || err.message.includes('ALREADY_CLOSED');
             });
 
-            const history = getRiskHistory(db, { project: 'proj-r4', risk_id: 'risk-twice' });
+            const history = await getRiskHistory(db, { project: 'proj-r4', risk_id: 'risk-twice' });
             assert.equal(history.length, 2, 'Must have exactly 2 events (opened and 1 closed)');
         });
 
-        it('AC-EV-04-05 / ED7: deterministic event order: closed risk does not enter proposal clusters', () => {
-            openRisk(db, { project: 'proj-race', risk_id: 'risk-race', actor: 'agent' });
-            closeRisk(db, { project: 'proj-race', risk_id: 'risk-race', actor: 'reviewer', reason: 'Closed before cluster' });
+        it('AC-EV-04-05 / ED7: deterministic event order: closed risk does not enter proposal clusters', async () => {
+            await openRisk(db, { project: 'proj-race', risk_id: 'risk-race', actor: 'agent' });
+            await closeRisk(db, { project: 'proj-race', risk_id: 'risk-race', actor: 'reviewer', reason: 'Closed before cluster' });
 
-            const cluster = listActiveRisks(db, { project: 'proj-race' });
+            const cluster = await listActiveRisks(db, { project: 'proj-race' });
             const inCluster = cluster.some((r) => r.risk_id === 'risk-race');
             assert.equal(inCluster, false, 'Closed risk must never enter active proposal cluster');
         });
     });
 
     describe('Ticket ESO-80: Replay Turn (US-EV-03 / Slice S1)', () => {
-        it('AC-EV-03-01: replays matching level, mode, basis, Resolved[], and FileUse[]', () => {
-            recordTurn(db, {
+        it('AC-EV-03-01: replays matching level, mode, basis, Resolved[], and FileUse[]', async () => {
+            await recordTurn(db, {
                 project: 'proj-rep-1',
                 turn_id: 'turn-rep-101',
                 level: 'sufficient',
@@ -385,7 +377,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 payload: { skill_versions: { 'skill-audit': '1.0' } },
             }, { isRuntime: true });
 
-            const rep = replayTurn(db, { project: 'proj-rep-1', turn_id: 'turn-rep-101' });
+            const rep = await replayTurn(db, { project: 'proj-rep-1', turn_id: 'turn-rep-101' });
             assert.equal(rep.level, 'sufficient');
             assert.equal(rep.mode, 'do');
             assert.equal(rep.basis, 'verified');
@@ -394,8 +386,8 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(rep.skill_versions['skill-audit'], '1.0');
         });
 
-        it('AC-EV-03-02: explicit note for dirty file', () => {
-            recordTurn(db, {
+        it('AC-EV-03-02: explicit note for dirty file', async () => {
+            await recordTurn(db, {
                 project: 'proj-rep-2',
                 turn_id: 'turn-rep-102',
                 level: 'partial',
@@ -404,13 +396,13 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 files_used: [{ path: 'src/wip.ts', hash: 'sha:wip', dirty: true }],
             }, { isRuntime: true });
 
-            const rep = replayTurn(db, { project: 'proj-rep-2', turn_id: 'turn-rep-102' });
+            const rep = await replayTurn(db, { project: 'proj-rep-2', turn_id: 'turn-rep-102' });
             assert.equal(rep.files_used[0].dirty, true);
             assert.ok(rep.files_used[0].note.includes('nội dung không lấy lại được'));
         });
 
-        it('AC-EV-03-03: cross-project query returns null', () => {
-            recordTurn(db, {
+        it('AC-EV-03-03: cross-project query returns null', async () => {
+            await recordTurn(db, {
                 project: 'proj-rep-3A',
                 turn_id: 'turn-rep-secret',
                 level: 'sufficient',
@@ -418,12 +410,12 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 basis: 'verified',
             }, { isRuntime: true });
 
-            const rep = replayTurn(db, { project: 'proj-rep-3B', turn_id: 'turn-rep-secret' });
+            const rep = await replayTurn(db, { project: 'proj-rep-3B', turn_id: 'turn-rep-secret' });
             assert.equal(rep, null);
         });
 
-        it('AC-EV-03-04 / ED1: turn that read 0 files returns files_used: [] empty array, never null', () => {
-            recordTurn(db, {
+        it('AC-EV-03-04 / ED1: turn that read 0 files returns files_used: [] empty array, never null', async () => {
+            await recordTurn(db, {
                 project: 'proj-rep-4',
                 turn_id: 'turn-rep-nofiles',
                 level: 'sufficient',
@@ -432,14 +424,14 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 files_used: [],
             }, { isRuntime: true });
 
-            const rep = replayTurn(db, { project: 'proj-rep-4', turn_id: 'turn-rep-nofiles' });
+            const rep = await replayTurn(db, { project: 'proj-rep-4', turn_id: 'turn-rep-nofiles' });
             assert.ok(Array.isArray(rep.files_used), 'files_used must be an array');
             assert.equal(rep.files_used.length, 0);
             assert.notEqual(rep.files_used, null);
         });
 
-        it('AC-EV-03-05 / ED10: deleted file marked dangling: true and gone: true, 0 crash', () => {
-            recordTurn(db, {
+        it('AC-EV-03-05 / ED10: deleted file marked dangling: true and gone: true, 0 crash', async () => {
+            await recordTurn(db, {
                 project: 'proj-rep-5',
                 turn_id: 'turn-rep-dangling',
                 level: 'sufficient',
@@ -449,7 +441,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             }, { isRuntime: true });
 
             const mockFs = () => false; // file removed
-            const rep = replayTurn(db, {
+            const rep = await replayTurn(db, {
                 project: 'proj-rep-5',
                 turn_id: 'turn-rep-dangling',
                 fsExists: mockFs,
@@ -460,8 +452,8 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(rep.files_used[0].content_hash, 'sha:rem');
         });
 
-        it('Gate W2: replaying twice produces completely identical output (zero diff)', () => {
-            recordTurn(db, {
+        it('Gate W2: replaying twice produces completely identical output (zero diff)', async () => {
+            await recordTurn(db, {
                 project: 'proj-w2',
                 turn_id: 'turn-w2-det',
                 level: 'sufficient',
@@ -472,8 +464,8 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 payload: { skill_versions: { 'skill-a': '1.2' } },
             }, { isRuntime: true });
 
-            const pass1 = replayTurn(db, { project: 'proj-w2', turn_id: 'turn-w2-det' });
-            const pass2 = replayTurn(db, { project: 'proj-w2', turn_id: 'turn-w2-det' });
+            const pass1 = await replayTurn(db, { project: 'proj-w2', turn_id: 'turn-w2-det' });
+            const pass2 = await replayTurn(db, { project: 'proj-w2', turn_id: 'turn-w2-det' });
 
             const diff = diffReplays(pass1, pass2);
             assert.deepEqual(diff, [], 'Replaying twice must produce zero diff (Gate W2)');
@@ -481,19 +473,19 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
     });
 
     describe('US-EV-02: Revert Marking & Window Isolation (ESO-85 / Slice S1)', () => {
-        it('AC-EV-02-01: Artefact created in [publish, revert) window is marked with reverted_version and event_id', () => {
+        it('AC-EV-02-01: Artefact created in [publish, revert) window is marked with reverted_version and event_id', async () => {
             const pubAt = '2026-11-04T01:00:00.000Z';
             const midAt = '2026-11-04T01:30:00.000Z';
             const revAt = '2026-11-04T02:00:00.000Z';
 
-            recordConfigSave(db, {
+            await recordConfigSave(db, {
                 project: 'proj-rev-1',
                 event_id: 'save-evt-1',
                 version: 13,
                 at: pubAt,
             });
 
-            recordTurn(db, {
+            await recordTurn(db, {
                 project: 'proj-rev-1',
                 turn_id: 'turn-rev-1',
                 at: midAt,
@@ -505,7 +497,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 },
             }, { isRuntime: true });
 
-            const res = revertConfig(db, {
+            const res = await revertConfig(db, {
                 project: 'proj-rev-1',
                 event_id: 'save-evt-1',
                 revert_event_id: 'rev-evt-1',
@@ -521,20 +513,20 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(res.marked_artifacts[0].artefact_state, 'present');
         });
 
-        it('AC-EV-02-02: Artefacts created outside [publish, revert) window are NOT marked', () => {
+        it('AC-EV-02-02: Artefacts created outside [publish, revert) window are NOT marked', async () => {
             const pubAt = '2026-11-04T01:00:00.000Z';
             const beforeAt = '2026-11-04T00:59:59.000Z';
             const revAt = '2026-11-04T02:00:00.000Z';
             const afterAt = '2026-11-04T02:00:00.000Z'; // exactly at upper boundary (half-open)
 
-            recordConfigSave(db, {
+            await recordConfigSave(db, {
                 project: 'proj-rev-2',
                 event_id: 'save-evt-2',
                 version: 2,
                 at: pubAt,
             });
 
-            recordTurn(db, {
+            await recordTurn(db, {
                 project: 'proj-rev-2',
                 turn_id: 'turn-before',
                 at: beforeAt,
@@ -544,7 +536,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 payload: { artifacts: ['art-before'] },
             }, { isRuntime: true });
 
-            recordTurn(db, {
+            await recordTurn(db, {
                 project: 'proj-rev-2',
                 turn_id: 'turn-at-upper',
                 at: afterAt,
@@ -554,7 +546,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 payload: { artifacts: ['art-upper'] },
             }, { isRuntime: true });
 
-            const res = revertConfig(db, {
+            const res = await revertConfig(db, {
                 project: 'proj-rev-2',
                 event_id: 'save-evt-2',
                 revert_event_id: 'rev-evt-2',
@@ -565,19 +557,19 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.deepEqual(res.marked_artifacts, []);
         });
 
-        it('AC-EV-02-03: MUTATE_FORBIDDEN: Artefact bytes/records are never mutated, config_event is append-only', () => {
+        it('AC-EV-02-03: MUTATE_FORBIDDEN: Artefact bytes/records are never mutated, config_event is append-only', async () => {
             const pubAt = '2026-11-04T01:00:00.000Z';
             const midAt = '2026-11-04T01:10:00.000Z';
             const revAt = '2026-11-04T01:20:00.000Z';
 
-            recordConfigSave(db, {
+            await recordConfigSave(db, {
                 project: 'proj-rev-3',
                 event_id: 'save-evt-3',
                 version: 5,
                 at: pubAt,
             });
 
-            recordTurn(db, {
+            await recordTurn(db, {
                 project: 'proj-rev-3',
                 turn_id: 'turn-immutable',
                 at: midAt,
@@ -587,39 +579,39 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 payload: { artifacts: [{ id: 'art-imm', content_hash: 'sha:fixed' }] },
             }, { isRuntime: true });
 
-            const turnBefore = db.get('SELECT * FROM evidence_turn WHERE project = ? AND turn_id = ?', ['proj-rev-3', 'turn-immutable']);
+            const turnBefore = await db.get('SELECT * FROM evidence_turn WHERE project = ? AND turn_id = ?', ['proj-rev-3', 'turn-immutable']);
 
-            revertConfig(db, {
+            await revertConfig(db, {
                 project: 'proj-rev-3',
                 event_id: 'save-evt-3',
                 at: revAt,
             });
 
-            const turnAfter = db.get('SELECT * FROM evidence_turn WHERE project = ? AND turn_id = ?', ['proj-rev-3', 'turn-immutable']);
+            const turnAfter = await db.get('SELECT * FROM evidence_turn WHERE project = ? AND turn_id = ?', ['proj-rev-3', 'turn-immutable']);
             assert.deepEqual(turnBefore, turnAfter, 'evidence_turn row must be strictly identical before and after revert');
 
             // BR-06: config_event append-only trigger prevents UPDATE and DELETE
-            assert.throws(() => {
-                db.run('UPDATE config_event SET version = 99 WHERE project = ?', ['proj-rev-3']);
+            await assert.rejects(async () => {
+                await db.run('UPDATE config_event SET version = 99 WHERE project = ?', ['proj-rev-3']);
             }, /BR-06/);
 
-            assert.throws(() => {
-                db.run('DELETE FROM config_event WHERE project = ?', ['proj-rev-3']);
+            await assert.rejects(async () => {
+                await db.run('DELETE FROM config_event WHERE project = ?', ['proj-rev-3']);
             }, /BR-06/);
         });
 
-        it('AC-EV-02-04 / ED1: Empty window returns marked_artifacts: [] with window timestamps, 0 error', () => {
+        it('AC-EV-02-04 / ED1: Empty window returns marked_artifacts: [] with window timestamps, 0 error', async () => {
             const pubAt = '2026-11-04T01:00:00.000Z';
             const revAt = '2026-11-04T02:00:00.000Z';
 
-            recordConfigSave(db, {
+            await recordConfigSave(db, {
                 project: 'proj-rev-empty',
                 event_id: 'save-empty',
                 version: 7,
                 at: pubAt,
             });
 
-            const res = revertConfig(db, {
+            const res = await revertConfig(db, {
                 project: 'proj-rev-empty',
                 event_id: 'save-empty',
                 at: revAt,
@@ -630,19 +622,19 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(res.window.to, revAt);
         });
 
-        it('AC-EV-02-05 / ED10: Deleted artefact within window is flagged artefact_state: deleted with 0 crash', () => {
+        it('AC-EV-02-05 / ED10: Deleted artefact within window is flagged artefact_state: deleted with 0 crash', async () => {
             const pubAt = '2026-11-04T01:00:00.000Z';
             const midAt = '2026-11-04T01:30:00.000Z';
             const revAt = '2026-11-04T02:00:00.000Z';
 
-            recordConfigSave(db, {
+            await recordConfigSave(db, {
                 project: 'proj-rev-del',
                 event_id: 'save-del',
                 version: 4,
                 at: pubAt,
             });
 
-            recordTurn(db, {
+            await recordTurn(db, {
                 project: 'proj-rev-del',
                 turn_id: 'turn-del',
                 at: midAt,
@@ -654,7 +646,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 },
             }, { isRuntime: true });
 
-            const res = revertConfig(db, {
+            const res = await revertConfig(db, {
                 project: 'proj-rev-del',
                 event_id: 'save-del',
                 revert_event_id: 'rev-del-evt',
@@ -670,18 +662,18 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(marked.dangling, true);
         });
 
-        it('Boundary tests: exact lower bound [publish.at] is INCLUDED', () => {
+        it('Boundary tests: exact lower bound [publish.at] is INCLUDED', async () => {
             const pubAt = '2026-11-04T01:00:00.000Z';
             const revAt = '2026-11-04T02:00:00.000Z';
 
-            recordConfigSave(db, {
+            await recordConfigSave(db, {
                 project: 'proj-bound',
                 event_id: 'save-bound',
                 version: 9,
                 at: pubAt,
             });
 
-            recordTurn(db, {
+            await recordTurn(db, {
                 project: 'proj-bound',
                 turn_id: 'turn-exact-lower',
                 at: pubAt, // exactly at lower bound
@@ -691,7 +683,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 payload: { artifacts: ['art-lower-bound'] },
             }, { isRuntime: true });
 
-            const res = revertConfig(db, {
+            const res = await revertConfig(db, {
                 project: 'proj-bound',
                 event_id: 'save-bound',
                 at: revAt,
@@ -701,20 +693,20 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.equal(res.marked_artifacts[0].artefact_id, 'art-lower-bound');
         });
 
-        it('Idempotency & computeMarkedArtefacts: repeating revert on same event_id produces identical result and picks up late outbox turns', () => {
+        it('Idempotency & computeMarkedArtefacts: repeating revert on same event_id produces identical result and picks up late outbox turns', async () => {
             const pubAt = '2026-11-04T01:00:00.000Z';
             const midAt1 = '2026-11-04T01:15:00.000Z';
             const midAt2 = '2026-11-04T01:45:00.000Z';
             const revAt = '2026-11-04T02:00:00.000Z';
 
-            recordConfigSave(db, {
+            await recordConfigSave(db, {
                 project: 'proj-idemp',
                 event_id: 'save-idemp',
                 version: 8,
                 at: pubAt,
             });
 
-            recordTurn(db, {
+            await recordTurn(db, {
                 project: 'proj-idemp',
                 turn_id: 'turn-early',
                 at: midAt1,
@@ -724,14 +716,14 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 payload: { artifacts: ['art-early'] },
             }, { isRuntime: true });
 
-            const res1 = revertConfig(db, {
+            const res1 = await revertConfig(db, {
                 project: 'proj-idemp',
                 event_id: 'save-idemp',
                 revert_event_id: 'rev-fixed-id',
                 at: revAt,
             });
 
-            const res2 = revertConfig(db, {
+            const res2 = await revertConfig(db, {
                 project: 'proj-idemp',
                 event_id: 'save-idemp',
                 revert_event_id: 'rev-fixed-id',
@@ -741,7 +733,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
             assert.deepEqual(res1.marked_artifacts, res2.marked_artifacts);
 
             // Now late arriving turn arrives (via outbox flush)
-            recordTurn(db, {
+            await recordTurn(db, {
                 project: 'proj-idemp',
                 turn_id: 'turn-late',
                 at: midAt2,
@@ -751,7 +743,7 @@ describe('@mu/eso-evidence — Unit Test Suite (Slice S1)', () => {
                 payload: { artifacts: ['art-late'] },
             }, { isRuntime: true });
 
-            const recomputed = computeMarkedArtefacts(db, {
+            const recomputed = await computeMarkedArtefacts(db, {
                 project: 'proj-idemp',
                 revert_event_id: 'rev-fixed-id',
             });

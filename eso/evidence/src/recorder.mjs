@@ -28,7 +28,7 @@ import {
  * @param {boolean} [options.isRuntime=false] Authorization token/flag (AC-EV-01-05)
  * @returns {object} Recording result
  */
-export function recordTurn(db, turnData, { isRuntime = false } = {}) {
+export async function recordTurn(db, turnData, { isRuntime = false } = {}) {
     // AC-EV-01-05: RBAC - Only runtime can directly write to evidence tables
     if (!isRuntime) {
         const err = new Error('DIRECT_WRITE_FORBIDDEN: Only authorized runtime can directly write to evidence tables');
@@ -71,7 +71,7 @@ export function recordTurn(db, turnData, { isRuntime = false } = {}) {
     }
 
     // AC-EV-01-06: Idempotent submission: check if (project, turn_id) already exists
-    const existing = db.get(
+    const existing = await db.get(
         `SELECT project, turn_id FROM evidence_turn WHERE project = ? AND turn_id = ?`,
         [project, turn_id]
     );
@@ -106,7 +106,7 @@ export function recordTurn(db, turnData, { isRuntime = false } = {}) {
     };
 
     // Insert evidence_turn
-    db.run(
+    await db.run(
         `INSERT INTO evidence_turn (
             project, turn_id, at, actor_role, actor_status,
             level, mode, basis, rule_version, payload
@@ -129,7 +129,7 @@ export function recordTurn(db, turnData, { isRuntime = false } = {}) {
 
     // AC-EV-01-01: Insert Resolved[] as evidence_item with kind='election'
     for (const elect of resolved) {
-        db.run(
+        await db.run(
             `INSERT INTO evidence_item (project, turn_id, seq, kind, payload)
              VALUES (?, ?, ?, 'election', ?)`,
             [project, turn_id, seqCounter++, JSON.stringify(elect)]
@@ -142,7 +142,7 @@ export function recordTurn(db, turnData, { isRuntime = false } = {}) {
         if (!CLOSED_ITEM_KINDS.includes(kind)) {
             throw new Error(`Invalid item kind: ${kind}`);
         }
-        db.run(
+        await db.run(
             `INSERT INTO evidence_item (project, turn_id, seq, kind, payload)
              VALUES (?, ?, ?, ?, ?)`,
             [project, turn_id, seqCounter++, kind, JSON.stringify(item.payload || item)]
@@ -167,13 +167,13 @@ export function recordTurn(db, turnData, { isRuntime = false } = {}) {
  * @param {function} [params.fsExists] Optional filesystem check: (path) => boolean
  * @returns {object|null} Turn record with Resolved[] and files_used with gone flags
  */
-export function readTurn(db, { project, turn_id, fsExists = null } = {}) {
+export async function readTurn(db, { project, turn_id, fsExists = null } = {}) {
     if (!project || !turn_id) {
         throw new Error('project and turn_id are required');
     }
 
     // AC-EV-01-04: Tenant isolation: query by project
-    const row = db.get(
+    const row = await db.get(
         `SELECT project, turn_id, at, actor_role, actor_status, level, mode, basis, rule_version, payload
          FROM evidence_turn
          WHERE project = ? AND turn_id = ?`,
@@ -187,7 +187,7 @@ export function readTurn(db, { project, turn_id, fsExists = null } = {}) {
     const payload = JSON.parse(row.payload || '{}');
 
     // Read associated items
-    const itemRows = db.all(
+    const itemRows = await db.all(
         `SELECT seq, kind, payload
          FROM evidence_item
          WHERE project = ? AND turn_id = ?

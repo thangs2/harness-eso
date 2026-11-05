@@ -1,7 +1,9 @@
 /**
- * @mu/eso-graph — Q5 Slice Tenant Boundary Query (ESO-211 / US-ARCH-06)
+ * @mu/eso-graph — Q5 Slice Tenant Boundary Query (ESO-211 / US-ARCH-06 / ESO-447)
  *
  * Implements:
+ * - Target columns: graph_node(project, build_id, node_id, kind, node_key, path)
+ *                   graph_edge(project, build_id, edge_id, from_node_id, to_node_id, kind, conflict)
  * - AC-ARCH-06-01: Tenant marker coverage >= 0.95 answers with yes/no and evidence
  * - AC-ARCH-06-02: Implicit tenant (inferred from schema, not declared) returns unknown + LOW_COVERAGE
  * - AC-ARCH-06-03: Coverage < 0.70 rejects claim "không chạm tenant" with LOW_COVERAGE
@@ -11,48 +13,7 @@
 
 export const TENANT_COVERAGE_FLOOR = 0.70;
 
-export function querySliceTenantBoundary({
-    sliceId,
-    project = null,
-    tables = [],
-    graph = null,
-    db = null,
-    coverage = null,
-    isImplicit = false,
-} = {}) {
-    if (!project || typeof project !== 'string' || !project.trim()) {
-        const err = new Error('project is mandatory');
-        err.code = 'INVALID_PROJECT';
-        throw err;
-    }
-    if (!sliceId) throw new Error('sliceId is required');
-
-    const proj = project.trim();
-    const database = db || (graph && typeof graph.all === 'function' ? graph : null);
-    let resolvedTables = Array.isArray(tables) ? tables.filter((t) => !t.project || t.project === proj) : [];
-
-    if (database && resolvedTables.length === 0) {
-        // Read table nodes associated with slice
-        const sql = `SELECT gn.id, gn.name, gn.metadata_json
-             FROM graph_node gn
-             JOIN graph_edge ge ON (ge.target_id = gn.id OR ge.source_id = gn.id)
-             WHERE (ge.source_id = ? OR ge.target_id = ?) AND gn.kind = 'table'
-               AND gn.project = ? AND ge.project = ?`;
-        const params = [sliceId, sliceId, proj, proj];
-        const rows = database.all(sql, params) || [];
-
-        resolvedTables = rows.map((r) => {
-            const meta = JSON.parse(r.metadata_json || '{}');
-            return {
-                id: r.id,
-                name: r.name,
-                has_tenant_marker: meta.has_tenant_marker === true || Boolean(meta.tenant_marker),
-                tenant_marker: meta.tenant_marker || null,
-                cross_tenant: meta.cross_tenant === true,
-            };
-        });
-    }
-
+function evaluateSliceTenant({ sliceId, resolvedTables, coverage, isImplicit }) {
     // AC-ARCH-06-05 / ED1: Slice with 0 tables -> unknown + EMPTY_SLICE
     if (resolvedTables.length === 0) {
         return {
@@ -60,12 +21,12 @@ export function querySliceTenantBoundary({
             code: 'EMPTY_SLICE',
             slice_id: sliceId,
             unknowns: ['empty_slice'],
-            message: 'slice rỗng; không kết luận không chạm',
+            message: 'Slice 0 bảng (slice rỗng); không thể xác định ranh giới tenant',
             completeness: coverage,
         };
     }
 
-    // AC-ARCH-06-02: Implicit tenant (inferred without explicit declaration) -> unknown
+    // AC-ARCH-06-02: Implicit tenant inferred from schema, undeclared
     if (isImplicit) {
         return {
             status: 'unknown',
@@ -90,8 +51,6 @@ export function querySliceTenantBoundary({
     }
 
     // AC-ARCH-06-03 & AC-ARCH-06-04 / ED4: Floor check
-    // If coverage < 0.70 -> rejected with LOW_COVERAGE
-    // If coverage >= 0.70 (including exactly 0.70) -> answerable!
     if (coverage < TENANT_COVERAGE_FLOOR) {
         return {
             status: 'unknown',
@@ -104,7 +63,6 @@ export function querySliceTenantBoundary({
     }
 
     // Check if tables in slice touch tenant boundary
-    // Tables touching tenant: either cross_tenant is true, or tenant_marker is present
     const touchingTables = resolvedTables.filter((t) => t.has_tenant_marker || t.cross_tenant);
     const touchesTenant = touchingTables.length > 0;
 
@@ -118,4 +76,52 @@ export function querySliceTenantBoundary({
         })),
         completeness: coverage,
     };
+}
+
+export function querySliceTenantBoundary({
+    sliceId,
+    project = null,
+    tables = [],
+    graph = null,
+    db = null,
+    coverage = null,
+    isImplicit = false,
+} = {}) {
+    if (!project || typeof project !== 'string' || !project.trim()) {
+        const err = new Error('project is mandatory');
+        err.code = 'INVALID_PROJECT';
+        throw err;
+    }
+    if (!sliceId) throw new Error('sliceId is required');
+
+    const proj = project.trim();
+    const database = db || (graph && typeof graph.all === 'function' ? graph : null);
+    let resolvedTables = Array.isArray(tables) ? tables.filter((t) => !t.project || t.project === proj) : [];
+
+    if (database && resolvedTables.length === 0) {
+        return (async () => {
+            const sql = `SELECT gn.node_id AS id, gn.node_key AS name, gn.path, ge.kind AS edge_kind
+                 FROM graph_node gn
+                 JOIN graph_edge ge ON (ge.to_node_id = gn.node_id OR ge.from_node_id = gn.node_id)
+                 WHERE (ge.from_node_id = ? OR ge.to_node_id = ?) AND gn.kind = 'table'
+                   AND gn.project = ? AND ge.project = ?`;
+            const params = [sliceId, sliceId, proj, proj];
+            const rows = (await database.all(sql, params)) || [];
+
+            const tablesFromDb = rows.map((r) => {
+                const isTenantEdge = r.edge_kind === 'tenant_marker';
+                return {
+                    id: r.id,
+                    name: r.name,
+                    has_tenant_marker: isTenantEdge || (typeof r.name === 'string' && r.name.includes('tenant')),
+                    tenant_marker: isTenantEdge ? 'tenant_marker' : null,
+                    cross_tenant: isTenantEdge,
+                };
+            });
+
+            return evaluateSliceTenant({ sliceId, resolvedTables: tablesFromDb, coverage, isImplicit });
+        })();
+    }
+
+    return evaluateSliceTenant({ sliceId, resolvedTables, coverage, isImplicit });
 }

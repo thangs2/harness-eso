@@ -18,6 +18,6 @@ CREATE TABLE IF NOT EXISTS proposal (
 );
 `;
 
-export function initProposalSchema(db) {
-  db.exec(PROPOSAL_SCHEMA_SQL);
+export async function initProposalSchema(db) {
+  await db.exec(PROPOSAL_SCHEMA_SQL);
 }

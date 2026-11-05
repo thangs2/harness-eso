@@ -128,25 +128,23 @@ CREATE TABLE IF NOT EXISTS provider_audit (
 );
 `;
 
-export function initIamSchema(db) {
-  db.exec(VERB_SCHEMA_SQL);
-  db.exec(ATTRIBUTE_DEF_SCHEMA_SQL);
-  db.exec(ROLE_SCHEMA_SQL);
-  db.exec(ROLE_SCOPE_SCHEMA_SQL);
-  db.exec(WORKER_SCHEMA_SQL);
-  db.exec(POLICY_SCHEMA_SQL);
-  db.exec(CAPABILITY_PIN_SCHEMA_SQL);
-  db.exec(PROVIDER_AUDIT_SCHEMA_SQL);
+export async function initIamSchema(db) {
+  await db.exec(VERB_SCHEMA_SQL);
+  await db.exec(ATTRIBUTE_DEF_SCHEMA_SQL);
+  await db.exec(ROLE_SCHEMA_SQL);
+  await db.exec(ROLE_SCOPE_SCHEMA_SQL);
+  await db.exec(WORKER_SCHEMA_SQL);
+  await db.exec(POLICY_SCHEMA_SQL);
+  await db.exec(CAPABILITY_PIN_SCHEMA_SQL);
+  await db.exec(PROVIDER_AUDIT_SCHEMA_SQL);
 
   // Seed closed verbs
   for (const v of CLOSED_VERBS) {
-    db.run?.(`INSERT OR IGNORE INTO verb (name) VALUES (?)`, [v]) ||
-    db.exec(`INSERT OR IGNORE INTO verb (name) VALUES ('${v}')`);
+    await db.run(`INSERT INTO verb (name) VALUES (?) ON CONFLICT (name) DO NOTHING`, [v]);
   }
 
   // Seed closed attributes
   for (const a of CLOSED_ATTRIBUTES) {
-    db.run?.(`INSERT OR IGNORE INTO attribute_def (name) VALUES (?)`, [a]) ||
-    db.exec(`INSERT OR IGNORE INTO attribute_def (name) VALUES ('${a}')`);
+    await db.run(`INSERT INTO attribute_def (name) VALUES (?) ON CONFLICT (name) DO NOTHING`, [a]);
   }
 }

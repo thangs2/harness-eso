@@ -86,7 +86,17 @@ function resolveAutomated(automated) {
 function runTestFile(fullPath) {
     const isBun = Boolean(process.versions?.bun);
     const args = isBun ? ['test', fullPath] : ['--test', fullPath];
-    const res = spawnSync(process.execPath, args, { encoding: 'utf-8', cwd: REPO_ROOT, timeout: 180_000 });
+    const spawnOnce = () => spawnSync(process.execPath, args, { encoding: 'utf-8', cwd: REPO_ROOT, timeout: 180_000 });
+    let res = spawnOnce();
+    /*
+     * A child killed by a signal never reached a verdict — the host killed it (SIGTERM from the
+     * runner itself on a busy machine is the case seen here). Retry once so an externally killed
+     * process cannot masquerade as a failing suite. A genuine hang is killed again and still
+     * reports `timed_out`; a genuine failure still exits non-zero, so nothing is excused.
+     */
+    if (res.status === null && (res.signal === 'SIGTERM' || res.signal === 'SIGKILL')) {
+        res = spawnOnce();
+    }
     return { exit_code: res.status, timed_out: res.signal === 'SIGTERM' };
 }
 
@@ -194,11 +204,12 @@ function registrySnapshot() {
     );
 }
 
-test('ESO-375: no scenario is marked executed unless the file it names exists and passes', () => {
+test('ESO-375: no scenario is marked executed unless the file it names exists and passes', { timeout: 180_000 }, () => {
     const report = runScenarioRegistry({ registryDir: REGISTRY_DIR });
 
     assert.ok(report.totals.scenarios >= 20, `expected the registry to hold scenarios, got ${report.totals.scenarios}`);
-    assert.equal(report.totals.failed, 0, 'a scenario whose named test file fails must be reported as failed');
+    const failedRows = report.scenarios.filter((s) => s.status === 'failed').map((s) => JSON.stringify({ id: s.scenario_id, file: s.automated, exit: s.exit_code, reason: s.reason, timed: s.timed_out }));
+    assert.equal(report.totals.failed, 0, `a scenario whose named test file fails must be reported as failed: ${failedRows.join(', ')}`);
     assert.ok(
         report.totals.executed >= 20,
         `expected >= 20 scenarios executed by real test files, got ${report.totals.executed} (run ${report.run_id})`,
@@ -220,7 +231,7 @@ test('ESO-375: no scenario is marked executed unless the file it names exists an
     console.log(`SCN run ${report.run_id}: ${report.totals.executed} executed, ${report.totals.failed} failed, ${report.totals.planned} planned`);
 });
 
-test('ESO-375: the report records executed/failed counts and a run id, outside the repository', () => {
+test('ESO-375: the report records executed/failed counts and a run id, outside the repository', { timeout: 180_000 }, () => {
     const registryBefore = registrySnapshot();
     const trackedReport = join(REPO_ROOT, 'comments/artifacts/slp/qc/scn-report.json');
     const trackedBefore = existsSync(trackedReport) ? readFileSync(trackedReport, 'utf-8') : null;
@@ -251,7 +262,7 @@ test('ESO-375: the report records executed/failed counts and a run id, outside t
     }
 });
 
-test('ESO-375: the runner refuses a report path inside the repository', () => {
+test('ESO-375: the runner refuses a report path inside the repository', { timeout: 180_000 }, () => {
     const guarded = join(REPO_ROOT, 'comments/artifacts/slp/qc');
     const marker = join(guarded, 'scn-report.json');
     const before = existsSync(marker) ? readFileSync(marker, 'utf-8') : null;
@@ -264,7 +275,7 @@ test('ESO-375: the runner refuses a report path inside the repository', () => {
     assert.equal(existsSync(marker) ? readFileSync(marker, 'utf-8') : null, before, 'a refused write must leave the tracked file alone');
 });
 
-test('ESO-375: a missing file stays planned, a passing file executes, a failing file is reported failed', () => {
+test('ESO-375: a missing file stays planned, a passing file executes, a failing file is reported failed', { timeout: 180_000 }, () => {
     const tmpDir = join(os.tmpdir(), `eso-scn-synthetic-${process.pid}-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
 

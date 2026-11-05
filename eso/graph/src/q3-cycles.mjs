@@ -1,71 +1,63 @@
 /**
- * @mu/eso-graph — Q3 Circular Dependency Query Implementation (ESO-60 / US-ARCH-04 / Slice S1)
+ * @mu/eso-graph — Q3 Circular Dependency Detection (ESO-60 / US-ARCH-04 / Slice S1 / ESO-447)
  *
  * Invariants:
- * - INV-GR-01: Không bịa cạnh, chỉ duyệt theo quan hệ thật trong graph_edge (depends_on).
- * - INV-GR-02: Completeness theo câu hỏi K(Q3) = [module, package], threshold >= floor (threshold = 0.90, floor = 0.70).
- * - INV-GR-03 / BR-05: Khi completeness < threshold (hoặc < 0.70), cấm kết luận "sạch" / không vòng; phải trả status: 'unknown'.
- * - AC-ARCH-04-01: Happy path: Liệt kê SCC thật (chu trình lặp).
- * - AC-ARCH-04-02: Edge: Diamond / dependency chung không báo vòng giả (0 false positive).
- * - AC-ARCH-04-03: Failure: coverage < 0.70 -> unknown + LOW_COVERAGE, không khẳng định "sạch".
- * - AC-ARCH-04-04: Edge: Graph 0 cạnh depends_on -> trả lời "không có vòng" kèm độ phủ, không im lặng.
- * - AC-ARCH-04-05: Edge: Cạnh depends_on trỏ module đã xóa -> bỏ cạnh treo, unknowns có mục DANGLING_MODULE, không báo vòng giả.
+ * - D-92 / D-93 / 26.graph-schema.md: Target PostgreSQL columns:
+ *     graph_node(project, build_id, node_id, kind, node_key, path)
+ *     graph_edge(project, build_id, edge_id, from_node_id, to_node_id, kind, conflict)
+ *     completeness(project, build_id, question, per_kind, value, measured_at)
+ * - INV-GR-01: Circular dependency detection runs Tarjan SCC on real depends_on edges.
+ * - INV-GR-02: Completeness calculation based on question K(Q3), floor = 0.70, threshold = 0.90.
+ * - BR-05: Khi completeness < floor, từ chối phát biểu không có vòng; trả status: 'unknown' và LOW_COVERAGE.
+ * - AC-ARCH-04-01: Phát hiện đúng chu trình thật (SCC).
+ * - AC-ARCH-04-02: Kim cương (diamond) không báo chu trình giả.
+ * - AC-ARCH-04-04: 0 cạnh depends_on -> nói rõ "không có vòng" kèm completeness.
+ * - AC-ARCH-04-05: Cắt tỉa cạnh mồ côi (dangling edge) mà không báo vòng giả.
  */
 
 import { calculateCompleteness } from './completeness.mjs';
 
 export const DEFAULT_THRESHOLD_Q3 = 0.90;
 export const DEFAULT_FLOOR_Q3 = 0.70;
-export const ALLOWED_RELATIONS_Q3 = ['depends_on'];
 
-/**
- * Tarjan's SCC algorithm to detect all strongly connected components with size >= 2 (or self loops).
- *
- * @param {Map<string, Array<string>>} adjMap Adjacency list: node -> outgoing neighbors
- * @returns {Array<Array<string>>} List of cycles/SCCs with size >= 2 (or self loop)
- */
 function findSCCs(adjMap) {
     let index = 0;
-    const stack = [];
-    const inStack = new Set();
     const indices = new Map();
-    const lowlinks = new Map();
+    const lowlink = new Map();
+    const onStack = new Set();
+    const stack = [];
     const sccs = [];
 
     function strongConnect(v) {
         indices.set(v, index);
-        lowlinks.set(v, index);
+        lowlink.set(v, index);
         index++;
         stack.push(v);
-        inStack.add(v);
+        onStack.add(v);
 
         const neighbors = adjMap.get(v) || [];
         for (const w of neighbors) {
             if (!indices.has(w)) {
                 strongConnect(w);
-                lowlinks.set(v, Math.min(lowlinks.get(v), lowlinks.get(w)));
-            } else if (inStack.has(w)) {
-                lowlinks.set(v, Math.min(lowlinks.get(v), indices.get(w)));
+                lowlink.set(v, Math.min(lowlink.get(v), lowlink.get(w)));
+            } else if (onStack.has(w)) {
+                lowlink.set(v, Math.min(lowlink.get(v), indices.get(w)));
             }
         }
 
-        if (lowlinks.get(v) === indices.get(v)) {
+        if (lowlink.get(v) === indices.get(v)) {
             const scc = [];
             let w;
             do {
                 w = stack.pop();
-                inStack.delete(w);
+                onStack.delete(w);
                 scc.push(w);
             } while (w !== v);
 
-            // A cycle is an SCC with > 1 node, or a single node with a self-loop
             if (scc.length > 1) {
+                sccs.push(scc.reverse());
+            } else if (scc.length === 1 && (adjMap.get(scc[0]) || []).includes(scc[0])) {
                 sccs.push(scc);
-            } else if (scc.length === 1) {
-                const selfNode = scc[0];
-                if ((adjMap.get(selfNode) || []).includes(selfNode)) {
-                    sccs.push(scc);
-                }
             }
         }
     }
@@ -82,16 +74,16 @@ function findSCCs(adjMap) {
 /**
  * Query circular dependencies (Q3)
  *
- * @param {object} db Database handle (exec, all, run, get)
+ * @param {object} db Database handle
  * @param {object} params
- * @param {string} params.project Project identifier (INV-GR-03)
- * @param {number|object} [params.completeness] Explicit completeness or overrides
- * @param {number} [params.threshold] Minimum threshold (defaults to 0.90)
- * @param {number} [params.floor] Refusal floor (defaults to 0.70 per AC-ARCH-04-03)
- * @param {string} [params.buildId] Optional build identifier
- * @returns {object} Query result
+ * @param {string} params.project Project identifier
+ * @param {number|object} [params.completeness] Explicit completeness
+ * @param {number} [params.threshold=0.90]
+ * @param {number} [params.floor=0.70]
+ * @param {string} [params.buildId=null]
+ * @returns {Promise<object>} Query result
  */
-export function queryCircularDependencies(db, {
+export async function queryCircularDependencies(db, {
     project,
     completeness,
     threshold = DEFAULT_THRESHOLD_Q3,
@@ -125,10 +117,17 @@ export function queryCircularDependencies(db, {
     } else if (completeness && typeof completeness.value === 'number') {
         compVal = completeness.value;
         completenessObj = completeness;
-    } else {
-        const computed = calculateCompleteness(db, normProject, 'Q3');
-        compVal = computed.value;
-        completenessObj = computed;
+    } else if (db && typeof db.all === 'function') {
+        try {
+            const rows = await db.all(
+                "SELECT value FROM completeness WHERE project = ? AND question = 'Q3' ORDER BY measured_at DESC LIMIT 1",
+                [normProject]
+            );
+            if (rows && rows.length > 0 && typeof rows[0].value === 'number') {
+                compVal = rows[0].value;
+                completenessObj = { question: 'Q3', value: compVal, status: compVal >= threshold ? 'ready' : 'unknown' };
+            }
+        } catch {}
     }
 
     // Refusal when coverage is below floor (0.70)
@@ -150,9 +149,9 @@ export function queryCircularDependencies(db, {
     const isUnknown = compVal < threshold;
     const unknowns = [];
 
-    // 2. Fetch all module / package nodes for this project
-    const allNodes = db.all(
-        `SELECT id, project, kind, name, path, metadata_json
+    // 2. Fetch all module / package nodes for this project (target columns: node_id, node_key, path)
+    const allNodes = await db.all(
+        `SELECT node_id AS id, node_id, project, kind, node_key AS name, node_key, path
          FROM graph_node
          WHERE project = ?`,
         [normProject]
@@ -160,14 +159,15 @@ export function queryCircularDependencies(db, {
 
     const nodeMap = new Map();
     for (const n of allNodes) {
-        nodeMap.set(n.id, n);
+        nodeMap.set(n.node_id, n);
+        nodeMap.set(n.node_key, n);
     }
 
-    // 3. Fetch all depends_on edges
-    const allEdges = db.all(
-        `SELECT id, project, source_id, target_id, relation, metadata_json
+    // 3. Fetch all depends_on edges (target columns: edge_id, from_node_id, to_node_id, kind)
+    const allEdges = await db.all(
+        `SELECT edge_id AS id, edge_id, project, from_node_id AS source_id, from_node_id, to_node_id AS target_id, to_node_id, kind AS relation, kind
          FROM graph_edge
-         WHERE project = ? AND relation = 'depends_on'`,
+         WHERE project = ? AND kind = 'depends_on'`,
         [normProject]
     );
 
@@ -191,7 +191,6 @@ export function queryCircularDependencies(db, {
     // 4. Build adjacency graph, filtering out dangling module edges (AC-ARCH-04-05 & ED10)
     const adjMap = new Map();
 
-    // Ensure all relevant nodes exist in adjMap
     for (const [id, node] of nodeMap.entries()) {
         if (['module', 'package', 'file'].includes(node.kind)) {
             adjMap.set(node.name || id, []);
@@ -201,26 +200,22 @@ export function queryCircularDependencies(db, {
     let validEdgesCount = 0;
 
     for (const edge of allEdges) {
-        const sourceNode = nodeMap.get(edge.source_id);
-        const targetNode = nodeMap.get(edge.target_id);
+        const sourceNode = nodeMap.get(edge.from_node_id);
+        const targetNode = nodeMap.get(edge.to_node_id);
 
-        // Check if target node or source node is missing or marked deleted (AC-ARCH-04-05)
-        const isTargetDeleted = !targetNode || (targetNode.metadata_json && targetNode.metadata_json.includes('"deleted":true'));
-        const isSourceDeleted = !sourceNode || (sourceNode.metadata_json && sourceNode.metadata_json.includes('"deleted":true'));
-
-        if (isTargetDeleted || isSourceDeleted) {
+        if (!sourceNode || !targetNode) {
             unknowns.push({
                 type: 'DANGLING_MODULE',
-                edgeId: edge.id,
-                sourceModule: sourceNode?.name || edge.source_id,
-                targetModule: targetNode?.name || edge.target_id,
-                message: `Dangling depends_on edge pruned: ${edge.source_id} -> ${edge.target_id}`,
+                edgeId: edge.edge_id,
+                sourceModule: sourceNode?.name || edge.from_node_id,
+                targetModule: targetNode?.name || edge.to_node_id,
+                message: `Dangling depends_on edge pruned: ${edge.from_node_id} -> ${edge.to_node_id}`,
             });
-            continue; // Prune dangling edge: do not add to graph, avoiding false positive cycles
+            continue;
         }
 
-        const srcName = sourceNode.name || sourceNode.id;
-        const tgtName = targetNode.name || targetNode.id;
+        const srcName = sourceNode.name || sourceNode.node_id;
+        const tgtName = targetNode.name || targetNode.node_id;
 
         if (!adjMap.has(srcName)) adjMap.set(srcName, []);
         if (!adjMap.has(tgtName)) adjMap.set(tgtName, []);

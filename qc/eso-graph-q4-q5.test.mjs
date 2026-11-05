@@ -135,45 +135,49 @@ test('ESO-386 / Tenant Isolation: queryEndpointPermissions strictly enforces man
     });
 });
 
-test('ESO-386 / Tenant Isolation: Q4 prevents cross-project grant leakage between distinct projects', () => {
-    const db = createDbAdapter(':memory:');
-    initSchema(db);
+import { createTestPgGraph } from './helpers/test-pg-graph.mjs';
+
+test('ESO-386 / Tenant Isolation: Q4 prevents cross-project grant leakage between distinct projects on PostgreSQL (D-92 / D-93)', async () => {
+    const pg = await createTestPgGraph();
+    const { db } = pg;
     const D = '2026-11-05';
 
-    // Proj A and Proj B share identical endpoint name 'POST /orders'
-    db.run(
-        `INSERT INTO graph_node (id, project, kind, name, path, metadata_json, created_at, updated_at) VALUES
-         ('ep-A','projA','endpoint','POST /orders','a.ts','{}',?,?),
-         ('ep-B','projB','endpoint','POST /orders','b.ts','{}',?,?),
-         ('perm-A','projA','permission','order:create','','{}',?,?),
-         ('perm-B','projB','permission','order:admin','','{}',?,?),
-         ('grant-A','projA','grant','role:A','rolesA.json','{}',?,?),
-         ('grant-B','projB','grant','role:B','rolesB.json','{}',?,?)`,
-        [D, D, D, D, D, D, D, D, D, D, D, D]
-    );
-    db.run(
-        `INSERT INTO graph_edge (id, project, source_id, target_id, relation, created_at) VALUES
-         ('e-A1','projA','ep-A','perm-A','requires',?),
-         ('e-A2','projA','perm-A','grant-A','granted_by',?),
-         ('e-B1','projB','ep-B','perm-B','requires',?),
-         ('e-B2','projB','perm-B','grant-B','granted_by',?)`,
-        [D, D, D, D]
-    );
+    try {
+        // Proj A and Proj B share identical endpoint name 'POST /orders'
+        await db.run(
+            `INSERT INTO graph_node (project, build_id, node_id, kind, node_key, path) VALUES
+             ('projA','b1','ep-A','endpoint','POST /orders','a.ts'),
+             ('projB','b1','ep-B','endpoint','POST /orders','b.ts'),
+             ('projA','b1','perm-A','permission','order:create',''),
+             ('projB','b1','perm-B','permission','order:admin',''),
+             ('projA','b1','grant-A','doc','role:A','rolesA.json'),
+             ('projB','b1','grant-B','doc','role:B','rolesB.json')`
+        );
+        await db.run(
+            `INSERT INTO graph_edge (project, build_id, edge_id, from_node_id, to_node_id, kind, conflict) VALUES
+             ('projA','b1','e-A1','ep-A','perm-A','requires',false),
+             ('projA','b1','e-A2','perm-A','grant-A','specifies',false),
+             ('projB','b1','e-B1','ep-B','perm-B','requires',false),
+             ('projB','b1','e-B2','perm-B','grant-B','specifies',false)`
+        );
 
-    const resA = queryEndpointPermissions({ db, endpointId: 'POST /orders', project: 'projA', coverage: 1.0 });
-    assert.equal(resA.status, 'answered');
-    assert.equal(resA.permission, 'order:create');
-    assert.equal(resA.grant, 'grant-A');
+        const resA = await queryEndpointPermissions({ db, endpointId: 'POST /orders', project: 'projA', coverage: 1.0 });
+        assert.equal(resA.status, 'answered');
+        assert.equal(resA.permission, 'order:create');
+        assert.equal(resA.grant, 'grant-A');
 
-    const resB = queryEndpointPermissions({ db, endpointId: 'POST /orders', project: 'projB', coverage: 1.0 });
-    assert.equal(resB.status, 'answered');
-    assert.equal(resB.permission, 'order:admin');
-    assert.equal(resB.grant, 'grant-B');
+        const resB = await queryEndpointPermissions({ db, endpointId: 'POST /orders', project: 'projB', coverage: 1.0 });
+        assert.equal(resB.status, 'answered');
+        assert.equal(resB.permission, 'order:admin');
+        assert.equal(resB.grant, 'grant-B');
 
-    // Unknown project returns unknown/not-found, never leaks from projA or projB
-    const resZ = queryEndpointPermissions({ db, endpointId: 'POST /orders', project: 'projZ', coverage: 1.0 });
-    assert.equal(resZ.status, 'unknown');
-    assert.equal(resZ.code, 'PERM_UNDECLARED');
+        // Unknown project returns unknown/not-found, never leaks from projA or projB
+        const resZ = await queryEndpointPermissions({ db, endpointId: 'POST /orders', project: 'projZ', coverage: 1.0 });
+        assert.equal(resZ.status, 'unknown');
+        assert.equal(resZ.code, 'PERM_UNDECLARED');
+    } finally {
+        await pg.cleanup();
+    }
 });
 
 test('SCN-ARCH-06-01 (AC-ARCH-06-01): Coverage >= 0.95 answers with yes/no and evidence', () => {

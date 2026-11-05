@@ -231,7 +231,7 @@ export function queryHistoricalPack({
     };
 }
 
-export function createTicketPackStore({ db = null } = {}) {
+export async function createTicketPackStore({ db = null } = {}) {
     const memoryRecords = [];
 
     if (db) {
@@ -241,31 +241,27 @@ export function createTicketPackStore({ db = null } = {}) {
                 source       TEXT NOT NULL,
                 ticket_key   TEXT,
                 tried        TEXT NOT NULL DEFAULT '[]',
-                fetched_at   TEXT NOT NULL,
+                fetched_at   TIMESTAMPTZ NOT NULL,
                 content_hash TEXT NOT NULL,
                 pack         TEXT NOT NULL,
                 PRIMARY KEY (project, source, fetched_at)
             );
-            CREATE TRIGGER IF NOT EXISTS trg_ticket_pack_no_update
-            BEFORE UPDATE ON ticket_pack
+            CREATE OR REPLACE FUNCTION ticket_pack_append_only()
+            RETURNS TRIGGER AS $$
             BEGIN
-                SELECT RAISE(ABORT, 'FORBIDDEN_MUTATION: ticket_pack is strictly append-only (no UPDATE)');
+                RAISE EXCEPTION 'FORBIDDEN_MUTATION: ticket_pack is strictly append-only (no UPDATE/DELETE)';
             END;
-            CREATE TRIGGER IF NOT EXISTS trg_ticket_pack_no_delete
-            BEFORE DELETE ON ticket_pack
-            BEGIN
-                SELECT RAISE(ABORT, 'FORBIDDEN_MUTATION: ticket_pack is strictly append-only (no DELETE)');
-            END;
+            $$ LANGUAGE plpgsql;
+            DROP TRIGGER IF EXISTS trg_ticket_pack_no_change ON ticket_pack;
+            CREATE TRIGGER trg_ticket_pack_no_change
+            BEFORE UPDATE OR DELETE ON ticket_pack
+            FOR EACH ROW EXECUTE FUNCTION ticket_pack_append_only();
         `;
-        if (typeof db.exec === 'function') {
-            db.exec(createTableSql);
-        } else if (typeof db.run === 'function') {
-            db.run(createTableSql);
-        }
+        await db.exec(createTableSql);
     }
 
     return {
-        appendPack({
+        async appendPack({
             project,
             source = 'jira',
             ticket_key = null,
@@ -312,13 +308,9 @@ export function createTicketPackStore({ db = null } = {}) {
                     JSON.stringify(record.pack),
                 ];
                 try {
-                    if (typeof db.run === 'function') {
-                        db.run(sql, ...params);
-                    } else if (typeof db.prepare === 'function') {
-                        db.prepare(sql).run(...params);
-                    }
+                    await db.run(sql, ...params);
                 } catch (e) {
-                    if (e.message && (e.message.includes('UNIQUE') || e.message.includes('PRIMARY KEY'))) {
+                    if (e.code === '23505' || (e.message && (e.message.includes('UNIQUE') || e.message.includes('PRIMARY KEY')))) {
                         const err = new Error(`IMMUTABLE_RECORD: ticket_pack is append-only and cannot overwrite existing primary key`);
                         err.code = 'IMMUTABLE_RECORD';
                         throw err;
@@ -340,7 +332,7 @@ export function createTicketPackStore({ db = null } = {}) {
             return record;
         },
 
-        getPacks({ project, ticket_key = null, source = null } = {}) {
+        async getPacks({ project, ticket_key = null, source = null } = {}) {
             if (!project) throw new Error('project is required');
 
             let records = [];
@@ -357,11 +349,7 @@ export function createTicketPackStore({ db = null } = {}) {
                 }
                 sql += ` ORDER BY fetched_at ASC`;
                 let rows = [];
-                if (typeof db.all === 'function') {
-                    rows = db.all(sql, ...params);
-                } else if (typeof db.prepare === 'function') {
-                    rows = db.prepare(sql).all(...params);
-                }
+                rows = await db.all(sql, ...params);
                 records = rows.map((r) => {
                     const packObj = JSON.parse(r.pack);
                     const computed = computeHash(packObj);
@@ -406,8 +394,8 @@ export function createTicketPackStore({ db = null } = {}) {
             return records;
         },
 
-        getLatestPack({ project, ticket_key = null, source = null } = {}) {
-            const list = this.getPacks({ project, ticket_key, source });
+        async getLatestPack({ project, ticket_key = null, source = null } = {}) {
+            const list = await this.getPacks({ project, ticket_key, source });
             if (list.length === 0) return null;
             return list[list.length - 1];
         },

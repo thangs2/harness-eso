@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync, rmSync, mkdirSync, cpSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve, join, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
@@ -107,9 +107,13 @@ console.log(`[smoke-turn] Executing smoke turn via real hook: ${hookPath}...`);
 const turnHook = await import(`file://${hookPath}`);
 assert.equal(typeof turnHook.onTurn, 'function', 'Hook must export onTurn function');
 
-const dbPath = join(targetDir, '.harness', 'eso.sqlite');
-const db = createDbAdapter(dbPath);
-ensureEvidenceSchema(db);
+const dbUrl = process.env.ESO_SMOKE_DB_URL || process.env.ESO_GRAPH_DB_URL || process.env.ESO_CTX_DB_URL;
+if (!dbUrl) {
+    console.error('[smoke-turn] PostgreSQL URL required: set ESO_SMOKE_DB_URL (D-93: no SQLite)');
+    process.exit(2);
+}
+const db = createDbAdapter(dbUrl);
+await ensureEvidenceSchema(db);
 
 const smokeTurnId = 'smoke-turn-' + Date.now();
 const projectName = basename(targetDir);
@@ -135,7 +139,7 @@ console.log(`[smoke-turn] Recorded turn evidence: ${smokeTurnId}`);
 
 // 3. Replay: đọc lại
 console.log(`[smoke-turn] Replaying turn evidence from database...`);
-const replayed = readTurnEvidence({
+const replayed = await readTurnEvidence({
     db,
     project: projectName,
     turnId: smokeTurnId,
@@ -156,22 +160,19 @@ console.log(`[smoke-turn] Replay verified successfully!`);
 
 // 4. Retain the evidence BEFORE the sandbox is removed (ESO-371). A PASS whose DB is deleted with the sandbox is
 //    unreviewable; QC needs the row, not the claim that the row existed.
-db.close();
+await db.close();
 mkdirSync(evidenceDir, { recursive: true });
 
-const retainedDb = join(evidenceDir, 'eso.sqlite');
-cpSync(dbPath, retainedDb);
-const dbBytes = readFileSync(retainedDb);
-const dbSha256 = createHash('sha256').update(dbBytes).digest('hex');
-
-// The retained copy is opened and read, not merely written: a copy nobody can query is not evidence.
-const retained = createDbAdapter(retainedDb);
-const retainedRecord = readTurnEvidence({ db: retained, project: projectName, turnId: smokeTurnId });
-assert.ok(retainedRecord, 'The retained evidence DB must hold the smoke turn');
+// Retain a JSON evidence record; no SQLite file is copied or opened (D-93).
+const retainedPath = join(evidenceDir, 'eso-smoke-turn.json');
+writeFileSync(retainedPath, JSON.stringify(replayed, null, 2));
+const retainedBytes = readFileSync(retainedPath);
+const dbSha256 = createHash('sha256').update(retainedBytes).digest('hex');
+const retainedRecord = JSON.parse(retainedBytes.toString('utf8'));
+assert.ok(retainedRecord, 'The retained evidence record must hold the smoke turn');
 assert.equal(retainedRecord.turn_id, smokeTurnId);
 assert.equal(retainedRecord.payload.command, 'bun test');
 assert.equal(retainedRecord.payload.result, 'PASS');
-retained.close();
 
 const evidenceLog = [
     'ESO-371 smoke-turn evidence',
@@ -207,6 +208,6 @@ assert.equal(existsSync(targetDir), false, 'targetDir must be completely removed
 assert.equal(existsSync(retainedDb), true, 'retained evidence DB must survive the sandbox removal');
 assert.equal(existsSync(evidenceLogPath), true, 'retained evidence log must survive the sandbox removal');
 
-console.log(`[smoke-turn] Evidence kept at: ${evidenceDir} (eso.sqlite + eso-smoke-turn.log)`);
+console.log(`[smoke-turn] Evidence kept at: ${evidenceDir} (eso-smoke-turn.json + eso-smoke-turn.log)`);
 console.log(`[smoke-turn] DoD VERIFIED: provision config+hook, smoke turn evidence_turn via real hook, replay, evidence retained, remove sạch!`);
 process.exit(0);

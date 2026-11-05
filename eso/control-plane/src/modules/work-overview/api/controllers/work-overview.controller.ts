@@ -21,14 +21,15 @@ export class WorkOverviewController {
     ) {}
 
     @Get()
-    getS1Page(
+    async getS1Page(
         @Query('project') project: string,
         @Res({ passthrough: true }) reply: FastifyReply
     ) {
         // The server owns the access decision (AC-UI-01-04): the S1 surface
         // only renders it. Denial answers with the one refusal sentence the
         // not-found case also gets, before the store is touched.
-        const result = renderS1Request({
+        // D-93: the evidence read is async, so `renderS1Request` may return a promise.
+        const result = await renderS1Request({
             project: project || 'default',
             canRead: (requested: string) => this.projectAccess.canReadProject(requested),
             loadTurns: (requested: string) => this.evidence.list(requested),

@@ -1,25 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDbAdapter } from '../eso/graph/src/db-adapter.mjs';
-import { initSchema, queryReadSet, calculateCompleteness, extractProjectGraph } from '../eso/graph/src/index.mjs';
+import { queryReadSet, calculateCompleteness, extractProjectGraph } from '../eso/graph/src/index.mjs';
+import { createTestPgGraph } from './helpers/test-pg-graph.mjs';
 
-function createDb() {
-    const db = createDbAdapter(':memory:');
-    initSchema(db);
-    return db;
-}
-
-test('ESO-384 (B6): missing or invalid db throws error instead of silent empty ready return', () => {
-    assert.throws(() => {
-        queryReadSet(null, {
+test('ESO-384 (B6): missing or invalid db throws error instead of silent empty ready return', async () => {
+    await assert.rejects(async () => {
+        await queryReadSet(null, {
             project: 'proj-1',
             symbolOrFile: 'MyClass',
             completeness: 1.0,
         });
     }, /Database instance is required/);
 
-    assert.throws(() => {
-        queryReadSet({}, {
+    await assert.rejects(async () => {
+        await queryReadSet({}, {
             project: 'proj-1',
             symbolOrFile: 'MyClass',
             completeness: 1.0,
@@ -27,35 +21,40 @@ test('ESO-384 (B6): missing or invalid db throws error instead of silent empty r
     }, /Database instance must provide \.all\(\)/);
 });
 
-test('ESO-384 (B6): Q1 read-set correctly executes with db adapter on Node and returns accurate dependencies', () => {
-    const db = createDb();
+test('ESO-384 (B6): Q1 read-set correctly executes with db adapter on PostgreSQL and returns accurate dependencies', async () => {
+    const pg = await createTestPgGraph();
+    const { db } = pg;
     const project = 'proj-precision';
 
-    db.run(
-        `INSERT INTO graph_node (id, project, kind, name, path, created_at, updated_at) VALUES
-         ('n_target', ?, 'symbol', 'OrderProcessor', 'src/order.ts', '2026-11-04', '2026-11-04'),
-         ('n_caller', ?, 'symbol', 'BillingService', 'src/billing.ts', '2026-11-04', '2026-11-04')`,
-        [project, project]
-    );
+    try {
+        await db.run(
+            `INSERT INTO graph_node (project, build_id, node_id, kind, node_key, path) VALUES
+             (?, 'b1', 'n_target', 'class', 'OrderProcessor', 'src/order.ts'),
+             (?, 'b1', 'n_caller', 'class', 'BillingService', 'src/billing.ts')`,
+            [project, project]
+        );
 
-    db.run(
-        `INSERT INTO graph_edge (id, project, source_id, target_id, relation, created_at) VALUES
-         ('e1', ?, 'n_caller', 'n_target', 'references', '2026-11-04')`,
-        [project]
-    );
+        await db.run(
+            `INSERT INTO graph_edge (project, build_id, edge_id, from_node_id, to_node_id, kind, conflict) VALUES
+             (?, 'b1', 'e1', 'n_caller', 'n_target', 'references', false)`,
+            [project]
+        );
 
-    const res = queryReadSet(db, {
-        project,
-        symbolOrFile: 'OrderProcessor',
-        completeness: 1.0,
-    });
+        const res = await queryReadSet(db, {
+            project,
+            symbolOrFile: 'OrderProcessor',
+            completeness: 1.0,
+        });
 
-    assert.equal(res.status, 'ready');
-    assert.equal(res.readSet.length, 1);
-    assert.ok(res.readSet.includes('src/billing.ts'));
+        assert.equal(res.status, 'ready');
+        assert.equal(res.readSet.length, 1);
+        assert.ok(res.readSet.includes('src/billing.ts'));
+    } finally {
+        await pg.cleanup();
+    }
 });
 
-test('ESO-385: file-only graph yields unknown coverage and is not falsely reported as 100% complete', () => {
+test('ESO-385: file-only graph yields unknown coverage and is not falsely reported as 100% complete', async () => {
     // 1. Direct completeness calculation on file-only coverage
     const fileOnlyCoverage = {
         file: { covered: 3, total: 3 },
@@ -76,7 +75,7 @@ test('ESO-385: file-only graph yields unknown coverage and is not falsely report
         { path: 'src/config.ts' },
         { path: 'src/constants.ts' },
     ];
-    const extractResult = extractProjectGraph('project-file-only', 'build-1', fileOnlyManifest);
+    const extractResult = await extractProjectGraph('project-file-only', 'build-1', fileOnlyManifest);
     assert.equal(extractResult.status, 'unknown');
     assert.notEqual(extractResult.coverage, 1.0, 'must not falsely report 100% coverage');
     assert.equal(extractResult.coverage, null, 'must report unknown coverage');
@@ -85,18 +84,22 @@ test('ESO-385: file-only graph yields unknown coverage and is not falsely report
     assert.equal(extractResult.completeness.perKind.method.coverage, null);
 
     // 3. Q1 readSet query with file-only completeness refuses
-    const db = createDb();
-    const q1Res = queryReadSet(db, {
-        project: 'project-file-only',
-        symbolOrFile: 'src/config.ts',
-        completeness: comp,
-    });
-    assert.notEqual(q1Res.status, 'ready', 'Q1 must not be ready when completeness is unknown / no coverage');
-    assert.equal(q1Res.status, 'REFUSED');
-    assert.equal(q1Res.error, 'NO_COVERAGE');
+    const pg = await createTestPgGraph();
+    try {
+        const q1Res = await queryReadSet(pg.db, {
+            project: 'project-file-only',
+            symbolOrFile: 'src/config.ts',
+            completeness: comp,
+        });
+        assert.notEqual(q1Res.status, 'ready', 'Q1 must not be ready when completeness is unknown / no coverage');
+        assert.equal(q1Res.status, 'REFUSED');
+        assert.equal(q1Res.error, 'NO_COVERAGE');
+    } finally {
+        await pg.cleanup();
+    }
 });
 
-test('ESO-385: graph with actual classes and methods computes reasonable coverage', () => {
+test('ESO-385: graph with actual classes and methods computes reasonable coverage', async () => {
     // 1. Manifest with extracted classes and methods
     const manifestWithSymbols = [
         {
@@ -116,7 +119,7 @@ test('ESO-385: graph with actual classes and methods computes reasonable coverag
         },
     ];
 
-    const extractResult = extractProjectGraph('project-symbols', 'build-2', manifestWithSymbols);
+    const extractResult = await extractProjectGraph('project-symbols', 'build-2', manifestWithSymbols);
     assert.equal(extractResult.status, 'ready');
     assert.equal(extractResult.coverage, 1.0);
     assert.equal(extractResult.completeness.status, 'ready');
@@ -147,7 +150,7 @@ test('ESO-385: graph with actual classes and methods computes reasonable coverag
         },
     ];
 
-    const partialResult = extractProjectGraph('project-partial', 'build-3', manifestPartial);
+    const partialResult = await extractProjectGraph('project-partial', 'build-3', manifestPartial);
     assert.equal(partialResult.status, 'unknown');
     assert.equal(partialResult.completeness.status, 'unknown');
     assert.equal(partialResult.completeness.perKind.file.covered, 1);
@@ -161,43 +164,47 @@ test('ESO-385: graph with actual classes and methods computes reasonable coverag
     assert.equal(partialResult.coverage, 0.5);
 });
 
-test('ESO-384: Q1 distinguishes absent vs unknown when symbol not found in graph', () => {
-    const db = createDb();
+test('ESO-384: Q1 distinguishes absent vs unknown when symbol not found in graph on PostgreSQL (D-92 / D-93)', async () => {
+    const pg = await createTestPgGraph();
+    const { db } = pg;
     const project = 'proj-eso-384';
 
-    // Standalone node
-    db.run(
-        `INSERT INTO graph_node (id, project, kind, name, path, created_at, updated_at) VALUES
-         ('n_stand', ?, 'symbol', 'StandaloneUtil', 'src/util.ts', '2026-11-04', '2026-11-04')`,
-        [project]
-    );
+    try {
+        await db.run(
+            `INSERT INTO graph_node (project, build_id, node_id, kind, node_key, path) VALUES
+             (?, 'b1', 'n_stand', 'method', 'StandaloneUtil', 'src/util.ts')`,
+            [project]
+        );
 
-    // 1. Unknown symbol with incomplete coverage (< 1.0) -> unknown + reason
-    const resUnknown = queryReadSet(db, {
-        project,
-        symbolOrFile: 'NonExistentSymbol',
-        completeness: 0.85,
-    });
-    assert.equal(resUnknown.status, 'unknown');
-    assert.equal(resUnknown.reason, 'SYMBOL_NOT_FOUND_INCOMPLETE_COVERAGE');
-    assert.deepEqual(resUnknown.readSet, []);
+        // 1. Unknown symbol with incomplete coverage (< 1.0) -> unknown + reason
+        const resUnknown = await queryReadSet(db, {
+            project,
+            symbolOrFile: 'NonExistentSymbol',
+            completeness: 0.85,
+        });
+        assert.equal(resUnknown.status, 'unknown');
+        assert.equal(resUnknown.reason, 'SYMBOL_NOT_FOUND_INCOMPLETE_COVERAGE');
+        assert.deepEqual(resUnknown.readSet, []);
 
-    // 2. Unknown symbol with full coverage (1.0) -> absent + reason
-    const resAbsent = queryReadSet(db, {
-        project,
-        symbolOrFile: 'NonExistentSymbol',
-        completeness: 1.0,
-    });
-    assert.equal(resAbsent.status, 'absent');
-    assert.equal(resAbsent.reason, 'SYMBOL_ABSENT');
-    assert.deepEqual(resAbsent.readSet, []);
+        // 2. Unknown symbol with full coverage (1.0) -> absent + reason
+        const resAbsent = await queryReadSet(db, {
+            project,
+            symbolOrFile: 'NonExistentSymbol',
+            completeness: 1.0,
+        });
+        assert.equal(resAbsent.status, 'absent');
+        assert.equal(resAbsent.reason, 'SYMBOL_ABSENT');
+        assert.deepEqual(resAbsent.readSet, []);
 
-    // 3. Known isolated symbol with full coverage (1.0) -> ready + []
-    const resReady = queryReadSet(db, {
-        project,
-        symbolOrFile: 'StandaloneUtil',
-        completeness: 1.0,
-    });
-    assert.equal(resReady.status, 'ready');
-    assert.deepEqual(resReady.readSet, []);
+        // 3. Known isolated symbol with full coverage (1.0) -> ready + []
+        const resReady = await queryReadSet(db, {
+            project,
+            symbolOrFile: 'StandaloneUtil',
+            completeness: 1.0,
+        });
+        assert.equal(resReady.status, 'ready');
+        assert.deepEqual(resReady.readSet, []);
+    } finally {
+        await pg.cleanup();
+    }
 });

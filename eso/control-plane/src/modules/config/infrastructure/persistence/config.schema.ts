@@ -1,7 +1,7 @@
 /**
- * @mu/eso-control-plane — Configuration Storage Schema
+ * @mu/eso-control-plane — Configuration Storage Schema (PostgreSQL)
  *
- * Implements T-04.2 (ESO-369): DDL and append-only event schema for config store.
+ * Implements T-04.2 (ESO-369) with D-93: PostgreSQL only, no SQLite.
  */
 
 export const CONFIG_SCHEMA_SQL = `
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS config_record (
     hash TEXT NOT NULL,
     content_json TEXT NOT NULL,
     operator TEXT NOT NULL DEFAULT 'system',
-    saved_at TEXT NOT NULL,
+    saved_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (project, version)
 );
 
@@ -24,29 +24,27 @@ CREATE TABLE IF NOT EXISTS config_event (
     hash TEXT NOT NULL,
     event_type TEXT NOT NULL,
     payload_json TEXT DEFAULT '{}',
-    created_at TEXT NOT NULL
+    created_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_config_event_project ON config_event(project);
 
--- Invariant: config_event is strictly append-only (prevent UPDATE)
-CREATE TRIGGER IF NOT EXISTS trg_prevent_config_event_update
-BEFORE UPDATE ON config_event
+CREATE OR REPLACE FUNCTION config_event_append_only()
+RETURNS TRIGGER AS $$
 BEGIN
-    SELECT RAISE(ABORT, 'config_event is append-only: UPDATE is forbidden');
+    RAISE EXCEPTION 'config_event is append-only: UPDATE and DELETE are forbidden';
 END;
+$$ LANGUAGE plpgsql;
 
--- Invariant: config_event is strictly append-only (prevent DELETE)
-CREATE TRIGGER IF NOT EXISTS trg_prevent_config_event_delete
-BEFORE DELETE ON config_event
-BEGIN
-    SELECT RAISE(ABORT, 'config_event is append-only: DELETE is forbidden');
-END;
+DROP TRIGGER IF EXISTS trg_prevent_config_event_change ON config_event;
+CREATE TRIGGER trg_prevent_config_event_change
+BEFORE UPDATE OR DELETE ON config_event
+FOR EACH ROW EXECUTE FUNCTION config_event_append_only();
 `;
 
-export function initConfigSchema(db) {
+export async function initConfigSchema(db) {
     if (!db || typeof db.exec !== 'function') {
         throw new Error('Database with .exec() method is required to initialize config schema');
     }
-    db.exec(CONFIG_SCHEMA_SQL);
+    await db.exec(CONFIG_SCHEMA_SQL);
 }

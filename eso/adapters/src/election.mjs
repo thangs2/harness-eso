@@ -17,7 +17,7 @@ export const KNOWN_HOSTS = Object.freeze(['cursor', 'antigravity', 'deepseek-har
 export const ERROR_SILENT_SWITCH = 'SILENT_SWITCH';
 export const ERROR_SILENT_NONE = 'SILENT_NONE';
 
-export function electCapabilityProvider({
+export async function electCapabilityProvider({
     project,
     turnId,
     capabilityKind,
@@ -52,21 +52,17 @@ export function electCapabilityProvider({
     // Check for pinning (US-HOST-04 & ESO-382: read from capability_pin store if present)
     let effectivePins = { ...pins };
     if (db) {
-        try {
-            const checkSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='capability_pin'`;
-            let exists = false;
-            if (typeof db.get === 'function') exists = !!db.get(checkSql);
-            else if (typeof db.prepare === 'function') exists = !!db.prepare(checkSql).get();
-            if (exists) {
-                const getPinSql = `SELECT pinned_branch FROM capability_pin WHERE project = ? AND capability_kind = ?`;
-                let row = null;
-                if (typeof db.get === 'function') row = db.get(getPinSql, project, capabilityKind);
-                else if (typeof db.prepare === 'function') row = db.prepare(getPinSql).get(project, capabilityKind);
-                if (row && row.pinned_branch) {
-                    effectivePins[capabilityKind] = row.pinned_branch;
-                }
+        // D-93: PostgreSQL catalog lookup; a missing table means no pin store yet.
+        const pinTable = await db.get(`SELECT to_regclass('capability_pin') AS oid`);
+        if (pinTable && pinTable.oid) {
+            const row = await db.get(
+                `SELECT pinned_branch FROM capability_pin WHERE project = ? AND capability_kind = ?`,
+                [project, capabilityKind]
+            );
+            if (row && row.pinned_branch) {
+                effectivePins[capabilityKind] = row.pinned_branch;
             }
-        } catch {}
+        }
     }
 
     const pin = effectivePins[capabilityKind];
@@ -252,7 +248,7 @@ export function handleMidTurnBranchFailure({
     };
 }
 
-export function setCapabilityPin({
+export async function setCapabilityPin({
     project = 'default',
     capabilityKind,
     targetBranch,
@@ -278,8 +274,7 @@ export function setCapabilityPin({
                 PRIMARY KEY (project, capability_kind)
             );
         `;
-        if (typeof db.exec === 'function') db.exec(ensureTableSql);
-        else if (typeof db.run === 'function') db.run(ensureTableSql);
+        await db.exec(ensureTableSql);
     }
 
     // AC-HOST-04-05 / ED1: Empty pin removes pinning
@@ -288,8 +283,7 @@ export function setCapabilityPin({
         delete updated[capabilityKind];
         if (db) {
             const delSql = `DELETE FROM capability_pin WHERE project = ? AND capability_kind = ?`;
-            if (typeof db.run === 'function') db.run(delSql, project, capabilityKind);
-            else if (typeof db.prepare === 'function') db.prepare(delSql).run(project, capabilityKind);
+            await db.run(delSql, [project, capabilityKind]);
         }
         return updated;
     }
@@ -304,8 +298,7 @@ export function setCapabilityPin({
                 updated_at = excluded.updated_at
         `;
         const now = new Date().toISOString();
-        if (typeof db.run === 'function') db.run(insertSql, project, capabilityKind, branch, now);
-        else if (typeof db.prepare === 'function') db.prepare(insertSql).run(project, capabilityKind, branch, now);
+        await db.run(insertSql, [project, capabilityKind, branch, now]);
     }
 
     return {
@@ -314,23 +307,19 @@ export function setCapabilityPin({
     };
 }
 
-export function loadCapabilityPins({
+export async function loadCapabilityPins({
     project = 'default',
     db = null,
 } = {}) {
     if (!db) return {};
 
-    const checkTableSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='capability_pin'`;
-    let exists = false;
-    if (typeof db.get === 'function') exists = !!db.get(checkTableSql);
-    else if (typeof db.prepare === 'function') exists = !!db.prepare(checkTableSql).get();
+    const pinTable = await db.get(`SELECT to_regclass('capability_pin') AS oid`);
+    if (!pinTable || !pinTable.oid) return {};
 
-    if (!exists) return {};
-
-    const sql = `SELECT capability_kind, pinned_branch FROM capability_pin WHERE project = ?`;
-    let rows = [];
-    if (typeof db.all === 'function') rows = db.all(sql, project);
-    else if (typeof db.prepare === 'function') rows = db.prepare(sql).all(project);
+    const rows = await db.all(
+        `SELECT capability_kind, pinned_branch FROM capability_pin WHERE project = ?`,
+        [project]
+    );
 
     const pins = {};
     for (const r of rows) {
@@ -339,7 +328,7 @@ export function loadCapabilityPins({
     return pins;
 }
 
-export function recordTurnProviderAudit({
+export async function recordTurnProviderAudit({
     project = 'default',
     turnId,
     election,
@@ -378,8 +367,7 @@ export function recordTurnProviderAudit({
                 PRIMARY KEY (project, turn_id, capability)
             );
         `;
-        if (typeof db.exec === 'function') db.exec(ensureSql);
-        else if (typeof db.run === 'function') db.run(ensureSql);
+        await db.exec(ensureSql);
 
         const insertSql = `
             INSERT INTO provider_audit (project, turn_id, capability, branch, provider_id, guarantee, pinned, reason, history, recorded_at)
@@ -405,8 +393,7 @@ export function recordTurnProviderAudit({
             JSON.stringify(record.history),
             record.recorded_at,
         ];
-        if (typeof db.run === 'function') db.run(insertSql, ...params);
-        else if (typeof db.prepare === 'function') db.prepare(insertSql).run(...params);
+        await db.run(insertSql, params);
     }
 
     if (Array.isArray(auditLog)) {
@@ -416,7 +403,7 @@ export function recordTurnProviderAudit({
     return record;
 }
 
-export function queryTurnProviderAudit({
+export async function queryTurnProviderAudit({
     turnId,
     project = 'default',
     db = null,
@@ -426,73 +413,44 @@ export function queryTurnProviderAudit({
 
     let records = [];
     if (db) {
-        // ESO-382: Read from evidence_item table (kind='election')
-        try {
-            const checkEvSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='evidence_item'`;
-            let hasEvItem = false;
-            if (typeof db.get === 'function') hasEvItem = !!db.get(checkEvSql);
-            else if (typeof db.prepare === 'function') hasEvItem = !!db.prepare(checkEvSql).get();
+        // ESO-382: read the canonical evidence_item rows (kind='election'). The canonical schema has
+        // no per-item timestamp, so the turn row supplies `recorded_at` when the payload has no `at`.
+        const hasEvItem = await db.get(`SELECT to_regclass('evidence_item') AS oid`);
+        if (hasEvItem && hasEvItem.oid) {
+            const evRows = await db.all(
+                `SELECT payload FROM evidence_item WHERE project = ? AND turn_id = ? AND kind = 'election' ORDER BY seq ASC`,
+                [project, turnId]
+            );
+            const turnRow = await db.get(
+                `SELECT at FROM evidence_turn WHERE project = ? AND turn_id = ?`,
+                [project, turnId]
+            );
+            const turnAt = turnRow ? turnRow.at : null;
 
-            if (hasEvItem) {
-                // The canonical evidence schema (eso/evidence/src/schema.mjs) has no `at` column on
-                // evidence_item; the adapter-local schema (host-bridge.mjs) adds one. Detect the shape
-                // so the audit reads whichever evidence store is attached instead of silently
-                // returning zero records when the column is absent.
-                let hasAtColumn = false;
-                try {
-                    let columns = [];
-                    if (typeof db.all === 'function') columns = db.all('PRAGMA table_info(evidence_item)');
-                    else if (typeof db.prepare === 'function') columns = db.prepare('PRAGMA table_info(evidence_item)').all();
-                    hasAtColumn = columns.some((c) => (c.name || c.column_name) === 'at');
-                } catch {}
-
-                const evSql = hasAtColumn
-                    ? `SELECT payload, at FROM evidence_item WHERE project = ? AND turn_id = ? AND kind = 'election' ORDER BY seq ASC`
-                    : `SELECT payload FROM evidence_item WHERE project = ? AND turn_id = ? AND kind = 'election' ORDER BY seq ASC`;
-                let evRows = [];
-                if (typeof db.all === 'function') evRows = db.all(evSql, project, turnId);
-                else if (typeof db.prepare === 'function') evRows = db.prepare(evSql).all(project, turnId);
-
-                // Without a per-item timestamp, the turn record is the only real time the store holds.
-                let turnAt = null;
-                if (!hasAtColumn) {
-                    try {
-                        const turnRow = typeof db.get === 'function'
-                            ? db.get(`SELECT at FROM evidence_turn WHERE project = ? AND turn_id = ?`, project, turnId)
-                            : db.prepare(`SELECT at FROM evidence_turn WHERE project = ? AND turn_id = ?`).get(project, turnId);
-                        turnAt = turnRow ? turnRow.at : null;
-                    } catch {}
-                }
-
-                for (const r of evRows) {
-                    const p = typeof r.payload === 'string' ? JSON.parse(r.payload) : (r.payload || {});
-                    records.push({
-                        project,
-                        turn_id: turnId,
-                        capability: p.capability || p.capabilityKind,
-                        branch: p.branch,
-                        provider_id: p.provider_id || p.providerId,
-                        guarantee: p.guarantee,
-                        pinned: !!p.pinned,
-                        reason: p.reason,
-                        history: p.history || [],
-                        recorded_at: r.at || p.at || turnAt || null,
-                    });
-                }
+            for (const r of evRows) {
+                const p = typeof r.payload === 'string' ? JSON.parse(r.payload) : (r.payload || {});
+                records.push({
+                    project,
+                    turn_id: turnId,
+                    capability: p.capability || p.capabilityKind,
+                    branch: p.branch,
+                    provider_id: p.provider_id || p.providerId,
+                    guarantee: p.guarantee,
+                    pinned: !!p.pinned,
+                    reason: p.reason,
+                    history: p.history || [],
+                    recorded_at: p.at || turnAt || null,
+                });
             }
-        } catch {}
+        }
 
         if (records.length === 0) {
-            const checkSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='provider_audit'`;
-            let exists = false;
-            if (typeof db.get === 'function') exists = !!db.get(checkSql);
-            else if (typeof db.prepare === 'function') exists = !!db.prepare(checkSql).get();
-
-            if (exists) {
-                const sql = `SELECT * FROM provider_audit WHERE project = ? AND turn_id = ?`;
-                let rows = [];
-                if (typeof db.all === 'function') rows = db.all(sql, project, turnId);
-                else if (typeof db.prepare === 'function') rows = db.prepare(sql).all(project, turnId);
+            const auditTable = await db.get(`SELECT to_regclass('provider_audit') AS oid`);
+            if (auditTable && auditTable.oid) {
+                const rows = await db.all(
+                    `SELECT * FROM provider_audit WHERE project = ? AND turn_id = ?`,
+                    [project, turnId]
+                );
 
                 records = rows.map((r) => ({
                     project: r.project,
@@ -529,7 +487,7 @@ export function queryTurnProviderAudit({
     };
 }
 
-export function queryBatchProviderAudit({
+export async function queryBatchProviderAudit({
     turnIds = [],
     project = 'default',
     db = null,
@@ -537,17 +495,11 @@ export function queryBatchProviderAudit({
 } = {}) {
     let records = [];
     if (db) {
-        const checkSql = `SELECT name FROM sqlite_master WHERE type='table' AND name='provider_audit'`;
-        let exists = false;
-        if (typeof db.get === 'function') exists = !!db.get(checkSql);
-        else if (typeof db.prepare === 'function') exists = !!db.prepare(checkSql).get();
-
-        if (exists && turnIds.length > 0) {
+        const auditTable = await db.get(`SELECT to_regclass('provider_audit') AS oid`);
+        if (auditTable && auditTable.oid && turnIds.length > 0) {
             const placeholders = turnIds.map(() => '?').join(',');
             const sql = `SELECT * FROM provider_audit WHERE project = ? AND turn_id IN (${placeholders})`;
-            let rows = [];
-            if (typeof db.all === 'function') rows = db.all(sql, project, ...turnIds);
-            else if (typeof db.prepare === 'function') rows = db.prepare(sql).all(project, ...turnIds);
+            const rows = await db.all(sql, [project, ...turnIds]);
 
             records = rows.map((r) => ({
                 project: r.project,
