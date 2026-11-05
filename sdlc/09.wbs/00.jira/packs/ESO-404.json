@@ -60,5 +60,5 @@
   "base_ref": "main",
   "owner": "graph",
   "allow_dependency": false,
-  "notes": "Graph acceptance on real baplatform; report only."
+  "notes": "Graph acceptance on real baplatform; report only. D-92/D-93: Postgres graph only; no SQLite; blocked by ESO-447; BIP READY-SPLIT."
 }

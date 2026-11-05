@@ -379,12 +379,11 @@ test('a RED packet carrying implementation code fails', () => {
 });
 
 /**
- * All eight shipped packs now build: graph `2.6…2.9` became `READY` after Stage 5b created the graph DDL
- * (`26.graph-schema.md`), memory `9.1…9.4` were already `READY`. A pack that fails would mean the gate
- * or the pack is wrong; READY-SPLIT/DRAFT refusal is covered by the fixture tests above.
+ * Memory `9.1…9.4` build. Graph `2.6…2.9` are intentionally `READY-SPLIT`: the graph code still runs SQLite
+ * (ESO-447, D-92/D-93), so the gate must refuse them rather than letting the build start on the wrong engine.
  */
-test('all eight shipped packs build, and none fails for another reason', () => {
-    for (const ticket of ['ESO-401', 'ESO-402', 'ESO-403', 'ESO-404', 'ESO-405', 'ESO-406', 'ESO-407', 'ESO-408']) {
+test('memory packs build; graph packs are blocked by the SQLite→Postgres migration', () => {
+    for (const ticket of ['ESO-405', 'ESO-406', 'ESO-407', 'ESO-408']) {
         const result = spawnSync(process.execPath, ['scripts/ticket-gate.mjs', ticket, '--content-only'], {
             cwd: REPO_ROOT,
             encoding: 'utf8',
@@ -393,6 +392,16 @@ test('all eight shipped packs build, and none fails for another reason', () => {
         assert.equal(report.stage5.status, 'READY', `${ticket} BIP status`);
         assert.equal(result.status, 0, `${ticket} must build: ${result.stdout}`);
         assert.deepEqual(report.failures, [], `${ticket}`);
+    }
+    for (const ticket of ['ESO-401', 'ESO-402', 'ESO-403', 'ESO-404']) {
+        const result = spawnSync(process.execPath, ['scripts/ticket-gate.mjs', ticket, '--content-only'], {
+            cwd: REPO_ROOT,
+            encoding: 'utf8',
+        });
+        const report = JSON.parse((result.stdout || '{}').slice((result.stdout || '{}').indexOf('{')));
+        assert.equal(report.stage5.status, 'READY-SPLIT', `${ticket} BIP status`);
+        assert.notEqual(result.status, 0, `${ticket} must be blocked`);
+        assert.ok(report.failures.some((f) => f.startsWith('BIP_NOT_READY')), `${ticket}: ${report.failures}`);
     }
 });
 

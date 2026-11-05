@@ -62,5 +62,5 @@
   "base_ref": "main",
   "owner": "graph",
   "allow_dependency": false,
-  "notes": "Docs graph specific-relative."
+  "notes": "Docs graph specific-relative. D-92/D-93: Postgres graph only; no SQLite; blocked by ESO-447; BIP READY-SPLIT."
 }

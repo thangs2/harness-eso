@@ -66,5 +66,5 @@
   "base_ref": "main",
   "owner": "graph",
   "allow_dependency": false,
-  "notes": "Graph store/index/API; D-73; off-path."
+  "notes": "Graph store/index/API; D-73; off-path. D-92/D-93: Postgres graph only; no SQLite; blocked by ESO-447; BIP READY-SPLIT."
 }
