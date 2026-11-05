@@ -56,7 +56,7 @@
   "verify": [
     "bun test qc/acceptance/ESO-404"
   ],
-  "base_commit": "ae361490b7d2d0bcf40530cd99805baa6143f00c",
+  "base_commit": "native-baseline",
   "base_ref": "main",
   "owner": "graph",
   "allow_dependency": false,
