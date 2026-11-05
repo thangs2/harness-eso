@@ -23,7 +23,7 @@ export type UXState =
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <div class="state-frame" [attr.aria-busy]="state() === 'ST2_LOADING'" [attr.aria-live]="state() === 'ST3_FAILED' ? 'assertive' : 'polite'">
+        <div class="state-frame" [attr.data-state]="state()" [attr.aria-busy]="state() === 'ST2_LOADING'" [attr.aria-live]="state() === 'ST3_FAILED' ? 'assertive' : 'polite'">
             @switch (state()) {
                 @case ('ST2_LOADING') {
                     <div class="frame-loading" role="status">

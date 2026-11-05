@@ -35,3 +35,6 @@ __pycache__/
 
 # Generated FE preview bundle (local inspection only; not shipped)
 eso/ui/preview/
+
+# Angular CLI cache
+.angular/

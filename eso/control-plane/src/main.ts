@@ -51,6 +51,13 @@ export async function createNestFastifyControlPlane(
         }
     }
 
+    // Demo UI on :4200 calls this server directly.
+    app.enableCors({
+        origin: ['http://localhost:4200', 'http://127.0.0.1:4200'],
+        methods: ['GET', 'POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+    });
+
     // Wire auth config
     if (options.authToken !== undefined) {
         const authConfig = app.get(AuthConfig);

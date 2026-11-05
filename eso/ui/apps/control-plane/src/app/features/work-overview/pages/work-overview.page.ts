@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { StateFrameComponent } from '../../../shared/state-frame/state-frame.component.js';
 import { WorkOverviewTableComponent } from '../components/work-overview-table.component.js';
 import { WorkOverviewStore } from '../state/work-overview.store.js';
@@ -18,7 +18,12 @@ import { WorkOverviewService } from '../data/work-overview.service.js';
     template: `
         <div class="s1-page-container">
             <header class="page-header">
-                <h1>Dự án: {{ store.project() }}</h1>
+                <div>
+                    <p class="eyebrow">ESO Control Plane</p>
+                    <h1>Work overview</h1>
+                    <p class="subtitle">Dự án: {{ store.project() }} · {{ store.totalItems() }} turn</p>
+                </div>
+                <span class="readonly-badge">Chỉ đọc</span>
             </header>
 
             <eso-state-frame
@@ -40,8 +45,11 @@ export class WorkOverviewPage implements OnInit {
     readonly store = inject(WorkOverviewStore);
     private readonly service = inject(WorkOverviewService);
     private readonly router = inject(Router, { optional: true });
+    private readonly route = inject(ActivatedRoute, { optional: true });
 
     ngOnInit(): void {
+        const project = this.route?.snapshot.queryParamMap.get('project');
+        if (project) this.store.setProject(project);
         void this.loadData();
     }
 

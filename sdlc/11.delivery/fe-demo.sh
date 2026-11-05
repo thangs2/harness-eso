@@ -21,6 +21,8 @@ fi
 echo "[fe-demo] batch=$BATCH"
 echo "[fe] build eso/ui"
 (cd "$ROOT/eso/ui" && npm run build)
+echo "[fe] real Angular build (AOT)"
+(cd "$ROOT/eso/ui" && npm run build:ng)
 echo "[fe] structure check"
 node "$ROOT/eso/ui/scripts/check-structure.mjs"
 echo "[fe] AC tests"

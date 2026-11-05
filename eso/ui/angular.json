@@ -1,36 +1,32 @@
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
-  "newProjectRoot": "projects",
   "projects": {
-    "eso-ui": {
+    "control-plane": {
       "projectType": "application",
       "root": "",
-      "sourceRoot": "src",
-      "prefix": "eso",
+      "sourceRoot": "apps/control-plane/src",
       "architect": {
         "build": {
-          "builder": "@angular-devkit/build-angular:application",
+          "builder": "@angular/build:application",
           "options": {
-            "outputPath": "dist/eso-ui",
-            "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": [
-              "zone.js"
-            ],
-            "tsConfig": "tsconfig.app.json"
+            "index": "src/index.html",
+            "tsConfig": "tsconfig.json",
+            "styles": ["src/styles.css"],
+            "assets": []
           },
           "configurations": {
-            "production": {
-              "optimization": false,
-              "extractLicenses": false,
-              "sourceMap": true
-            },
-            "development": {
-              "optimization": false,
-              "extractLicenses": false,
-              "sourceMap": true
-            }
+            "production": { "outputHashing": "all", "optimization": true },
+            "development": { "optimization": false, "sourceMap": true }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": { "buildTarget": "control-plane:build:production" },
+            "development": { "buildTarget": "control-plane:build:development" }
           },
           "defaultConfiguration": "development"
         }

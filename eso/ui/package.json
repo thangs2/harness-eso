@@ -8,20 +8,23 @@
   "scripts": {
     "build": "tsc",
     "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "build:ng": "ng build",
+    "serve": "ng serve --port 4200 --host 127.0.0.1"
   },
   "dependencies": {
-    "@angular/common": "^22.1.1",
-    "@angular/compiler": "^22.1.1",
-    "@angular/core": "^22.1.1",
-    "@angular/platform-browser": "^22.1.1",
-    "@angular/router": "^22.1.1",
+    "@angular/common": "22.2.4",
+    "@angular/compiler": "22.2.4",
+    "@angular/core": "22.2.4",
+    "@angular/platform-browser": "22.2.4",
+    "@angular/router": "22.2.4",
     "rxjs": "^7.8.1",
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
-    "@angular/cli": "^22.1.1",
-    "@angular/compiler-cli": "^22.1.1",
-    "typescript": "^5.7.2"
+    "@angular/build": "22.2.4",
+    "@angular/cli": "22.2.4",
+    "@angular/compiler-cli": "22.2.4",
+    "typescript": "6.0.3"
   }
 }
