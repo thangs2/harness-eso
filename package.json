@@ -24,9 +24,7 @@
     "test:observatory": "bun run --filter @mu/harness-observatory test",
     "dev:observatory": "bun run --filter @mu/harness-observatory dev",
     "observe:server": "node packages/harness-observe-server/src/server.mjs",
-    "dev:observe": "./scripts/dev-observe.sh",
-    "demo:eso": "node scripts/demo-eso-v2.mjs --check",
-    "demo:eso:serve": "node scripts/demo-eso-v2.mjs --serve"
+    "dev:observe": "./scripts/dev-observe.sh"
   },
   "dependencies": {
     "@mu/harness-decision": "workspace:*",
