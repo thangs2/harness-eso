@@ -1,10 +1,11 @@
-import { Component, ChangeDetectionStrategy, OnInit, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { JsonPipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { OnboardingStore } from '../state/onboarding.store.js';
 import { ConsumerProfileService } from '../data/consumer-profile.service.js';
 import { GATES, HOST_PROFILES, PROFILE_RECIPES, ROLES, SOURCES } from '../models/onboarding.model.js';
+import type { ConsumerPlan } from '../../../../../../../libs/api-client/types.js';
 
 @Component({
     selector: 'eso-onboarding-page',
@@ -52,6 +53,13 @@ import { GATES, HOST_PROFILES, PROFILE_RECIPES, ROLES, SOURCES } from '../models
                             </button>
                         }
                     </div>
+                    @if (selectedRecipe(); as recipe) {
+                        <div class="recipe-detail">
+                            <div><h3>{{ recipe.name }} · nguồn bằng chứng</h3><p>{{ recipe.sources }}</p></div>
+                            <div><strong>Yêu cầu</strong><p>{{ recipe.requires }}</p></div>
+                            <div><strong>Phù hợp</strong><p>{{ recipe.bestFor }}</p></div>
+                        </div>
+                    }
                     <div class="form-grid">
                         <label>Host profile
                             <select [ngModel]="store.profile().profile.hostProfile" (ngModelChange)="store.patch({ profile: { ...store.profile().profile, hostProfile: $event } })">
@@ -167,27 +175,43 @@ import { GATES, HOST_PROFILES, PROFILE_RECIPES, ROLES, SOURCES } from '../models
 
                 @if (store.step() === 4) {
                     <h2>4 · Preview</h2>
-                    <dl class="review-grid">
-                        <dt>Profile</dt><dd>{{ store.profile().profile.recipe }} · {{ store.profile().profile.hostProfile }}</dd>
-                        <dt>Consumer</dt><dd>{{ store.profile().id }} — {{ store.profile().name }}</dd>
-                        <dt>Repo</dt><dd>{{ store.profile().root }}</dd>
-                        <dt>SDLC root</dt><dd>{{ store.profile().sdlcRoot }}</dd>
-                        <dt>Integration</dt><dd>{{ store.profile().integration.jevMode }} · {{ store.profile().integration.hostPack }} · {{ store.profile().integration.memoryAdapter }}</dd>
-                        <dt>Roles</dt><dd>{{ store.profile().team.roles.join(', ') }}</dd>
-                        <dt>Protected paths</dt><dd>{{ store.profile().protectedPaths.length }} path</dd>
-                    </dl>
-                    <details>
-                        <summary>Profile JSON</summary>
-                        <pre>{{ store.profile() | json }}</pre>
-                    </details>
+                    <p class="section-hint">Đây là plan sẽ được ghi khi consumer được áp dụng. Chưa có file nào bị thay đổi.</p>
+                    @if (planning()) {
+                        <p class="loading-label">Đang tạo plan…</p>
+                    } @else if (plan(); as p) {
+                        <div class="plan-head">
+                            <span>Root: <code>{{ p.root }}</code></span>
+                            <span>{{ p.files.length }} file · {{ p.warnings.length }} cảnh báo</span>
+                        </div>
+                        @if (p.warnings.length) {
+                            <ul class="warn-list">
+                                @for (warning of p.warnings; track warning) { <li>{{ warning }}</li> }
+                            </ul>
+                        }
+                        <div class="plan-files">
+                            @for (file of p.files; track file.relative) {
+                                <details class="plan-file">
+                                    <summary><code>{{ file.relative }}</code><span class="action-badge">{{ file.action }}</span></summary>
+                                    <pre>{{ file.preview | json }}</pre>
+                                </details>
+                            }
+                        </div>
+                        <label class="check confirm-line">
+                            <input type="checkbox" [checked]="confirmed()" (change)="confirmed.set(!confirmed())">
+                            Tôi đã xem plan và xác nhận đăng ký consumer này.
+                        </label>
+                    } @else if (planError(); as message) {
+                        <p class="form-error" role="alert">{{ message }}</p>
+                        <button type="button" class="btn-ghost" (click)="loadPlan()">Thử lại</button>
+                    }
                 }
 
                 <div class="actions-row">
                     <button type="button" class="btn-ghost" [disabled]="store.step() === 1" (click)="store.back()">Quay lại</button>
                     @if (store.step() < 4) {
-                        <button type="button" class="btn-primary" (click)="store.next()">Tiếp</button>
+                        <button type="button" class="btn-primary" (click)="next()">Tiếp</button>
                     } @else {
-                        <button type="button" class="btn-primary" [disabled]="store.saving()" (click)="save()">
+                        <button type="button" class="btn-primary" [disabled]="store.saving() || !confirmed()" (click)="save()">
                             {{ store.saving() ? 'Đang lưu…' : 'Lưu consumer' }}
                         </button>
                     }
@@ -206,6 +230,13 @@ export class OnboardingPage implements OnInit {
     readonly sources = SOURCES;
     readonly recipes = PROFILE_RECIPES;
     readonly hosts = HOST_PROFILES;
+    readonly selectedRecipe = computed(
+        () => this.recipes.find((recipe) => recipe.id === this.store.profile().profile.recipe) || this.recipes[1]
+    );
+    readonly plan = signal<ConsumerPlan | null>(null);
+    readonly planning = signal(false);
+    readonly planError = signal<string | null>(null);
+    readonly confirmed = signal(false);
     private editingId: string | null = null;
 
     ngOnInit(): void {
@@ -220,7 +251,31 @@ export class OnboardingPage implements OnInit {
             .catch((error) => this.store.error.set(error?.detail || 'Không tải được profile'));
     }
 
+    next(): void {
+        const before = this.store.step();
+        if (!this.store.next()) return;
+        if (before < 4 && this.store.step() === 4) void this.loadPlan();
+    }
+
+    async loadPlan(): Promise<void> {
+        this.planning.set(true);
+        this.planError.set(null);
+        try {
+            this.plan.set(await this.service.plan(this.store.profile()));
+        } catch (error: any) {
+            this.planError.set(error?.detail || error?.message || 'Không tạo được plan');
+        } finally {
+            this.planning.set(false);
+        }
+    }
+
     async save(): Promise<void> {
+        if (!this.plan()) await this.loadPlan();
+        if (!this.plan()) return;
+        if (!this.confirmed()) {
+            this.store.error.set('Xem plan và tick xác nhận trước khi lưu.');
+            return;
+        }
         const profile = this.store.profile();
         if (!profile.id || !profile.name || !profile.root) {
             this.store.error.set('Consumer id, tên và repo là bắt buộc.');

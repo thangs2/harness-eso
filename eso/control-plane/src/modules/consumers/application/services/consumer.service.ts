@@ -56,6 +56,76 @@ export class ConsumerService {
         return this.toResponse(this.repository.update(project, dto as ConsumerProfileInput));
     }
 
+
+    plan(dto: ConsumerProfileDto) {
+        this.validate(dto);
+        const warnings: string[] = [];
+        if (!dto.root.startsWith('/') && !/^[A-Za-z]:\\/.test(dto.root)) {
+            warnings.push('root nên là đường dẫn tuyệt đối tới repo consumer.');
+        }
+        if (dto.profile.recipe === 'lite' && (dto.sources.docgraph || dto.sources.codegraph || dto.sources.memory)) {
+            warnings.push('Recipe Lite không dùng external provider; các source đang bật sẽ không có tác dụng.');
+        }
+        if (dto.integration.jevMode !== 'off' && !dto.integration.consent) {
+            warnings.push('JEV đang bật nhưng chưa cấp consent ghi evidence.');
+        }
+        const files: Array<{ relative: string; action: string; preview: unknown }> = [
+            {
+                relative: 'harness.config.json',
+                action: 'create-if-missing',
+                preview: {
+                    project: { id: dto.id, name: dto.name },
+                    server: { port: dto.observePort || 8792 },
+                    hostMode: dto.hostMode || 'dual-ide',
+                    profile: dto.profile,
+                },
+            },
+            {
+                relative: '.harness/decision-policy.json',
+                action: 'merge',
+                preview: {
+                    eso: { enabled: true, sources: dto.sources },
+                    paths: { locked: dto.protectedPaths },
+                    team: dto.team,
+                    gates: dto.gates,
+                    integration: dto.integration,
+                },
+            },
+            {
+                relative: '.harness/sidecar.env',
+                action: 'create-if-missing',
+                preview: { HARNESS_SIDECAR_URL: `http://127.0.0.1:${dto.observePort || 8792}` },
+            },
+        ];
+        if ((dto.hostMode || 'dual-ide') === 'dual-ide' || dto.profile.hostProfile.startsWith('cursor')) {
+            files.push({
+                relative: '.cursor/hooks.json',
+                action: 'merge',
+                preview: { hooks: { beforeShellExecution: '.harness/host-pack/route-hook.py' } },
+            });
+        }
+        if ((dto.hostMode || 'dual-ide') === 'dual-ide' || dto.profile.hostProfile.startsWith('agents')) {
+            files.push({
+                relative: '.agents/hooks.json',
+                action: 'merge',
+                preview: { hooks: { beforeShellExecution: '.harness/host-pack/route-hook.py' } },
+            });
+        }
+        files.push({
+            relative: '.harness/host-pack/',
+            action: 'runtime',
+            preview: { note: 'Host pack được build bởi scripts/build-host-pack.mjs trước khi provision.' },
+        });
+        return {
+            root: dto.root,
+            consumer: dto.id,
+            profile: dto.profile,
+            files,
+            warnings,
+            generatedAt: new Date().toISOString(),
+        };
+    }
+
     private validate(dto: ConsumerProfileDto): void {
         if (!dto.name?.trim()) this.bad('CONSUMER_NAME_REQUIRED', 'name is required');
         if (!dto.root?.trim()) this.bad('CONSUMER_ROOT_REQUIRED', 'root is required');

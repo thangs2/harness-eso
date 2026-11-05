@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { CONTROL_PLANE_API_CLIENT } from '../../../core/tokens.js';
 import type { ConsumerProfile } from '../models/onboarding.model.js';
-import type { ConsumerListResponse } from '../../../../../../../libs/api-client/types.js';
+import type { ConsumerListResponse, ConsumerPlan } from '../../../../../../../libs/api-client/types.js';
 
 @Injectable({ providedIn: 'root' })
 export class ConsumerProfileService {
@@ -15,6 +15,11 @@ export class ConsumerProfileService {
     get(project: string): Promise<ConsumerProfile> {
         if (!this.client) throw new Error('API client chưa được cấu hình');
         return this.client.getConsumer(project);
+    }
+
+    plan(profile: ConsumerProfile): Promise<ConsumerPlan> {
+        if (!this.client) throw new Error('API client chưa được cấu hình');
+        return this.client.planConsumer(profile);
     }
 
     create(profile: ConsumerProfile): Promise<ConsumerProfile> {

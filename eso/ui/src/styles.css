@@ -264,3 +264,26 @@ h3 { color: #8fa3b8; }
 .stat-value { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
 .stat-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 @media (max-width: 720px) { .stats-row { grid-template-columns: 1fr; } }
+/* Onboarding layout/plan */
+.eso-content { width: min(1040px, 100%); }
+.stepper { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.step { justify-content: center; }
+.profile-cards { grid-auto-rows: 1fr; }
+.recipe-detail { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: #0d1828; margin: 0 0 16px; }
+.recipe-detail h3 { margin: 0 0 4px; color: #7fe3f0; text-transform: none; letter-spacing: 0; font-size: 14px; }
+.recipe-detail p { margin: 0; color: var(--muted); font-size: 13px; }
+.recipe-detail strong { display: block; margin-bottom: 4px; color: #c7d5e5; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.plan-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin: 8px 0 12px; }
+.warn-list { margin: 0 0 14px; padding: 10px 12px 10px 28px; border: 1px solid #5a4420; background: var(--warn-bg); color: var(--warn-ink); border-radius: 8px; }
+.plan-files { display: grid; gap: 8px; }
+.plan-file { border: 1px solid var(--line); border-radius: 8px; background: #0d1828; padding: 0 12px; }
+.plan-file summary { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; }
+.plan-file summary code { color: #c7d5e5; }
+.action-badge { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px; border: 1px solid #2a3b52; color: #8fa3b8; }
+.plan-file pre { margin: 0 0 12px; max-height: 240px; }
+.confirm-line { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-weight: 600; color: #c7d5e5; }
+.confirm-line input { width: auto; }
+@media (max-width: 900px) {
+  .recipe-detail { grid-template-columns: 1fr; }
+  .stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

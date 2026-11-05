@@ -4,6 +4,7 @@ import type {
     ProblemDetailsDto,
     ConsumerProfile,
     ConsumerListResponse,
+    ConsumerPlan,
 } from './types.js';
 
 export class ControlPlaneApiClient {
@@ -130,6 +131,16 @@ export class ControlPlaneApiClient {
         } catch {
             return { title: 'HTTP Error', status: res.status, detail: res.statusText };
         }
+    }
+
+    async planConsumer(profile: ConsumerProfile): Promise<ConsumerPlan> {
+        const res = await fetch(`${this.baseUrl}/api/v1/consumers/plan`, {
+            method: 'POST',
+            headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile),
+        });
+        if (!res.ok) throw await this.problem(res);
+        return (await res.json()) as ConsumerPlan;
     }
 
 }

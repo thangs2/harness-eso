@@ -73,3 +73,18 @@ export interface ConsumerSummary {
 export interface ConsumerListResponse {
     items: ConsumerSummary[];
 }
+
+export interface ConsumerPlanFile {
+    relative: string;
+    action: string;
+    preview: unknown;
+}
+
+export interface ConsumerPlan {
+    root: string;
+    consumer: string;
+    profile: { recipe: string; hostProfile: string; description?: string };
+    files: ConsumerPlanFile[];
+    warnings: string[];
+    generatedAt: string;
+}

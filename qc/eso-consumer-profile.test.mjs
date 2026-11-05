@@ -49,6 +49,17 @@ test('ESO-390: consumer profile create/list/get/update persists versions', async
     assert.equal(created.id, 'acme');
     assert.equal(created.version, 1);
 
+    const plan = await fetch(`${base}/api/v1/consumers/plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...BASE_PROFILE, id: 'planned' }),
+    });
+    assert.equal(plan.status, 200);
+    const planned = await plan.json();
+    assert.equal(planned.files.some((f) => f.relative === 'harness.config.json'), true);
+    assert.equal(planned.files.some((f) => f.relative === '.harness/decision-policy.json'), true);
+    assert.equal(Array.isArray(planned.warnings), true);
+
     const list = await fetch(`${base}/api/v1/consumers`, { headers });
     assert.equal(list.status, 200);
     const listed = await list.json();

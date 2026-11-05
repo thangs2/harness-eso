@@ -18,6 +18,12 @@ export class ConsumerController {
         return this.consumerService.get(project);
     }
 
+    @Post('plan')
+    @HttpCode(HttpStatus.OK)
+    plan(@Body() body: ConsumerProfileDto) {
+        return this.consumerService.plan(body);
+    }
+
     @Post()
     @HttpCode(HttpStatus.CREATED)
     create(@Body() body: ConsumerProfileDto) {
