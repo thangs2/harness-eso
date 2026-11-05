@@ -46,6 +46,7 @@ export interface ConsumerProfile {
     hostMode?: string;
     observePort?: number;
     sdlcRoot: string;
+    profile: { recipe: string; hostProfile: string; description?: string };
     zones: ConsumerZone[];
     headerProfile: string;
     presetVersion?: string;
@@ -61,6 +62,7 @@ export interface ConsumerSummary {
     name: string;
     root: string;
     sdlcRoot: string;
+    profile: { recipe: string; hostProfile: string; description?: string };
     version: number;
     status: string;
     updatedAt: string;

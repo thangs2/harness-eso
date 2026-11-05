@@ -34,6 +34,19 @@ export class OnboardingStore {
         this.patch({ zones });
     }
 
+    selectRecipe(recipe: string): void {
+        const sources =
+            recipe === 'lite'
+                ? { docgraph: false, codegraph: false, memory: false }
+                : recipe === 'dsh-native'
+                  ? { docgraph: true, codegraph: true, memory: true }
+                  : { docgraph: true, codegraph: true, memory: true };
+        this.patch({
+            profile: { ...this.profile().profile, recipe, description: recipe },
+            sources,
+        });
+    }
+
     toggleRole(role: string): void {
         const roles = this.profile().team.roles;
         const next = roles.includes(role) ? roles.filter((r) => r !== role) : [...roles, role];
@@ -68,15 +81,19 @@ export class OnboardingStore {
     validateStep(): string | null {
         const p = this.profile();
         if (this.step() === 1) {
+            if (!p.profile?.recipe) return 'Chọn một profile recipe.';
+            if (!p.profile?.hostProfile) return 'Chọn host profile.';
+        }
+        if (this.step() === 2) {
             if (!/^[a-z][a-z0-9-]{1,31}$/.test(p.id)) return 'Consumer id phải là slug thường (2–32 ký tự).';
             if (!p.name.trim()) return 'Tên consumer là bắt buộc.';
             if (!p.root.trim()) return 'Đường dẫn repo là bắt buộc.';
         }
-        if (this.step() === 2) {
+        if (this.step() === 3) {
             if (!p.sdlcRoot.trim()) return 'SDLC root là bắt buộc.';
             if (p.zones.some((zone) => !zone.path.trim())) return 'Mỗi zone phải có path.';
+            if (p.team.roles.length === 0) return 'Chọn ít nhất một role.';
         }
-        if (this.step() === 3 && p.team.roles.length === 0) return 'Chọn ít nhất một role.';
         return null;
     }
 

@@ -61,6 +61,9 @@ export class ConsumerService {
         if (!dto.root?.trim()) this.bad('CONSUMER_ROOT_REQUIRED', 'root is required');
         if (!dto.sdlcRoot?.trim()) this.bad('SDLC_ROOT_REQUIRED', 'sdlcRoot is required');
         if (!dto.headerProfile?.trim()) this.bad('HEADER_PROFILE_REQUIRED', 'headerProfile is required');
+        if (!dto.profile?.recipe || !dto.profile?.hostProfile) {
+            this.bad('PROFILE_REQUIRED', 'profile.recipe and profile.hostProfile are required');
+        }
         if (!Array.isArray(dto.zones) || dto.zones.length === 0) {
             this.bad('ZONES_REQUIRED', 'at least one zone is required');
         }
@@ -86,12 +89,18 @@ export class ConsumerService {
         throw new BadRequestException({ code, detail });
     }
 
+    private summaryProfile(row: any) {
+        const parsed = JSON.parse(row.profile_json);
+        return parsed.profile || { recipe: 'pro', hostProfile: 'cursor-superset' };
+    }
+
     private toSummary(row: any) {
         return {
             id: row.project,
             name: row.name,
             root: row.root,
             sdlcRoot: row.sdlc_root,
+            profile: this.summaryProfile(row),
             version: row.version,
             status: row.status,
             updatedAt: row.updated_at,
@@ -99,8 +108,10 @@ export class ConsumerService {
     }
 
     private toResponse(row: any) {
+        const parsed = JSON.parse(row.profile_json);
         return {
-            ...JSON.parse(row.profile_json),
+            ...parsed,
+            profile: this.summaryProfile(row),
             version: row.version,
             status: row.status,
             createdAt: row.created_at,

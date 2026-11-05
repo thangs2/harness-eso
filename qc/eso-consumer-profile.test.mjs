@@ -12,6 +12,7 @@ const BASE_PROFILE = {
   hostMode: 'dual-ide',
   observePort: 8792,
   sdlcRoot: 'sdlc',
+  profile: { recipe: 'pro', hostProfile: 'cursor-superset', description: 'Full external evidence' },
   zones: [
     { name: 'human', path: 'sdlc', headerProfile: 'human-v1' },
     { name: 'agent', path: '.agents', headerProfile: 'agent-v1' },

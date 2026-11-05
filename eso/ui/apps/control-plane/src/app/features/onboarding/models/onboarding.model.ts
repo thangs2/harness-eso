@@ -12,6 +12,7 @@ export interface ConsumerProfile {
     hostMode?: string;
     observePort?: number;
     sdlcRoot: string;
+    profile: { recipe: string; hostProfile: string; description?: string };
     zones: ConsumerZone[];
     headerProfile: string;
     presetVersion?: string;
@@ -20,6 +21,10 @@ export interface ConsumerProfile {
     gates: Record<string, unknown>;
     sources: Record<string, unknown>;
     protectedPaths: string[];
+    version?: number;
+    status?: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export const DEFAULT_PROFILE: ConsumerProfile = {
@@ -30,6 +35,7 @@ export const DEFAULT_PROFILE: ConsumerProfile = {
     hostMode: 'dual-ide',
     observePort: 8792,
     sdlcRoot: 'sdlc',
+    profile: { recipe: 'pro', hostProfile: 'cursor-superset', description: 'Full external evidence' },
     zones: [
         { name: 'human', path: 'sdlc', headerProfile: 'human-v1' },
         { name: 'agent', path: '.agents', headerProfile: 'agent-v1' },
@@ -44,5 +50,11 @@ export const DEFAULT_PROFILE: ConsumerProfile = {
 };
 
 export const ROLES = ['lead', 'build', 'verify', 'audit', 'operator'];
+export const PROFILE_RECIPES = [
+    { id: 'lite', name: 'Lite', description: 'Host-only: no external law/code/memory providers.' },
+    { id: 'pro', name: 'Pro', description: 'Full external evidence: docgraph + codegraph + memory.' },
+    { id: 'dsh-native', name: 'DSH native', description: 'Prefer host session memory, then agentmemory.' },
+];
+export const HOST_PROFILES = ['cursor-superset', 'agents-superset', 'claude-superset'];
 export const GATES = ['design', 'build', 'verify', 'release'];
 export const SOURCES = ['docgraph', 'codegraph', 'memory'];

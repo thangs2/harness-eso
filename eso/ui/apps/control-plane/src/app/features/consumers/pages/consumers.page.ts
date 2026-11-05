@@ -1,12 +1,13 @@
 import { Component, ChangeDetectionStrategy, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { DatePipe } from '@angular/common';
 import { ConsumerProfileService } from '../../onboarding/data/consumer-profile.service.js';
 import type { ConsumerSummary } from '../../../../../../../libs/api-client/types.js';
 
 @Component({
     selector: 'eso-consumers-page',
     standalone: true,
-    imports: [RouterLink],
+    imports: [RouterLink, DatePipe],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <header class="page-header">
@@ -32,17 +33,18 @@ import type { ConsumerSummary } from '../../../../../../../libs/api-client/types
         } @else {
             <section class="panel table-panel">
                 <table class="turns-table" aria-label="Danh sách consumer">
-                    <thead><tr><th>Consumer</th><th>Repo</th><th>SDLC root</th><th>Version</th><th>Cập nhật</th><th></th></tr></thead>
+                    <thead><tr><th>Consumer</th><th>Repo</th><th>Profile</th><th>Version</th><th>Cập nhật</th><th></th></tr></thead>
                     <tbody>
                         @for (item of items(); track item.id) {
                             <tr>
                                 <td class="col-work"><strong>{{ item.id }}</strong><br><small>{{ item.name }}</small></td>
                                 <td>{{ item.root }}</td>
-                                <td>{{ item.sdlcRoot }}</td>
+                                <td><span class="pill">{{ item.profile?.recipe }}</span><br><small>{{ item.profile?.hostProfile }}</small></td>
                                 <td>v{{ item.version }}</td>
-                                <td>{{ item.updatedAt }}</td>
+                                <td>{{ item.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</td>
                                 <td class="col-actions">
-                                    <a class="btn-why" [routerLink]="['/work-overview']" [queryParams]="{ project: item.id }">Mở</a>
+                                    <a class="btn-why" [routerLink]="['/consumers', item.id]">Chi tiết</a>
+                                    <a class="btn-why" [routerLink]="['/work-overview']" [queryParams]="{ project: item.id }">Work</a>
                                     <a class="btn-why" [routerLink]="['/onboarding', item.id]">Sửa</a>
                                 </td>
                             </tr>

@@ -27,6 +27,9 @@ export class ConsumerProfileDto {
     @IsString()
     sdlcRoot: string;
 
+    @IsObject()
+    profile: { recipe: string; hostProfile: string; description?: string };
+
     @IsArray()
     zones: Array<{ name: string; path: string; headerProfile?: string }>;
 

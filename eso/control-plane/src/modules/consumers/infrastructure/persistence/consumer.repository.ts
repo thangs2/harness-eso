@@ -10,6 +10,7 @@ export interface ConsumerProfileInput {
     hostMode?: string;
     observePort?: number;
     sdlcRoot: string;
+    profile: { recipe: string; hostProfile: string; description?: string };
     zones: Array<{ name: string; path: string; headerProfile?: string }>;
     headerProfile: string;
     presetVersion?: string;
