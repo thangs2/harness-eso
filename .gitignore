@@ -1,7 +1,8 @@
 node_modules/
+# comments/artifacts is scratch: drafts only, never tracked
+comments/artifacts/
 .DS_Store
 *.log
-!comments/artifacts/slp/verify/*.log
 .harness/
 .cursor/mcp/node_modules/
 dist/
