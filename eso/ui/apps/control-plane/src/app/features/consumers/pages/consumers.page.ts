@@ -1,0 +1,69 @@
+import { Component, ChangeDetectionStrategy, OnInit, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { ConsumerProfileService } from '../../onboarding/data/consumer-profile.service.js';
+import type { ConsumerSummary } from '../../../../../../../libs/api-client/types.js';
+
+@Component({
+    selector: 'eso-consumers-page',
+    standalone: true,
+    imports: [RouterLink],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    template: `
+        <header class="page-header">
+            <div>
+                <p class="eyebrow">Control Plane</p>
+                <h1>Consumers</h1>
+                <p class="subtitle">Profile đã đăng ký; chọn một consumer để xử lý case-by-case.</p>
+            </div>
+            <a class="btn-primary" routerLink="/onboarding">Thiết lập consumer</a>
+        </header>
+
+        @if (error(); as message) {
+            <p class="form-error" role="alert">{{ message }}</p>
+        }
+        @if (loading()) {
+            <section class="panel"><p class="loading-label">Đang nạp consumers…</p></section>
+        } @else if (items().length === 0) {
+            <section class="panel empty-panel">
+                <h2>Chưa có consumer</h2>
+                <p>Bắt đầu bằng việc khai báo profile cho một repo cụ thể.</p>
+                <a class="btn-primary" routerLink="/onboarding">Thiết lập consumer đầu tiên</a>
+            </section>
+        } @else {
+            <section class="panel table-panel">
+                <table class="turns-table" aria-label="Danh sách consumer">
+                    <thead><tr><th>Consumer</th><th>Repo</th><th>SDLC root</th><th>Version</th><th>Cập nhật</th><th></th></tr></thead>
+                    <tbody>
+                        @for (item of items(); track item.id) {
+                            <tr>
+                                <td class="col-work"><strong>{{ item.id }}</strong><br><small>{{ item.name }}</small></td>
+                                <td>{{ item.root }}</td>
+                                <td>{{ item.sdlcRoot }}</td>
+                                <td>v{{ item.version }}</td>
+                                <td>{{ item.updatedAt }}</td>
+                                <td class="col-actions">
+                                    <a class="btn-why" [routerLink]="['/work-overview']" [queryParams]="{ project: item.id }">Mở</a>
+                                    <a class="btn-why" [routerLink]="['/onboarding', item.id]">Sửa</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+        }
+    `,
+})
+export class ConsumersPage implements OnInit {
+    private readonly service = inject(ConsumerProfileService);
+    readonly items = signal<ConsumerSummary[]>([]);
+    readonly loading = signal(true);
+    readonly error = signal<string | null>(null);
+
+    ngOnInit(): void {
+        this.service
+            .list()
+            .then((res) => this.items.set(res.items || []))
+            .catch((err) => this.error.set(err?.detail || 'Không tải được consumers'))
+            .finally(() => this.loading.set(false));
+    }
+}

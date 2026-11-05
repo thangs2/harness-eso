@@ -31,3 +31,41 @@ export interface ProblemDetailsDto {
     detail?: string;
     instance?: string;
 }
+
+export interface ConsumerZone {
+    name: 'human' | 'agent';
+    path: string;
+    headerProfile?: string;
+}
+
+export interface ConsumerProfile {
+    id: string;
+    name: string;
+    root: string;
+    repoUrl?: string;
+    hostMode?: string;
+    observePort?: number;
+    sdlcRoot: string;
+    zones: ConsumerZone[];
+    headerProfile: string;
+    presetVersion?: string;
+    tools: Record<string, unknown>;
+    team: { roles: string[]; presets?: string[] };
+    gates: Record<string, unknown>;
+    sources: Record<string, unknown>;
+    protectedPaths: string[];
+}
+
+export interface ConsumerSummary {
+    id: string;
+    name: string;
+    root: string;
+    sdlcRoot: string;
+    version: number;
+    status: string;
+    updatedAt: string;
+}
+
+export interface ConsumerListResponse {
+    items: ConsumerSummary[];
+}

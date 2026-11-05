@@ -7,6 +7,14 @@ export const APP_ROUTES: Routes = [
         pathMatch: 'full',
     },
     {
+        path: 'consumers',
+        loadChildren: () => import('./features/consumers/consumers.routes.js').then((m) => m.CONSUMERS_ROUTES),
+    },
+    {
+        path: 'onboarding',
+        loadChildren: () => import('./features/onboarding/onboarding.routes.js').then((m) => m.ONBOARDING_ROUTES),
+    },
+    {
         path: 'work-overview',
         loadChildren: () => import('./features/work-overview/work-overview.routes.js').then((m) => m.WORK_OVERVIEW_ROUTES),
     },

@@ -102,3 +102,59 @@ footer.demo-note { margin-top: 20px; color: var(--muted); font-size: 12px; }
   .page-header { align-items: flex-start; flex-direction: column; }
   .turns-table th, .turns-table td { padding: 10px 8px; }
 }
+/* Onboarding + consumers */
+.onboarding { display: grid; gap: 18px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; }
+.stepper { display: flex; gap: 8px; flex-wrap: wrap; }
+.step { display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #fff; font-size: 13px; }
+.step-no { width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 50%; background: #eef2f5; font-size: 12px; font-weight: 700; }
+.step.active { border-color: #9cc7d1; color: var(--brand); background: #eef7f9; }
+.step.active .step-no, .step.done .step-no { background: var(--brand); color: #fff; }
+.step.done { color: var(--brand); }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 14px 0; }
+.form-grid label, label.full { display: grid; gap: 6px; font-weight: 600; color: #33414d; }
+.form-grid small { color: var(--muted); font-weight: 400; }
+input, select, textarea {
+  font: inherit; color: var(--ink); background: #fff; border: 1px solid #c9d3dc; border-radius: 8px; padding: 9px 11px; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid #9cc7d1; outline-offset: 1px; border-color: var(--brand); }
+textarea { resize: vertical; }
+h2 { margin: 0 0 6px; font-size: 18px; }
+h3 { margin: 18px 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.check-row { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: #33414d; }
+.check input { width: auto; }
+.zone-row { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 10px; align-items: center; margin-bottom: 8px; }
+.zone-row strong { text-transform: capitalize; color: var(--muted); font-size: 13px; }
+.actions-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.btn-primary {
+  appearance: none; border: 1px solid var(--brand); background: var(--brand); color: var(--brand-ink);
+  border-radius: 8px; padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary:hover { background: #0b3b48; }
+.btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+.btn-ghost {
+  appearance: none; border: 1px solid #c9d3dc; background: #fff; color: #33414d;
+  border-radius: 8px; padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none;
+}
+.btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
+.form-error { margin: 0; padding: 10px 12px; border: 1px solid #f2c7c7; background: var(--danger-bg); color: var(--danger-ink); border-radius: 8px; }
+.saved-panel { border-color: #b9d7de; background: #f4fbfc; }
+.saved-panel h2 { color: var(--brand); }
+.saved-panel code { background: #dff0f4; padding: 2px 6px; border-radius: 5px; }
+.review-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 14px; margin: 14px 0; }
+.review-grid dt { color: var(--muted); font-weight: 600; }
+.review-grid dd { margin: 0; }
+details { margin-top: 12px; }
+details summary { cursor: pointer; color: var(--brand); font-weight: 600; }
+pre { background: #0f1b22; color: #d7e7ec; padding: 14px; border-radius: 8px; overflow: auto; font-size: 12px; }
+.table-panel { padding: 0; overflow: hidden; }
+.table-panel .turns-table { border: 0; border-radius: 0; box-shadow: none; }
+.empty-panel { text-align: center; display: grid; gap: 8px; place-items: center; }
+.empty-panel p { color: var(--muted); margin: 0; }
+.col-actions { display: flex; gap: 8px; }
+@media (max-width: 720px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .zone-row { grid-template-columns: 1fr; }
+  .review-grid { grid-template-columns: 1fr; }
+}

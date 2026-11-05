@@ -1,4 +1,10 @@
-import type { WorkOverviewResponse, ConfigPreviewDto, ProblemDetailsDto } from './types.js';
+import type {
+    WorkOverviewResponse,
+    ConfigPreviewDto,
+    ProblemDetailsDto,
+    ConsumerProfile,
+    ConsumerListResponse,
+} from './types.js';
 
 export class ControlPlaneApiClient {
     private baseUrl: string;
@@ -84,4 +90,46 @@ export class ControlPlaneApiClient {
         }
         return await res.json() as { success: boolean; hash: string };
     }
+    async listConsumers(): Promise<ConsumerListResponse> {
+        const res = await fetch(`${this.baseUrl}/api/v1/consumers`, { headers: this.getHeaders() });
+        if (!res.ok) throw await this.problem(res);
+        return (await res.json()) as ConsumerListResponse;
+    }
+
+    async getConsumer(project: string): Promise<ConsumerProfile> {
+        const res = await fetch(`${this.baseUrl}/api/v1/consumers/${encodeURIComponent(project)}`, {
+            headers: this.getHeaders(),
+        });
+        if (!res.ok) throw await this.problem(res);
+        return (await res.json()) as ConsumerProfile;
+    }
+
+    async createConsumer(profile: ConsumerProfile): Promise<ConsumerProfile> {
+        const res = await fetch(`${this.baseUrl}/api/v1/consumers`, {
+            method: 'POST',
+            headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile),
+        });
+        if (!res.ok) throw await this.problem(res);
+        return (await res.json()) as ConsumerProfile;
+    }
+
+    async updateConsumer(project: string, profile: ConsumerProfile): Promise<ConsumerProfile> {
+        const res = await fetch(`${this.baseUrl}/api/v1/consumers/${encodeURIComponent(project)}`, {
+            method: 'PUT',
+            headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile),
+        });
+        if (!res.ok) throw await this.problem(res);
+        return (await res.json()) as ConsumerProfile;
+    }
+
+    private async problem(res: Response): Promise<ProblemDetailsDto> {
+        try {
+            return (await res.json()) as ProblemDetailsDto;
+        } catch {
+            return { title: 'HTTP Error', status: res.status, detail: res.statusText };
+        }
+    }
+
 }
