@@ -13,6 +13,7 @@ const BASE_PROFILE = {
   observePort: 8792,
   sdlcRoot: 'sdlc',
   profile: { recipe: 'pro', hostProfile: 'cursor-superset', description: 'Full external evidence' },
+  integration: { jevMode: 'off', consent: true, hostPack: 'full', memoryAdapter: 'none' },
   zones: [
     { name: 'human', path: 'sdlc', headerProfile: 'human-v1' },
     { name: 'agent', path: '.agents', headerProfile: 'agent-v1' },

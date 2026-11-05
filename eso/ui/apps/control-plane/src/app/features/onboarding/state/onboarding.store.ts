@@ -34,6 +34,10 @@ export class OnboardingStore {
         this.patch({ zones });
     }
 
+    patchIntegration(partial: Partial<{ jevMode: string; consent: boolean; hostPack: string; memoryAdapter: string }>): void {
+        this.patch({ integration: { ...this.profile().integration, ...partial } });
+    }
+
     selectRecipe(recipe: string): void {
         const sources =
             recipe === 'lite'

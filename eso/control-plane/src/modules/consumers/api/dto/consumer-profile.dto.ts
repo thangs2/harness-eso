@@ -30,6 +30,9 @@ export class ConsumerProfileDto {
     @IsObject()
     profile: { recipe: string; hostProfile: string; description?: string };
 
+    @IsObject()
+    integration: Record<string, any>;
+
     @IsArray()
     zones: Array<{ name: string; path: string; headerProfile?: string }>;
 

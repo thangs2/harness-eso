@@ -26,7 +26,7 @@ import { GATES, HOST_PROFILES, PROFILE_RECIPES, ROLES, SOURCES } from '../models
                 @for (n of [1, 2, 3, 4]; track n) {
                     <div class="step" [class.active]="store.step() === n" [class.done]="store.step() > n">
                         <span class="step-no">{{ n }}</span>
-                        <span>{{ n === 1 ? 'Profile' : n === 2 ? 'Consumer' : n === 3 ? 'Configuration' : 'Review' }}</span>
+                        <span>{{ n === 1 ? 'Profile' : n === 2 ? 'Consumer' : n === 3 ? 'Integration' : 'Preview' }}</span>
                     </div>
                 }
             </nav>
@@ -96,8 +96,27 @@ import { GATES, HOST_PROFILES, PROFILE_RECIPES, ROLES, SOURCES } from '../models
                 }
 
                 @if (store.step() === 3) {
-                    <h2>3 · Configuration</h2>
-                    <p class="section-hint">Cấu trúc knowledge base, team và gate áp cho consumer này.</p>
+                    <h2>3 · Integration</h2>
+                    <p class="section-hint">Knowledge base, team, gate và adapter áp cho consumer này.</p>
+                    <h3>Runtime</h3>
+                    <div class="form-grid">
+                        <label>JEV mode
+                            <select [ngModel]="store.profile().integration.jevMode" (ngModelChange)="store.patchIntegration({ jevMode: $event })">
+                                <option value="off">off</option><option value="flash">flash</option><option value="pro">pro</option>
+                            </select>
+                        </label>
+                        <label>Host pack
+                            <select [ngModel]="store.profile().integration.hostPack" (ngModelChange)="store.patchIntegration({ hostPack: $event })">
+                                <option value="full">full</option><option value="lite">lite</option>
+                            </select>
+                        </label>
+                        <label>Memory adapter
+                            <select [ngModel]="store.profile().integration.memoryAdapter" (ngModelChange)="store.patchIntegration({ memoryAdapter: $event })">
+                                <option value="none">none</option><option value="agentmemory">agentmemory</option><option value="native">native</option>
+                            </select>
+                        </label>
+                        <label class="check"><input type="checkbox" [checked]="store.profile().integration.consent" (change)="store.patchIntegration({ consent: !store.profile().integration.consent })"> Cho phép ghi evidence / consent</label>
+                    </div>
                     <div class="form-grid">
                         <label>SDLC root
                             <input [ngModel]="store.profile().sdlcRoot" (ngModelChange)="store.patch({ sdlcRoot: $event })" placeholder="sdlc">
@@ -147,12 +166,13 @@ import { GATES, HOST_PROFILES, PROFILE_RECIPES, ROLES, SOURCES } from '../models
                 }
 
                 @if (store.step() === 4) {
-                    <h2>4 · Review</h2>
+                    <h2>4 · Preview</h2>
                     <dl class="review-grid">
                         <dt>Profile</dt><dd>{{ store.profile().profile.recipe }} · {{ store.profile().profile.hostProfile }}</dd>
                         <dt>Consumer</dt><dd>{{ store.profile().id }} — {{ store.profile().name }}</dd>
                         <dt>Repo</dt><dd>{{ store.profile().root }}</dd>
                         <dt>SDLC root</dt><dd>{{ store.profile().sdlcRoot }}</dd>
+                        <dt>Integration</dt><dd>{{ store.profile().integration.jevMode }} · {{ store.profile().integration.hostPack }} · {{ store.profile().integration.memoryAdapter }}</dd>
                         <dt>Roles</dt><dd>{{ store.profile().team.roles.join(', ') }}</dd>
                         <dt>Protected paths</dt><dd>{{ store.profile().protectedPaths.length }} path</dd>
                     </dl>

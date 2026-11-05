@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, OnInit, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { ConsumerProfileService } from '../../onboarding/data/consumer-profile.service.js';
@@ -18,6 +18,12 @@ import type { ConsumerSummary } from '../../../../../../../libs/api-client/types
             </div>
             <a class="btn-primary" routerLink="/onboarding">Thiết lập consumer</a>
         </header>
+
+        <div class="stats-row">
+            <div class="stat"><span class="stat-value">{{ items().length }}</span><span class="stat-label">consumers</span></div>
+            <div class="stat"><span class="stat-value">{{ profileCount() }}</span><span class="stat-label">profiles</span></div>
+            <div class="stat"><span class="stat-value">{{ latest() || '—' }}</span><span class="stat-label">last update</span></div>
+        </div>
 
         @if (error(); as message) {
             <p class="form-error" role="alert">{{ message }}</p>
@@ -58,6 +64,11 @@ import type { ConsumerSummary } from '../../../../../../../libs/api-client/types
 export class ConsumersPage implements OnInit {
     private readonly service = inject(ConsumerProfileService);
     readonly items = signal<ConsumerSummary[]>([]);
+    readonly profileCount = computed(() => new Set(this.items().map((item) => item.profile?.recipe).filter(Boolean)).size);
+    readonly latest = computed(() => {
+        const dates = this.items().map((item) => item.updatedAt).filter(Boolean).sort();
+        return dates.length ? dates[dates.length - 1].slice(0, 16).replace('T', ' ') : '';
+    });
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
 

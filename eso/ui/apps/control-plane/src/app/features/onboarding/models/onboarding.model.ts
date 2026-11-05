@@ -13,6 +13,7 @@ export interface ConsumerProfile {
     observePort?: number;
     sdlcRoot: string;
     profile: { recipe: string; hostProfile: string; description?: string };
+    integration: { jevMode: string; consent: boolean; hostPack: string; memoryAdapter: string };
     zones: ConsumerZone[];
     headerProfile: string;
     presetVersion?: string;
@@ -36,6 +37,7 @@ export const DEFAULT_PROFILE: ConsumerProfile = {
     observePort: 8792,
     sdlcRoot: 'sdlc',
     profile: { recipe: 'pro', hostProfile: 'cursor-superset', description: 'Full external evidence' },
+    integration: { jevMode: 'off', consent: true, hostPack: 'full', memoryAdapter: 'none' },
     zones: [
         { name: 'human', path: 'sdlc', headerProfile: 'human-v1' },
         { name: 'agent', path: '.agents', headerProfile: 'agent-v1' },

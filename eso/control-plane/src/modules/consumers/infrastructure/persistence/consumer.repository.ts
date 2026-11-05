@@ -11,6 +11,7 @@ export interface ConsumerProfileInput {
     observePort?: number;
     sdlcRoot: string;
     profile: { recipe: string; hostProfile: string; description?: string };
+    integration: Record<string, any>;
     zones: Array<{ name: string; path: string; headerProfile?: string }>;
     headerProfile: string;
     presetVersion?: string;

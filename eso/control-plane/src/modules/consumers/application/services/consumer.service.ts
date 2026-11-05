@@ -61,6 +61,9 @@ export class ConsumerService {
         if (!dto.root?.trim()) this.bad('CONSUMER_ROOT_REQUIRED', 'root is required');
         if (!dto.sdlcRoot?.trim()) this.bad('SDLC_ROOT_REQUIRED', 'sdlcRoot is required');
         if (!dto.headerProfile?.trim()) this.bad('HEADER_PROFILE_REQUIRED', 'headerProfile is required');
+        if (!dto.integration || typeof dto.integration !== 'object') {
+            this.bad('INTEGRATION_REQUIRED', 'integration object is required');
+        }
         if (!dto.profile?.recipe || !dto.profile?.hostProfile) {
             this.bad('PROFILE_REQUIRED', 'profile.recipe and profile.hostProfile are required');
         }
@@ -94,6 +97,11 @@ export class ConsumerService {
         return parsed.profile || { recipe: 'pro', hostProfile: 'cursor-superset' };
     }
 
+    private summaryIntegration(row: any) {
+        const parsed = JSON.parse(row.profile_json);
+        return parsed.integration || { jevMode: 'off', consent: true, hostPack: 'full', memoryAdapter: 'none' };
+    }
+
     private toSummary(row: any) {
         return {
             id: row.project,
@@ -101,6 +109,7 @@ export class ConsumerService {
             root: row.root,
             sdlcRoot: row.sdlc_root,
             profile: this.summaryProfile(row),
+            integration: this.summaryIntegration(row),
             version: row.version,
             status: row.status,
             updatedAt: row.updated_at,
@@ -112,6 +121,7 @@ export class ConsumerService {
         return {
             ...parsed,
             profile: this.summaryProfile(row),
+            integration: parsed.integration || { jevMode: 'off', consent: true, hostPack: 'full', memoryAdapter: 'none' },
             version: row.version,
             status: row.status,
             createdAt: row.created_at,

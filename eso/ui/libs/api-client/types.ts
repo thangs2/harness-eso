@@ -47,6 +47,7 @@ export interface ConsumerProfile {
     observePort?: number;
     sdlcRoot: string;
     profile: { recipe: string; hostProfile: string; description?: string };
+    integration: { jevMode: string; consent: boolean; hostPack: string; memoryAdapter: string };
     zones: ConsumerZone[];
     headerProfile: string;
     presetVersion?: string;
@@ -63,6 +64,7 @@ export interface ConsumerSummary {
     root: string;
     sdlcRoot: string;
     profile: { recipe: string; hostProfile: string; description?: string };
+    integration: { jevMode: string; consent: boolean; hostPack: string; memoryAdapter: string };
     version: number;
     status: string;
     updatedAt: string;

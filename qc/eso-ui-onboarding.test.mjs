@@ -36,6 +36,9 @@ test('ESO-390 UI: profile recipe drives evidence sources', () => {
   assert.deepEqual(store.profile().sources, { docgraph: false, codegraph: false, memory: false });
   store.selectRecipe('pro');
   assert.deepEqual(store.profile().sources, { docgraph: true, codegraph: true, memory: true });
+  store.patchIntegration({ jevMode: 'flash', consent: false });
+  assert.equal(store.profile().integration.jevMode, 'flash');
+  assert.equal(store.profile().integration.consent, false);
 });
 
 test('ESO-390 UI: roles, gates, sources and protected paths are editable data', () => {
