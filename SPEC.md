@@ -1,6 +1,6 @@
 # harness-eso spec
 
-Every requirement is a row with an id. Agents build against approved rows; commits cite the ids they serve. `pullboard spec check` lints this file.
+Every requirement is a row with an id. Agents build against approved rows; commits cite the ids they serve. Không còn tool nào lint file này (pullboard đã gỡ 2026-11-06) — review row bằng tay.
 
 Statuses: approved = decided · draft = proposed · pending = open question · fact = true today · wont = won't build, decided and kept · retired = no longer applies, kept. Ids are permanent: never delete or renumber a row. Tiers: must · aim.
 
