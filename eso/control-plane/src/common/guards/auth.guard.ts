@@ -3,6 +3,7 @@ import {
     CanActivate,
     ExecutionContext,
     UnauthorizedException,
+    ForbiddenException,
 } from '@nestjs/common';
 import { AuthConfig } from './auth-config.service.js';
 
@@ -46,6 +47,39 @@ export class AuthGuard implements CanActivate {
                 code: 'UNAUTHORIZED',
                 error: 'UNAUTHORIZED',
                 detail: 'Bearer token mismatch or invalid',
+            });
+        }
+
+        // Token authenticated. Now enforce tenant project context (MVP 1 token = 1 project).
+        const configuredProject = this.authConfig.project;
+        if (!configuredProject) {
+            throw new ForbiddenException({
+                type: 'https://eso.dev/errors/forbidden',
+                title: 'Forbidden',
+                status: 403,
+                code: 'AUTH_PROJECT_MISSING',
+                error: 'AUTH_PROJECT_MISSING',
+                detail: 'Authentication project scope not configured on server (fail-closed)',
+            });
+        }
+
+        request.esoProject = configuredProject;
+
+        // Check if request specifies a project in query, params, or body
+        const requestedProject =
+            (request.query && typeof request.query.project === 'string' && request.query.project) ||
+            (request.params && typeof request.params.project === 'string' && request.params.project) ||
+            (request.body && typeof request.body === 'object' && typeof request.body.project === 'string' && request.body.project) ||
+            null;
+
+        if (requestedProject && requestedProject !== configuredProject) {
+            throw new ForbiddenException({
+                type: 'https://eso.dev/errors/forbidden',
+                title: 'Forbidden',
+                status: 403,
+                code: 'OUT_OF_SCOPE',
+                error: 'OUT_OF_SCOPE',
+                detail: `Project '${requestedProject}' is out of scope for authenticated token`,
             });
         }
 

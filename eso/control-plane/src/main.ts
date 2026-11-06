@@ -13,6 +13,7 @@ import { ProblemDetailsFilter } from './common/filters/problem-details.filter.js
 export interface NestControlPlaneOptions {
     db?: any;
     authToken?: string;
+    authProject?: string;
     port?: number;
     host?: string;
 }
@@ -59,10 +60,15 @@ export async function createNestFastifyControlPlane(
     });
 
     // Wire auth config
-    if (options.authToken !== undefined) {
-        const authConfig = app.get(AuthConfig);
-        if (authConfig) {
+    const authConfig = app.get(AuthConfig);
+    if (authConfig) {
+        if (options.authToken !== undefined) {
             authConfig.token = options.authToken;
+        }
+        if (options.authProject !== undefined) {
+            authConfig.project = options.authProject;
+        } else if (!authConfig.project && process.env.ESO_AUTH_PROJECT) {
+            authConfig.project = process.env.ESO_AUTH_PROJECT;
         }
     }
 

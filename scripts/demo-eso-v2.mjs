@@ -122,7 +122,7 @@ await recordTurnEvidence({
   payload: { work: 'thêm endpoint' },
 });
 
-const app = await createNestFastifyControlPlane({ db, authToken: TOKEN });
+const app = await createNestFastifyControlPlane({ db, authToken: TOKEN, authProject: PROJECT });
 await app.listen(MODE === 'serve' ? PORT : 0, '127.0.0.1');
 const port = MODE === 'serve' ? PORT : app.getHttpAdapter().getInstance().server.address().port;
 const base = `http://127.0.0.1:${port}`;

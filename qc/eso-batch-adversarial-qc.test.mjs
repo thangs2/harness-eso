@@ -90,7 +90,7 @@ test('ADVERSARIAL QC 2: Stored XSS Prevention in /s1 endpoint', async () => {
         payload: { test: true },
     });
 
-    const app = await createNestFastifyControlPlane({ db, authToken: BEARER });
+    const app = await createNestFastifyControlPlane({ db, authToken: BEARER, authProject: maliciousProject });
     await app.listen(0, '127.0.0.1');
     const port = app.getHttpAdapter().getInstance().server.address().port;
     const base = `http://127.0.0.1:${port}`;
@@ -118,7 +118,7 @@ test('ADVERSARIAL QC 2: Stored XSS Prevention in /s1 endpoint', async () => {
 test('ADVERSARIAL QC 3: Concurrency & Preview Hash verification', async () => {
     const pg = await createTestDb();
     const db = pg.db;
-    const app = await createNestFastifyControlPlane({ db, authToken: BEARER });
+    const app = await createNestFastifyControlPlane({ db, authToken: BEARER, authProject: 'p1' });
     await app.listen(0, '127.0.0.1');
     const port = app.getHttpAdapter().getInstance().server.address().port;
     const base = `http://127.0.0.1:${port}`;
@@ -200,7 +200,7 @@ test('ADVERSARIAL QC 3: Concurrency & Preview Hash verification', async () => {
 test('ADVERSARIAL QC 4: Strict validation, error masking, and health duck-typing', async () => {
     const pg = await createTestDb();
     const db = pg.db;
-    const app = await createNestFastifyControlPlane({ db, authToken: BEARER });
+    const app = await createNestFastifyControlPlane({ db, authToken: BEARER, authProject: 'p1' });
     await app.listen(0, '127.0.0.1');
     const port = app.getHttpAdapter().getInstance().server.address().port;
     const base = `http://127.0.0.1:${port}`;
@@ -244,7 +244,7 @@ test('ADVERSARIAL QC 4: Strict validation, error masking, and health duck-typing
         get() { throw new Error('SQLITE_ERROR: secret table structure exposed'); },
         all() { throw new Error('SQLITE_ERROR: secret table structure exposed'); },
     };
-    const boomApp = await createNestFastifyControlPlane({ db: boomDb, authToken: BEARER });
+    const boomApp = await createNestFastifyControlPlane({ db: boomDb, authToken: BEARER, authProject: 'p1' });
     await boomApp.listen(0, '127.0.0.1');
     const boomPort = boomApp.getHttpAdapter().getInstance().server.address().port;
     try {

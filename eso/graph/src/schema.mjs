@@ -93,6 +93,53 @@ CREATE TABLE IF NOT EXISTS completeness (
   CONSTRAINT completeness_value_range CHECK (value >= 0 AND value <= 1),
   CONSTRAINT completeness_per_kind_object CHECK (jsonb_typeof(per_kind) = 'object')
 );
+
+-- 5. manifest_entry: build output cho coverage — khoá (project, build_id, kind, logical_id)
+CREATE TABLE IF NOT EXISTS manifest_entry (
+  project      text NOT NULL,
+  build_id     text NOT NULL,
+  kind         text NOT NULL,
+  logical_id   text NOT NULL,
+  path         text NOT NULL,
+  at           timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (project, build_id, kind, logical_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manifest_entry_kind ON manifest_entry (project, build_id, kind);
+
+DROP TRIGGER IF EXISTS trg_manifest_entry_no_change ON manifest_entry;
+CREATE TRIGGER trg_manifest_entry_no_change
+BEFORE UPDATE OR DELETE ON manifest_entry
+FOR EACH ROW EXECUTE FUNCTION raise_append_only();
+
+-- 6. graph_index_run: trạng thái chạy và source_hash index graph cho API-28
+CREATE TABLE IF NOT EXISTS graph_index_run (
+  project      text NOT NULL,
+  build_id     text NOT NULL,
+  source_kind  text NOT NULL CHECK (source_kind IN ('roslyn','docs')),
+  source_hash  text NOT NULL,
+  status       text NOT NULL CHECK (status IN ('queued','running','succeeded','failed','parse_failed')),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz,
+  PRIMARY KEY (project, build_id, source_kind)
+);
+
+CREATE INDEX IF NOT EXISTS idx_graph_index_run_build ON graph_index_run (project, build_id);
+
+CREATE OR REPLACE FUNCTION check_graph_index_run_immutable_keys()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.project <> OLD.project OR NEW.build_id <> OLD.build_id OR NEW.source_kind <> OLD.source_kind OR NEW.source_hash <> OLD.source_hash THEN
+    RAISE EXCEPTION 'IMMUTABLE_KEY: project, build_id, source_kind, and source_hash cannot be modified';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_graph_index_run_immutable ON graph_index_run;
+CREATE TRIGGER trg_graph_index_run_immutable
+BEFORE UPDATE ON graph_index_run
+FOR EACH ROW EXECUTE FUNCTION check_graph_index_run_immutable_keys();
 `;
 
 export const POSTGRES_RLS_SQL = `
@@ -105,6 +152,10 @@ ALTER TABLE source_claim ENABLE ROW LEVEL SECURITY;
 ALTER TABLE source_claim FORCE ROW LEVEL SECURITY;
 ALTER TABLE completeness ENABLE ROW LEVEL SECURITY;
 ALTER TABLE completeness FORCE ROW LEVEL SECURITY;
+ALTER TABLE manifest_entry ENABLE ROW LEVEL SECURITY;
+ALTER TABLE manifest_entry FORCE ROW LEVEL SECURITY;
+ALTER TABLE graph_index_run ENABLE ROW LEVEL SECURITY;
+ALTER TABLE graph_index_run FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS graph_node_project_only ON graph_node;
 CREATE POLICY graph_node_project_only ON graph_node
@@ -129,6 +180,18 @@ CREATE POLICY completeness_project_only ON completeness
   FOR ALL
   USING      (project = current_setting('eso.project', true))
   WITH CHECK (project = current_setting('eso.project', true));
+
+DROP POLICY IF EXISTS manifest_entry_project_only ON manifest_entry;
+CREATE POLICY manifest_entry_project_only ON manifest_entry
+  FOR ALL
+  USING      (project = current_setting('eso.project', true))
+  WITH CHECK (project = current_setting('eso.project', true));
+
+DROP POLICY IF EXISTS graph_index_run_project_only ON graph_index_run;
+CREATE POLICY graph_index_run_project_only ON graph_index_run
+  FOR ALL
+  USING      (project = current_setting('eso.project', true))
+  WITH CHECK (project = current_setting('eso.project', true));
 `;
 
 export const TABLES = Object.freeze([
@@ -136,6 +199,8 @@ export const TABLES = Object.freeze([
   'graph_edge',
   'source_claim',
   'completeness',
+  'manifest_entry',
+  'graph_index_run',
 ]);
 
 /**

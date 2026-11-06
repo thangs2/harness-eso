@@ -21,6 +21,7 @@ test('ESO-370 / D-71: NestJS + Fastify + Kysely Control Plane server full suite'
     const app = await createNestFastifyControlPlane({
         db,
         authToken: BEARER_SAMPLE,
+        authProject: 'p1',
     });
 
     await app.listen(0, '127.0.0.1');
