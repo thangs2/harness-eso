@@ -90,6 +90,7 @@ export class GraphService {
             db,
             project,
             buildId: dto.build_id,
+            source: dto.source,
             onTurnPath,
             consumerRoot: process.env.ESO_CONSUMER_ROOT || null,
         });

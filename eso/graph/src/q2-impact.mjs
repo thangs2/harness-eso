@@ -42,9 +42,9 @@ export async function queryColumnImpact(db, options = {}) {
         column = null,
         candidates = null,
         completeness = null,
+        buildId = null,
         threshold = DEFAULT_THRESHOLD_Q2,
         floor = DEFAULT_FLOOR_Q2,
-        buildId = null,
     } = options;
 
     const normProject = (project || '').trim();
@@ -81,8 +81,8 @@ export async function queryColumnImpact(db, options = {}) {
     } else if (db && typeof db.all === 'function') {
         try {
             const rows = await db.all(
-                "SELECT value FROM completeness WHERE project = ? AND question = 'Q2' ORDER BY measured_at DESC LIMIT 1",
-                [normProject]
+                "SELECT value FROM completeness WHERE project = ?" + (buildId ? " AND build_id = ?" : "") + " AND question = 'Q2' ORDER BY measured_at DESC LIMIT 1",
+                buildId ? [normProject, buildId] : [normProject]
             );
             if (rows && rows.length > 0 && typeof rows[0].value === 'number') {
                 compVal = rows[0].value;
@@ -115,8 +115,8 @@ export async function queryColumnImpact(db, options = {}) {
     const tableNodes = await db.all(
         `SELECT node_id AS id, node_id, project, kind, node_key AS name, path
          FROM graph_node
-         WHERE project = ? AND (node_key = ? OR path = ?) AND kind = 'table'`,
-        [normProject, normTable, normTable]
+         WHERE project = ?` + (buildId ? ' AND build_id = ?' : '') + ` AND (node_key = ? OR path = ?) AND kind = 'table'`,
+        buildId ? [normProject, buildId, normTable, normTable] : [normProject, normTable, normTable]
     );
 
     // AC-ARCH-03-05: Check for entities referencing a deleted or missing table
@@ -124,8 +124,8 @@ export async function queryColumnImpact(db, options = {}) {
     const danglingClaims = await db.all(
         `SELECT c.edge_id, c.claim
          FROM source_claim c
-         WHERE c.project = ? AND c.claim LIKE ?`,
-        [normProject, `%"${normTable}"%`]
+         WHERE c.project = ?` + (buildId ? ' AND c.build_id = ?' : '') + ` AND c.claim LIKE ?`,
+        buildId ? [normProject, buildId, `%"${normTable}"%`] : [normProject, `%"${normTable}"%`]
     );
 
     // 2. Via graph_edge if table is absent
@@ -134,9 +134,9 @@ export async function queryColumnImpact(db, options = {}) {
         danglingEdges = await db.all(
             `SELECT e.edge_id, e.from_node_id, n.node_key AS entity_name, n.path AS entity_path
              FROM graph_edge e
-             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?
-             WHERE e.project = ? AND (e.to_node_id = ? OR e.to_node_id LIKE ?) AND e.kind = 'maps_to'`,
-            [normProject, normProject, normTable, `%${normTable}%`]
+             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?` + (buildId ? ' AND e.build_id = n.build_id' : '') + `
+             WHERE e.project = ?` + (buildId ? ' AND e.build_id = ?' : '') + ` AND (e.to_node_id = ? OR e.to_node_id LIKE ?) AND e.kind = 'maps_to'`,
+            buildId ? [normProject, normProject, buildId, normTable, `%${normTable}%`] : [normProject, normProject, normTable, `%${normTable}%`]
         );
     }
 
@@ -190,10 +190,10 @@ export async function queryColumnImpact(db, options = {}) {
     const entityEdges = await db.all(
         `SELECT e.from_node_id AS source_id, n.node_id AS id, n.kind, n.node_key AS name, n.path
          FROM graph_edge e
-         JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?
-         WHERE e.project = ? AND e.to_node_id = ? AND e.kind IN ('maps_to', 'references', 'defines')
+         JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?` + (buildId ? ' AND e.build_id = n.build_id' : '') + `
+         WHERE e.project = ?` + (buildId ? ' AND e.build_id = ?' : '') + ` AND e.to_node_id = ? AND e.kind IN ('maps_to', 'references', 'defines')
            AND n.kind = 'entity'`,
-        [normProject, normProject, tableNode.node_id]
+        buildId ? [normProject, normProject, buildId, tableNode.node_id] : [normProject, normProject, tableNode.node_id]
     );
 
     // AC-ARCH-03-04: If no entity or consumer reads this table -> empty list, ready
@@ -236,10 +236,10 @@ export async function queryColumnImpact(db, options = {}) {
         const dtoEdges = await db.all(
             `SELECT e.from_node_id AS source_id, n.node_id AS id, n.kind, n.node_key AS name, n.path
              FROM graph_edge e
-             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?
-             WHERE e.project = ? AND e.to_node_id IN (${entityPlaceholders}) AND e.kind IN ('references', 'maps_to')
+             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?` + (buildId ? ' AND e.build_id = n.build_id' : '') + `
+             WHERE e.project = ?` + (buildId ? ' AND e.build_id = ?' : '') + ` AND e.to_node_id IN (${entityPlaceholders}) AND e.kind IN ('references', 'maps_to')
                AND n.kind = 'dto'`,
-            [normProject, normProject, ...entityIds]
+            buildId ? [normProject, normProject, buildId, ...entityIds] : [normProject, normProject, ...entityIds]
         );
 
         for (const row of dtoEdges) {
@@ -263,10 +263,10 @@ export async function queryColumnImpact(db, options = {}) {
         const serviceEdges = await db.all(
             `SELECT e.from_node_id AS source_id, n.node_id AS id, n.kind, n.node_key AS name, n.path
              FROM graph_edge e
-             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?
-             WHERE e.project = ? AND e.to_node_id IN (${hopPlaceholders}) AND e.kind IN ('references')
+             JOIN graph_node n ON e.from_node_id = n.node_id AND n.project = ?` + (buildId ? ' AND e.build_id = n.build_id' : '') + `
+             WHERE e.project = ?` + (buildId ? ' AND e.build_id = ?' : '') + ` AND e.to_node_id IN (${hopPlaceholders}) AND e.kind IN ('references')
                AND n.kind IN ('app_service', 'service')`,
-            [normProject, normProject, ...nextHopIds]
+            buildId ? [normProject, normProject, buildId, ...nextHopIds] : [normProject, normProject, ...nextHopIds]
         );
 
         for (const row of serviceEdges) {

@@ -101,8 +101,8 @@ export async function queryReadSet(db, options = {}) {
     if (compVal === null && db && typeof db.all === 'function') {
         try {
             const rows = await db.all(
-                "SELECT value FROM completeness WHERE project = ? AND question = 'Q1' ORDER BY measured_at DESC LIMIT 1",
-                [normProject]
+                "SELECT value FROM completeness WHERE project = ?" + (buildId ? " AND build_id = ?" : "") + " AND question = 'Q1' ORDER BY measured_at DESC LIMIT 1",
+                buildId ? [normProject, buildId] : [normProject]
             );
             if (rows && rows.length > 0 && typeof rows[0].value === 'number') {
                 compVal = Math.max(0, Math.min(1, rows[0].value));
@@ -161,10 +161,10 @@ export async function queryReadSet(db, options = {}) {
     const startNodes = await db.all(
         `SELECT node_id AS id, node_id, project, kind, node_key AS name, node_key, path
          FROM graph_node
-         WHERE project = ? AND (
+         WHERE project = ?` + (buildId ? ' AND build_id = ?' : '') + ` AND (
              node_id = ? OR node_key = ? OR path = ? OR path = ?
          )`,
-        [normProject, normTarget, normTarget, normTarget, strippedTarget]
+        buildId ? [normProject, buildId, normTarget, normTarget, normTarget, strippedTarget] : [normProject, normTarget, normTarget, normTarget, strippedTarget]
     );
 
     // AC-ARCH-02-04 & ESO-384: Target symbol/file not found in graph
@@ -198,8 +198,8 @@ export async function queryReadSet(db, options = {}) {
             try {
                 const declaredEdges = await db.all(
                     `SELECT to_node_id AS target_id FROM graph_edge
-                     WHERE project = ? AND from_node_id = ? AND kind = 'defines'`,
-                    [normProject, node.node_id]
+                     WHERE project = ?` + (buildId ? ' AND build_id = ?' : '') + ` AND from_node_id = ? AND kind = 'defines'`,
+                    buildId ? [normProject, buildId, node.node_id] : [normProject, node.node_id]
                 );
                 for (const edge of declaredEdges) {
                     startNodeIds.add(edge.target_id);
@@ -218,13 +218,15 @@ export async function queryReadSet(db, options = {}) {
         if (currentLevelIds.length === 0) break;
 
         const placeholders = currentLevelIds.map(() => '?').join(',');
-        const queryParams = [normProject, ...currentLevelIds, ...currentLevelIds];
+        const queryParams = buildId
+            ? [normProject, buildId, ...currentLevelIds, ...currentLevelIds]
+            : [normProject, ...currentLevelIds, ...currentLevelIds];
 
         // INV-GR-01: Chỉ duyệt theo quan hệ thật trong graph_edge (references, maps_to, defines)
         const edges = await db.all(
             `SELECT from_node_id AS source_id, to_node_id AS target_id, kind AS relation
              FROM graph_edge
-             WHERE project = ?
+             WHERE project = ?` + (buildId ? ' AND build_id = ?' : '') + `
                AND kind IN ('references', 'maps_to', 'defines')
                AND (from_node_id IN (${placeholders}) OR to_node_id IN (${placeholders}))`,
             queryParams
@@ -251,8 +253,8 @@ export async function queryReadSet(db, options = {}) {
         const neighborNodes = await db.all(
             `SELECT node_id AS id, kind, node_key AS name, path
              FROM graph_node
-             WHERE project = ? AND node_id IN (${neighborPlaceholders})`,
-            [normProject, ...nextLevelIds]
+             WHERE project = ?` + (buildId ? ' AND build_id = ?' : '') + ` AND node_id IN (${neighborPlaceholders})`,
+            buildId ? [normProject, buildId, ...nextLevelIds] : [normProject, ...nextLevelIds]
         );
 
         for (const node of neighborNodes) {

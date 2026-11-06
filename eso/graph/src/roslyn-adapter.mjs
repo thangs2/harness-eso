@@ -14,6 +14,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { QUESTION_KIND_MAP } from './completeness.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../..');
@@ -166,6 +167,50 @@ export async function extractRoslynGraph({
  * @param {object} result - sidecar result { nodes, edges, source_claims, completeness }
  * @param {{project?: string, buildId?: string}} [scope]
  */
+
+/** Persist one completeness row for every question from manifest vs indexed kinds. */
+async function persistQuestionCompleteness(db, { project, buildId, fallback }) {
+    const manifest = new Map();
+    const indexed = new Map();
+    try {
+        const rows = await db.all(
+            'SELECT kind, count(*)::int AS n FROM manifest_entry WHERE project = ? AND build_id = ? GROUP BY kind',
+            [project, buildId]
+        );
+        for (const row of rows || []) manifest.set(row.kind, Number(row.n) || 0);
+        const rows2 = await db.all(
+            'SELECT kind, count(*)::int AS n FROM graph_node WHERE project = ? AND build_id = ? GROUP BY kind',
+            [project, buildId]
+        );
+        for (const row of rows2 || []) indexed.set(row.kind, Number(row.n) || 0);
+    } catch {
+        return;
+    }
+    for (const [question, kinds] of Object.entries(QUESTION_KIND_MAP)) {
+        const perKind = {};
+        let unknown = false;
+        for (const kind of kinds) {
+            const total = manifest.get(kind) || 0;
+            const covered = indexed.get(kind) || 0;
+            if (total <= 0) { perKind[kind] = null; unknown = true; }
+            else perKind[kind] = Math.min(1, covered / total);
+        }
+        if (question === 'Q1' && fallback?.per_kind && typeof fallback.per_kind === 'object') {
+            Object.assign(perKind, fallback.per_kind);
+            unknown = Object.values(perKind).some((v) => v === null || v === undefined);
+        }
+        const ratios = Object.values(perKind).filter((v) => typeof v === 'number');
+        const value = unknown || ratios.length !== kinds.length ? 0 : Math.min(...ratios);
+        await db.run(
+            `INSERT INTO completeness (project, build_id, question, per_kind, value, measured_at)
+             VALUES (?, ?, ?, ?, ?, now())
+             ON CONFLICT (project, build_id, question) DO UPDATE
+             SET per_kind = EXCLUDED.per_kind, value = EXCLUDED.value, measured_at = EXCLUDED.measured_at`,
+            [project, buildId, question, perKind, value]
+        );
+    }
+}
+
 export async function persistGraphResult(db, result, scope = {}) {
     const nodes = result.nodes || [];
     const edges = result.edges || [];
@@ -224,6 +269,12 @@ export async function persistGraphResult(db, result, scope = {}) {
             [project, buildId, question, perKind, value]
         );
     }
+
+    await persistQuestionCompleteness(db, {
+        project: fallbackProject,
+        buildId: fallbackBuildId,
+        fallback: completeness,
+    });
 
     return { nodes: nodes.length, edges: edges.length, claims: claims.length };
 }

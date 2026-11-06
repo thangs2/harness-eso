@@ -120,8 +120,8 @@ export async function queryCircularDependencies(db, {
     } else if (db && typeof db.all === 'function') {
         try {
             const rows = await db.all(
-                "SELECT value FROM completeness WHERE project = ? AND question = 'Q3' ORDER BY measured_at DESC LIMIT 1",
-                [normProject]
+                "SELECT value FROM completeness WHERE project = ?" + (buildId ? " AND build_id = ?" : "") + " AND question = 'Q3' ORDER BY measured_at DESC LIMIT 1",
+                buildId ? [normProject, buildId] : [normProject]
             );
             if (rows && rows.length > 0 && typeof rows[0].value === 'number') {
                 compVal = rows[0].value;
@@ -153,8 +153,8 @@ export async function queryCircularDependencies(db, {
     const allNodes = await db.all(
         `SELECT node_id AS id, node_id, project, kind, node_key AS name, node_key, path
          FROM graph_node
-         WHERE project = ?`,
-        [normProject]
+         WHERE project = ?` + (buildId ? ' AND build_id = ?' : ''),
+        buildId ? [normProject, buildId] : [normProject]
     );
 
     const nodeMap = new Map();
@@ -167,8 +167,8 @@ export async function queryCircularDependencies(db, {
     const allEdges = await db.all(
         `SELECT edge_id AS id, edge_id, project, from_node_id AS source_id, from_node_id, to_node_id AS target_id, to_node_id, kind AS relation, kind
          FROM graph_edge
-         WHERE project = ? AND kind = 'depends_on'`,
-        [normProject]
+         WHERE project = ?` + (buildId ? ' AND build_id = ?' : '') + ` AND kind = 'depends_on'`,
+        buildId ? [normProject, buildId] : [normProject]
     );
 
     // AC-ARCH-04-04: Graph with 0 depends_on edges -> "không có vòng" kèm độ phủ, không im lặng

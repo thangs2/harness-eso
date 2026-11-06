@@ -48,6 +48,12 @@
       "test_file": "qc/acceptance/US-GRAPH-03/AC-GRAPH-03-04.test.mjs",
       "test_name": "SCN-GRAPH-14 · AC-GRAPH-03-04 — coverage dưới floor ⇒ unknown",
       "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-14`: **actual** `coverage = 0.3` vẫn trả `sufficient` · **expected** `unknown` + `unknowns[]` + `LOW_COVERAGE`"
+    },
+    {
+      "packet": "sdlc/10.test/41.graph-store-api.tdd-qc.md",
+      "test_file": "qc/acceptance/US-GRAPH-03/AC-GRAPH-03-05.test.mjs",
+      "test_name": "SCN-GRAPH-15 · AC-GRAPH-03-05 — query nặng trên turn ⇒ HEAVY_ON_TURN",
+      "expected_failure": "`AssertionError` ở `SCN-GRAPH-15`: **actual** route trả 200 và chạy graph · **expected** `HEAVY_ON_TURN`, 0 thay đổi store"
     }
   ],
   "allowed_files": [

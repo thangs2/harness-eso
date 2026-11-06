@@ -155,7 +155,7 @@ export async function indexGraph({
 
     const sourceHash = hashGraphSource({ kind: source.kind, solutionPath: fullPath });
     const existing = await readIndexRun(db, { project, buildId });
-    if (existing) {
+    if (existing && existing.status !== 'failed') {
         if (existing.source_hash !== sourceHash) {
             return {
                 status: 409,
@@ -217,6 +217,7 @@ export async function rebuildGraph({
     db,
     project,
     buildId,
+    source = null,
     onTurnPath = false,
     consumerRoot = null,
 } = {}) {
@@ -225,9 +226,8 @@ export async function rebuildGraph({
 
     const run = await readIndexRun(db, { project, buildId });
     if (!run) {
-        return missing(
-            `build_id '${buildId}' has no index run; rebuild needs a prior API-28 (OPEN-API-GRAPH-06)`
-        );
+        if (!source) return missing(`build_id '${buildId}' has no index run; provide source to build it`);
+        return indexGraph({ db, project, buildId, source, onTurnPath, consumerRoot });
     }
     if (!run.source_path || !fs.existsSync(run.source_path)) {
         return toolchainUnavailable(`Indexed source no longer exists for build_id '${buildId}'`);
@@ -284,8 +284,8 @@ async function resolveBuildId(db, { project, question }) {
 }
 
 function normalizeStatus(value) {
-    if (value === 'ready' || value === 'answered' || value === 'absent') return 'ready';
-    if (value === 'unknown') return 'unknown';
+    if (value === 'absent') return 'absent';
+    if (value === 'ready' || value === 'answered') return 'ready';
     return 'unknown';
 }
 
