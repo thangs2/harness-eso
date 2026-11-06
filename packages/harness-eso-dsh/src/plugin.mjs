@@ -28,6 +28,7 @@ import { resolveEsoPolicy } from '../../harness-eso-core/src/eso-policy.mjs';
 import { receiptMatchesVerdict, writeDshAttestation } from './attestation.mjs';
 import { isCompletedBrainCall, recordBrainCall } from './brain-attestation.mjs';
 import { decideToolCall, findConsumerRoot } from './guards.mjs';
+import { estimatePromptTokens, guardStream } from './route-budget.mjs';
 
 /** Last user-authored text in the step, bounded — what the trail records as the trigger. */
 function userStem(payload) {
@@ -58,6 +59,23 @@ function makeLogger(ctx) {
 }
 
 /**
+ * The same sink at `warn`, for the two facts a user must not have to dig for: a guard that stopped
+ * applying (so the turn runs on DSH's own watchdog), and a budget that fired.
+ */
+function makeWarnLogger(ctx) {
+    const logger = typeof ctx?.logger?.warn === 'function' ? ctx.logger : null;
+    const info = makeLogger(ctx);
+    return (message) => {
+        try {
+            if (logger) logger.warn(`harness-eso: ${message}`);
+            else info(message);
+        } catch {
+            /* logging must never decide anything */
+        }
+    };
+}
+
+/**
  * The Cordis/DSH plugin object.
  *
  * @param {{ root?: string, onDecision?: (decision: object) => void }} [defaults]
@@ -79,6 +97,7 @@ export function createEsoDshPlugin(defaults = {}) {
         inject: ['workingDirectory'],
         apply(ctx, config = {}) {
             const log = makeLogger(ctx);
+            const warn = makeWarnLogger(ctx);
             const configRoot = config.root || defaults.root || null;
             /* `host` delegates a not-yet-approved path to the host's approval UI; the default denies,
              * because a host `ask` was measured to let the write through. */
@@ -87,6 +106,12 @@ export function createEsoDshPlugin(defaults = {}) {
             const declaredChecks = config.checks ?? defaults.checks ?? null;
             /* Every deny is recorded by default; a consumer that wants a quiet trail can turn it off. */
             const recordToolDecisions = config.recordToolDecisions !== false && defaults.recordToolDecisions !== false;
+            /*
+             * The stream budget is on by default: DSH's own watchdog cannot tell a 5-minute prefill
+             * from a dead stream, and every consumer running a big transcript hits that cliff. `false`
+             * turns it off; an object overrides `DEFAULT_STREAM_BUDGET`.
+             */
+            const streamBudget = config.streamBudget ?? defaults.streamBudget ?? true;
             const onDecision = typeof defaults.onDecision === 'function' ? defaults.onDecision : null;
 
             /**
@@ -326,6 +351,51 @@ export function createEsoDshPlugin(defaults = {}) {
                 }
             });
             if (typeof offStep === 'function') disposers.push(offStep);
+
+            /*
+             * The stream budget. DSH's adapter watchdog charges the wait for the *first* byte against
+             * the same constant it uses for a gap between two deltas, and river's `: keep-alive` pings do
+             * not reset it, so a provider stall and a healthy slow request look identical until the
+             * watchdog fires. Session logs of 2026-11-06 (455–506k-token prompts, chunk timestamps)
+             * recorded 204/232/274/278/281 s waits; a probe against river measured a healthy cached 427k
+             * prompt at 7 s and a cold miss at 50–121 s. `guardStream` leaves the adapter's constant as a
+             * coarse net and applies the real policy here: a first-byte allowance scaled to the request,
+             * and a tight inter-chunk idle. A breach is emitted as the adapter's own terminal `finish`
+             * chunk, so the existing retry policy still sees a plain TIMEOUT.
+             */
+            if (streamBudget !== false) {
+                const offStream = ctx.on('llm/stream', (options, next) => {
+                    let chunks;
+                    try {
+                        chunks = next();
+                    } catch (err) {
+                        log(`llm/stream: next() threw (${err?.message ?? err})`);
+                        throw err;
+                    }
+                    try {
+                        return guardStream(chunks, {
+                            tokens: estimatePromptTokens(options?.messages, options?.tools, options?.system),
+                            budget: streamBudget && typeof streamBudget === 'object' ? streamBudget : undefined,
+                            route: options?.provider ? `${options.provider}/${options.model ?? ''}` : undefined,
+                            onTimeout: (detail) =>
+                                warn(
+                                    `llm/stream: ${detail.phase} allowance ${detail.allowanceMs}ms exceeded` +
+                                        `${detail.route ? ` on ${detail.route}` : ''} — reporting TIMEOUT`,
+                                ),
+                            onFallback: (err) =>
+                                warn(
+                                    `llm/stream: budget dropped for this call (${err?.message ?? err}); ` +
+                                        'this turn runs on DSH\'s own watchdog only',
+                                ),
+                        });
+                    } catch (err) {
+                        /* A budget that cannot be applied must not change the turn. */
+                        warn(`llm/stream: budget not applied (${err?.message ?? err})`);
+                        return chunks;
+                    }
+                });
+                if (typeof offStream === 'function') disposers.push(offStream);
+            }
 
             return () => {
                 for (const dispose of disposers) {

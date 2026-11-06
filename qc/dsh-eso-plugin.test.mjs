@@ -56,18 +56,90 @@ test('the plugin object is the shape DSH loads, and injects only the directory s
     assert.equal(typeof pluginDefault.apply, 'function');
 });
 
-test('it registers the three seams it needs, and unwinds', () => {
+test('it registers the four seams it needs, and unwinds', () => {
     /*
-     * `tools/pre-execute` stops a call, `agent/pre-step` refuses a step on a named finding, and
+     * `tools/pre-execute` stops a call, `agent/pre-step` refuses a step on a named finding,
      * `tools/post-execute` **witnesses** a completed Brain call — the only evidence a host whose sandbox
-     * blocks the usage ledger can produce. The exact set is asserted so a seam that silently stops being
-     * registered (the failure that leaves a gate looking installed and doing nothing) fails a test.
+     * blocks the usage ledger can produce — and `llm/stream` budgets the wait for the first byte, which
+     * DSH charges against a constant that a 500k-token prefill cannot meet. The exact set is asserted so
+     * a seam that silently stops being registered (the failure that leaves a gate looking installed and
+     * doing nothing) fails a test.
      */
     const ctx = fakeCtx();
     const dispose = createEsoDshPlugin().apply(ctx);
-    assert.deepEqual([...ctx.listeners.keys()].sort(), ['agent/pre-step', 'tools/post-execute', 'tools/pre-execute']);
+    assert.deepEqual([...ctx.listeners.keys()].sort(), [
+        'agent/pre-step',
+        'llm/stream',
+        'tools/post-execute',
+        'tools/pre-execute',
+    ]);
     dispose();
     assert.equal(ctx.listeners.size, 0);
+});
+
+test('the stream budget is on by default, configurable, and can be turned off', async () => {
+    /* On by default: the hook exists and a silent adapter becomes the adapter's own TIMEOUT finish. */
+    const ctx = fakeCtx();
+    createEsoDshPlugin({ streamBudget: { baseFirstByteMs: 10, maxFirstByteMs: 10, interChunkMs: 10 } }).apply(ctx);
+    const handler = ctx.listeners.get('llm/stream');
+    assert.equal(typeof handler, 'function');
+    const guarded = handler(
+        { provider: 'river-ai', model: 'm', messages: [{ role: 'user', content: 'x'.repeat(400) }] },
+        () => ({
+            [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}), return: async () => ({ done: true }) }),
+        }),
+    );
+    const out = [];
+    for await (const chunk of guarded) out.push(chunk);
+    assert.equal(out.at(-1)?.reason?.failure?.code, 'TIMEOUT');
+
+    /* Off by config: the seam is not registered at all, so DSH sees its own watchdog only. */
+    const off = fakeCtx();
+    createEsoDshPlugin({ streamBudget: false }).apply(off);
+    assert.equal(off.listeners.has('llm/stream'), false);
+});
+
+test('a waterfall argument the guard cannot use falls back to the untouched stream', async () => {
+    /* Fail-open on the plugin side: `next()` returns something that is not a stream at all. */
+    const ctx = fakeCtx();
+    createEsoDshPlugin().apply(ctx);
+    const handler = ctx.listeners.get('llm/stream');
+    /* `{}` has neither an async nor a sync iterator: guardStream throws and the handler returns `next()`,
+     * so DSH sees exactly the stream its adapter produced. */
+    const passthrough = handler({ provider: 'river-ai', model: 'm', messages: [] }, () => ({}));
+    assert.deepEqual(passthrough, {});
+});
+
+test('a garbage streamBudget never cuts a healthy stream', async () => {
+    /* Row config is YAML a human types: `baseFirstByteMs: 90s`, a null, a string. None may become NaN. */
+    for (const garbage of [{ baseFirstByteMs: '90s', interChunkMs: null }, 'nonsense', 0, []]) {
+        const ctx = fakeCtx();
+        createEsoDshPlugin({ streamBudget: garbage }).apply(ctx);
+        const handler = ctx.listeners.get('llm/stream');
+        const stream = handler({ provider: 'river-ai', model: 'm', messages: [] }, () => ({
+            [Symbol.asyncIterator]: () => {
+                let index = 0;
+                return {
+                    async next() {
+                        index += 1;
+                        if (index === 1) return { done: false, value: { type: 'text-delta', index: 0, text: 'a' } };
+                        if (index === 2) return { done: false, value: { type: 'finish', reason: { kind: 'stop' } } };
+                        return { done: true, value: undefined };
+                    },
+                    async return() {
+                        return { done: true, value: undefined };
+                    },
+                };
+            },
+        }));
+        const out = [];
+        for await (const chunk of stream) out.push(chunk);
+        assert.deepEqual(
+            out.map((chunk) => chunk.type),
+            ['text-delta', 'finish'],
+            `budget ${JSON.stringify(garbage)} cut a healthy stream: ${JSON.stringify(out)}`,
+        );
+    }
 });
 
 test('a locked path is denied with a reason the model can read', () => {
