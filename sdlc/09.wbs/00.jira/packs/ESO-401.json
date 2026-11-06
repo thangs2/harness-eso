@@ -52,13 +52,13 @@
       "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-04`: **actual** chạy đồng bộ ⇒ trả kết quả, ghi dòng, turn **chờ** build · **expected** `HEAVY_ON_TURN`, **0** dòng ghi, việc xếp off-path"
     },
     {
-      "packet": "sdlc/10.test/05.graph-roslyn.tdd-unit.md",
+      "packet": "sdlc/10.test/39.graph-roslyn.tdd-unit.md",
       "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-05.test.mjs",
       "test_name": "SCN-GRAPH-05 · AC-GRAPH-01-05 — thiếu toolchain ⇒ TOOLCHAIN_UNAVAILABLE",
       "expected_failure": "`AssertionError` ở `SCN-GRAPH-05`: **actual** coverage=0/synthetic node · **expected** TOOLCHAIN_UNAVAILABLE, 0 row, coverage≠0"
     },
     {
-      "packet": "sdlc/10.test/06.graph-roslyn.tdd-impl.md",
+      "packet": "sdlc/10.test/40.graph-roslyn.tdd-impl.md",
       "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-06.test.mjs",
       "test_name": "SCN-GRAPH-06 · AC-GRAPH-01-06 — tenant isolation / RLS",
       "expected_failure": "`AssertionError` ở `SCN-GRAPH-06`: **actual** đọc/ghi project B · **expected** RLS chặn, 0 rò"
