@@ -118,11 +118,17 @@ CREATE TABLE IF NOT EXISTS graph_index_run (
   build_id     text NOT NULL,
   source_kind  text NOT NULL CHECK (source_kind IN ('roslyn','docs')),
   source_hash  text NOT NULL,
+  -- API-29 rebuild needs the exact source that produced the build; without it a rebuild of an
+  -- already-indexed build_id could only guess. Nullable for rows written before this column.
+  source_path  text,
   status       text NOT NULL CHECK (status IN ('queued','running','succeeded','failed','parse_failed')),
   created_at   timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz,
   PRIMARY KEY (project, build_id, source_kind)
 );
+
+-- Existing graph databases predate the source_path column; keep migration idempotent.
+ALTER TABLE graph_index_run ADD COLUMN IF NOT EXISTS source_path text;
 
 CREATE INDEX IF NOT EXISTS idx_graph_index_run_build ON graph_index_run (project, build_id);
 

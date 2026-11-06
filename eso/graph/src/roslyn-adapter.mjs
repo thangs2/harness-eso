@@ -149,64 +149,83 @@ export async function extractRoslynGraph({
         consumerRoot,
     });
 
-    // Database persistence in PostgreSQL (D-92 / D-93)
     if (db && typeof db.run === 'function') {
-        const nodes = result.nodes || [];
-        const edges = result.edges || [];
-        const claims = result.source_claims || [];
-        const completeness = result.completeness;
-
-        for (const node of nodes) {
-            await db.run(
-                `INSERT INTO graph_node (project, build_id, node_id, kind, node_key, path)
-                 VALUES (?, ?, ?, ?, ?, ?)
-                 ON CONFLICT (project, build_id, node_id) DO UPDATE
-                 SET kind = EXCLUDED.kind,
-                     node_key = EXCLUDED.node_key,
-                     path = EXCLUDED.path`,
-                [node.project, node.build_id, node.node_id, node.kind, node.node_key, node.path]
-            );
-        }
-
-        for (const edge of edges) {
-            await db.run(
-                `INSERT INTO graph_edge (project, build_id, edge_id, from_node_id, to_node_id, kind, conflict)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT (project, build_id, edge_id) DO UPDATE
-                 SET from_node_id = EXCLUDED.from_node_id,
-                     to_node_id = EXCLUDED.to_node_id,
-                     kind = EXCLUDED.kind,
-                     conflict = EXCLUDED.conflict`,
-                [edge.project, edge.build_id, edge.edge_id, edge.from_node_id, edge.to_node_id, edge.kind, edge.conflict || false]
-            );
-        }
-
-        for (const claim of claims) {
-            await db.run(
-                `INSERT INTO source_claim (project, build_id, edge_id, seq, source_kind, claim, at)
-                 VALUES (?, ?, ?, ?, ?, ?, now())
-                 ON CONFLICT (project, build_id, edge_id, seq) DO NOTHING`,
-                [claim.project, claim.build_id, claim.edge_id, claim.seq || 1, claim.source_kind || 'roslyn', claim.claim]
-            );
-        }
-
-        if (completeness) {
-            const question = completeness.question || 'Q1';
-            const perKind = typeof completeness.per_kind === 'object' ? completeness.per_kind : {};
-            const value = completeness.value ?? 0;
-            await db.run(
-                `INSERT INTO completeness (project, build_id, question, per_kind, value, measured_at)
-                 VALUES (?, ?, ?, ?, ?, now())
-                 ON CONFLICT (project, build_id, question) DO UPDATE
-                 SET per_kind = EXCLUDED.per_kind,
-                     value = EXCLUDED.value,
-                     measured_at = EXCLUDED.measured_at`,
-                [normProject, normBuildId, question, perKind, value]
-            );
-        }
+        await persistGraphResult(db, result, { project: normProject, buildId: normBuildId });
     }
 
     return result;
+}
+
+/**
+ * Persist an extraction result into the graph tables.
+ *
+ * Kept separate from the extractor so API-29 can snapshot the sidecar output first and then
+ * replace a build inside one transaction instead of upserting row-by-row over live data.
+ *
+ * @param {object} db - adapter with .run()
+ * @param {object} result - sidecar result { nodes, edges, source_claims, completeness }
+ * @param {{project?: string, buildId?: string}} [scope]
+ */
+export async function persistGraphResult(db, result, scope = {}) {
+    const nodes = result.nodes || [];
+    const edges = result.edges || [];
+    const claims = result.source_claims || [];
+    const completeness = result.completeness;
+    const fallbackProject = scope.project;
+    const fallbackBuildId = scope.buildId;
+
+    for (const node of nodes) {
+        await db.run(
+            `INSERT INTO graph_node (project, build_id, node_id, kind, node_key, path)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT (project, build_id, node_id) DO UPDATE
+             SET kind = EXCLUDED.kind,
+                 node_key = EXCLUDED.node_key,
+                 path = EXCLUDED.path`,
+            [node.project || fallbackProject, node.build_id || fallbackBuildId, node.node_id, node.kind, node.node_key, node.path]
+        );
+    }
+
+    for (const edge of edges) {
+        await db.run(
+            `INSERT INTO graph_edge (project, build_id, edge_id, from_node_id, to_node_id, kind, conflict)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT (project, build_id, edge_id) DO UPDATE
+             SET from_node_id = EXCLUDED.from_node_id,
+                 to_node_id = EXCLUDED.to_node_id,
+                 kind = EXCLUDED.kind,
+                 conflict = EXCLUDED.conflict`,
+            [edge.project || fallbackProject, edge.build_id || fallbackBuildId, edge.edge_id, edge.from_node_id, edge.to_node_id, edge.kind, edge.conflict || false]
+        );
+    }
+
+    for (const claim of claims) {
+        await db.run(
+            `INSERT INTO source_claim (project, build_id, edge_id, seq, source_kind, claim, at)
+             VALUES (?, ?, ?, ?, ?, ?, now())
+             ON CONFLICT (project, build_id, edge_id, seq) DO NOTHING`,
+            [claim.project || fallbackProject, claim.build_id || fallbackBuildId, claim.edge_id, claim.seq || 1, claim.source_kind || 'roslyn', claim.claim]
+        );
+    }
+
+    if (completeness) {
+        const question = completeness.question || 'Q1';
+        const perKind = typeof completeness.per_kind === 'object' ? completeness.per_kind : {};
+        const value = completeness.value ?? 0;
+        const project = completeness.project || fallbackProject;
+        const buildId = completeness.build_id || fallbackBuildId;
+        await db.run(
+            `INSERT INTO completeness (project, build_id, question, per_kind, value, measured_at)
+             VALUES (?, ?, ?, ?, ?, now())
+             ON CONFLICT (project, build_id, question) DO UPDATE
+             SET per_kind = EXCLUDED.per_kind,
+                 value = EXCLUDED.value,
+                 measured_at = EXCLUDED.measured_at`,
+            [project, buildId, question, perKind, value]
+        );
+    }
+
+    return { nodes: nodes.length, edges: edges.length, claims: claims.length };
 }
 
 /**

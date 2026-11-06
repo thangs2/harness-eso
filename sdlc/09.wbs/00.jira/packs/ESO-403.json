@@ -6,7 +6,10 @@
     "file": "sdlc/09.wbs/01.packets/01.bip/47.graph-store-api.md"
   },
   "technical": false,
-  "inv": [],
+  "inv": [
+    "BR-05",
+    "BR-12"
+  ],
   "ac": [
     "AC-GRAPH-03-01",
     "AC-GRAPH-03-02",

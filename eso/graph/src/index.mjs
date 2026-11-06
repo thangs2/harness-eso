@@ -33,7 +33,18 @@ import {
 import {
     extractRoslynGraph,
     indexGraphApi28,
+    persistGraphResult,
 } from './roslyn-adapter.mjs';
+import {
+    GRAPH_QUESTIONS,
+    DEFAULT_GRAPH_FLOOR,
+    graphFloor,
+    hashGraphSource,
+    readIndexRun,
+    indexGraph,
+    rebuildGraph,
+    answerGraphQuestion,
+} from './graph-store.mjs';
 
 export {
     initSchema,
@@ -49,6 +60,15 @@ export {
     extractProjectGraph,
     extractRoslynGraph,
     indexGraphApi28,
+    persistGraphResult,
+    GRAPH_QUESTIONS,
+    DEFAULT_GRAPH_FLOOR,
+    graphFloor,
+    hashGraphSource,
+    readIndexRun,
+    indexGraph,
+    rebuildGraph,
+    answerGraphQuestion,
     queryReadSet,
     DEFAULT_THRESHOLD,
     DEFAULT_FLOOR,

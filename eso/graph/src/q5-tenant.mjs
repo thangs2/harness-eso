@@ -86,6 +86,7 @@ export function querySliceTenantBoundary({
     db = null,
     coverage = null,
     isImplicit = false,
+    buildId = null,
 } = {}) {
     if (!project || typeof project !== 'string' || !project.trim()) {
         const err = new Error('project is mandatory');
@@ -104,8 +105,8 @@ export function querySliceTenantBoundary({
                  FROM graph_node gn
                  JOIN graph_edge ge ON (ge.to_node_id = gn.node_id OR ge.from_node_id = gn.node_id)
                  WHERE (ge.from_node_id = ? OR ge.to_node_id = ?) AND gn.kind = 'table'
-                   AND gn.project = ? AND ge.project = ?`;
-            const params = [sliceId, sliceId, proj, proj];
+                   AND gn.project = ? AND ge.project = ?` + (buildId ? ' AND gn.build_id = ? AND ge.build_id = ?' : '');
+            const params = buildId ? [sliceId, sliceId, proj, proj, buildId, buildId] : [sliceId, sliceId, proj, proj];
             const rows = (await database.all(sql, params)) || [];
 
             const tablesFromDb = rows.map((r) => {

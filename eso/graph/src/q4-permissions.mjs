@@ -103,6 +103,7 @@ export function queryEndpointPermissions({
     db = null,
     project = null,
     coverage = null,
+    buildId = null,
 } = {}) {
     if (!project || typeof project !== 'string' || !project.trim()) {
         const err = new Error('project is mandatory');
@@ -116,8 +117,8 @@ export function queryEndpointPermissions({
 
     if (database) {
         return (async () => {
-            const epSql = `SELECT node_id AS id, node_key AS name, path, project FROM graph_node WHERE (node_id = ? OR node_key = ?) AND kind = 'endpoint' AND project = ?`;
-            const epParams = [endpointId, endpointId, proj];
+            const epSql = `SELECT node_id AS id, node_key AS name, path, project FROM graph_node WHERE (node_id = ? OR node_key = ?) AND kind = 'endpoint' AND project = ?` + (buildId ? ' AND build_id = ?' : '');
+            const epParams = buildId ? [endpointId, endpointId, proj, buildId] : [endpointId, endpointId, proj];
             const epNode = await database.get(epSql, epParams);
 
             let endpoint = null;
@@ -129,8 +130,8 @@ export function queryEndpointPermissions({
                      FROM graph_edge ge
                      JOIN graph_node gn ON ge.to_node_id = gn.node_id
                      WHERE ge.from_node_id = ? AND (ge.kind = 'requires' OR ge.kind = 'defines' OR ge.kind = 'references') AND gn.kind = 'permission'
-                       AND ge.project = ? AND gn.project = ?`;
-                const permParams = [epNode.id, proj, proj];
+                       AND ge.project = ? AND gn.project = ?` + (buildId ? ' AND ge.build_id = ? AND gn.build_id = ?' : '');
+                const permParams = buildId ? [epNode.id, proj, proj, buildId, buildId] : [epNode.id, proj, proj];
                 const permEdge = await database.get(permSql, permParams);
 
                 if (permEdge) {
@@ -144,8 +145,8 @@ export function queryEndpointPermissions({
                          FROM graph_edge ge
                          JOIN graph_node gn ON ge.to_node_id = gn.node_id
                          WHERE ge.from_node_id = ? AND (ge.kind = 'granted_by' OR ge.kind = 'maps_to' OR ge.kind = 'defines' OR ge.kind = 'specifies')
-                           AND ge.project = ? AND gn.project = ?`;
-                    const grantParams = [permEdge.id, proj, proj];
+                           AND ge.project = ? AND gn.project = ?` + (buildId ? ' AND ge.build_id = ? AND gn.build_id = ?' : '');
+                    const grantParams = buildId ? [permEdge.id, proj, proj, buildId, buildId] : [permEdge.id, proj, proj];
                     const grantEdge = await database.get(grantSql, grantParams);
 
                     if (grantEdge) {
