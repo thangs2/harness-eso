@@ -55,6 +55,7 @@ Thân bài:
 | [`US-MEM-02`](60.memory-store.md) | Native memory store + consolidation | A-01 | UC-05 | P3 | ✅ 5 AC |
 | [`US-MEM-03`](61.memory-migrate.md) | Migrate agentmemory + host adapters | A-01 | UC-05 | P3 | ✅ 5 AC |
 | [`US-MEM-04`](62.memory-acceptance.md) | Portable memory acceptance | A-01 | UC-05 | P3 | ✅ 4 AC |
+| [`US-CONSUMER-01`](63.consumer-tenant.md) | Consumer API không vượt project của token | A-01 | UC-04 | P6 | ✅ 6 AC |
 
 
 ⬜ = AC **chưa viết**; đây là bước kế tiếp của Stage 2, không được coi là Ready.

@@ -66,8 +66,9 @@ postcondition: phán quyết có được ghi, `basis` có được giữ, `unkn
 | `US-MEM-02` | `AC-MEM-02-01`…`05` | [`60.memory-store.md`](60.memory-store.md) | ✅ |
 | `US-MEM-03` | `AC-MEM-03-01`…`05` | [`61.memory-migrate.md`](61.memory-migrate.md) | ✅ |
 | `US-MEM-04` | `AC-MEM-04-01`…`04` | [`62.memory-acceptance.md`](62.memory-acceptance.md) | ✅ |
+| `AC-CONSUMER-01-01`…`06` | [`63.consumer-tenant.md`](63.consumer-tenant.md) | ✅ |
 
-**Tổng: 386 AC** (đếm bằng id, không bằng ước lượng).
+**Tổng: 392 AC** (đếm bằng id, không bằng ước lượng).
 
 **37 AC.** Mỗi file có ba phần bắt buộc ngoài bảng: **điều kiện sau** (ghi gì), **test sẽ chứng minh** (tên test cụ thể), và
 **AC này KHÔNG kiểm** (ranh giới — để không phình).

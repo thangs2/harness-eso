@@ -304,7 +304,7 @@ test('X8: packet coverage is counted against the leaves, not sampled', () => {
 
     assert.deepEqual(unknownLeaf, [], 'a packet names a leaf the tree does not contain');
     const missing = [...leaves].filter((l) => !claimed.has(l)).sort();
-    assert.equal(leaves.size, 64, `tree should have 64 leaves, saw ${leaves.size}`);
+    assert.equal(leaves.size, 65, `tree should have 65 leaves, saw ${leaves.size}`);
 
     // The gap is real, so it is asserted as an allowance rather than ignored: the number must
     // match the recorded debt. Writing the count here means the test fails the moment a packet is

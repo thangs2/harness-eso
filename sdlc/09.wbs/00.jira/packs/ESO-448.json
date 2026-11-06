@@ -1,0 +1,107 @@
+{
+  "ticket": "ESO-448",
+  "epic": "ESO-12",
+  "bip": {
+    "id": "BIP-2_10",
+    "file": "sdlc/09.wbs/01.packets/01.bip/54.consumer-tenant.md"
+  },
+  "technical": false,
+  "inv": [
+    "BR-12"
+  ],
+  "ac": [
+    "AC-CONSUMER-01-01",
+    "AC-CONSUMER-01-02",
+    "AC-CONSUMER-01-03",
+    "AC-CONSUMER-01-04",
+    "AC-CONSUMER-01-05",
+    "AC-CONSUMER-01-06"
+  ],
+  "scn": [
+    "SCN-CONSUMER-01",
+    "SCN-CONSUMER-02",
+    "SCN-CONSUMER-03",
+    "SCN-CONSUMER-04",
+    "SCN-CONSUMER-05",
+    "SCN-CONSUMER-06"
+  ],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/33.consumer-tenant.tdd-unit.md",
+      "test_file": "qc/acceptance/US-CONSUMER-01/AC-CONSUMER-01-01.test.mjs",
+      "test_name": "SCN-CONSUMER-01 · AC-CONSUMER-01-01 — consumer tenant isolation",
+      "expected_failure": "`AssertionError` ở `SCN-CONSUMER-01`: **actual** request/body id khác auth project vẫn được chấp nhận hoặc list trả profile project khác · **expected** 403 `OUT_OF_SCOPE`, 0 write, list chỉ auth project"
+    },
+    {
+      "packet": "sdlc/10.test/34.consumer-tenant.tdd-impl.md",
+      "test_file": "qc/acceptance/US-CONSUMER-01/AC-CONSUMER-01-02.test.mjs",
+      "test_name": "SCN-CONSUMER-02 · AC-CONSUMER-01-02 — consumer tenant isolation",
+      "expected_failure": "`AssertionError` ở `SCN-CONSUMER-02`: **actual** request/body id khác auth project vẫn được chấp nhận hoặc list trả profile project khác · **expected** 403 `OUT_OF_SCOPE`, 0 write, list chỉ auth project"
+    },
+    {
+      "packet": "sdlc/10.test/35.consumer-tenant.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-CONSUMER-01/AC-CONSUMER-01-03.test.mjs",
+      "test_name": "SCN-CONSUMER-03 · AC-CONSUMER-01-03 — consumer tenant isolation",
+      "expected_failure": "`AssertionError` ở `SCN-CONSUMER-03`: **actual** request/body id khác auth project vẫn được chấp nhận hoặc list trả profile project khác · **expected** 403 `OUT_OF_SCOPE`, 0 write, list chỉ auth project"
+    },
+    {
+      "packet": "sdlc/10.test/36.consumer-tenant.tdd-qc.md",
+      "test_file": "qc/acceptance/US-CONSUMER-01/AC-CONSUMER-01-04.test.mjs",
+      "test_name": "SCN-CONSUMER-04 · AC-CONSUMER-01-04 — consumer tenant isolation",
+      "expected_failure": "`AssertionError` ở `SCN-CONSUMER-04`: **actual** request/body id khác auth project vẫn được chấp nhận hoặc list trả profile project khác · **expected** 403 `OUT_OF_SCOPE`, 0 write, list chỉ auth project"
+    },
+    {
+      "packet": "sdlc/10.test/37.consumer-tenant.tdd-unit.md",
+      "test_file": "qc/acceptance/US-CONSUMER-01/AC-CONSUMER-01-05.test.mjs",
+      "test_name": "SCN-CONSUMER-05 · AC-CONSUMER-01-05 — consumer tenant isolation",
+      "expected_failure": "`AssertionError` ở `SCN-CONSUMER-05`: **actual** request/body id khác auth project vẫn được chấp nhận hoặc list trả profile project khác · **expected** 403 `OUT_OF_SCOPE`, 0 write, list chỉ auth project"
+    },
+    {
+      "packet": "sdlc/10.test/38.consumer-tenant.tdd-impl.md",
+      "test_file": "qc/acceptance/US-CONSUMER-01/AC-CONSUMER-01-06.test.mjs",
+      "test_name": "SCN-CONSUMER-06 · AC-CONSUMER-01-06 — consumer tenant isolation",
+      "expected_failure": "`AssertionError` ở `SCN-CONSUMER-06`: **actual** request/body id khác auth project vẫn được chấp nhận hoặc list trả profile project khác · **expected** 403 `OUT_OF_SCOPE`, 0 write, list chỉ auth project"
+    }
+  ],
+  "allowed_files": [
+    "eso/control-plane/src/modules/consumers/**",
+    "eso/control-plane/src/common/decorators/current-project.decorator.ts",
+    "qc/eso-auth-project.test.mjs",
+    "qc/eso-consumer-profile.test.mjs",
+    "qc/eso-cp-nestjs.test.mjs",
+    "qc/acceptance/US-CONSUMER-01/**",
+    "sdlc/05.requirements/01.specification/03.frd/11.agent-team.md",
+    "sdlc/06.analysis/02.user-stories/63.consumer-tenant.md",
+    "sdlc/06.analysis/02.user-stories/README.md",
+    "sdlc/06.analysis/03.acceptance-criteria/63.consumer-tenant.md",
+    "sdlc/06.analysis/03.acceptance-criteria/README.md",
+    "sdlc/06.analysis/04.quality-control/00.index.md",
+    "sdlc/06.analysis/04.quality-control/15.native-rtm.md",
+    "sdlc/06.analysis/04.quality-control/16.consumer.md",
+    "sdlc/07.technical/03.api/00.index.md",
+    "sdlc/09.wbs/00.index.md",
+    "sdlc/09.wbs/00.jira/packs/00.index.md",
+    "sdlc/09.wbs/00.jira/packs/ESO-448.json",
+    "sdlc/09.wbs/01.packets/01.bip/54.consumer-tenant.md",
+    "sdlc/09.wbs/01.packets/02.fip/01.interface-out.md",
+    "sdlc/09.wbs/02.wbs-tree.md",
+    "sdlc/09.wbs/03.deliverable-map.md",
+    "sdlc/09.wbs/05.deliverable-2.md",
+    "qc/jira-plan.test.mjs",
+    "qc/sdlc-wbs.test.mjs"
+  ],
+  "forbidden": [
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "cd eso/control-plane && bun run build && cd ../.. && bun run test"
+  ],
+  "base_commit": "6585eefd981356489f8085da3ac7429218334e94",
+  "base_ref": "6585eefd981356489f8085da3ac7429218334e94",
+  "owner": "control-plane",
+  "allow_dependency": false,
+  "notes": "Security bug: consumer API must use request.esoProject, not body.id. D-93 PostgreSQL only. No API-28/schema changes."
+}
