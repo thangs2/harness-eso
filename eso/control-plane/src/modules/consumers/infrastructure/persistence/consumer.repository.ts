@@ -45,12 +45,17 @@ export class ConsumerRepository {
         return db;
     }
 
-    async list(): Promise<ConsumerProfileRow[]> {
+    async list(project: string): Promise<ConsumerProfileRow[]> {
+        if (!project || typeof project !== 'string' || !project.trim()) {
+            throw new Error('PROJECT_MANDATORY: ConsumerRepository.list requires project parameter');
+        }
         return (await this.db()).all(
             `SELECT p.* FROM sdlc_profile p
-             JOIN (SELECT project, MAX(version) AS v FROM sdlc_profile GROUP BY project) m
+             JOIN (SELECT project, MAX(version) AS v FROM sdlc_profile WHERE project = ? GROUP BY project) m
                ON p.project = m.project AND p.version = m.v
-             ORDER BY p.updated_at DESC`
+             WHERE p.project = ?
+             ORDER BY p.updated_at DESC`,
+            [project, project]
         );
     }
 

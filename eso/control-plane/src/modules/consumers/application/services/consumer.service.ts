@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
@@ -11,14 +12,44 @@ import { ConsumerRepository, ConsumerProfileInput } from '../../infrastructure/p
 export class ConsumerService {
     constructor(private readonly repository: ConsumerRepository) {}
 
-    async list() {
-        const rows = await this.repository.list();
+    private assertProjectContext(authProject?: string | null): string {
+        if (!authProject || typeof authProject !== 'string' || !authProject.trim()) {
+            throw new ForbiddenException({
+                type: 'https://eso.dev/errors/forbidden',
+                title: 'Forbidden',
+                status: 403,
+                code: 'AUTH_PROJECT_MISSING',
+                error: 'AUTH_PROJECT_MISSING',
+                detail: 'Authentication project scope not configured on server (fail-closed)',
+            });
+        }
+        return authProject;
+    }
+
+    private assertScopeMatch(targetProject: string, authProject: string) {
+        if (targetProject !== authProject) {
+            throw new ForbiddenException({
+                type: 'https://eso.dev/errors/forbidden',
+                title: 'Forbidden',
+                status: 403,
+                code: 'OUT_OF_SCOPE',
+                error: 'OUT_OF_SCOPE',
+                detail: `Target project "${targetProject}" does not match authenticated project "${authProject}"`,
+            });
+        }
+    }
+
+    async list(project: string) {
+        const authProject = this.assertProjectContext(project);
+        const rows = await this.repository.list(authProject);
         return {
             items: rows.map((row) => this.toSummary(row)),
         };
     }
 
-    async get(project: string) {
+    async get(project: string, currentProject: string) {
+        const authProject = this.assertProjectContext(currentProject);
+        this.assertScopeMatch(project, authProject);
         const row = await this.repository.get(project);
         if (!row) {
             throw new NotFoundException({
@@ -29,8 +60,10 @@ export class ConsumerService {
         return this.toResponse(row);
     }
 
-    async create(dto: ConsumerProfileDto) {
+    async create(dto: ConsumerProfileDto, project: string) {
+        const authProject = this.assertProjectContext(project);
         this.validate(dto);
+        this.assertScopeMatch(dto.id, authProject);
         if (await this.repository.get(dto.id)) {
             throw new ConflictException({
                 code: 'CONSUMER_EXISTS',
@@ -40,7 +73,9 @@ export class ConsumerService {
         return this.toResponse(await this.repository.create(dto as ConsumerProfileInput));
     }
 
-    async update(project: string, dto: ConsumerProfileDto) {
+    async update(project: string, dto: ConsumerProfileDto, currentProject: string) {
+        const authProject = this.assertProjectContext(currentProject);
+        this.assertScopeMatch(project, authProject);
         if (dto.id !== project) {
             throw new BadRequestException({
                 code: 'CONSUMER_ID_MISMATCH',
@@ -58,8 +93,10 @@ export class ConsumerService {
     }
 
 
-    plan(dto: ConsumerProfileDto) {
+    plan(dto: ConsumerProfileDto, project: string) {
+        const authProject = this.assertProjectContext(project);
         this.validate(dto);
+        this.assertScopeMatch(dto.id, authProject);
         const warnings: string[] = [];
         if (!dto.root.startsWith('/') && !/^[A-Za-z]:\\/.test(dto.root)) {
             warnings.push('root nên là đường dẫn tuyệt đối tới repo consumer.');
@@ -128,6 +165,7 @@ export class ConsumerService {
     }
 
     private validate(dto: ConsumerProfileDto): void {
+        if (!dto.id || typeof dto.id !== 'string' || !dto.id.trim()) this.bad('CONSUMER_ID_REQUIRED', 'id is required');
         if (!dto.name?.trim()) this.bad('CONSUMER_NAME_REQUIRED', 'name is required');
         if (!dto.root?.trim()) this.bad('CONSUMER_ROOT_REQUIRED', 'root is required');
         if (!dto.sdlcRoot?.trim()) this.bad('SDLC_ROOT_REQUIRED', 'sdlcRoot is required');

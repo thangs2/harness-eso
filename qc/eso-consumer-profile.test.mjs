@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestPgDb } from './helpers/test-pg-db.mjs';
 import { createNestFastifyControlPlane } from '../eso/control-plane/dist/main.js';
+import { ConsumerService } from '../eso/control-plane/dist/modules/consumers/application/services/consumer.service.js';
 
 const TOKEN = 'consumer-test-token';
 const BASE_PROFILE = {
@@ -30,7 +31,7 @@ const BASE_PROFILE = {
 test('Consumer profile: consumer profile create/list/get/update persists versions', async () => {
   const pg = await createTestPgDb();
   const db = pg.db;
-  const app = await createNestFastifyControlPlane({ db, authToken: TOKEN });
+  const app = await createNestFastifyControlPlane({ db, authToken: TOKEN, authProject: 'acme' });
   await app.listen(0, '127.0.0.1');
   const port = app.getHttpAdapter().getInstance().server.address().port;
   const base = `http://127.0.0.1:${port}`;
@@ -53,7 +54,7 @@ test('Consumer profile: consumer profile create/list/get/update persists version
     const plan = await fetch(`${base}/api/v1/consumers/plan`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ ...BASE_PROFILE, id: 'planned' }),
+      body: JSON.stringify({ ...BASE_PROFILE, id: 'acme' }),
     });
     assert.equal(plan.status, 200);
     const planned = await plan.json();
@@ -78,7 +79,7 @@ test('Consumer profile: consumer profile create/list/get/update persists version
     const missingZone = await fetch(`${base}/api/v1/consumers`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ ...BASE_PROFILE, id: 'bad', zones: [{ name: 'human', path: 'sdlc' }] }),
+      body: JSON.stringify({ ...BASE_PROFILE, id: 'acme', zones: [{ name: 'human', path: 'sdlc' }] }),
     });
     assert.equal(missingZone.status, 400);
 
@@ -105,6 +106,60 @@ test('Consumer profile: consumer profile create/list/get/update persists version
     const get = await fetch(`${base}/api/v1/consumers/acme`, { headers });
     assert.equal(get.status, 200);
     assert.equal((await get.json()).version, 2);
+  } finally {
+    await app.close();
+    await pg.cleanup();
+  }
+});
+
+test('ConsumerService: direct service calls enforce fail-closed tenant boundary (defense-in-depth)', async () => {
+  const pg = await createTestPgDb();
+  const db = pg.db;
+  const app = await createNestFastifyControlPlane({ db, authToken: TOKEN, authProject: 'proj-alpha' });
+  const service = app.get(ConsumerService);
+
+  const profileB = { ...BASE_PROFILE, id: 'proj-beta' };
+
+  try {
+    // 1. service.list(undefined) => 403 AUTH_PROJECT_MISSING
+    await assert.rejects(
+      async () => await service.list(undefined),
+      (err) => err.status === 403 && (err.response?.code === 'AUTH_PROJECT_MISSING' || /AUTH_PROJECT_MISSING/.test(JSON.stringify(err)))
+    );
+
+    // 2. service.create(profileB, undefined) => 403 AUTH_PROJECT_MISSING
+    await assert.rejects(
+      async () => await service.create(profileB, undefined),
+      (err) => err.status === 403 && (err.response?.code === 'AUTH_PROJECT_MISSING' || /AUTH_PROJECT_MISSING/.test(JSON.stringify(err)))
+    );
+
+    // 3. service.plan(profileB, undefined) => 403 AUTH_PROJECT_MISSING
+    await assert.rejects(
+      async () => service.plan(profileB, undefined),
+      (err) => err.status === 403 && (err.response?.code === 'AUTH_PROJECT_MISSING' || /AUTH_PROJECT_MISSING/.test(JSON.stringify(err)))
+    );
+
+    // 4. direct service missing id -> 400 before scope
+    await assert.rejects(
+      async () => await service.create({ ...BASE_PROFILE, id: '' }, 'proj-alpha'),
+      (err) => err.status === 400 && err.response?.code === 'CONSUMER_ID_REQUIRED'
+    );
+    await assert.rejects(
+      async () => service.plan({ ...BASE_PROFILE, id: undefined }, 'proj-alpha'),
+      (err) => err.status === 400 && err.response?.code === 'CONSUMER_ID_REQUIRED'
+    );
+
+    // 5. service.get(projectB, projectA) => 403 OUT_OF_SCOPE
+    await assert.rejects(
+      async () => await service.get('proj-beta', 'proj-alpha'),
+      (err) => err.status === 403 && (err.response?.code === 'OUT_OF_SCOPE' || /OUT_OF_SCOPE/.test(JSON.stringify(err)))
+    );
+
+    // 6. service.update(projectB, dto, projectA) => 403 OUT_OF_SCOPE
+    await assert.rejects(
+      async () => await service.update('proj-beta', profileB, 'proj-alpha'),
+      (err) => err.status === 403 && (err.response?.code === 'OUT_OF_SCOPE' || /OUT_OF_SCOPE/.test(JSON.stringify(err)))
+    );
   } finally {
     await app.close();
     await pg.cleanup();
