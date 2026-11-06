@@ -32,7 +32,7 @@ không phải mô tả thiết kế. Chi tiết + hệ quả: `sdlc/04.landscape
 | Năng lực | Cursor | Antigravity (AGY) | DeepSeek Harness (DSH) |
 |---|---|---|---|
 | `AGENTS.md` bơm vào context | ✅ | ✅ (user_rules) | ✅ (workspace instructions) |
-| `.cursor/rules/*.mdc` (14) tự nạp | ✅ | ⚠ nạp `.agents/rules/*.md` | ❌ **không nạp** |
+| `.cursor/rules/*.mdc` (16) tự nạp | ✅ | ⚠ nạp `.agents/rules/*.md` | ❌ **không nạp** |
 | `.cursor/agents/*-runtime.md` — 7 worker SLP | ✅ đọc + spawn | ✅ `.agents/agents/` + `invoke_subagent` | ⚠ đọc được, **không** có role registry ⇒ dùng skill `harness-engineering-team` |
 | `.agents/skills/*/SKILL.md` | ✅ | ✅ (qua skill catalog) | ✅ (qua skill catalog) |
 | MCP `codegraph` · `docgraph` CLI · `agentmemory-mcp` · `deepseek-direct` | ✅ | ✅ (`call_mcp_tool` / eager tools) | ❌ **không có trong toolset** |
@@ -92,7 +92,7 @@ Request cần sửa nhiều package hoặc nhiều tầng ⇒ chạy **SLP**, kh
 | Luật | `.cursor/rules/core.slp.mdc` (mirror `.agents/rules/core.slp.md`) |
 | Thứ tự gate | skill **`harness-engineering-team`** — 9 gate đánh số |
 | 7 worker | `.cursor/agents/{scout,plan,build,verify,audit,fixbug,qc}-runtime.md` (Cursor) · `.agents/agents/` (Antigravity) |
-| Bằng chứng | `comments/artifacts/slp/{recon,plan,verify,audit}/` |
+| Bằng chứng | scratch: `comments/artifacts/slp/{recon,plan,verify,audit}/` — **không cite**; proof thật là board receipts + gate + commit (`core.artifacts`) |
 
 **Jira parent-child rollup:** sau mỗi child transition, chạy `node scripts/jira-rollup.mjs <STORY-KEY>` — child `In Progress` ⇒ Story `In Progress`; tất cả child `Human In Review`/`Done` ⇒ Story `Human In Review`; **không auto `Done`**. Rule: [`delivery.jira-agent-execution`](.agents/rules/delivery.jira-agent-execution.md).
 
@@ -154,6 +154,7 @@ Operator (x79), không bắt buộc khi chỉ sửa code harness-eso:
 ## Quy ước code
 
 - ESM (`.mjs`), workspaces `@mu/harness-*`.
+- **Không ghi tài liệu bền vào `comments/`** — đó là scratch: `gitignore` cả thư mục, người vận hành sẽ xoá bất cứ lúc nào. Thiết kế/reference → `docs/<NN.topic>/` · luật/quyết định → `sdlc/` · tạm trong phiên → `/tmp` (ngoài repo). Luật đầy đủ: `.cursor/rules/core.artifacts.mdc` · `.agents/rules/core.artifacts.md`.
 - Test: `node:test` trong `qc/` và `packages/*/src/*.test.mjs`.
 - Không commit `.harness/` (local state). Không sửa tay `harness.config.json` trên x79 nếu flow chuẩn là `init profile` — trừ khi task yêu cầu.
 - Chỉ commit khi user yêu cầu.

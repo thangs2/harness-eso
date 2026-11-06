@@ -8,6 +8,7 @@
 |------|------|
 | **`core.law-gate.mdc`** | **Always first** — force Read `AGENTS.md`; supremacy |
 | `core.workspace-isolation.mdc` | Always — after law loaded |
+| `core.artifacts.mdc` / `.md` | Always — `comments/` là **scratch** (gitignored, bị xoá); tài liệu bền → `docs/<NN.topic>/`, luật → `sdlc/` |
 | `core.harness-agents.mdc` | Always — pipeline after law |
 | `delivery.jira-agent-execution.mdc` / `.md` | Jira parent-child rollup — §6.1 · script `jira-rollup` |
 | `core.slp.mdc` | Task chạm **>1 package/tầng** — 7 worker · slice rời nhau · rubric ≥85 |

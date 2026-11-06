@@ -1,0 +1,41 @@
+---
+description: Artifact location — comments/ is scratch (gitignored, deletable); durable docs go to docs/
+layer: core
+alwaysApply: true
+version: "1.0.0"
+canonical: .cursor/rules/core.artifacts.mdc
+---
+# Artifact location — `comments/` là scratch, không phải nơi lưu
+
+**Prerequisite:** `core.law-gate.mdc` (`AGENTS.md` Read this session).
+
+## The rule
+
+`comments/` — nhất là `comments/artifacts/` — là **scratch**. `.gitignore:2` ghi nguyên văn:
+`# comments/artifacts is scratch: drafts only, never tracked`. Người vận hành xác nhận (2026-11-06):
+*"folder này là tmp folder, sẽ xóa bất cứ lúc nào, đừng dùng folder comments/"*.
+
+**NEVER** ghi vào đó thứ sẽ còn phải đọc lại: thiết kế, recon, plan, handover, hay evidence sẽ cite.
+
+| Thứ cần lưu | Chỗ |
+|---|---|
+| Thiết kế · reference sản phẩm · hướng dẫn | `docs/<NN.topic>/` — gói bàn giao, folder số |
+| Luật · quyết định · governance | `sdlc/` |
+| Script · hạ tầng | `scripts/` |
+| Tạm trong một phiên, không cần giữ | `/tmp` — **ngoài** repo |
+| Nháp đang tranh luận, chắc chắn bỏ | `comments/artifacts/` (được phép, nhưng **đừng cite**) |
+
+## Why this rule exists (defect)
+
+Phiên 2026-11-06 ghi 4 tài liệu thiết kế (`01.paseo-concept-extract` · `02.eso-layout-concept` ·
+`03.paseo-cp-integration` · `04.spec-drafts`) vào `comments/artifacts/ui-concept-paseo/`. Chúng **không
+được track** (gitignore) nên `git status` vẫn sạch — không có tín hiệu nào cho thấy chúng đang mất dần.
+Người vận hành phải nói ra mới biết. Đã chuyển sang `docs/10.ui/`.
+
+Bài học: scratch folder **không có tín hiệu mất mát**. Chọn chỗ lưu theo **vòng đời của tài liệu**,
+không theo sự tiện tay lúc viết.
+
+## Check
+
+`review` — khi review một thay đổi có file mới dưới `comments/`, hỏi: tài liệu này có được cite ở đâu
+không? Nếu có, nó phải nằm dưới `docs/` hoặc `sdlc/`.
