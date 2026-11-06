@@ -54,7 +54,7 @@
     {
       "packet": "sdlc/10.test/39.graph-roslyn.tdd-unit.md",
       "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-05.test.mjs",
-      "test_name": "SCN-GRAPH-05 · AC-GRAPH-01-05 — thiếu toolchain ⇒ TOOLCHAIN_UNAVAILABLE",
+      "test_name": "SCN-GRAPH-05 · AC-GRAPH-01-05 — thiếu SDK/build fail ⇒ TOOLCHAIN_UNAVAILABLE",
       "expected_failure": "`AssertionError` ở `SCN-GRAPH-05`: **actual** coverage=0/synthetic node · **expected** TOOLCHAIN_UNAVAILABLE, 0 row, coverage≠0"
     },
     {
@@ -82,5 +82,5 @@
   "base_ref": "a05cd11",
   "owner": "graph",
   "allow_dependency": false,
-  "notes": "D-92/D-93: Postgres graph only; no SQLite. ESO-447 migrated code/test/demo; HIR. BIP READY."
+  "notes": "D-92/D-93: Postgres graph only; no SQLite. ESO-447 migrated code/test/demo; HIR. BIP READY. Full gate on the interleaved feature branch is out-of-scope by branch history; content gate + isolated audit are the evidence."
 }
