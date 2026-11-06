@@ -99,8 +99,8 @@
   "verify": [
     "cd eso/control-plane && bun run build && cd ../.. && bun run test"
   ],
-  "base_commit": "6585eefd981356489f8085da3ac7429218334e94",
-  "base_ref": "6585eefd981356489f8085da3ac7429218334e94",
+  "base_commit": "f13baa9",
+  "base_ref": "f13baa9",
   "owner": "control-plane",
   "allow_dependency": false,
   "notes": "Security bug: consumer API must use request.esoProject, not body.id. D-93 PostgreSQL only. No API-28/schema changes."
