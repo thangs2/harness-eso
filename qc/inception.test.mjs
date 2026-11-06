@@ -38,9 +38,9 @@ test('X31: every id cited in sdlc/ is defined where its family is owned', () => 
         { name: 'G', ref: /\bG-([A-Z])\b/g, def: defs([join(INC, '01.vision', '01.vision-mission-goals.md')], /^### G-([A-Z]) /gm) },
         { name: 'O', ref: /\bO-(\d)\b/g, def: defs([join(INC, '01.vision', '01.vision-mission-goals.md')], /^### O-(\d) /gm) },
         { name: 'D', ref: /\bD-(\d{2,3})\b/g, def: defs(inDir('03.inception/02.decision-log'), /^### D-(\d{2,3}) — /gm) },
-        { name: 'DQ', ref: /\bDQ-(\d{2})\b/g, def: defs([join(INC, '02.decision-log', '01.open-decisions.md')], /^### `DQ-(\d{2})`/gm) },
+        { name: 'DQ', ref: /\bDQ-(\d{2,3})\b/g, def: defs([join(INC, '02.decision-log', '01.open-decisions.md')], /^### `DQ-(\d{2,3})`/gm) },
         { name: 'MET', ref: /\bMET-(\d+)\b/g, def: defs([join(SDLC, '05.requirements', '01.specification', '01.prd', '06.success-metrics.md')], /^\|\s*`MET-(\d+)`\s*\|/gm) },
-        { name: 'F', ref: /\bF-(\d{2})\b/g, def: defs([join(SDLC, '06.analysis', '01.business-analysis', '06.eso-features.md')], /\*\*F-(\d{2})\*\*/g) },
+        { name: 'F', ref: /\bF-(\d{2,3})\b/g, def: defs([join(SDLC, '06.analysis', '01.business-analysis', '06.eso-features.md')], /\*\*F-(\d{2,3})\*\*/g) },
     ];
 
     // A two-digit-only pattern does not "misparse" a three-digit id — it drops it silently, so the citation
@@ -51,6 +51,14 @@ test('X31: every id cited in sdlc/ is defined where its family is owned', () => 
         ['100', '99'],
         'D ids must parse three digits whole',
     );
+
+    // Same silent drop for the other two-digit families: widen before either id ever reaches 100.
+    const dqFamily = FAMILIES.find((f) => f.name === 'DQ');
+    assert.deepEqual([...'see DQ-100, DQ-16'.matchAll(dqFamily.ref)].map((m) => m[1]), ['100', '16'],
+        'DQ ids must parse three digits whole');
+    const fFamily = FAMILIES.find((f) => f.name === 'F');
+    assert.deepEqual([...'see F-100, F-42'.matchAll(fFamily.ref)].map((m) => m[1]), ['100', '42'],
+        'F ids must parse three digits whole');
 
     const corpus = walk(SDLC).map((f) => [relative(SDLC, f), read(f)]);
     const problems = [];
