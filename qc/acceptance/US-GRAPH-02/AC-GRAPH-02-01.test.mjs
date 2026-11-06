@@ -18,15 +18,17 @@ test('SCN-GRAPH-07 · AC-GRAPH-02-01 — doc + relation specifies/constrains', {
              (?, ?, 'target', 'method', 'OrderService.Create', 'src/order-service.ts'),
              (?, ?, 'doc-spec', 'doc', 'docs/spec.md', 'docs/spec.md'),
              (?, ?, 'doc-constraint', 'doc', 'docs/constraint.md', 'docs/constraint.md'),
-             (?, ?, 'doc-derived', 'doc', 'docs/derived.md', 'docs/derived.md')`,
-            Array(4).fill([PROJECT, BUILD]).flat()
+             (?, ?, 'doc-derived', 'doc', 'docs/derived.md', 'docs/derived.md'),
+             (?, ?, 'class-not-doc', 'class', 'src/c.ts', 'src/c.ts')`,
+            Array(5).fill([PROJECT, BUILD]).flat()
         );
         await db.run(
             `INSERT INTO graph_edge (project, build_id, edge_id, from_node_id, to_node_id, kind, conflict) VALUES
              (?, ?, 'e-spec', 'doc-spec', 'target', 'specifies', false),
              (?, ?, 'e-constraint', 'doc-constraint', 'target', 'constrains', false),
-             (?, ?, 'e-derived', 'target', 'doc-derived', 'derived_from', false)`,
-            Array(3).fill([PROJECT, BUILD]).flat()
+             (?, ?, 'e-derived', 'target', 'doc-derived', 'derived_from', false),
+             (?, ?, 'e-bad', 'class-not-doc', 'target', 'specifies', false)`,
+            Array(4).fill([PROJECT, BUILD]).flat()
         );
 
         api = await startGraphApi({ db, project: PROJECT, token: TOKEN });
@@ -47,13 +49,25 @@ test('SCN-GRAPH-07 · AC-GRAPH-02-01 — doc + relation specifies/constrains', {
         assert.equal(byPath.get('docs/constraint.md').relation, 'constrains');
         assert.ok(byPath.has('docs/derived.md'), 'derived_from relation must be returned in either direction');
         assert.equal(byPath.get('docs/derived.md').relation, 'derived_from');
+        assert.ok(!byPath.has('src/c.ts'), 'a non-doc node must never be returned as a governing doc');
 
         // The relation is a stored edge, not a similarity ranking.
         const stored = await db.all(
             `SELECT kind FROM graph_edge WHERE project = ? AND build_id = ? ORDER BY edge_id`,
             [PROJECT, BUILD]
         );
-        assert.deepEqual(stored.map((r) => r.kind), ['constrains', 'derived_from', 'specifies']);
+        assert.deepEqual(stored.map((r) => r.kind), ['specifies', 'constrains', 'derived_from', 'specifies']);
+
+        // BR-06: source_claim is append-only.
+        await db.run(
+            `INSERT INTO source_claim (project, build_id, edge_id, seq, source_kind, claim)
+             VALUES (?, ?, 'e-spec', 1, 'docs', 'anchor')`,
+            [PROJECT, BUILD]
+        );
+        await assert.rejects(
+            async () => db.run(`UPDATE source_claim SET claim = 'tampered' WHERE project = ? AND build_id = ? AND edge_id = 'e-spec'`, [PROJECT, BUILD]),
+            /IMMUTABLE|append|source_claim/i
+        );
     } finally {
         if (api) await api.close();
         await pg.cleanup();

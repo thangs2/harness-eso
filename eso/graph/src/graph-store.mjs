@@ -578,6 +578,7 @@ export async function answerDocsGraph({
              JOIN graph_node d
                ON d.project = e.project AND d.build_id = e.build_id AND d.node_id = e.from_node_id
              WHERE e.project = ? AND e.build_id = ?
+               AND d.kind = 'doc'
                AND e.kind IN ('specifies','constrains','derived_from')
                AND e.to_node_id = ?
              UNION ALL
@@ -586,6 +587,7 @@ export async function answerDocsGraph({
              JOIN graph_node d
                ON d.project = e.project AND d.build_id = e.build_id AND d.node_id = e.to_node_id
              WHERE e.project = ? AND e.build_id = ?
+               AND d.kind = 'doc'
                AND e.kind IN ('specifies','constrains','derived_from')
                AND e.from_node_id = ?`,
             [project, effectiveBuildId, target.node_id, project, effectiveBuildId, target.node_id]
