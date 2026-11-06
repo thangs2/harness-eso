@@ -31,7 +31,21 @@ const storyIds = (root) => {
     return ids;
 };
 
-const citedByFeature = (root) => new Set((read(layout(root).features).match(/US-[A-Z0-9]+-\d+/g) ?? []));
+/** Feature rows cite stories in two shapes: explicit ids, and ranges like `US-GRAPH-01…04`.
+ *  Missing the range form is how X36 first "found" 34 orphans when only 25 were unowned. */
+const citedByFeature = (root) => {
+    const out = new Set();
+    for (const line of read(layout(root).features).split('\n')) {
+        if (!/^\| \*\*F-\d{2}\*\*/.test(line)) continue;
+        const cells = line.split('|');
+        const cell = cells[6] ?? '';
+        for (const m of cell.matchAll(/US-[A-Z]+-\d+/g)) out.add(m[0]);
+        for (const m of cell.matchAll(/(US-[A-Z]+-)(\d+)…(\d+)/g)) {
+            for (let n = Number(m[2]); n <= Number(m[3]); n++) out.add(`${m[1]}${String(n).padStart(2, '0')}`);
+        }
+    }
+    return out;
+};
 
 /** Rows of the debt register: | `US-X-01` | owner | why | certainty | */
 const registered = (root) => {
@@ -74,7 +88,7 @@ const fixture = ({ extraStory = null, registerExtra = '', citeRegistered = false
     write(path.join(L.stories, '01.a.md'), '---\nus: US-A-01\n---\n# a\n');
     write(path.join(L.stories, '02.b.md'), '---\nus: US-B-01\n---\n# b\n');
     if (extraStory) write(path.join(L.stories, '03.c.md'), `---\nus: ${extraStory}\n---\n# c\n`);
-    write(L.features, `| **F-01** | x |\n| \`US-A-01\` |${citeRegistered ? ' `US-B-01` |' : ''}\n`);
+    write(L.features, `| **F-01** | a | b | c | d | \`US-A-01\` | 1 AC |\n| **F-02** | a | b | c | d | ${citeRegistered ? '\`US-B-01\`' : '—'} | 1 AC |\n`);
     write(L.register, `| US | Chủ đúng | Vì sao | Chắc |\n|---|---|---|---|\n| \`US-B-01\` | \`F-01\` | thiếu | chắc |\n${registerExtra}`);
     return root;
 };
