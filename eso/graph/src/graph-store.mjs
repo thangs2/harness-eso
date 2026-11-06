@@ -155,6 +155,15 @@ export async function indexGraph({
 
     const sourceHash = hashGraphSource({ kind: source.kind, solutionPath: fullPath });
     const existing = await readIndexRun(db, { project, buildId });
+    if (existing?.status === 'failed') {
+        // A failed run has no usable rows and its keys are immutable by trigger. Delete the
+        // failed ledger row; the fresh insert below records the new source hash/path.
+        await db.run(
+            'DELETE FROM graph_index_run WHERE project = ? AND build_id = ? AND source_kind = ? AND status = ?',
+            [project, buildId, source.kind, 'failed']
+        );
+    }
+
     if (existing && existing.status !== 'failed') {
         if (existing.source_hash !== sourceHash) {
             return {

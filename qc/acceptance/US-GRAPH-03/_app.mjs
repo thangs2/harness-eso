@@ -53,6 +53,7 @@ export function postGraph(baseUrl, route, body, options = {}) {
     const headers = {
         Authorization: `Bearer ${options.token || 'graph-acceptance-token'}`,
         'Content-Type': 'application/json',
+        'x-eso-turn-phase': 'off-path',
         ...(options.headers || {}),
     };
     return fetch(`${baseUrl}${route}`, {

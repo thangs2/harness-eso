@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '../../../../common/guards/auth.guard.js';
 import { CurrentProject } from '../../../../common/decorators/current-project.decorator.js';
-import { GraphService, isTurnPath } from '../../application/services/graph.service.js';
+import { GraphService } from '../../application/services/graph.service.js';
 import { GraphIndexDto } from '../dto/graph-index.dto.js';
 import { GraphRebuildDto } from '../dto/graph-rebuild.dto.js';
 import { GraphQueryDto } from '../dto/graph-query.dto.js';
@@ -37,7 +37,7 @@ export class GraphController {
         @CurrentProject() project: string,
         @Headers('x-eso-turn-phase') turnPhase?: string
     ) {
-        return this.graphService.index(project, dto, isTurnPath(turnPhase));
+        return this.graphService.index(project, dto, this.graphService.turnPhase(turnPhase));
     }
 
     @Post('rebuild')
@@ -47,7 +47,7 @@ export class GraphController {
         @CurrentProject() project: string,
         @Headers('x-eso-turn-phase') turnPhase?: string
     ) {
-        return this.graphService.rebuild(project, dto, isTurnPath(turnPhase));
+        return this.graphService.rebuild(project, dto, this.graphService.turnPhase(turnPhase));
     }
 
     /** Generic form: `{ question: "Q1".."Q5", ...inputs }`. */
@@ -58,36 +58,36 @@ export class GraphController {
         @CurrentProject() project: string,
         @Headers('x-eso-turn-phase') turnPhase?: string
     ) {
-        return this.graphService.query(project, dto.question || 'Q1', dto, isTurnPath(turnPhase));
+        return this.graphService.query(project, dto.question || 'Q1', dto, this.graphService.turnPhase(turnPhase));
     }
 
     @Post('q1')
     @HttpCode(HttpStatus.OK)
     q1(@Body() dto: GraphQueryDto, @CurrentProject() project: string, @Headers('x-eso-turn-phase') turnPhase?: string) {
-        return this.graphService.query(project, 'Q1', dto, isTurnPath(turnPhase));
+        return this.graphService.query(project, 'Q1', dto, this.graphService.turnPhase(turnPhase));
     }
 
     @Post('q2')
     @HttpCode(HttpStatus.OK)
     q2(@Body() dto: GraphQueryDto, @CurrentProject() project: string, @Headers('x-eso-turn-phase') turnPhase?: string) {
-        return this.graphService.query(project, 'Q2', dto, isTurnPath(turnPhase));
+        return this.graphService.query(project, 'Q2', dto, this.graphService.turnPhase(turnPhase));
     }
 
     @Post('q3')
     @HttpCode(HttpStatus.OK)
     q3(@Body() dto: GraphQueryDto, @CurrentProject() project: string, @Headers('x-eso-turn-phase') turnPhase?: string) {
-        return this.graphService.query(project, 'Q3', dto, isTurnPath(turnPhase));
+        return this.graphService.query(project, 'Q3', dto, this.graphService.turnPhase(turnPhase));
     }
 
     @Post('q4')
     @HttpCode(HttpStatus.OK)
     q4(@Body() dto: GraphQueryDto, @CurrentProject() project: string, @Headers('x-eso-turn-phase') turnPhase?: string) {
-        return this.graphService.query(project, 'Q4', dto, isTurnPath(turnPhase));
+        return this.graphService.query(project, 'Q4', dto, this.graphService.turnPhase(turnPhase));
     }
 
     @Post('q5')
     @HttpCode(HttpStatus.OK)
     q5(@Body() dto: GraphQueryDto, @CurrentProject() project: string, @Headers('x-eso-turn-phase') turnPhase?: string) {
-        return this.graphService.query(project, 'Q5', dto, isTurnPath(turnPhase));
+        return this.graphService.query(project, 'Q5', dto, this.graphService.turnPhase(turnPhase));
     }
 }

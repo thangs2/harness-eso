@@ -8,6 +8,7 @@
   "technical": false,
   "inv": [
     "BR-05",
+    "BR-06",
     "BR-12"
   ],
   "ac": [
@@ -71,8 +72,8 @@
   "verify": [
     "bun test qc/acceptance/US-GRAPH-03"
   ],
-  "base_commit": "native-baseline",
-  "base_ref": "main",
+  "base_commit": "ca6d8ee",
+  "base_ref": "ca6d8ee",
   "owner": "graph",
   "allow_dependency": false,
   "notes": "D-92/D-93: Postgres graph only; no SQLite. ESO-447 migrated code/test/demo; HIR. BIP READY."

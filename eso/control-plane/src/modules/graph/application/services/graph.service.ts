@@ -58,6 +58,30 @@ export function isTurnPath(raw?: string): boolean {
 export class GraphService {
     constructor(private readonly dbService: DatabaseService) {}
 
+    /**
+     * Graph routes are off-path. The phase is required and fail-closed: a caller that omits it
+     * cannot silently run heavy work on a judging turn.
+     */
+    turnPhase(raw?: string): boolean {
+        if (!raw || !String(raw).trim()) {
+            throw new BadRequestException({
+                status: 400,
+                code: 'TURN_PHASE_REQUIRED',
+                error: 'TURN_PHASE_REQUIRED',
+                detail: 'x-eso-turn-phase must be off-path or judging',
+            });
+        }
+        const phase = String(raw).trim().toLowerCase();
+        if (phase === 'off-path' || phase === 'off_path') return false;
+        if (phase === 'judging') return true;
+        throw new BadRequestException({
+            status: 400,
+            code: 'TURN_PHASE_INVALID',
+            error: 'TURN_PHASE_INVALID',
+            detail: 'x-eso-turn-phase must be off-path or judging',
+        });
+    }
+
     private database() {
         const db = this.dbService.getDatabase();
         if (!db) {

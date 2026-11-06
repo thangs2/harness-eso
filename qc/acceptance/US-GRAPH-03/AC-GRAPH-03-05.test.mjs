@@ -37,7 +37,23 @@ test('SCN-GRAPH-15 · AC-GRAPH-03-05 — query nặng trên turn ⇒ HEAVY_ON_TU
         const turnedBody = JSON.parse(turnedText);
         assert.equal(turnedBody.code, 'HEAVY_ON_TURN');
 
-        // 2. Indexing is heavy too and must be refused under the same context.
+        // 2. Missing and unknown phases fail closed; they cannot bypass the turn guard.
+        const missing = await fetch(`${api.baseUrl}/v1/graph/q1`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ build_id: BUILD, symbol: 'TurnSymbol' }),
+        });
+        assert.equal(missing.status, 400);
+        assert.equal((await missing.json()).code, 'TURN_PHASE_REQUIRED');
+
+        const bogus = await postGraph(api.baseUrl, '/v1/graph/q1', { build_id: BUILD, symbol: 'TurnSymbol' }, {
+            token: TOKEN,
+            headers: { 'x-eso-turn-phase': 'bogus' },
+        });
+        assert.equal(bogus.status, 400);
+        assert.equal((await bogus.json()).code, 'TURN_PHASE_INVALID');
+
+        // 3. Indexing is heavy too and must be refused under the same context.
         const turnIndex = await postGraph(api.baseUrl, '/v1/graph/index', {
             build_id: BUILD,
             source: { kind: 'roslyn', solution_path: 'src/App.sln' },
