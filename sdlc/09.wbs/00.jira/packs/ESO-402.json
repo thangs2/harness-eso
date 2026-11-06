@@ -6,7 +6,10 @@
     "file": "sdlc/09.wbs/01.packets/01.bip/46.docs-graph.md"
   },
   "technical": false,
-  "inv": [],
+  "inv": [
+    "BR-05",
+    "BR-12"
+  ],
   "ac": [
     "AC-GRAPH-02-01",
     "AC-GRAPH-02-02",
@@ -47,7 +50,10 @@
   ],
   "allowed_files": [
     "eso/graph/**",
-    "qc/acceptance/US-GRAPH-02/**"
+    "qc/acceptance/US-GRAPH-02/**",
+    "eso/control-plane/src/modules/graph/api/controllers/graph.controller.ts",
+    "eso/control-plane/src/modules/graph/application/services/graph.service.ts",
+    "eso/control-plane/src/modules/graph/api/dto/graph-docs.dto.ts"
   ],
   "forbidden": [
     "scripts/ticket-gate.mjs",

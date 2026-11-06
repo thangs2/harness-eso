@@ -9,10 +9,11 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '../../../../common/guards/auth.guard.js';
 import { CurrentProject } from '../../../../common/decorators/current-project.decorator.js';
-import { GraphService } from '../../application/services/graph.service.js';
+import { GraphService, isTurnPath } from '../../application/services/graph.service.js';
 import { GraphIndexDto } from '../dto/graph-index.dto.js';
 import { GraphRebuildDto } from '../dto/graph-rebuild.dto.js';
 import { GraphQueryDto } from '../dto/graph-query.dto.js';
+import { GraphDocsDto } from '../dto/graph-docs.dto.js';
 
 /**
  * Graph store API — API-28/29 (write) and API-30…34 (Q1–Q5, read).
@@ -59,6 +60,17 @@ export class GraphController {
         @Headers('x-eso-turn-phase') turnPhase?: string
     ) {
         return this.graphService.query(project, dto.question || 'Q1', dto, this.graphService.turnPhase(turnPhase));
+    }
+
+    /** API-35: docs graph around one code/topology node. */
+    @Post('docs')
+    @HttpCode(HttpStatus.OK)
+    docs(
+        @Body() dto: GraphDocsDto,
+        @CurrentProject() project: string,
+        @Headers('x-eso-turn-phase') turnPhase?: string
+    ) {
+        return this.graphService.docs(project, dto, this.graphService.turnPhase(turnPhase));
     }
 
     @Post('q1')

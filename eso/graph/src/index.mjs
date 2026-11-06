@@ -44,6 +44,9 @@ import {
     indexGraph,
     rebuildGraph,
     answerGraphQuestion,
+    answerDocsGraph,
+    DOCS_NODE_KINDS,
+    DOC_RELATIONS,
 } from './graph-store.mjs';
 
 export {
@@ -69,6 +72,9 @@ export {
     indexGraph,
     rebuildGraph,
     answerGraphQuestion,
+    answerDocsGraph,
+    DOCS_NODE_KINDS,
+    DOC_RELATIONS,
     queryReadSet,
     DEFAULT_THRESHOLD,
     DEFAULT_FLOOR,

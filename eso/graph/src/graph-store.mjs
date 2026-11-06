@@ -505,3 +505,167 @@ export async function answerGraphQuestion({
         },
     };
 }
+
+export const DOCS_NODE_KINDS = Object.freeze(['method', 'service', 'route', 'module']);
+export const DOC_RELATIONS = Object.freeze(['specifies', 'constrains', 'derived_from']);
+
+async function latestBuildId(db, project) {
+    const run = await db.get(
+        `SELECT build_id FROM graph_index_run WHERE project = ? ORDER BY created_at DESC LIMIT 1`,
+        [project]
+    );
+    if (run) return run.build_id;
+    const node = await db.get(
+        `SELECT build_id FROM graph_node WHERE project = ? LIMIT 1`,
+        [project]
+    );
+    return node ? node.build_id : null;
+}
+
+/**
+ * API-35 — docs graph specific-relative.
+ *
+ * A doc is only returned when a stored edge anchors it to the target node. When nothing anchors
+ * the node the answer is `unknown` + UNLINKED_DOC, never a similarity guess (BR-05).
+ * A superseded doc is excluded from `docs` and kept in `superseded` with its supersedes trace.
+ */
+export async function answerDocsGraph({
+    db,
+    project,
+    buildId = null,
+    node = {},
+    onTurnPath = false,
+} = {}) {
+    if (onTurnPath) return heavyOnTurn();
+    if (!project) return missing('project is required');
+    if (!node || typeof node !== 'object' || !node.kind || !node.id) {
+        return missing('node.kind and node.id are required');
+    }
+    if (!DOCS_NODE_KINDS.includes(node.kind)) {
+        return missing(`node.kind must be one of ${DOCS_NODE_KINDS.join(', ')}`);
+    }
+
+    const effectiveBuildId = buildId || (await latestBuildId(db, project));
+    if (!effectiveBuildId) {
+        return {
+            status: 200,
+            code: 'UNLINKED_DOC',
+            data: {
+                project,
+                build_id: null,
+                node: { kind: node.kind, id: node.id },
+                status: 'unknown',
+                as_of: new Date().toISOString(),
+                docs: [],
+                superseded: [],
+                unknowns: [{ reason: 'UNLINKED_DOC', detail: 'no graph build for project' }],
+                code: 'UNLINKED_DOC',
+            },
+        };
+    }
+
+    const target = await db.get(
+        `SELECT node_id, node_key, path FROM graph_node
+         WHERE project = ? AND build_id = ? AND kind = ? AND (node_id = ? OR node_key = ?)
+         LIMIT 1`,
+        [project, effectiveBuildId, node.kind, node.id, node.id]
+    );
+
+    const linked = target
+        ? await db.all(
+            `SELECT e.edge_id, e.kind AS relation, d.node_id AS doc_id, d.node_key AS doc_key, d.path AS doc_path
+             FROM graph_edge e
+             JOIN graph_node d
+               ON d.project = e.project AND d.build_id = e.build_id AND d.node_id = e.from_node_id
+             WHERE e.project = ? AND e.build_id = ?
+               AND e.kind IN ('specifies','constrains','derived_from')
+               AND e.to_node_id = ?
+             UNION ALL
+             SELECT e.edge_id, e.kind AS relation, d.node_id AS doc_id, d.node_key AS doc_key, d.path AS doc_path
+             FROM graph_edge e
+             JOIN graph_node d
+               ON d.project = e.project AND d.build_id = e.build_id AND d.node_id = e.to_node_id
+             WHERE e.project = ? AND e.build_id = ?
+               AND e.kind IN ('specifies','constrains','derived_from')
+               AND e.from_node_id = ?`,
+            [project, effectiveBuildId, target.node_id, project, effectiveBuildId, target.node_id]
+        )
+        : [];
+
+    const supersedeRows = await db.all(
+        `SELECT e.from_node_id AS newer_id, e.to_node_id AS older_id,
+                n.node_key AS newer_key, COALESCE(n.path, n.node_key) AS newer_path
+         FROM graph_edge e
+         JOIN graph_node n
+           ON n.project = e.project AND n.build_id = e.build_id AND n.node_id = e.from_node_id
+         WHERE e.project = ? AND e.build_id = ? AND e.kind = 'supersedes'`,
+        [project, effectiveBuildId]
+    );
+    const supersededBy = new Map(supersedeRows.map((row) => [row.older_id, row]));
+
+    const docs = [];
+    const superseded = [];
+    for (const row of linked) {
+        const entry = {
+            doc_path: row.doc_path || row.doc_key,
+            relation: row.relation,
+            via: [row.doc_key, target.node_key],
+        };
+        const newer = supersededBy.get(row.doc_id);
+        if (newer) {
+            superseded.push({
+                doc_path: entry.doc_path,
+                relation: 'supersedes',
+                superseded_by: newer.newer_path || newer.newer_key,
+                via: [row.doc_key, newer.newer_key],
+            });
+        } else {
+            docs.push(entry);
+        }
+    }
+
+    if (docs.length === 0) {
+        const allDocs = await db.all(
+            `SELECT node_id, node_key, path FROM graph_node
+             WHERE project = ? AND build_id = ? AND kind = 'doc'`,
+            [project, effectiveBuildId]
+        );
+        const linkedIds = new Set(linked.map((row) => row.doc_id));
+        const unlinked = allDocs
+            .filter((doc) => !linkedIds.has(doc.node_id))
+            .map((doc) => doc.path || doc.node_key);
+        return {
+            status: 200,
+            code: 'UNLINKED_DOC',
+            data: {
+                project,
+                build_id: effectiveBuildId,
+                node: { kind: node.kind, id: node.id },
+                status: 'unknown',
+                as_of: new Date().toISOString(),
+                docs: [],
+                superseded,
+                unknowns: [{
+                    reason: 'UNLINKED_DOC',
+                    ...(unlinked.length ? { docs: unlinked } : { detail: 'no doc anchors this node' }),
+                }],
+                code: 'UNLINKED_DOC',
+            },
+        };
+    }
+
+    return {
+        status: 200,
+        code: 'OK',
+        data: {
+            project,
+            build_id: effectiveBuildId,
+            node: { kind: node.kind, id: node.id },
+            status: 'ready',
+            as_of: new Date().toISOString(),
+            docs,
+            superseded,
+            unknowns: [],
+        },
+    };
+}

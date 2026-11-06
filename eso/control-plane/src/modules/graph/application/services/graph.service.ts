@@ -11,10 +11,12 @@ import {
     indexGraph,
     rebuildGraph,
     answerGraphQuestion,
+    answerDocsGraph,
 } from '../../../../../../graph/src/graph-store.mjs';
 import { GraphIndexDto } from '../../api/dto/graph-index.dto.js';
 import { GraphRebuildDto } from '../../api/dto/graph-rebuild.dto.js';
 import { GraphQueryDto } from '../../api/dto/graph-query.dto.js';
+import { GraphDocsDto } from '../../api/dto/graph-docs.dto.js';
 
 type Envelope = { status: number; code: string; data: any };
 
@@ -117,6 +119,18 @@ export class GraphService {
             source: dto.source,
             onTurnPath,
             consumerRoot: process.env.ESO_CONSUMER_ROOT || null,
+        });
+        return unwrap(res as Envelope);
+    }
+
+    async docs(project: string, dto: GraphDocsDto, onTurnPath = false) {
+        const db = this.database();
+        const res = await answerDocsGraph({
+            db,
+            project,
+            buildId: dto.build_id || null,
+            node: dto.node,
+            onTurnPath,
         });
         return unwrap(res as Envelope);
     }

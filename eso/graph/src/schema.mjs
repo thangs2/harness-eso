@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS graph_edge (
   PRIMARY KEY (project, build_id, edge_id),
   CONSTRAINT graph_edge_kind_closed CHECK (kind IN
     ('references','maps_to','depends_on','requires','defines',
-     'tenant_marker','specifies','constrains','supersedes')),
+     'tenant_marker','specifies','constrains','supersedes','derived_from')),
   CONSTRAINT graph_edge_from_node_fk FOREIGN KEY (project, build_id, from_node_id)
     REFERENCES graph_node (project, build_id, node_id),
   CONSTRAINT graph_edge_to_node_fk FOREIGN KEY (project, build_id, to_node_id)
@@ -51,6 +51,12 @@ CREATE TABLE IF NOT EXISTS graph_edge (
 CREATE INDEX IF NOT EXISTS idx_graph_edge_from ON graph_edge (project, build_id, from_node_id);
 CREATE INDEX IF NOT EXISTS idx_graph_edge_to ON graph_edge (project, build_id, to_node_id);
 CREATE INDEX IF NOT EXISTS idx_graph_edge_kind ON graph_edge (project, build_id, kind);
+
+-- Docs graph adds derived_from; existing databases carry the old closed list, so replace it.
+ALTER TABLE graph_edge DROP CONSTRAINT IF EXISTS graph_edge_kind_closed;
+ALTER TABLE graph_edge ADD CONSTRAINT graph_edge_kind_closed CHECK (kind IN
+  ('references','maps_to','depends_on','requires','defines',
+   'tenant_marker','specifies','constrains','supersedes','derived_from'));
 
 -- 3. source_claim: provenance của edge, CHỈ ghi thêm (BR-06)
 CREATE TABLE IF NOT EXISTS source_claim (
