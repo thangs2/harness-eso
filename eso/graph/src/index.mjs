@@ -30,6 +30,10 @@ import {
     querySliceTenantBoundary,
     TENANT_COVERAGE_FLOOR,
 } from './q5-tenant.mjs';
+import {
+    extractRoslynGraph,
+    indexGraphApi28,
+} from './roslyn-adapter.mjs';
 
 export {
     initSchema,
@@ -43,6 +47,8 @@ export {
     dispatchQuery,
     generateNodeId,
     extractProjectGraph,
+    extractRoslynGraph,
+    indexGraphApi28,
     queryReadSet,
     DEFAULT_THRESHOLD,
     DEFAULT_FLOOR,
