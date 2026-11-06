@@ -250,7 +250,9 @@ export async function indexGraphApi28(payload, options = {}) {
     if (options.consumerRoot) {
         const resolvedPath = path.resolve(options.consumerRoot, source.solution_path);
         const resolvedRoot = path.resolve(options.consumerRoot);
-        if (!resolvedPath.startsWith(resolvedRoot)) {
+        const relative = path.relative(resolvedRoot, resolvedPath);
+        const escaped = relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+        if (escaped) {
             return {
                 status: 403,
                 code: 'BLOCKED_SCOPE',

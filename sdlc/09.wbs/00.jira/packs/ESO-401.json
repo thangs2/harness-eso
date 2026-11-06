@@ -6,7 +6,10 @@
     "file": "sdlc/09.wbs/01.packets/01.bip/49.roslyn-csharp.md"
   },
   "technical": false,
-  "inv": [],
+  "inv": [
+    "BR-05",
+    "BR-12"
+  ],
   "ac": [
     "AC-GRAPH-01-01",
     "AC-GRAPH-01-02",
@@ -47,6 +50,18 @@
       "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-04.test.mjs",
       "test_name": "SCN-GRAPH-04 · AC-GRAPH-01-04 — gọi trên turn ⇒ HEAVY_ON_TURN",
       "expected_failure": "`AssertionError` ở assert của `SCN-GRAPH-04`: **actual** chạy đồng bộ ⇒ trả kết quả, ghi dòng, turn **chờ** build · **expected** `HEAVY_ON_TURN`, **0** dòng ghi, việc xếp off-path"
+    },
+    {
+      "packet": "sdlc/10.test/05.graph-roslyn.tdd-unit.md",
+      "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-05.test.mjs",
+      "test_name": "SCN-GRAPH-05 · AC-GRAPH-01-05 — thiếu toolchain ⇒ TOOLCHAIN_UNAVAILABLE",
+      "expected_failure": "`AssertionError` ở `SCN-GRAPH-05`: **actual** coverage=0/synthetic node · **expected** TOOLCHAIN_UNAVAILABLE, 0 row, coverage≠0"
+    },
+    {
+      "packet": "sdlc/10.test/06.graph-roslyn.tdd-impl.md",
+      "test_file": "qc/acceptance/US-GRAPH-01/AC-GRAPH-01-06.test.mjs",
+      "test_name": "SCN-GRAPH-06 · AC-GRAPH-01-06 — tenant isolation / RLS",
+      "expected_failure": "`AssertionError` ở `SCN-GRAPH-06`: **actual** đọc/ghi project B · **expected** RLS chặn, 0 rò"
     }
   ],
   "allowed_files": [
@@ -63,8 +78,8 @@
   "verify": [
     "bun test qc/acceptance/US-GRAPH-01"
   ],
-  "base_commit": "native-baseline",
-  "base_ref": "main",
+  "base_commit": "a05cd11",
+  "base_ref": "a05cd11",
   "owner": "graph",
   "allow_dependency": false,
   "notes": "D-92/D-93: Postgres graph only; no SQLite. ESO-447 migrated code/test/demo; HIR. BIP READY."

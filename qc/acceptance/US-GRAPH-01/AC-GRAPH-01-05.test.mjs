@@ -50,6 +50,18 @@ test('SCN-GRAPH-05 · AC-GRAPH-01-05 — thiếu SDK/build fail ⇒ TOOLCHAIN_UN
         assert.equal(apiResponse.code || apiResponse.data?.error, 'TOOLCHAIN_UNAVAILABLE');
         assert.notEqual(apiResponse.data?.coverage, 0, 'Must NOT report coverage=0');
 
+        // 3. Prefix-sibling escape: /tmp/croot must not authorize /tmp/croot-evil.
+        const escapedResponse = await indexGraphApi28(
+            {
+                project,
+                build_id: 'build-scope-escape',
+                source: { kind: 'roslyn', solution_path: '../croot-evil/x.sln' },
+            },
+            { onTurnPath: false, db, consumerRoot: '/tmp/croot' }
+        );
+        assert.equal(escapedResponse.status, 403, 'prefix sibling must be BLOCKED_SCOPE');
+        assert.equal(escapedResponse.code, 'BLOCKED_SCOPE');
+
         // 3. Database is clean: no rows persisted
         const nodes = await db.all("SELECT count(*)::int AS cnt FROM graph_node WHERE project = $1", [project]);
         assert.equal(nodes[0].cnt, 0, 'No nodes should be written on toolchain failure');
