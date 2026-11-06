@@ -37,11 +37,20 @@ test('X31: every id cited in sdlc/ is defined where its family is owned', () => 
         { name: 'P', ref: /\bP([1-9])\b(?!\.)/g, def: defs([join(INC, '00.problem', '00.index.md')], /^\| \*\*P(\d+)\*\* \|/gm) },
         { name: 'G', ref: /\bG-([A-Z])\b/g, def: defs([join(INC, '01.vision', '01.vision-mission-goals.md')], /^### G-([A-Z]) /gm) },
         { name: 'O', ref: /\bO-(\d)\b/g, def: defs([join(INC, '01.vision', '01.vision-mission-goals.md')], /^### O-(\d) /gm) },
-        { name: 'D', ref: /\bD-(\d{2})\b/g, def: defs(inDir('03.inception/02.decision-log'), /^### D-(\d{2}) — /gm) },
+        { name: 'D', ref: /\bD-(\d{2,3})\b/g, def: defs(inDir('03.inception/02.decision-log'), /^### D-(\d{2,3}) — /gm) },
         { name: 'DQ', ref: /\bDQ-(\d{2})\b/g, def: defs([join(INC, '02.decision-log', '01.open-decisions.md')], /^### `DQ-(\d{2})`/gm) },
         { name: 'MET', ref: /\bMET-(\d+)\b/g, def: defs([join(SDLC, '05.requirements', '01.specification', '01.prd', '06.success-metrics.md')], /^\|\s*`MET-(\d+)`\s*\|/gm) },
         { name: 'F', ref: /\bF-(\d{2})\b/g, def: defs([join(SDLC, '06.analysis', '01.business-analysis', '06.eso-features.md')], /\*\*F-(\d{2})\*\*/g) },
     ];
+
+    // A two-digit-only pattern does not "misparse" a three-digit id — it drops it silently, so the citation
+    // escapes X31 with no error at all. `D-100` must parse whole before any id reaches 100.
+    const dFamily = FAMILIES.find((f) => f.name === 'D');
+    assert.deepEqual(
+        [...'see D-100, D-99'.matchAll(dFamily.ref)].map((m) => m[1]),
+        ['100', '99'],
+        'D ids must parse three digits whole',
+    );
 
     const corpus = walk(SDLC).map((f) => [relative(SDLC, f), read(f)]);
     const problems = [];
