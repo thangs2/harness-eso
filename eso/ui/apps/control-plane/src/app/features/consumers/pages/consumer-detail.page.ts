@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { ConsumerProfileService } from '../../onboarding/data/consumer-profile.service.js';
-import type { ConsumerProfile } from '../../onboarding/models/onboarding.model.js';
+import { ConsumerProfileService } from '../../../core/consumers/consumer-profile.service.js';
+import type { ConsumerProfile } from '../../../../../../../libs/api-client/types.js';
 
 @Component({
     selector: 'eso-consumer-detail-page',

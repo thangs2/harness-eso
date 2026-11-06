@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { JsonPipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { OnboardingStore } from '../state/onboarding.store.js';
-import { ConsumerProfileService } from '../data/consumer-profile.service.js';
+import { ConsumerProfileService } from '../../../core/consumers/consumer-profile.service.js';
 import { GATES, HOST_PROFILES, PROFILE_RECIPES, ROLES, SOURCES } from '../models/onboarding.model.js';
 import type { ConsumerPlan } from '../../../../../../../libs/api-client/types.js';
 

@@ -136,3 +136,24 @@ jobs:
             - run: bun run build:console
             - run: bun run build:observatory
             - run: bun run test:observatory
+
+    # `eso/ui` had no machine gate at all: this file never mentioned it, its `tsconfig` was not strict
+    # and `scripts/check-structure.mjs` was invoked by nothing. Row `E1`/`E2` of
+    # `sdlc/08.ui-design/08.requirements-ui.md` closes that. The gate chains typecheck → structure →
+    # unit → build, and the build carries the bundle budgets, so a size regression fails here too.
+    control-plane-ui:
+        name: control-plane UI gate
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+            # No lockfile is committed for this workspace yet, so `npm ci` cannot run; `npm install`
+            # is the honest form until one exists.
+            - name: install
+              working-directory: eso/ui
+              run: npm install --no-audit --no-fund
+            - name: gate (typecheck · structure · unit · build+budgets)
+              working-directory: eso/ui
+              run: npm run gate

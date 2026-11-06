@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { CONTROL_PLANE_API_CLIENT } from '../../../core/tokens.js';
-import type { ConsumerProfile } from '../models/onboarding.model.js';
-import type { ConsumerListResponse, ConsumerPlan } from '../../../../../../../libs/api-client/types.js';
+import { CONTROL_PLANE_API_CLIENT } from '../tokens.js';
+import type { ConsumerListResponse, ConsumerPlan, ConsumerProfile } from '../../../../../../libs/api-client/types.js';
 
 @Injectable({ providedIn: 'root' })
 export class ConsumerProfileService {

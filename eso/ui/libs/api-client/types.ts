@@ -56,6 +56,12 @@ export interface ConsumerProfile {
     gates: Record<string, unknown>;
     sources: Record<string, unknown>;
     protectedPaths: string[];
+    // The detail endpoint returns the snapshot's own bookkeeping alongside the profile; the type must say so
+    // or every consumer of it has to reach for a cast (D-72 bans casts that only silence the compiler).
+    version?: number;
+    status?: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface ConsumerSummary {

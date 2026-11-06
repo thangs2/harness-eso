@@ -4,7 +4,10 @@ import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const APP_ROOT = resolve(__dirname, '../apps/control-plane/src/app');
+// The root is overridable so the rules can be tested against a fixture tree; the default stays the real app.
+const APP_ROOT = process.env.ESO_UI_APP_ROOT
+    ? resolve(process.env.ESO_UI_APP_ROOT)
+    : resolve(__dirname, '../apps/control-plane/src/app');
 
 const errors = [];
 
@@ -101,26 +104,56 @@ function validateFile(filePath) {
         }
     }
 
-    // 8. Cross-boundary import checks
-    // Core cannot import features
-    if (rel.startsWith('core/') && content.includes('/features/')) {
-        errors.push(`[Boundary] ${rel} (core) must not import from features/`);
-    }
+    // 8. Cross-boundary import checks — resolved, not string-matched.
+    // The defect this replaces: matching the literal text `features/<x>` missed every relative import, so
+    // `consumers.page.ts` reached into another feature while the check stayed green.
+    const zoneOf = (relPath) => {
+        const m = relPath.match(/^features\/([^/]+)\//);
+        if (m) return { zone: 'feature', name: m[1] };
+        if (/^layout\//.test(relPath)) return { zone: 'layout' };
+        if (/^shared\//.test(relPath)) return { zone: 'shared' };
+        if (/^core\//.test(relPath)) return { zone: 'core' };
+        return { zone: 'other' };
+    };
+    const self = zoneOf(rel);
 
-    // Shared cannot import features
-    if (rel.startsWith('shared/') && content.includes('/features/')) {
-        errors.push(`[Boundary] ${rel} (shared) must not import from features/`);
-    }
-
-    // Feature cannot import another feature directly
-    const featureMatch = rel.match(/^features\/([^/]+)\//);
-    if (featureMatch) {
-        const currentFeature = featureMatch[1];
-        // match imports like '../s2-why' or 'features/s2-why'
-        const otherFeatureRegex = new RegExp(`features/(?!${currentFeature}/)[^/'"]+`, 'g');
-        if (otherFeatureRegex.test(content)) {
-            errors.push(`[Boundary] ${rel} imports another feature directly`);
+    const specifiers = [...content.matchAll(/(?:from\s*|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)].map((m) => m[1]);
+    for (const spec of specifiers) {
+        let targetRel = null;
+        if (spec.startsWith('.')) {
+            targetRel = relative(APP_ROOT, resolve(dirname(filePath), spec)).replace(/\\/g, '/');
+        } else if (/^(features|layout|shared|core)\//.test(spec)) {
+            targetRel = spec;
         }
+        if (targetRel === null) continue;           // bare package specifier (§1.2 does not govern those)
+        const target = zoneOf(targetRel);
+        const where = `${rel} → ${targetRel}`;
+
+        // B-cross: one feature must not import another, whatever the spelling.
+        if (self.zone === 'feature' && target.zone === 'feature' && target.name !== self.name) {
+            errors.push(`[Boundary] ${where}: a feature must not import another feature`);
+        }
+        // B-1: features ↛ layout.
+        if (self.zone === 'feature' && target.zone === 'layout') {
+            errors.push(`[Boundary] ${where}: features must not import layout/`);
+        }
+        // B-2: layout ↛ features.
+        if (self.zone === 'layout' && target.zone === 'feature') {
+            errors.push(`[Boundary] ${where}: layout/ must not import features/`);
+        }
+        // B-3: shared ↛ features, shared ↛ layout.
+        if (self.zone === 'shared' && (target.zone === 'feature' || target.zone === 'layout')) {
+            errors.push(`[Boundary] ${where}: shared/ must not import features/ or layout/`);
+        }
+        // core ↛ features.
+        if (self.zone === 'core' && target.zone === 'feature') {
+            errors.push(`[Boundary] ${where}: core/ must not import features/`);
+        }
+    }
+
+    // B-4: the layout mode is published once; only the shell may read it.
+    if (/\bLAYOUT_MODE\b/.test(content) && !/^layout\//.test(rel) && !/^core\/layout\//.test(rel)) {
+        errors.push(`[Boundary] ${rel} reads LAYOUT_MODE — only layout/ and core/layout/ may`);
     }
 }
 

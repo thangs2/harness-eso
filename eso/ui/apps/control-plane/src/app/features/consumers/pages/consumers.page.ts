@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
-import { ConsumerProfileService } from '../../onboarding/data/consumer-profile.service.js';
+import { ConsumerProfileService } from '../../../core/consumers/consumer-profile.service.js';
 import type { ConsumerSummary } from '../../../../../../../libs/api-client/types.js';
 
 @Component({
