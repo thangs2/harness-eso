@@ -25,7 +25,7 @@ tượng ta đang xây. Việc của consumer thuộc SDLC của chính consumer
 ([naming law](02.governance/01.standard/02.artifacts.md) §4.1). Ở cấp `sdlc/` chỉ có folder, nên đây là **một** dãy — liền
 mạch, **không trùng số**, và **không mang nghĩa "stage"**.
 
-> **Luật nằm trong `sdlc/`.** Chuẩn SDLC (kind · cổng · BIP/FIP · workflow · 46 phép kiểm) sống ở
+> **Luật nằm trong `sdlc/`.** Chuẩn SDLC (kind · cổng · BIP/FIP · workflow · 47 phép kiểm) sống ở
 > [`02.governance/01.standard/`](02.governance/01.standard/00.index.md) — cùng cây với các artifact nó mô tả, vì `sdlc/`
 > **không** được ship, **không** được provision, **không** có bản sao ở consumer. Consumer nhận **study sample** để đọc, không
 > phải bản copy để chạy.
