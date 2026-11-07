@@ -56,3 +56,7 @@ export {
 export {
   inventoryKnowledge,
 } from './inventory.mjs';
+
+export {
+  sufficiencyReport,
+} from './sufficiency.mjs';
