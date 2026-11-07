@@ -13,8 +13,8 @@ test('SCN-KNOW-05 · AC-KNOW-01-05 — loại không có chủ ⇒ nêu "loại 
         'inventoryKnowledge phải được export từ eso/knowledge/src/index.mjs',
     );
 
-    // FRD-F19 §1 + §2: `owner` suy ra từ `kind`; kind không có trong bảng kindOwners ⇒ owner rỗng,
-    // dòng vẫn hiện và khuyết chủ phải được nêu — không lấy một chủ mặc định.
+    // FRD-F19 §1 + §2: `owner` suy từ `kind` qua bảng `kindOwners`, KHÔNG đọc từ tài liệu và KHÔNG khai tay.
+    // `kindOwners` thiếu entry cho `decision` ⇒ owner rỗng, dòng vẫn hiện và khuyết chủ phải được nêu.
     const sources = [
         { kind: 'decision', custodian: 'repo', locator: 'docs/decisions', documents: ['d1.md', 'd2.md'] },
         { kind: 'policy', custodian: 'repo', locator: 'docs/policies', documents: ['p1.md'] },
@@ -25,9 +25,9 @@ test('SCN-KNOW-05 · AC-KNOW-01-05 — loại không có chủ ⇒ nêu "loại 
 
     const entry = result.kinds.find((row) => row.kind === 'decision');
     assert.ok(entry, 'loại chưa có chủ vẫn phải hiện trong danh sách');
-    assert.equal(entry.owner, '', 'chủ phải để trống, không được lấy một chủ mặc định');
+    assert.equal(entry.owner, '', 'owner suy từ kindOwners; thiếu entry thì để trống, không lấy chủ mặc định');
     assert.equal(entry.declared, true, 'loại vẫn khai được; chỉ owner khuyết');
-    assert.equal(entry.missing?.code, 'KIND_UNOWNED', 'mã lỗi FRD cho kind có instance nhưng không có owner');
+    assert.equal(entry.missing?.code, 'KIND_UNOWNED', 'mã FRD cho kind có instance nhưng không có owner');
     assert.match(
         String(entry.missing?.message ?? ''),
         /loại decision chưa có chủ/i,
@@ -35,7 +35,7 @@ test('SCN-KNOW-05 · AC-KNOW-01-05 — loại không có chủ ⇒ nêu "loại 
     );
 
     const policy = result.kinds.find((row) => row.kind === 'policy');
-    assert.equal(policy.owner, 'A-08');
+    assert.equal(policy.owner, 'A-08', 'owner phải lấy từ entry kindOwners của chính kind đó');
     assert.equal(policy.missing, null);
     assert.deepEqual(result.unseen, [], 'khuyết chủ không phải phần không thấy');
 });

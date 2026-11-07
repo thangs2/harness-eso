@@ -34,12 +34,13 @@ test('SCN-KNOW-19 · AC-KNOW-04-04 — duyệt hai lần ⇒ replay, đúng mộ
         reason: 'đúng chủ loại, bằng chứng đã đủ',
     };
 
+    // Nhánh 1 — CÙNG `proposal_id` duyệt lần hai ⇒ replay, không phải quyết định mới.
     const first = await transferToKnowledgeBase({ project, proposal, approver });
     const second = await transferToKnowledgeBase({ project, proposal, approver });
 
     assert.equal(first.status, 'approved');
     assert.equal(first.kt_state, 'approved');
-    assert.equal(second.status, 'replay', 'lần duyệt thứ hai là replay, không phải duyệt mới');
+    assert.equal(second.status, 'replay', 'cùng proposal_id duyệt lần hai là replay, không phải duyệt mới');
     assert.equal(second.kt_state, 'approved', 'replay vẫn trả về kt-state của bản ghi đã duyệt');
     assert.equal(project.declarations.length, 1, 'KB phải có đúng một bản, không ghi hai dòng');
     assert.equal(
@@ -57,4 +58,28 @@ test('SCN-KNOW-19 · AC-KNOW-04-04 — duyệt hai lần ⇒ replay, đúng mộ
     assert.equal(project.declarations[0].record.at, first.record.at);
     assert.equal(project.proposals.length, 1, 'không tạo thêm đề xuất trùng');
     assert.equal(project.proposals[0].status, 'approved');
+
+    // Nhánh 2 — đề xuất KHÁC (`proposal_id` khác) cho bản ghi đã `approved` ⇒ ALREADY_DECIDED, không phải replay.
+    const otherProposal = {
+        id: 'PROP-04-04-B',
+        kind: 'decision',
+        record_id: first.declaration.id,
+        title: 'Đổi quyết định đã duyệt tại chỗ',
+        content: 'Sửa nội dung của bản ghi đã đóng băng.',
+        source: 'consumer: docs/decisions/d4.md',
+        author: 'A-02',
+    };
+
+    const third = await transferToKnowledgeBase({ project, proposal: otherProposal, approver });
+
+    assert.equal(
+        third.code,
+        'ALREADY_DECIDED',
+        'đề xuất khác cho bản ghi đã approved phải bị từ chối bằng ALREADY_DECIDED',
+    );
+    assert.notEqual(third.status, 'replay', 'ALREADY_DECIDED khác nghĩa replay — không phải cùng một đề xuất');
+    assert.equal(third.kt_state, 'approved', 'bản ghi đã duyệt không đổi trạng thái');
+    assert.equal(project.declarations.length, 1, 'từ chối không được thêm bản ghi thứ hai');
+    assert.equal(project.declarations[0].id, first.declaration.id, 'bản ghi gốc phải giữ nguyên danh tính');
+    assert.deepEqual(project.declarations[0].record, first.record, 'bản ghi đóng băng không được sửa tại chỗ');
 });

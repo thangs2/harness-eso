@@ -20,6 +20,7 @@ test('SCN-KNOW-06 · AC-KNOW-02-01 — thiếu hẳn loại decision ⇒ nêu ki
             { kind: 'runbook', consequence: 'sự cố không có bước xử lý' },
         ],
     };
+    const kindOwners = { decision: 'A-04', policy: 'A-08', runbook: 'A-09' };
     const declarations = [
         { kind: 'policy', id: 'policy-security', path: 'consumer: docs/policies/security.md', content: '# Security policy\n' },
         { kind: 'runbook', id: 'runbook-incident', path: 'docs/runbooks/incident.md', content: '# Incident runbook\n' },
@@ -29,9 +30,10 @@ test('SCN-KNOW-06 · AC-KNOW-02-01 — thiếu hẳn loại decision ⇒ nêu ki
         project: 'project-alpha',
         template,
         declarations,
+        kindOwners,
     });
 
-    // FRD-F20 §1: `findings[]`, mỗi cái có `code` · `kind` · lý do (`reason`) · hậu quả (`consequence`).
+    // FRD-F20 §1: `findings[]`, mỗi cái có `code` · `kind` · lý do (`reason`) · hậu quả (`consequence`) · `owner`.
     assert.equal(report.status, 'measured');
     assert.ok(Array.isArray(report.findings), 'kết quả phải có findings[] — không tách missing/duplicates/incorrect');
     assert.equal(report.findings.length, 1, 'chỉ decision thiếu so với template');
@@ -44,6 +46,14 @@ test('SCN-KNOW-06 · AC-KNOW-02-01 — thiếu hẳn loại decision ⇒ nêu ki
         'tranh chấp không có điểm dừng',
         'hậu quả phải lấy từ template của dự án',
     );
+    // `INV-KB-01`: mục thiếu phải nêu người chịu, để còn biết hỏi ai. `owner` suy từ `kindOwners`.
+    assert.equal(
+        report.findings[0].owner,
+        'A-04',
+        'owner của finding phải suy từ kindOwners theo kind, không đọc từ tài liệu',
+    );
+    assert.equal(typeof report.findings[0].owner, 'string', 'owner phải là chuỗi');
+    assert.ok(report.findings[0].owner.trim().length > 0, 'owner phải khác rỗng khi suy được từ kindOwners');
     assert.equal(typeof report.message, 'string');
     assert.match(report.message, /decision/, 'message phải nêu tên kind thiếu');
     assert.match(

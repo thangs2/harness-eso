@@ -5,7 +5,7 @@ import * as knowledge from '../../../eso/knowledge/src/index.mjs';
 
 const { nextActions } = knowledge;
 
-test('SCN-KNOW-13 · AC-KNOW-03-03 — 20 phát hiện ⇒ 20 việc riêng, không gộp', async () => {
+test('SCN-KNOW-13 · AC-KNOW-03-03 — 20 phát hiện ⇒ next ≤ 5 bước, kèm TRUNCATED nói còn lại', async () => {
     // RED: nextActions chưa tồn tại trong index.mjs. Đỏ vì thiếu hành vi, không phải vì test sai cú pháp.
     assert.equal(
         typeof nextActions,
@@ -33,13 +33,20 @@ test('SCN-KNOW-13 · AC-KNOW-03-03 — 20 phát hiện ⇒ 20 việc riêng, kh�
 
     const result = await nextActions({ project: 'project-many', findings, kindOwners, playbooks });
 
-    assert.equal(result.next.length, 20, 'số việc phải bằng số phát hiện — không gộp, không cắt');
-    assert.equal(result.total, 20, 'tổng việc phải là 20');
-    assert.equal(new Set(result.next.map((step) => step.finding)).size, 20, 'mỗi phát hiện đúng một việc');
+    // FRD-F21 §2: mặc định `next` ≤ 5 bước; danh sách dài không được đọc.
+    assert.ok(result.next.length > 0, 'phải có ít nhất một bước để làm');
+    assert.ok(result.next.length <= 5, `next phải ≤ 5 bước, nhận ${result.next.length}`);
+
+    // 1:1 — mỗi bước neo đúng một phát hiện, không gộp nhiều phát hiện vào một bước.
+    assert.equal(
+        new Set(result.next.map((step) => step.finding)).size,
+        result.next.length,
+        'mỗi bước phải neo vào một phát hiện riêng',
+    );
 
     for (const step of result.next) {
         const finding = findings.find((row) => row.id === step.finding);
-        assert.ok(finding, `việc ${step.finding} phải neo vào phát hiện có thật`);
+        assert.ok(finding, `bước ${step.finding} phải neo vào phát hiện có thật`);
         assert.equal(step.kind, finding.kind, `kind của ${step.finding} phải khớp phát hiện`);
         for (const part of ['action', 'owner', 'whyNow', 'blocker', 'playbook']) {
             assert.equal(typeof step[part], 'string', `phần ${part} của ${step.finding} phải là chữ`);
@@ -49,7 +56,15 @@ test('SCN-KNOW-13 · AC-KNOW-03-03 — 20 phát hiện ⇒ 20 việc riêng, kh�
 
     assert.equal(
         new Set(result.next.map((step) => step.action)).size,
-        20,
-        '20 việc phải là 20 câu riêng — không được gộp thành một câu',
+        result.next.length,
+        'mỗi bước phải là một câu riêng — không được gộp chung một câu',
+    );
+
+    // FRD-F21 §4: `TRUNCATED` — không phải lỗi, nhưng phải nói còn bao nhiêu.
+    assert.equal(result.truncated?.code, 'TRUNCATED', 'cắt bước phải kèm mã TRUNCATED');
+    assert.equal(
+        result.truncated?.omitted,
+        findings.length - result.next.length,
+        'TRUNCATED phải nói đúng số phát hiện còn lại chưa thành bước',
     );
 });

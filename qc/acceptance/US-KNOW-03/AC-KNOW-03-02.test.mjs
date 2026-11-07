@@ -14,6 +14,7 @@ test('SCN-KNOW-12 · AC-KNOW-03-02 — không quy được người ⇒ nêu "ch
     );
 
     // Phát hiện thuộc loại `decision` nhưng bảng kind→owner không có chủ — không được lấy vai mặc định.
+    // FRD-F21 §2: bước thiếu `kind`/`owner` KHÔNG hiển thị ⇒ không thành bước, mà vào `rejected[]`.
     const findings = [
         {
             id: 'F-12-01',
@@ -28,18 +29,20 @@ test('SCN-KNOW-12 · AC-KNOW-03-02 — không quy được người ⇒ nêu "ch
 
     const result = await nextActions({ project: 'project-unowned', findings, kindOwners, playbooks });
 
-    assert.equal(result.next.length, 1, 'việc vẫn phải có, nhưng ô người để trống');
-    const [step] = result.next;
+    assert.deepEqual(result.next, [], 'phát hiện không quy được người KHÔNG được thành bước');
+    assert.ok(Array.isArray(result.rejected), 'phải có rejected[] để nêu lý do từ chối');
+    assert.equal(result.rejected.length, 1, 'đúng một dòng từ chối cho một phát hiện không có chủ');
 
-    assert.equal(step.finding, 'F-12-01', 'việc phải neo đúng phát hiện');
-    assert.equal(step.kind, 'decision');
-    assert.equal(step.owner, '', 'ô người phải để trống — không được gán bừa một vai mặc định');
-    assert.doesNotMatch(String(step.owner), /^A-\d+$/, 'không được lấy vai mặc định của người viết story');
-    assert.equal(step.code, 'OWNER_UNASSIGNED', 'mã FRD cho kind không suy ra được owner');
-
+    const rejection = result.rejected[0];
+    assert.equal(rejection.code, 'OWNER_UNASSIGNED', 'mã FRD cho kind không suy ra được owner');
     assert.match(
-        String(step.note ?? ''),
+        String(rejection.reason ?? ''),
         /chưa xác định người/i,
-        'ô người trống phải có nhãn nói rõ "chưa xác định người"',
+        'lý do từ chối phải nói rõ "chưa xác định người"',
+    );
+    assert.equal(
+        result.next.some((step) => step.owner === '' || !step.owner),
+        false,
+        'không được độn một bước với ô người trống',
     );
 });

@@ -19,14 +19,21 @@ test('SCN-KNOW-10 · AC-KNOW-02-05 — loại có nhưng nội dung sai ⇒ tác
             { kind: 'policy', consequence: 'mỗi người làm một kiểu' },
         ],
     };
+    const kindOwners = { decision: 'A-04', policy: 'A-08' };
     const declarations = [
         { kind: 'decision', id: 'decision-postgres', path: 'consumer: docs/decisions/d1.md', content: '# Chốt Postgres\n' },
-        // policy CÓ mặt nhưng là bản dẫn xuất nêu khẳng định từ một nguồn không có ⇒ "có nhưng sai".
+        // policy CÓ mặt; nguồn của nó tồn tại và nói Postgres, nhưng bản policy nói MySQL ⇒ "có nhưng mâu thuẫn nguồn".
+        {
+            kind: 'policy',
+            id: 'policy-source',
+            path: 'consumer: docs/policies/source.md',
+            content: '# Source\nUse Postgres for all stores.\n',
+        },
         {
             kind: 'policy',
             id: 'policy-security',
             path: 'consumer: docs/policies/security.md',
-            content: '# Policy\nDẫn xuất từ consumer: docs/policies/source.md\n',
+            content: '# Policy\nUse MySQL for all stores.\n',
             derivedFrom: 'consumer: docs/policies/source.md',
         },
     ];
@@ -35,16 +42,23 @@ test('SCN-KNOW-10 · AC-KNOW-02-05 — loại có nhưng nội dung sai ⇒ tác
         project: 'project-alpha',
         template,
         declarations,
+        kindOwners,
     });
 
-    // FRD-F20 §4: `DERIVED_WITHOUT_SOURCE` — bản dẫn xuất nêu nguồn không có (`BR-16`).
+    // FRD-F20 §4: `CONTENT_CONTRADICTS` — nội dung có nhưng mâu thuẫn nguồn/khẳng định khác.
+    // Khác `DERIVED_WITHOUT_SOURCE` (thiếu nguồn): ở đây nguồn có và còn nói ngược lại.
     assert.equal(report.status, 'measured');
-    assert.equal(report.findings.length, 1, 'policy có mặt nhưng sai ⇒ đúng một finding sai');
-    assert.equal(report.findings[0].code, 'DERIVED_WITHOUT_SOURCE');
+    assert.equal(report.findings.length, 1, 'policy có mặt nhưng mâu thuẫn nguồn ⇒ đúng một finding sai');
+    assert.equal(report.findings[0].code, 'CONTENT_CONTRADICTS');
     assert.equal(report.findings[0].kind, 'policy');
     assert.equal(typeof report.findings[0].reason, 'string');
     assert.ok(report.findings[0].reason.length > 0, 'finding sai phải nêu lý do');
-    assert.match(String(report.findings[0].reason), /nguồn/i, 'lý do phải nêu nguồn không có');
+    assert.match(String(report.findings[0].reason), /mâu thuẫn/i, 'lý do phải nêu mâu thuẫn, không phải thiếu nguồn');
+    assert.equal(
+        report.findings[0].consequence,
+        'mỗi người làm một kiểu',
+        'finding sai vẫn phải nêu hậu quả lấy từ template (FRD-F20 §2)',
+    );
     assert.equal(
         report.findings.some((finding) => finding.code === 'MISSING_KIND'),
         false,
@@ -54,6 +68,11 @@ test('SCN-KNOW-10 · AC-KNOW-02-05 — loại có nhưng nội dung sai ⇒ tác
         report.findings.some((finding) => finding.code === 'MISSING_KIND' && finding.kind === 'policy'),
         false,
     );
+    assert.equal(
+        report.findings.some((finding) => finding.code === 'DERIVED_WITHOUT_SOURCE'),
+        false,
+        'nguồn có mặt ⇒ không phải `DERIVED_WITHOUT_SOURCE`; mã đúng là `CONTENT_CONTRADICTS`',
+    );
     assert.match(report.message, /policy/);
-    assert.match(report.message, /nguồn/i, 'message phải phân biệt sai với thiếu');
+    assert.match(report.message, /mâu thuẫn/i, 'message phải phân biệt sai (mâu thuẫn) với thiếu');
 });

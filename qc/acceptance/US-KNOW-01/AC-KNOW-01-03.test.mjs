@@ -18,7 +18,9 @@ test('SCN-KNOW-03 · AC-KNOW-01-03 — 0 tài liệu ⇒ "chưa có tri thức n
     assert.deepEqual(result.kinds, [], 'project 0 tài liệu thì không có dòng kind nào');
     assert.deepEqual(result.unseen, [], 'cây rỗng nhưng đã thấy hết ⇒ unseen rỗng');
     assert.equal(result.total, 0, 'tổng tài liệu phải là 0');
-    assert.equal(result.status, 'empty', 'ca rỗng phải là trạng thái riêng, không phải pass');
+    // FRD-F19 §1: vòng đời `draft → collected → current | partial`, KHÔNG có `empty`.
+    assert.equal(result.status, 'collected', 'FRD-F19 chỉ có `collected`, không có trạng thái `empty`');
+    assert.notEqual(result.status, 'empty', '`empty` không nằm trong vòng đời FRD-F19 nên không được trả về');
     assert.notEqual(result.status, 'pass', 'không được coi ca 0 tài liệu là pass');
     assert.match(String(result.message ?? ''), /chưa có tri thức nào/i, 'phải nói rõ "chưa có tri thức nào"');
     assert.doesNotMatch(String(result.message ?? ''), /không đọc được/i, 'ca rỗng phải khác ca lỗi đọc');
