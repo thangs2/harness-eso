@@ -64,3 +64,7 @@ export {
 export {
   nextActions,
 } from './guidance.mjs';
+
+export {
+  transferToKnowledgeBase,
+} from './transfer.mjs';
