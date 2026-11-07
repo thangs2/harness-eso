@@ -62,8 +62,8 @@
   "verify": [
     "bun test qc/acceptance/US-KNOW-03"
   ],
-  "base_commit": "7f8e564",
-  "base_ref": "7f8e564",
+  "base_commit": "805c608",
+  "base_ref": "805c608",
   "owner": "knowledge",
   "allow_dependency": false,
   "notes": "WP 10.3 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó. · Stage 7 4 packet (verifier) · 4 lane / 5 AC: AC không có packet riêng được test nhưng không pin ở red_packets (gate đọc R2 đầu tiên của packet)."
