@@ -41,6 +41,12 @@ jobs:
             - name: profiles and entrypoints are shell-free
               shell: bash
               run: bun test qc/hook-portability.test.mjs qc/entrypoint-scripts.test.mjs qc/output-wrapper.test.mjs
+            # DSH never scans `.cursor/rules/`; the always-on rules reach it only through the generated
+            # mirror. Committed generated files drift silently unless something compares them, and a
+            # stale mirror means a DSH session runs without rules a Cursor session has.
+            - name: the DSH rule mirror matches .cursor/rules
+              shell: bash
+              run: node scripts/build-dsh-rules.mjs --check
 
     # The operator surface, exercised the way an operator starts it: `sh` for the POSIX path (that is
     # what P2 broke) and `harness.ps1` for Windows. `--plan` only: nothing is provisioned, no container
