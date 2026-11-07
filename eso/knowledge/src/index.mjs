@@ -60,3 +60,7 @@ export {
 export {
   sufficiencyReport,
 } from './sufficiency.mjs';
+
+export {
+  nextActions,
+} from './guidance.mjs';
