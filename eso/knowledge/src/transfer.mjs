@@ -74,6 +74,18 @@ export async function transferToKnowledgeBase({ project, proposal, approver } = 
     };
   }
 
+  // Check foreign approver (approver must be the owner of the proposal kind)
+  if (approver?.id !== expectedOwner) {
+    return {
+      status: 'blocked',
+      code: 'FOREIGN_APPROVER',
+      kt_state: null,
+      declaration: null,
+      record: null,
+      message: `người duyệt không phải chủ của loại ${proposal.kind}`,
+    };
+  }
+
   // Owner decision
   const record = {
     actor: approver.id,
