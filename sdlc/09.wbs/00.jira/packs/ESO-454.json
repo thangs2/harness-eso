@@ -23,7 +23,32 @@
     "SCN-KNOW-04",
     "SCN-KNOW-05"
   ],
-  "red_packets": [],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/42.know-inventory.tdd-unit.md",
+      "test_file": "qc/acceptance/US-KNOW-01/AC-KNOW-01-01.test.mjs",
+      "test_name": "SCN-KNOW-01 · AC-KNOW-01-01 — inventory liệt kê kind · chỗ · chủ",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-01`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` trả `kinds` 3 dòng, mỗi dòng đủ `kind` · `location` · `owner`, `count` = số tài liệu, `total` = 6"
+    },
+    {
+      "packet": "sdlc/10.test/43.know-inventory.tdd-impl.md",
+      "test_file": "qc/acceptance/US-KNOW-01/AC-KNOW-01-02.test.mjs",
+      "test_name": "SCN-KNOW-02 · AC-KNOW-01-02 — loại không đọc được vẫn hiện, ghi \"không đọc được\"",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-02`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` giữ `policy` trong `kinds` với `readable: false`, `count: null`, `note` chứa *\"không đọc được\"*, và `gaps` có `reason: \"unreadable\"`"
+    },
+    {
+      "packet": "sdlc/10.test/44.know-inventory.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-KNOW-01/AC-KNOW-01-04.test.mjs",
+      "test_name": "SCN-KNOW-04 · AC-KNOW-01-04 — 1 000 tài liệu · 12 loại ⇒ tổng theo loại",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-04`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` trả `kinds` đủ 12 loại, `count` từng loại khớp, tổng `1000`, `total` 1000"
+    },
+    {
+      "packet": "sdlc/10.test/45.know-inventory.tdd-qc.md",
+      "test_file": "qc/acceptance/US-KNOW-01/AC-KNOW-01-05.test.mjs",
+      "test_name": "SCN-KNOW-05 · AC-KNOW-01-05 — loại không có chủ ⇒ nêu \"loại X chưa có chủ\"",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-05`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `kinds` vẫn có `decision` với `owner: \"\"`, `gaps` có `reason: \"missing-owner\"` và message *\"loại decision chưa có chủ\"*"
+    }
+  ],
   "allowed_files": [
     "eso/knowledge/**",
     "qc/acceptance/US-KNOW-01/**"
@@ -41,5 +66,5 @@
   "base_ref": "c4419a9",
   "owner": "knowledge",
   "allow_dependency": false,
-  "notes": "WP 10.1 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó."
+  "notes": "WP 10.1 · BIP READY. Stage 7 đã có (verifier, 4 packet 42–45); test đỏ 5/5 trước implementation (E2)."
 }
