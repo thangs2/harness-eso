@@ -13,33 +13,40 @@ test('SCN-KNOW-02 · AC-KNOW-01-02 — loại không đọc được vẫn hiệ
         'inventoryKnowledge phải được export từ eso/knowledge/src/index.mjs',
     );
 
+    // FRD-F19 §2: `locator` không mở được ⇒ dòng đó là `missing` (LOCATOR_UNRESOLVED),
+    // không bị bỏ khỏi danh sách; phần không thấy phải nêu ở `unseen` (UNSEEN_SCOPE).
     const sources = [
-        { kind: 'decision', locator: 'docs/decisions', owner: 'A-04', documents: ['d1.md'] },
+        { kind: 'decision', custodian: 'repo', locator: 'docs/decisions', documents: ['d1.md'] },
         {
             kind: 'policy',
+            custodian: 'provider',
             locator: 'docs/policies',
-            owner: 'A-08',
             documents: [],
-            readable: false,
             error: 'EACCES',
         },
     ];
+    const kindOwners = { decision: 'A-04', policy: 'A-08' };
 
-    const result = await inventoryKnowledge({ project: 'project-broken', sources });
+    const result = await inventoryKnowledge({ project: 'project-broken', sources, kindOwners });
 
     assert.equal(result.kinds.length, 2, 'loại không đọc được không được bị bỏ khỏi danh sách');
 
     const broken = result.kinds.find((row) => row.kind === 'policy');
     assert.ok(broken, 'policy vẫn phải hiện dù không đọc được');
-    assert.equal(broken.readable, false);
+    assert.equal(broken.locator, 'docs/policies', 'locator hỏng vẫn phải giữ nguyên đường dẫn');
+    assert.equal(broken.declared, false, 'locator không mở được ⇒ declared: false');
     assert.equal(broken.count, null, 'không đọc được là unknown, không phải 0 tài liệu');
-    assert.match(String(broken.note ?? ''), /không đọc được/i, 'dòng của loại hỏng phải ghi "không đọc được"');
+    assert.equal(broken.missing?.code, 'LOCATOR_UNRESOLVED', 'mã lỗi FRD cho locator không mở được');
+    assert.match(String(broken.missing?.message ?? ''), /không đọc được/i, 'dòng của loại hỏng phải ghi "không đọc được"');
 
     const good = result.kinds.find((row) => row.kind === 'decision');
     assert.ok(good, 'loại đọc được vẫn phải còn');
-    assert.equal(good.readable, true);
+    assert.equal(good.declared, true);
+    assert.equal(good.missing, null);
 
-    const gap = result.gaps.find((row) => row.kind === 'policy' && row.reason === 'unreadable');
-    assert.ok(gap, 'phần khuyết phải được nêu trong gaps');
-    assert.match(String(gap.message ?? ''), /không đọc được/i);
+    const unseen = result.unseen.find(
+        (row) => row.code === 'UNSEEN_SCOPE' && row.locator === 'docs/policies',
+    );
+    assert.ok(unseen, 'phần không thấy phải được nêu trong unseen');
+    assert.match(String(unseen.message ?? ''), /không đọc được/i);
 });
