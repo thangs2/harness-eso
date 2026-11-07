@@ -455,7 +455,7 @@ function main() {
     }
     if (typeof pack.technical !== 'boolean') failures.push('TECHNICAL_FLAG_NOT_BOOLEAN');
     if (!Array.isArray(pack.inv)) failures.push('MISSING_INVARIANTS');
-    else if (pack.inv.length === 0) warnings.push('INV_UNDECLARED: pack cites no INV-* id');
+    else if (pack.inv.length === 0) warnings.push('INV_UNDECLARED: pack cites no constraint id — `BR-*` (business rule) hoặc `INV-*` (domain invariant), xem E1');
     if (!Array.isArray(pack.ac) || pack.ac.length === 0) {
         if (pack.technical !== true) failures.push('MISSING_AC_OR_TECHNICAL_FLAG');
     }

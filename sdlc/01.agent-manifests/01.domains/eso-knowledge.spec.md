@@ -35,6 +35,7 @@ design_refs:
 | **INV-KB-01** | **Mỗi `kind` đúng một người chịu** — không chủ thì không duyệt được | `BR-14` · `X27` |
 | **INV-KB-02** | **Tri thức bền chỉ vào KB qua quyết định của người**: máy **không** tự duyệt | `BR-15` |
 | **INV-KB-03** | Nâng `shared` ⇒ **mọi** project theo, trừ project đã `đè`, và việc đè **phải hiện ra** | `REQ-KB-03` |
+| **INV-KB-04** | **Conformance công bố mọi phép kiểm**: `pass` · `fail` · `OUT` + lý do — không phép kiểm nào **vắng mặt** hay bị **bỏ qua im lặng** | `BR-20` · `ESO-458` |
 ## 3. Specific prohibitions
 
 - Ghi ngoài `allowed_files`, kể cả "chỉ một file" · sửa `sdlc/**` hoặc `packages/harness-*` (v1 **đóng băng**, `D-74`).
