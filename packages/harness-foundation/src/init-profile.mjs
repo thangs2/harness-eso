@@ -98,6 +98,7 @@ export function initProfile(project, profilesDir, registryPath, opts = {}) {
             dryRun: true,
             root: plan.root,
             hostProfileIds: plan.hostProfileIds,
+            storage: plan.storage,
             files: plan.files.map((f) => ({
                 relative: f.relative,
                 action: f.action,

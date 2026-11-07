@@ -47,7 +47,8 @@
     "eso/graph/src/schema.mjs"
   ],
   "forbidden": [
-    "sdlc/**",
+    "sdlc/02.governance/**",
+    "sdlc/10.test/**",
     "qc/acceptance/**",
     "qc/provision-storage.test.mjs",
     "scripts/ticket-gate.mjs",

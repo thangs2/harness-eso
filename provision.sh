@@ -247,6 +247,15 @@ process.stdin.on("data", (d) => (raw += d)).on("end", () => {
         for (const f of res.files || []) {
             console.log(`   - [${f.action}] ${f.relative} ${f.exists ? "(exists)" : "(new)"}`);
         }
+        if (res.storage && res.storage.graph) {
+            console.log("\nstorage.graph:");
+            console.log(`  host: ${res.storage.graph.host}`);
+            console.log(`  port: ${res.storage.graph.port}`);
+            console.log(`  database: ${res.storage.graph.database}`);
+            console.log(`  schema: ${res.storage.graph.schema}`);
+            console.log(`  ssl: ${res.storage.graph.ssl}`);
+            console.log(`  isolation: ${res.storage.graph.isolation}`);
+        }
         return;
     }
     console.log("✅ Provisioned");

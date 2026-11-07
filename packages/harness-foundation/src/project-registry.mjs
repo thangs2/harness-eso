@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG_NAME } from './repo-root.mjs';
 import { claimObservePort, normalizePort } from './observe-port.mjs';
+import { planGraphStorage } from './graph-storage.mjs';
 import {
     addProjectEntry,
     loadWorkspace,
@@ -457,6 +458,18 @@ export function buildProvisionPlan(project, profilesDir, registryPath, opts = {}
         integrations: project.plugins,
     };
 
+    const adminUrl = opts.adminUrl || process.env.HARNESS_GRAPH_ADMIN_URL;
+    let graphStorage = null;
+    if (adminUrl) {
+        const planned = planGraphStorage({
+            consumerId: project.id,
+            config: harnessConfig,
+            adminUrl,
+        });
+        graphStorage = planned.storage.graph;
+        harnessConfig.storage = planned.config.storage;
+    }
+
     const harnessConfigPath = path.join(root, CONFIG_NAME);
     const policyPath = path.join(root, '.harness', 'decision-policy.json');
     const integrationsPath = path.join(root, '.harness', 'integrations.json');
@@ -491,5 +504,13 @@ export function buildProvisionPlan(project, profilesDir, registryPath, opts = {}
     };
     files.push(...hostPreviewFiles(root, combinedHost, hostProfileIds.join('+'), observePort));
 
-    return { root, files, project, hostProfileIds, hostProfiles, observePort };
+    return {
+        root,
+        files,
+        project,
+        hostProfileIds,
+        hostProfiles,
+        observePort,
+        storage: graphStorage ? { graph: graphStorage } : undefined,
+    };
 }

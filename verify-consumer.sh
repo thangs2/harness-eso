@@ -140,6 +140,56 @@ verify_one() {
         echo "=================================================="
     fi
 
+    # Verify graph storage reachability when configured
+    local graph_check
+    if ! graph_check=$(node --input-type=module -e '
+        import fs from "node:fs";
+        import path from "node:path";
+        import net from "node:net";
+
+        const root = process.argv[1];
+        const id = process.argv[2];
+        const cfgPath = path.join(root, "harness.config.json");
+        if (!fs.existsSync(cfgPath)) {
+            process.exit(0);
+        }
+        let cfg;
+        try {
+            cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+        } catch {
+            process.exit(0);
+        }
+        const graph = cfg.storage?.graph;
+        if (!graph) {
+            process.exit(0);
+        }
+        const host = graph.host || "127.0.0.1";
+        const port = Number(graph.port) || 5432;
+        const dbName = graph.database || "unknown";
+        const timeoutMs = Number(process.env.PGCONNECT_TIMEOUT || 2) * 1000;
+
+        const socket = new net.Socket();
+        socket.setTimeout(timeoutMs);
+        socket.on("connect", () => {
+            socket.destroy();
+            process.exit(0);
+        });
+        socket.on("timeout", () => {
+            socket.destroy();
+            console.error(`❌ storage.graph: could not reach database \x27${dbName}\x27 at ${host}:${port} (timeout)\n   → [provision] ./provision.sh ${id}`);
+            process.exit(1);
+        });
+        socket.on("error", (err) => {
+            socket.destroy();
+            console.error(`❌ storage.graph: could not reach database \x27${dbName}\x27 at ${host}:${port} (${err.message})\n   → [provision] ./provision.sh ${id}`);
+            process.exit(1);
+        });
+        socket.connect(port, host);
+    ' "$root" "$id" 2>&1); then
+        echo "$graph_check" >&2
+        return 1
+    fi
+
     # The CLI resolves the standard and writes the diagnostics report; this script only decides which
     # consumer and how to report the exit code.
     local args=(verify consumer "$root")
