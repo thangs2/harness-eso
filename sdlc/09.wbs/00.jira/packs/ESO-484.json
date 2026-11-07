@@ -1,0 +1,63 @@
+{
+  "ticket": "ESO-484",
+  "epic": "ESO-292",
+  "bip": {
+    "id": "BIP-1_8",
+    "file": "sdlc/09.wbs/01.packets/01.bip/61.provision-storage.md"
+  },
+  "technical": true,
+  "inv": [],
+  "ac": [],
+  "scn": [],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/66.provision-storage.tdd-unit.md",
+      "test_file": "qc/provision-storage.test.mjs",
+      "test_name": "provision --plan is read-only and prints storage.graph",
+      "expected_failure": "`AssertionError` ở `provision --plan is read-only and prints storage.graph`: **actual** exit `0` nhưng output chỉ có `📋 DRY RUN — files that would be written` (danh sách 10 file, **0** lần `storage.graph`), **0** connection tới admin URL, consumer rỗng · **expected** output có block `storage.graph` với `host` · `port` · `database` · `schema` · `ssl` · `isolation` đúng giá trị admin URL (`127.0.0.1` · `<cổng>` · `eso_alpha` · `eso` · `false` · `shared`), **không** chứa mật khẩu, vẫn exit `0`, vẫn **0** connection, consumer vẫn rỗng"
+    },
+    {
+      "packet": "sdlc/10.test/67.provision-storage.tdd-impl.md",
+      "test_file": "qc/provision-storage.test.mjs",
+      "test_name": "apply is idempotent — two runs, one schema, one project row",
+      "expected_failure": "`AssertionError` ở `apply is idempotent — two runs, one schema, one project row`: **actual** `typeof applyGraphStorage === \"undefined\"` — `packages/harness-foundation/src/graph-storage.mjs` chưa có (`Cannot find module`) · **expected** `function` chạy 2 lần: `connections = 2` (mỗi lần 1), `maxActive = 1`, `0` duplicate DDL, `0` insert vào bảng chưa tạo, đủ 4 bảng lõi với `ENABLE`/`FORCE` RLS + policy theo `project`, trigger trên `source_claim`, đúng **1** dòng `project` = `alpha`, `schemaVersion` hai lần bằng nhau"
+    },
+    {
+      "packet": "sdlc/10.test/68.provision-storage.tdd-coverage.md",
+      "test_file": "qc/provision-storage.test.mjs",
+      "test_name": "be-demo.sh requires a provisioned consumer",
+      "expected_failure": "`AssertionError` ở `be-demo.sh requires a provisioned consumer`: **actual** exit `0` và runner bị gọi với `scripts/demo-eso-v2.mjs --check --consumer=alpha` dù consumer không có `harness.config.json` (`ESO_DEMO_DB_URL` vẫn là đường chạy) · **expected** exit **≠ 0**, **không** gọi runner, output nêu `./provision.sh alpha`, không chứa mật khẩu env"
+    },
+    {
+      "packet": "sdlc/10.test/69.provision-storage.tdd-qc.md",
+      "test_file": "qc/provision-storage.test.mjs",
+      "test_name": "verify-consumer.sh fails when the graph database is missing",
+      "expected_failure": "`AssertionError` ở `verify-consumer.sh fails when the graph database is missing`: **actual** exit `1` nhưng report **0** lần nhắc `storage.graph` (chỉ có maturity check + remediation chung `./provision.sh <id>`), **0** lần nhắc `eso_alpha_missing` · **expected** exit `1` kèm lý do nêu `storage.graph`, tên database `eso_alpha_missing`, và đúng lệnh `./provision.sh alpha`"
+    }
+  ],
+  "allowed_files": [
+    "packages/harness-foundation/src/graph-storage.mjs",
+    "packages/harness-foundation/src/init-profile.mjs",
+    "packages/harness-foundation/src/project-registry.mjs",
+    "packages/harness-cli/src/**",
+    "provision.sh",
+    "verify-consumer.sh",
+    "sdlc/11.delivery/be-demo.sh",
+    "scripts/demo-eso-v2.mjs",
+    "eso/graph/src/schema.mjs"
+  ],
+  "forbidden": [
+    "sdlc/**",
+    "qc/acceptance/**",
+    "qc/provision-storage.test.mjs",
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "AGENTS.local.md",
+    "scripts/build-dsh-rules.mjs"
+  ],
+  "verify": [
+    "bun test qc/provision-storage.test.mjs"
+  ],
+  "base_commit": "27a5e9d0f951faff9862e96a1eea0fa60dbfa5cd",
+  "notes": "Task kỹ thuật (technical: true, không AC/SCN) theo D-105. 4 packet/5 test: T3 nằm §3.1 packet 66 nên KHÔNG có entry riêng (gate đọc R2 đầu). base=27a5e9d."
+}
