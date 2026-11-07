@@ -43,7 +43,7 @@
       "packet": "sdlc/10.test/56.know-transfer.tdd-coverage.md",
       "test_file": "qc/acceptance/US-KNOW-04/AC-KNOW-04-04.test.mjs",
       "test_name": "SCN-KNOW-19 · AC-KNOW-04-04 — duyệt hai lần ⇒ replay, đúng một bản ghi",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-19`: **actual** `typeof transferToKnowledgeBase === \"undefined\"` (index chưa export) · **expected** `function` cho lần một `approved` + `kt_state: 'approved'`, lần hai `replay` + `kt_state: 'approved'` với cùng `declaration.id` · `record`, `project.declarations` đúng 1 bản, `project.proposals` đúng 1 dòng"
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-19`: **actual** `typeof transferToKnowledgeBase === \"undefined\"` (index chưa export) · **expected** nhánh replay — lần một `approved` + `kt_state: 'approved'`, lần hai `replay` + `kt_state: 'approved'` với cùng `declaration.id` · `record`, `project.declarations` đúng 1 bản, `project.proposals` đúng 1 dòng; nhánh khác đề xuất — lần ba trả `code: 'ALREADY_DECIDED'`, `status` khác `replay`, bản ghi gốc không đổi, vẫn đúng 1 bản"
     },
     {
       "packet": "sdlc/10.test/57.know-transfer.tdd-qc.md",
@@ -65,8 +65,8 @@
   "verify": [
     "bun test qc/acceptance/US-KNOW-04"
   ],
-  "base_commit": "5d6fdf5",
-  "base_ref": "5d6fdf5",
+  "base_commit": "0b1c9e0",
+  "base_ref": "0b1c9e0",
   "owner": "knowledge",
   "allow_dependency": false,
   "notes": "WP 10.4 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó. · Stage 7 4 packet (verifier) · 4 lane / 5 AC: AC không có packet riêng được test nhưng không pin ở red_packets (gate đọc R2 đầu tiên của packet)."

@@ -34,13 +34,13 @@
       "packet": "sdlc/10.test/51.know-guidance.tdd-impl.md",
       "test_file": "qc/acceptance/US-KNOW-03/AC-KNOW-03-02.test.mjs",
       "test_name": "SCN-KNOW-12 · AC-KNOW-03-02 — không quy được người ⇒ nêu \"chưa xác định người\"",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-12`: **actual** `typeof nextActions === \"undefined\"` (index chưa export) · **expected** `next` 1 dòng với `owner: \"\"` (không lấy vai mặc định), `code: \"OWNER_UNASSIGNED\"` và `note` chứa *\"chưa xác định người\"*"
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-12`: **actual** `typeof nextActions === \"undefined\"` (index chưa export) · **expected** `next: []` (không thành bước), `rejected` đúng 1 dòng `{ code: \"OWNER_UNASSIGNED\", reason: <chứa *\"chưa xác định người\"*> }`, không có bước nào mang `owner: \"\"`"
     },
     {
       "packet": "sdlc/10.test/52.know-guidance.tdd-coverage.md",
       "test_file": "qc/acceptance/US-KNOW-03/AC-KNOW-03-03.test.mjs",
-      "test_name": "SCN-KNOW-13 · AC-KNOW-03-03 — 20 phát hiện ⇒ 20 việc riêng, không gộp",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-13`: **actual** `typeof nextActions === \"undefined\"` (index chưa export) · **expected** `ED3` — 20 phát hiện ⇒ `next` đúng 20 dòng riêng, mỗi dòng đủ `kind` · `action` · `owner` · `whyNow` · `blocker` · `playbook` và `finding` 1:1, `total` = 20, không gộp"
+      "test_name": "SCN-KNOW-13 · AC-KNOW-03-03 — 20 phát hiện ⇒ next ≤ 5 bước, kèm TRUNCATED nói còn lại",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-13`: **actual** `typeof nextActions === \"undefined\"` (index chưa export) · **expected** `ED3` — 20 phát hiện ⇒ `next` **≤ 5** bước (khác rỗng), mỗi bước đủ `kind` · `action` · `owner` · `whyNow` · `blocker` · `playbook` và `finding` 1:1, các `action` không trùng; `truncated.code: \"TRUNCATED\"` với `truncated.omitted` = `20 - next.length` (vd `15`); **không** trả 20 việc"
     },
     {
       "packet": "sdlc/10.test/53.know-guidance.tdd-qc.md",
@@ -62,8 +62,8 @@
   "verify": [
     "bun test qc/acceptance/US-KNOW-03"
   ],
-  "base_commit": "5d6fdf5",
-  "base_ref": "5d6fdf5",
+  "base_commit": "0b1c9e0",
+  "base_ref": "0b1c9e0",
   "owner": "knowledge",
   "allow_dependency": false,
   "notes": "WP 10.3 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó. · Stage 7 4 packet (verifier) · 4 lane / 5 AC: AC không có packet riêng được test nhưng không pin ở red_packets (gate đọc R2 đầu tiên của packet)."

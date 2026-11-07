@@ -28,7 +28,7 @@
       "packet": "sdlc/10.test/46.know-sufficiency.tdd-unit.md",
       "test_file": "qc/acceptance/US-KNOW-02/AC-KNOW-02-01.test.mjs",
       "test_name": "SCN-KNOW-06 · AC-KNOW-02-01 — thiếu hẳn loại decision ⇒ nêu kind + hậu quả",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-06`: **actual** `typeof sufficiencyReport === \"undefined\"` (index chưa export) · **expected** `function` trả `status: \"measured\"`, `findings` đúng 1 mục `{ code: \"MISSING_KIND\", kind: \"decision\", reason: <khác rỗng>, consequence: \"tranh chấp không có điểm dừng\" }`, `message` nêu tên `decision` + hậu quả và **không** chứa *\"còn thiếu tài liệu\"*"
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-06`: **actual** `typeof sufficiencyReport === \"undefined\"` (index chưa export) · **expected** `function` trả `status: \"measured\"`, `findings` đúng 1 mục `{ code: \"MISSING_KIND\", kind: \"decision\", reason: <khác rỗng>, consequence: \"tranh chấp không có điểm dừng\", owner: \"A-04\" }` (owner suy từ `kindOwners`), `message` nêu tên `decision` + hậu quả và **không** chứa *\"còn thiếu tài liệu\"*"
     },
     {
       "packet": "sdlc/10.test/47.know-sufficiency.tdd-impl.md",
@@ -46,7 +46,7 @@
       "packet": "sdlc/10.test/49.know-sufficiency.tdd-qc.md",
       "test_file": "qc/acceptance/US-KNOW-02/AC-KNOW-02-05.test.mjs",
       "test_name": "SCN-KNOW-10 · AC-KNOW-02-05 — loại có nhưng nội dung sai ⇒ tách sai khỏi thiếu",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-10`: **actual** `typeof sufficiencyReport === \"undefined\"` (index chưa export) · **expected** `function` trả `findings` đúng 1 mục `{ code: \"DERIVED_WITHOUT_SOURCE\", kind: \"policy\", reason: <chuỗi khác rỗng nêu nguồn không có>, consequence: <từ template> }`, không có `MISSING_KIND`, `message` nêu `policy` + nguồn"
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-10`: **actual** `typeof sufficiencyReport === \"undefined\"` (index chưa export) · **expected** `function` trả `findings` đúng 1 mục `{ code: \"CONTENT_CONTRADICTS\", kind: \"policy\", reason: <chuỗi khác rỗng nêu mâu thuẫn nguồn>, consequence: <từ template> }`, không có `MISSING_KIND`, không có `DERIVED_WITHOUT_SOURCE`, `message` nêu `policy` + *\"mâu thuẫn\"*"
     }
   ],
   "allowed_files": [
@@ -62,8 +62,8 @@
   "verify": [
     "bun test qc/acceptance/US-KNOW-02"
   ],
-  "base_commit": "5d6fdf5",
-  "base_ref": "5d6fdf5",
+  "base_commit": "0b1c9e0",
+  "base_ref": "0b1c9e0",
   "owner": "knowledge",
   "allow_dependency": false,
   "notes": "WP 10.2 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó. · Stage 7 4 packet (verifier) · 4 lane / 5 AC: AC không có packet riêng được test nhưng không pin ở red_packets (gate đọc R2 đầu tiên của packet)."
