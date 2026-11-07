@@ -62,8 +62,8 @@
   "verify": [
     "bun test qc/acceptance/US-KNOW-01"
   ],
-  "base_commit": "1017180",
-  "base_ref": "1017180",
+  "base_commit": "f512ba4",
+  "base_ref": "f512ba4",
   "owner": "knowledge",
   "allow_dependency": false,
   "notes": "WP 10.1 · BIP READY. Stage 7 đã có (verifier, 4 packet 42–45); test đỏ 5/5 trước implementation (E2). · Stage 7 4 packet (verifier) · 4 lane / 5 AC: AC không có packet riêng được test nhưng không pin ở red_packets (gate đọc R2 đầu tiên của packet)."
