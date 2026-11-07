@@ -68,3 +68,7 @@ export {
 export {
   transferToKnowledgeBase,
 } from './transfer.mjs';
+
+export {
+  runConformance,
+} from './conformance.mjs';
