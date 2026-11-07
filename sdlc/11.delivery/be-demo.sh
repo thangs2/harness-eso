@@ -24,4 +24,5 @@ if [ ! -f "$ROOT/sdlc/11.delivery/demo/$BATCH/00.index.md" ]; then
   exit 2
 fi
 echo "[be-demo] batch=$BATCH mode=$MODE"
-exec node "$ROOT/scripts/demo-eso-v2.mjs" "$MODE" ${EXTRA[@]+"${EXTRA[@]}"}
+# The runner is a Bun script (`Bun.SQL`, D-93: PostgreSQL only); `node` dies at `new Bun.SQL`.
+exec bun "$ROOT/scripts/demo-eso-v2.mjs" "$MODE" ${EXTRA[@]+"${EXTRA[@]}"}
