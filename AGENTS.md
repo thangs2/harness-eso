@@ -35,13 +35,18 @@ không phải mô tả thiết kế. Chi tiết + hệ quả: `sdlc/04.landscape
 | `.cursor/rules/*.mdc` (16) tự nạp | ✅ | ⚠ nạp `.agents/rules/*.md` | ❌ **không nạp** |
 | `.cursor/agents/*-runtime.md` — 7 worker SLP | ✅ đọc + spawn | ✅ `.agents/agents/` + `invoke_subagent` | ⚠ đọc được, **không** có role registry ⇒ dùng skill `harness-engineering-team` |
 | `.agents/skills/*/SKILL.md` | ✅ | ✅ (qua skill catalog) | ✅ (qua skill catalog) |
-| MCP `codegraph` · `docgraph` CLI · `agentmemory-mcp` · `deepseek-direct` | ✅ | ✅ (`call_mcp_tool` / eager tools) | ❌ **không có trong toolset** |
+| MCP `codegraph` | ✅ | ✅ | ❌ **không có trong toolset** |
+| `docgraph` CLI | ✅ | ✅ | ❌ — có tệp `.docgraph/`, không có công cụ truy vấn |
+| `agentmemory-mcp` | ✅ | ✅ (`call_mcp_tool` / eager tools) | ✅ **đo lại 2026-11-07**: `memory_smart_search` · `memory_save` · `memory_diagnose` gọi được, store **966** bản ghi |
+| `deepseek-direct` | ✅ | ✅ | ❌ **không có trong toolset** |
 | `.docgraph/` · `.codegraph/` trên đĩa | ✅ truy vấn được | ✅ truy vấn được | ⚠ có tệp, **không có công cụ truy vấn** |
 | file tools · shell · `bun test` · subagent | ✅ | ✅ (`invoke_subagent`, `define_subagent`) | ✅ |
 
 **Luật suy ra:** quy trình recon dưới đây là **quy trình của Cursor**. Trên host không có MCP, bước recon **thay bằng**
 `grep`/`glob` + `read` có kiểm soát, và phải **nói rõ** khi một kết luận dựa trên suy đoán thay vì tra cứu — vì thiếu tra
 cứu làm tăng khẳng định sai (đã xảy ra 3 lần trong một phiên).
+
+**Đo lại 2026-11-07 (DSH):** dòng cũ gộp bốn MCP vào một ô và ghi ❌ cho **cả bốn** — sai với `agentmemory-mcp`. Host DSH có memory tools (đã gọi thật, store 966 bản ghi) nhưng **không** có codegraph/docgraph CLI. Tách dòng vì một ô gộp làm cả hai chiều cùng sai: agent bỏ qua memory (đúng ra phải dùng), và tưởng có codegraph (đúng ra không).
 
 **Luật này áp cho mọi agent, không chỉ người viết nó:** gặp host chưa có trong bảng ⇒ **đo rồi bổ sung bảng**, không giả
 định năng lực.
