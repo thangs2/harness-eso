@@ -72,6 +72,9 @@ const VAGUE_FAILURE = [
     /\bn\/a\b/i,
 ];
 
+/** File hợp đồng của ticket — nằm ngoài phạm vi công việc của slice (xem scope loop). */
+const PACK_FILE = /^sdlc\/09\.wbs\/00\.jira\/packs\/ESO-\d+\.json$/;
+
 /** Stage 7 is a spec. A packet carrying implementation is a Stage 8 artefact filed in the wrong place. */
 const CODE_FENCE = /^```(js|javascript|ts|typescript|tsx|jsx|mjs|cjs|py|python|cs|csharp|java|go|golang|rb|ruby|rs|rust|php)\b/im;
 const CODE_MARKERS = [
@@ -503,6 +506,10 @@ function main() {
         files = changedFiles(pack.base_commit || pack.base_ref, root);
         if (files.length === 0) failures.push('NO_DIFF');
         for (const file of files) {
+            // Pack là **hợp đồng của ticket**, không phải việc của slice: `base_commit` chỉ có thể được
+            // ghi sau khi mọi artifact trước-build đã commit, nên chính commit đó luôn nằm sau `base_commit`.
+            // Không loại nó ra thì mọi ticket đều tự báo OUT_OF_SCOPE trên file của chính nó.
+            if (PACK_FILE.test(file)) continue;
             if (!matchesAny(file, pack.allowed_files)) failures.push(`OUT_OF_SCOPE:${file}`);
             if (matchesAny(file, pack.forbidden)) failures.push(`FORBIDDEN_FILE:${file}`);
         }
