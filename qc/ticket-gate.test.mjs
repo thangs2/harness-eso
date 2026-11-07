@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -383,8 +383,16 @@ test('a RED packet carrying implementation code fails', () => {
  * All eight shipped packs build again. Graph `2.6…2.9` was blocked only while the graph runtime was SQLite;
  * ESO-447 migrated it to PostgreSQL and is now HIR, so the feature slices are ready to build.
  */
-test('all eight shipped packs build, and none fails for another reason', () => {
-    for (const ticket of ['ESO-401', 'ESO-402', 'ESO-403', 'ESO-404', 'ESO-405', 'ESO-406', 'ESO-407', 'ESO-408']) {
+test('every shipped pack builds, and none fails for another reason', () => {
+    // Danh sách cũ ghim **tám** ticket. Năm pack mới của sprint 8 lệch R2 mà test vẫn xanh — đúng kiểu
+    // "xanh vì không nhìn". Quét **mọi** pack đang ship, và ghim rằng phép quét không rỗng.
+    const packsDir = join(REPO_ROOT, 'sdlc/09.wbs/00.jira/packs');
+    const tickets = readdirSync(packsDir)
+        .filter((n) => /^ESO-\d+\.json$/.test(n))
+        .map((n) => n.replace(/\.json$/, ''))
+        .sort();
+    assert.ok(tickets.length >= 14, `chỉ thấy ${tickets.length} pack — quét không phủ`);
+    for (const ticket of tickets) {
         const result = spawnSync(process.execPath, ['scripts/ticket-gate.mjs', ticket, '--content-only'], {
             cwd: REPO_ROOT,
             encoding: 'utf8',
