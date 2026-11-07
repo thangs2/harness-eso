@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "AgentMemory (multi-repo)",
+    "description": "One AgentMemory MCP plugin for every repo: each workspace resolves its own memory server and credential, so x79 :3111, baplatform :3211 and FinESO :3311 coexist in one DSH profile."
+  }
+}

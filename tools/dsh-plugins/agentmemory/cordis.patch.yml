@@ -1,0 +1,42 @@
+# AgentMemory MCP, per workspace — a Host plugin bundle.
+#
+# Mounts one plugin row. That row reads the working directory of each new agent,
+# resolves which AgentMemory server that repo owns, and spawns the stdio MCP shim
+# for it. A repo with no AgentMemory config gets no tools and no process.
+#
+# Why per repo matters here: each repo runs its own agentmemory container on its
+# own host port (x79 3111, baplatform 3211, FinESO 3311). One static row cannot
+# express that — the Loader composes rows once at boot, before any session or
+# working directory exists.
+#
+# Credentials are never stored here. For loopback servers the MCP shim reads
+# `~/.agentmemory/secret` itself; a hosted (https) server uses a credential name
+# that the plugin resolves through `ctx.credentials` ($DSH_HOME/.credentials.yaml,
+# owner-only), then the repo's own `.cursor/mcp.json` secret, then the environment.
+- insert:
+    - id: agentmemory-mcp-plugin
+      name: '@local/agentmemory-mcp-plugin'
+      config:
+        # A configured repo whose server does not answer `/agentmemory/livez`
+        # registers no tools and logs why. There is deliberately no "mount
+        # anyway": with FORCE_PROXY the shim's own handshake fails on a dead URL,
+        # and without it the shim falls back to a store shared by every repo
+        # (see README, "ba sự thật đo được").
+        #
+        # Raise startup failures from logger.info to logger.error. Never throws:
+        # a throwing agent/created listener rejects agent registration, which
+        # would kill every session in that repo.
+        failOnStartupError: false
+
+        # Per-call ceiling. A first semantic search after a cold index is the
+        # slow case; consolidate/reflect can also take seconds.
+        timeoutMs: 120000
+
+        # The MCP shim. Any stdio MCP server that speaks tools/list works here.
+        # `--offline` is what the repos' `.cursor/mcp.json` already uses on this
+        # machine; drop it on a host without a warm npm cache.
+        serverCommand: /opt/homebrew/bin/npx
+        serverArgs:
+          - '-y'
+          - '--offline'
+          - '@agentmemory/mcp'

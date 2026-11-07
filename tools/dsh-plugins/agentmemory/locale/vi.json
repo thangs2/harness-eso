@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "AgentMemory (nhiều repo)",
+    "description": "Một plugin AgentMemory MCP dùng cho mọi repo: mỗi workspace tự xác định memory server và credential riêng, nên x79 :3111, baplatform :3211 và FinESO :3311 cùng tồn tại trong một profile DSH."
+  }
+}
