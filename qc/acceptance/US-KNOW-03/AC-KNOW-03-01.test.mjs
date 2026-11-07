@@ -25,9 +25,10 @@ test('SCN-KNOW-11 · AC-KNOW-03-01 — phát hiện "thiếu loại decision" �
         },
     ];
     const kindOwners = { decision: 'A-04' };
+    const project = { id: 'project-alpha', kindOwners };
     const playbooks = { decision: 'docs/templates/decision-playbook.md' };
 
-    const result = await nextActions({ project: 'project-alpha', findings, kindOwners, playbooks });
+    const result = await nextActions({ project, findings, playbooks });
 
     // FRD-F21 §1: đầu ra là `next[]`; mỗi bước: làm gì (`kind`) · ai (`owner`) · vì sao bây giờ · cái chặn · mẫu.
     assert.equal(result.total, 1, 'mỗi phát hiện đúng một việc');
@@ -52,6 +53,35 @@ test('SCN-KNOW-11 · AC-KNOW-03-01 — phát hiện "thiếu loại decision" �
     assert.equal(step.playbook, 'docs/templates/decision-playbook.md', 'mẫu phải trỏ playbook của kind');
 
     // "việc đọc lại được" + BIP §1 idempotent: cùng đầu vào, cùng danh sách việc.
-    const again = await nextActions({ project: 'project-alpha', findings, kindOwners, playbooks });
+    const again = await nextActions({ project, findings, playbooks });
     assert.deepEqual(again.next, result.next, 'cùng đầu vào phải cho cùng danh sách việc');
+});
+
+test('SCN-KNOW-11 · AC-KNOW-03-01 — finding tự khai owner ⇒ bỏ qua, OWNER_UNASSIGNED', async () => {
+    const project = {
+        id: 'project-alpha',
+        kindOwners: {}, // khuyết decision
+    };
+    const findings = [
+        {
+            id: 'F-11-02',
+            kind: 'decision',
+            code: 'MISSING_KIND',
+            reason: 'thiếu loại decision',
+            consequence: 'tranh chấp không có điểm dừng',
+            owner: 'A-99', // finding tự khai owner
+        },
+    ];
+    const playbooks = { decision: 'docs/templates/decision-playbook.md' };
+
+    const result = await nextActions({ project, findings, playbooks });
+
+    assert.deepEqual(result.next, [], 'finding tự khai owner không được thành bước');
+    assert.equal(result.rejected.length, 1);
+    assert.equal(result.rejected[0].code, 'OWNER_UNASSIGNED');
+    assert.equal(
+        result.next.some((step) => step.owner === 'A-99'),
+        false,
+        'không có bước nào mang owner: A-99',
+    );
 });

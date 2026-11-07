@@ -36,8 +36,9 @@ test('SCN-KNOW-09 · AC-KNOW-02-04 — 12 loại đều thiếu ⇒ liệt kê t
     };
 
     // ED3: 12 loại đều thiếu — không có declaration nào.
+    const project = { id: 'project-alpha', kindOwners: {} };
     const report = await sufficiencyReport({
-        project: 'project-alpha',
+        project,
         template,
         declarations: [],
     });

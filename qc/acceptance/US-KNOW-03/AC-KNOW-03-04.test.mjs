@@ -27,9 +27,10 @@ test('SCN-KNOW-14 · AC-KNOW-03-04 — nguồn đã mất ⇒ vẫn nêu phát h
         },
     ];
     const kindOwners = { decision: 'A-04' };
+    const project = { id: 'project-lost-source', kindOwners };
     const playbooks = { decision: 'docs/templates/decision-playbook.md' };
 
-    const result = await nextActions({ project: 'project-lost-source', findings, kindOwners, playbooks });
+    const result = await nextActions({ project, findings, playbooks });
 
     assert.equal(result.next.length, 1, 'mục không được biến mất chỉ vì nguồn đã mất');
 

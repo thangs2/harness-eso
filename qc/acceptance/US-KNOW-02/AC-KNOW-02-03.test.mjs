@@ -21,6 +21,7 @@ test('SCN-KNOW-08 · AC-KNOW-02-03 — hai bản gần giống ⇒ nêu trùng, 
         ],
     };
     const kindOwners = { decision: 'A-04', policy: 'A-08', runbook: 'A-09' };
+    const project = { id: 'project-alpha', kindOwners };
     const declarations = [
         { kind: 'decision', id: 'decision-postgres', path: 'consumer: docs/decisions/d1.md', content: '# Chốt Postgres\n' },
         { kind: 'runbook', id: 'runbook-incident', path: 'docs/runbooks/incident.md', content: '# Incident runbook\n' },
@@ -40,10 +41,9 @@ test('SCN-KNOW-08 · AC-KNOW-02-03 — hai bản gần giống ⇒ nêu trùng, 
     ];
 
     const report = await sufficiencyReport({
-        project: 'project-alpha',
+        project,
         template,
         declarations,
-        kindOwners,
     });
 
     // FRD-F20 §4: `NEAR_DUPLICATE` — hai bản khác `id` nhưng nội dung gần trùng (khác `DUPLICATE_ID` là cùng `id`).

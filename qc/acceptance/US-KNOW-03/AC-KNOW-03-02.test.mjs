@@ -25,9 +25,10 @@ test('SCN-KNOW-12 · AC-KNOW-03-02 — không quy được người ⇒ nêu "ch
         },
     ];
     const kindOwners = {};
+    const project = { id: 'project-unowned', kindOwners };
     const playbooks = { decision: 'docs/templates/decision-playbook.md' };
 
-    const result = await nextActions({ project: 'project-unowned', findings, kindOwners, playbooks });
+    const result = await nextActions({ project, findings, playbooks });
 
     assert.deepEqual(result.next, [], 'phát hiện không quy được người KHÔNG được thành bước');
     assert.ok(Array.isArray(result.rejected), 'phải có rejected[] để nêu lý do từ chối');

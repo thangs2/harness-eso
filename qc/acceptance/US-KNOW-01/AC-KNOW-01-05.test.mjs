@@ -20,8 +20,9 @@ test('SCN-KNOW-05 · AC-KNOW-01-05 — loại không có chủ ⇒ nêu "loại 
         { kind: 'policy', custodian: 'repo', locator: 'docs/policies', documents: ['p1.md'] },
     ];
     const kindOwners = { policy: 'A-08' };
+    const project = { id: 'project-ownerless', kindOwners };
 
-    const result = await inventoryKnowledge({ project: 'project-ownerless', sources, kindOwners });
+    const result = await inventoryKnowledge({ project, sources });
 
     const entry = result.kinds.find((row) => row.kind === 'decision');
     assert.ok(entry, 'loại chưa có chủ vẫn phải hiện trong danh sách');

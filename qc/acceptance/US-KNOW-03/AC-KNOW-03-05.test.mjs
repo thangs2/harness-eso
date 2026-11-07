@@ -24,9 +24,10 @@ test('SCN-KNOW-15 · AC-KNOW-03-05 — "cần cải thiện" ⇒ từ chối, n�
         },
     ];
     const kindOwners = { decision: 'A-04' };
+    const project = { id: 'project-vague', kindOwners };
     const playbooks = { decision: 'docs/templates/decision-playbook.md' };
 
-    const result = await nextActions({ project: 'project-vague', findings, kindOwners, playbooks });
+    const result = await nextActions({ project, findings, playbooks });
 
     assert.deepEqual(result.next, [], 'không được hiển thị một việc không làm được gì');
     assert.equal(result.total, 0, 'việc mơ hồ không được đếm vào tổng việc');

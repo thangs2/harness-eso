@@ -66,3 +66,34 @@ test('SCN-KNOW-16 · AC-KNOW-04-01 — đề xuất hợp lệ được owner du
     assert.equal(project.proposals.length, 1, 'đề xuất đã duyệt vẫn còn trong lịch sử');
     assert.equal(project.proposals[0].status, 'approved');
 });
+
+test('SCN-KNOW-16 · AC-KNOW-04-01 — chủ khác duyệt ⇒ FOREIGN_APPROVER, KB không đổi', async () => {
+    const project = {
+        id: 'project-alpha',
+        kindOwners: { decision: 'A-04', policy: 'A-08' },
+        declarations: [],
+        proposals: [],
+    };
+    const proposal = {
+        id: 'PROP-04-01-FAIL',
+        kind: 'decision',
+        title: 'Dùng Fastify cho control plane',
+        content: 'Chốt dùng Fastify vì đội đã vận hành được.',
+        source: 'consumer: docs/decisions/d1.md',
+        author: 'A-02',
+    };
+    const approver = {
+        id: 'A-05',
+        role: 'owner',
+        decision: 'approve',
+        reason: 'tôi duyệt thay chủ loại',
+    };
+
+    const result = await transferToKnowledgeBase({ project, proposal, approver });
+
+    assert.equal(result.status, 'blocked', 'chủ khác duyệt phải bị blocked');
+    assert.equal(result.code, 'FOREIGN_APPROVER', 'mã lỗi FRD cho người duyệt không phải chủ kind');
+    assert.equal(result.declaration, null);
+    assert.equal(result.record, null);
+    assert.equal(project.declarations.length, 0, 'KB không đổi');
+});

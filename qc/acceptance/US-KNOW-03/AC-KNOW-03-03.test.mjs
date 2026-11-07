@@ -26,12 +26,13 @@ test('SCN-KNOW-13 · AC-KNOW-03-03 — 20 phát hiện ⇒ next ≤ 5 bước, k
         };
     });
     const kindOwners = { decision: 'A-04', policy: 'A-08' };
+    const project = { id: 'project-many', kindOwners };
     const playbooks = {
         decision: 'docs/templates/decision-playbook.md',
         policy: 'docs/templates/policy-playbook.md',
     };
 
-    const result = await nextActions({ project: 'project-many', findings, kindOwners, playbooks });
+    const result = await nextActions({ project, findings, playbooks });
 
     // FRD-F21 §2: mặc định `next` ≤ 5 bước; danh sách dài không được đọc.
     assert.ok(result.next.length > 0, 'phải có ít nhất một bước để làm');

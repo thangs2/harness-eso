@@ -19,8 +19,9 @@ test('SCN-KNOW-07 · AC-KNOW-02-02 — chưa khai template ⇒ nói "chưa có t
         { kind: 'decision', id: 'decision-postgres', path: 'consumer: docs/decisions/d1.md', content: '# Chốt Postgres\n' },
     ];
 
+    const project = { id: 'project-beta', kindOwners: {} };
     const report = await sufficiencyReport({
-        project: 'project-beta',
+        project,
         template: undefined,
         declarations: declarationsOfAnotherProject,
     });

@@ -20,6 +20,7 @@ test('SCN-KNOW-10 · AC-KNOW-02-05 — loại có nhưng nội dung sai ⇒ tác
         ],
     };
     const kindOwners = { decision: 'A-04', policy: 'A-08' };
+    const project = { id: 'project-alpha', kindOwners };
     const declarations = [
         { kind: 'decision', id: 'decision-postgres', path: 'consumer: docs/decisions/d1.md', content: '# Chốt Postgres\n' },
         // policy CÓ mặt; nguồn của nó tồn tại và nói Postgres, nhưng bản policy nói MySQL ⇒ "có nhưng mâu thuẫn nguồn".
@@ -39,10 +40,9 @@ test('SCN-KNOW-10 · AC-KNOW-02-05 — loại có nhưng nội dung sai ⇒ tác
     ];
 
     const report = await sufficiencyReport({
-        project: 'project-alpha',
+        project,
         template,
         declarations,
-        kindOwners,
     });
 
     // FRD-F20 §4: `CONTENT_CONTRADICTS` — nội dung có nhưng mâu thuẫn nguồn/khẳng định khác.

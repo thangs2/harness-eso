@@ -26,8 +26,9 @@ test('SCN-KNOW-02 · AC-KNOW-01-02 — loại không đọc được vẫn hiệ
         },
     ];
     const kindOwners = { decision: 'A-04', policy: 'A-08' };
+    const project = { id: 'project-broken', kindOwners };
 
-    const result = await inventoryKnowledge({ project: 'project-broken', sources, kindOwners });
+    const result = await inventoryKnowledge({ project, sources });
 
     assert.equal(result.kinds.length, 2, 'loại không đọc được không được bị bỏ khỏi danh sách');
 

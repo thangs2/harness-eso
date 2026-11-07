@@ -28,7 +28,8 @@ test('SCN-KNOW-04 · AC-KNOW-01-04 — 1 000 tài liệu · 12 loại ⇒ tổng
         };
     });
 
-    const result = await inventoryKnowledge({ project: 'project-large', sources, kindOwners });
+    const project = { id: 'project-large', kindOwners };
+    const result = await inventoryKnowledge({ project, sources });
 
     assert.equal(result.kinds.length, 12, 'phải tổng hợp đủ 12 loại, không cắt bớt');
     assert.equal(result.total, 1000, 'tổng phải khớp 1 000 tài liệu thật');

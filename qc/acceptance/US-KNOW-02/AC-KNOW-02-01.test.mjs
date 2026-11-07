@@ -21,16 +21,16 @@ test('SCN-KNOW-06 · AC-KNOW-02-01 — thiếu hẳn loại decision ⇒ nêu ki
         ],
     };
     const kindOwners = { decision: 'A-04', policy: 'A-08', runbook: 'A-09' };
+    const project = { id: 'project-alpha', kindOwners };
     const declarations = [
         { kind: 'policy', id: 'policy-security', path: 'consumer: docs/policies/security.md', content: '# Security policy\n' },
         { kind: 'runbook', id: 'runbook-incident', path: 'docs/runbooks/incident.md', content: '# Incident runbook\n' },
     ];
 
     const report = await sufficiencyReport({
-        project: 'project-alpha',
+        project,
         template,
         declarations,
-        kindOwners,
     });
 
     // FRD-F20 §1: `findings[]`, mỗi cái có `code` · `kind` · lý do (`reason`) · hậu quả (`consequence`) · `owner`.

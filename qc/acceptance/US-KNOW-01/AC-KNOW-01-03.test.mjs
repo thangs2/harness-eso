@@ -13,7 +13,8 @@ test('SCN-KNOW-03 · AC-KNOW-01-03 — 0 tài liệu ⇒ "chưa có tri thức n
         'inventoryKnowledge phải được export từ eso/knowledge/src/index.mjs',
     );
 
-    const result = await inventoryKnowledge({ project: 'project-empty', sources: [], kindOwners: {} });
+    const project = { id: 'project-empty', kindOwners: {} };
+    const result = await inventoryKnowledge({ project, sources: [] });
 
     assert.deepEqual(result.kinds, [], 'project 0 tài liệu thì không có dòng kind nào');
     assert.deepEqual(result.unseen, [], 'cây rỗng nhưng đã thấy hết ⇒ unseen rỗng');

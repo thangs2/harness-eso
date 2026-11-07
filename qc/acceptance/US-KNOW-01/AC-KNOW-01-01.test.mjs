@@ -21,8 +21,9 @@ test('SCN-KNOW-01 · AC-KNOW-01-01 — inventory liệt kê kind · chỗ · ch�
         { kind: 'runbook', custodian: 'provider', locator: 'docs/runbooks', documents: ['r1.md', 'r2.md', 'r3.md'] },
     ];
     const kindOwners = { decision: 'A-04', policy: 'A-08', runbook: 'A-01' };
+    const project = { id: 'project-alpha', kindOwners };
 
-    const result = await inventoryKnowledge({ project: 'project-alpha', sources, kindOwners });
+    const result = await inventoryKnowledge({ project, sources });
 
     assert.equal(result.total, 6, 'tổng tài liệu phải khớp tổng thật');
     assert.equal(result.kinds.length, 3, 'mỗi loại tri thức đúng một dòng');
