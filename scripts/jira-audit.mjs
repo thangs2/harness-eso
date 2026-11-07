@@ -90,9 +90,15 @@ for (const i of issues) {
 }
 
 // ── Subtask đúng chuẩn §11.1
+const wpOf = (i) => (i.fields.labels || []).find((l) => l.startsWith('wp-'));
 for (const i of issues) {
-    if (type(i) === 'Subtask' && !(i.fields.subtasks || []).length && !(i.fields.labels || []).some((l) => l.startsWith('wp-')))
-        add('subtask-mất-ngữ-cảnh', 'warn', `${i.key} — subtask không mang label wp-* (không truy được work package)`);
+    // Ngữ cảnh truy được qua **cha** không kém qua chính nó: sub lấy work package của ticket giao nó.
+    // Đòi nhãn trên từng subtask thì một story có bộ bốn `tdd-*` quanh một work package sinh ra bốn ticket
+    // cho một work package — đúng thứ `wp-trùng-ticket` cấm. Nên chỉ cảnh báo khi **cả cha** cũng không có.
+    const parentKey = i.fields.parent?.key;
+    const parent = parentKey ? issues.find((x) => x.key === parentKey) : null;
+    if (type(i) === 'Subtask' && !(i.fields.subtasks || []).length && !wpOf(i) && !(parent && wpOf(parent)))
+        add('subtask-mất-ngữ-cảnh', 'warn', `${i.key} — subtask không mang label wp-*, và cha ${parentKey || '(không có)'} cũng không (không truy được work package)`);
 }
 // Task 0 subtask: hợp lệ chỉ khi có `subtasks: none — lý do`; Story 0 subtask thì luôn sai (§6)
 for (const [id, ts] of tickets) {

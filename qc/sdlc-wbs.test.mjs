@@ -205,7 +205,7 @@ test('X8: a wave with no interface criteria carries FIP = OUT', () => {
     const leaves = new Set();
     for (const dir of ['04.deliverable-1.md', '05.deliverable-2.md', '06.deliverable-3.md', '07.deliverable-4.md',
         '08.deliverable-5.md', '09.deliverable-6.md', '10.deliverable-7.md', '11.deliverable-8.md',
-        '14.deliverable-9.md']) {
+        '14.deliverable-9.md', '15.deliverable-10.md']) {
         let t = '';
         try { t = readFileSync(join(WBS_DIR, dir), 'utf8'); } catch { assert.fail(`X8: thiếu dictionary ${dir} — không suy được leaf`); }
         for (const m of t.matchAll(/^### `(\d+\.\d+)` · /gm)) leaves.add(m[1]);
