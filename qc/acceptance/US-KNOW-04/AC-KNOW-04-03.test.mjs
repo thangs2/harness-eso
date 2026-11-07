@@ -24,7 +24,7 @@ test('SCN-KNOW-18 · AC-KNOW-04-03 — owner từ chối ⇒ ghi lý do, không 
         kind: 'decision',
         title: 'Bỏ kiểm thử tích hợp',
         content: 'Đề xuất giảm thời gian CI.',
-        source: 'docs/decisions/d3.md',
+        source: 'consumer: docs/decisions/d3.md',
         author: 'A-02',
     };
     const approver = {

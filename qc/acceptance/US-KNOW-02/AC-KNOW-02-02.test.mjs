@@ -16,7 +16,7 @@ test('SCN-KNOW-07 · AC-KNOW-02-02 — chưa khai template ⇒ nói "chưa có t
     // project-beta chưa khai template. Declaration dưới đây thuộc project-alpha —
     // nếu report lấy template/declaration của project khác thì test này phải đỏ.
     const declarationsOfAnotherProject = [
-        { kind: 'decision', id: 'decision-postgres', path: 'docs/decisions/d1.md', content: '# Chốt Postgres\n' },
+        { kind: 'decision', id: 'decision-postgres', path: 'consumer: docs/decisions/d1.md', content: '# Chốt Postgres\n' },
     ];
 
     const report = await sufficiencyReport({

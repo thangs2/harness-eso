@@ -14,7 +14,7 @@ test('SCN-KNOW-14 · AC-KNOW-03-04 — nguồn đã mất ⇒ vẫn nêu phát h
     );
 
     // ED10 — phát hiện trỏ tới một tài liệu đã bị xoá khỏi cây tài liệu.
-    const missingSource = 'docs/decisions/removed-decision.md';
+    const missingSource = 'consumer: docs/decisions/removed-decision.md';
     const findings = [
         {
             id: 'F-14-01',

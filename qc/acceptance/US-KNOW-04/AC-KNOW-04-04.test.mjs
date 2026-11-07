@@ -24,7 +24,7 @@ test('SCN-KNOW-19 · AC-KNOW-04-04 — duyệt hai lần ⇒ replay, đúng mộ
         kind: 'decision',
         title: 'Chốt dùng Fastify',
         content: 'Cùng một đề xuất, duyệt hai lần.',
-        source: 'docs/decisions/d4.md',
+        source: 'consumer: docs/decisions/d4.md',
         author: 'A-02',
     };
     const approver = {

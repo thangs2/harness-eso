@@ -20,14 +20,14 @@ test('SCN-KNOW-10 · AC-KNOW-02-05 — loại có nhưng nội dung sai ⇒ tác
         ],
     };
     const declarations = [
-        { kind: 'decision', id: 'decision-postgres', path: 'docs/decisions/d1.md', content: '# Chốt Postgres\n' },
+        { kind: 'decision', id: 'decision-postgres', path: 'consumer: docs/decisions/d1.md', content: '# Chốt Postgres\n' },
         // policy CÓ mặt nhưng là bản dẫn xuất nêu khẳng định từ một nguồn không có ⇒ "có nhưng sai".
         {
             kind: 'policy',
             id: 'policy-security',
-            path: 'docs/policies/security.md',
-            content: '# Policy\nDẫn xuất từ docs/policies/source.md\n',
-            derivedFrom: 'docs/policies/source.md',
+            path: 'consumer: docs/policies/security.md',
+            content: '# Policy\nDẫn xuất từ consumer: docs/policies/source.md\n',
+            derivedFrom: 'consumer: docs/policies/source.md',
         },
     ];
 

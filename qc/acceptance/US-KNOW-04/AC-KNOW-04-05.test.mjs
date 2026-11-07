@@ -31,7 +31,7 @@ test('SCN-KNOW-20 · AC-KNOW-04-05 — tên loại unicode dài ⇒ lưu và đ�
         kind,
         title: 'Tên loại dài có unicode',
         content: 'Kiểm tra lưu và đọc lại nguyên vẹn.',
-        source: 'docs/decisions/d5.md',
+        source: 'consumer: docs/decisions/d5.md',
         author: 'A-02',
     };
     const approver = {

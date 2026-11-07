@@ -24,7 +24,7 @@ test('SCN-KNOW-21 · AC-KNOW-04-06 — loại chưa có chủ ⇒ dừng, nêu "
         kind: 'policy',
         title: 'Chính sách lưu log 90 ngày',
         content: 'Loại policy chưa có chủ trong project.',
-        source: 'docs/policies/security.md',
+        source: 'consumer: docs/policies/security.md',
         author: 'A-02',
     };
     const approver = {

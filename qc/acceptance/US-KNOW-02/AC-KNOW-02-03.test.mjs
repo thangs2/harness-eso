@@ -21,18 +21,18 @@ test('SCN-KNOW-08 · AC-KNOW-02-03 — hai bản gần giống ⇒ nêu trùng, 
         ],
     };
     const declarations = [
-        { kind: 'decision', id: 'decision-postgres', path: 'docs/decisions/d1.md', content: '# Chốt Postgres\n' },
+        { kind: 'decision', id: 'decision-postgres', path: 'consumer: docs/decisions/d1.md', content: '# Chốt Postgres\n' },
         { kind: 'runbook', id: 'runbook-incident', path: 'docs/runbooks/incident.md', content: '# Incident runbook\n' },
         {
             kind: 'policy',
             id: 'policy-security',
-            path: 'docs/policies/security.md',
+            path: 'consumer: docs/policies/security.md',
             content: '# Policy\nUse Postgres for all stores.\n',
         },
         {
             kind: 'policy',
             id: 'policy-security',
-            path: 'docs/policies/security-copy.md',
+            path: 'consumer: docs/policies/security-copy.md',
             content: '# Policy\nUse Postgres for all stores.  \n',
         },
     ];
@@ -53,7 +53,7 @@ test('SCN-KNOW-08 · AC-KNOW-02-03 — hai bản gần giống ⇒ nêu trùng, 
     assert.equal(report.findings[0].copies.length, 2, 'cả hai bản phải được nêu tên');
     assert.deepEqual(
         [...report.findings[0].copies].sort(),
-        ['docs/policies/security-copy.md', 'docs/policies/security.md'],
+        ['consumer: docs/policies/security-copy.md', 'consumer: docs/policies/security.md'],
         'không được đếm hai bản thành một',
     );
     assert.equal(

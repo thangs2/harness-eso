@@ -24,7 +24,7 @@ test('SCN-KNOW-17 · AC-KNOW-04-02 — agent tự đẩy ⇒ không vào KB, nê
         kind: 'decision',
         title: 'Đổi sang message queue',
         content: 'Agent cho rằng đã rõ ràng đúng.',
-        source: 'docs/decisions/d2.md',
+        source: 'consumer: docs/decisions/d2.md',
         author: 'A-02',
     };
     const agent = {

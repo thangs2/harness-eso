@@ -14,12 +14,12 @@ const catalog = [
     {
         check_id: 'CHK-EVIDENCE',
         title: 'mỗi declaration có bằng chứng',
-        run: async () => ({ status: 'pass', evidence: 'docs/decisions/d1.md:1' }),
+        run: async () => ({ status: 'pass', evidence: 'consumer: docs/decisions/d1.md:1' }),
     },
     {
         check_id: 'CHK-MISSING-OWNER',
         title: 'mỗi kind có chủ',
-        run: async () => ({ status: 'fail', evidence: 'docs/decisions/d1.md:12' }),
+        run: async () => ({ status: 'fail', evidence: 'consumer: docs/decisions/d1.md:12' }),
     },
     {
         check_id: 'CHK-NOT-APPLICABLE',

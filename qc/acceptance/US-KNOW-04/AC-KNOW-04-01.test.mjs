@@ -24,7 +24,7 @@ test('SCN-KNOW-16 · AC-KNOW-04-01 — đề xuất hợp lệ được owner du
         kind: 'decision',
         title: 'Dùng Fastify cho control plane',
         content: 'Chốt dùng Fastify vì đội đã vận hành được.',
-        source: 'docs/decisions/d1.md',
+        source: 'consumer: docs/decisions/d1.md',
         author: 'A-02',
     };
     const approver = {

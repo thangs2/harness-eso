@@ -21,7 +21,7 @@ test('SCN-KNOW-06 · AC-KNOW-02-01 — thiếu hẳn loại decision ⇒ nêu ki
         ],
     };
     const declarations = [
-        { kind: 'policy', id: 'policy-security', path: 'docs/policies/security.md', content: '# Security policy\n' },
+        { kind: 'policy', id: 'policy-security', path: 'consumer: docs/policies/security.md', content: '# Security policy\n' },
         { kind: 'runbook', id: 'runbook-incident', path: 'docs/runbooks/incident.md', content: '# Incident runbook\n' },
     ];
 
