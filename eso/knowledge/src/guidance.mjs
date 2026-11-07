@@ -2,20 +2,20 @@
  * Convert findings into actionable next steps (FRD-F21 / US-KNOW-03).
  *
  * @param {Object} params
- * @param {string} params.project
+ * @param {Object} params.project
+ * @param {Record<string, string>} [params.project.kindOwners]
  * @param {Array<Object>} [params.findings]
- * @param {Record<string, string>} [params.kindOwners]
  * @param {Record<string, string>} [params.playbooks]
  * @returns {Promise<Object>}
  */
 export async function nextActions({
   project,
   findings = [],
-  kindOwners = {},
   playbooks = {},
 } = {}) {
   const rejected = [];
   const validSteps = [];
+  const kindOwners = project?.kindOwners || {};
 
   for (const finding of findings) {
     const findingId = finding.id || '';
@@ -32,8 +32,8 @@ export async function nextActions({
       continue;
     }
 
-    // Check for unassigned owner
-    const owner = (kindOwners && kindOwners[kind]) || finding.owner || '';
+    // Check for unassigned owner (derived only from project.kindOwners)
+    const owner = (kindOwners && kindOwners[kind]) || '';
     if (!owner || !owner.trim()) {
       rejected.push({
         finding: findingId,
