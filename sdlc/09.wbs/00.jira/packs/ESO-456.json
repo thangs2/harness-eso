@@ -23,7 +23,32 @@
     "SCN-KNOW-14",
     "SCN-KNOW-15"
   ],
-  "red_packets": [],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/50.know-guidance.tdd-unit.md",
+      "test_file": "qc/acceptance/US-KNOW-03/AC-KNOW-03-01.test.mjs",
+      "test_name": "SCN-KNOW-11 · AC-KNOW-03-01 — phát hiện \"thiếu loại decision\" ⇒ việc đủ bốn phần",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-11`: **actual** `typeof nextActions === \"undefined\"` (index chưa export) · **expected** `function` trả `next` 1 dòng cho phát hiện thiếu loại `decision`, đủ `kind` · `action` · `owner` = `A-04` · `whyNow` · `blocker` · `playbook` khác rỗng, `total` = 1"
+    },
+    {
+      "packet": "sdlc/10.test/51.know-guidance.tdd-impl.md",
+      "test_file": "qc/acceptance/US-KNOW-03/AC-KNOW-03-02.test.mjs",
+      "test_name": "SCN-KNOW-12 · AC-KNOW-03-02 — không quy được người ⇒ nêu \"chưa xác định người\"",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-12`: **actual** `typeof nextActions === \"undefined\"` (index chưa export) · **expected** `next` 1 dòng với `owner: \"\"` (không lấy vai mặc định), `code: \"OWNER_UNASSIGNED\"` và `note` chứa *\"chưa xác định người\"*"
+    },
+    {
+      "packet": "sdlc/10.test/52.know-guidance.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-KNOW-03/AC-KNOW-03-03.test.mjs",
+      "test_name": "SCN-KNOW-13 · AC-KNOW-03-03 — 20 phát hiện ⇒ 20 việc riêng, không gộp",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-13`: **actual** `typeof nextActions === \"undefined\"` (index chưa export) · **expected** `ED3` — 20 phát hiện ⇒ `next` đúng 20 dòng riêng, mỗi dòng đủ `kind` · `action` · `owner` · `whyNow` · `blocker` · `playbook` và `finding` 1:1, `total` = 20, không gộp"
+    },
+    {
+      "packet": "sdlc/10.test/53.know-guidance.tdd-qc.md",
+      "test_file": "qc/acceptance/US-KNOW-03/AC-KNOW-03-05.test.mjs",
+      "test_name": "SCN-KNOW-15 · AC-KNOW-03-05 — \"cần cải thiện\" ⇒ từ chối, nêu \"thiếu nội dung hành động\"",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-15`: **actual** `typeof nextActions === \"undefined\"` (index chưa export) · **expected** `next` rỗng, `total` = 0, `rejected` 1 dòng cho phát hiện chỉ nói *\"cần cải thiện\"* với `reason` chứa *\"thiếu nội dung hành động\"*"
+    }
+  ],
   "allowed_files": [
     "eso/knowledge/**"
   ],
@@ -37,9 +62,9 @@
   "verify": [
     "bun test qc/acceptance/US-KNOW-03"
   ],
-  "base_commit": "c4419a9d9f82d1e65775fce59e9ada4e24f2173e",
-  "base_ref": "c4419a9",
+  "base_commit": "3d26ad2",
+  "base_ref": "3d26ad2",
   "owner": "knowledge",
   "allow_dependency": false,
-  "notes": "WP 10.3 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó."
+  "notes": "WP 10.3 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó. · Stage 7 4 packet (verifier) · 4 lane / 5 AC: AC không có packet riêng được test nhưng không pin ở red_packets (gate đọc R2 đầu tiên của packet)."
 }

@@ -23,7 +23,32 @@
     "SCN-KNOW-25",
     "SCN-KNOW-26"
   ],
-  "red_packets": [],
+  "red_packets": [
+    {
+      "packet": "sdlc/10.test/58.know-conformance.tdd-unit.md",
+      "test_file": "qc/acceptance/US-KNOW-05/AC-KNOW-05-01.test.mjs",
+      "test_name": "SCN-KNOW-22 · AC-KNOW-05-01 — mọi phép kiểm trong danh mục có kết quả: pass · fail · OUT + lý do",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-22`: **actual** `typeof runConformance === \"undefined\"` (index chưa export) · **expected** `function` trả `verdicts` đủ 3 dòng `pass` · `fail` · `OUT`, dòng `pass` có `evidence` khác rỗng, dòng `OUT` có `reason` khác rỗng, `report.status` `partial`"
+    },
+    {
+      "packet": "sdlc/10.test/59.know-conformance.tdd-impl.md",
+      "test_file": "qc/acceptance/US-KNOW-05/AC-KNOW-05-02.test.mjs",
+      "test_name": "SCN-KNOW-23 · AC-KNOW-05-02 — phép kiểm không chạy được vẫn hiện OUT + lý do, không bị bỏ",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-23`: **actual** `typeof runConformance === \"undefined\"` (index chưa export) · **expected** `function` giữ `CHK-NEEDS-DATA` trong `verdicts` với `status` `OUT`, `reason` chứa *\"thiếu dữ liệu\"*, `verdicts` đủ 3 dòng, dòng `pass` có `evidence` khác rỗng"
+    },
+    {
+      "packet": "sdlc/10.test/60.know-conformance.tdd-coverage.md",
+      "test_file": "qc/acceptance/US-KNOW-05/AC-KNOW-05-03.test.mjs",
+      "test_name": "SCN-KNOW-24 · AC-KNOW-05-03 — ED1 · 0 tài liệu ⇒ báo cáo vẫn đủ mọi phép kiểm, không áp dụng ghi OUT",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-24`: **actual** `typeof runConformance === \"undefined\"` (index chưa export) · **expected** `function` trả `verdicts` đủ 4 dòng, các dòng không áp dụng là `OUT` + `reason`, dòng `pass` có `evidence`, `report.status` `complete`"
+    },
+    {
+      "packet": "sdlc/10.test/61.know-conformance.tdd-qc.md",
+      "test_file": "qc/acceptance/US-KNOW-05/AC-KNOW-05-04.test.mjs",
+      "test_name": "SCN-KNOW-25 · AC-KNOW-05-04 — ED10 · phép kiểm đã mất hiện trong báo cáo, không phải pass",
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-25`: **actual** `typeof runConformance === \"undefined\"` (index chưa export) · **expected** `function` trả `verdicts` đủ 3 dòng, `CHK-DELETED` là `OUT` với `reason` chứa *\"phép kiểm đã mất\"*, không phải `pass`, `CHK-ALIVE` là `pass` + `evidence`"
+    }
+  ],
   "allowed_files": [
     "eso/knowledge/**"
   ],
@@ -37,9 +62,9 @@
   "verify": [
     "bun test qc/acceptance/US-KNOW-05"
   ],
-  "base_commit": "c4419a9d9f82d1e65775fce59e9ada4e24f2173e",
-  "base_ref": "c4419a9",
+  "base_commit": "3d26ad2",
+  "base_ref": "3d26ad2",
   "owner": "knowledge",
   "allow_dependency": false,
-  "notes": "WP 10.5 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó."
+  "notes": "WP 10.5 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó. · Stage 7 4 packet (verifier) · 4 lane / 5 AC: AC không có packet riêng được test nhưng không pin ở red_packets (gate đọc R2 đầu tiên của packet)."
 }

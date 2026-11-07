@@ -28,25 +28,25 @@
       "packet": "sdlc/10.test/42.know-inventory.tdd-unit.md",
       "test_file": "qc/acceptance/US-KNOW-01/AC-KNOW-01-01.test.mjs",
       "test_name": "SCN-KNOW-01 · AC-KNOW-01-01 — inventory liệt kê kind · chỗ · chủ",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-01`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` trả `kinds` 3 dòng, mỗi dòng đủ `kind` · `location` · `owner`, `count` = số tài liệu, `total` = 6"
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-01`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` trả `kinds` 3 dòng, mỗi dòng đủ `kind` · `custodian` · `locator` · `owner` (từ `kindOwners`), `declared: true`, `missing: null`, `count` = số tài liệu, `total` = 6, `unseen: []`"
     },
     {
       "packet": "sdlc/10.test/43.know-inventory.tdd-impl.md",
       "test_file": "qc/acceptance/US-KNOW-01/AC-KNOW-01-02.test.mjs",
       "test_name": "SCN-KNOW-02 · AC-KNOW-01-02 — loại không đọc được vẫn hiện, ghi \"không đọc được\"",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-02`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` giữ `policy` trong `kinds` với `readable: false`, `count: null`, `note` chứa *\"không đọc được\"*, và `gaps` có `reason: \"unreadable\"`"
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-02`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` giữ `policy` trong `kinds` với `declared: false`, `missing.code: \"LOCATOR_UNRESOLVED\"`, `count: null`, `missing.message` chứa *\"không đọc được\"*, và `unseen` có `UNSEEN_SCOPE`"
     },
     {
       "packet": "sdlc/10.test/44.know-inventory.tdd-coverage.md",
       "test_file": "qc/acceptance/US-KNOW-01/AC-KNOW-01-04.test.mjs",
       "test_name": "SCN-KNOW-04 · AC-KNOW-01-04 — 1 000 tài liệu · 12 loại ⇒ tổng theo loại",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-04`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` trả `kinds` đủ 12 loại, `count` từng loại khớp, tổng `1000`, `total` 1000"
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-04`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `function` trả `kinds` đủ 12 loại, `count` từng loại khớp, `total` 1000, `owner` suy ra từ `kind`, `declared: true`, `missing: null`, `unseen: []`"
     },
     {
       "packet": "sdlc/10.test/45.know-inventory.tdd-qc.md",
       "test_file": "qc/acceptance/US-KNOW-01/AC-KNOW-01-05.test.mjs",
       "test_name": "SCN-KNOW-05 · AC-KNOW-01-05 — loại không có chủ ⇒ nêu \"loại X chưa có chủ\"",
-      "expected_failure": "`AssertionError` ở `SCN-KNOW-05`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `kinds` vẫn có `decision` với `owner: \"\"`, `gaps` có `reason: \"missing-owner\"` và message *\"loại decision chưa có chủ\"*"
+      "expected_failure": "`AssertionError` ở `SCN-KNOW-05`: **actual** `typeof inventoryKnowledge === \"undefined\"` (index chưa export) · **expected** `kinds` có `decision` với `owner: \"\"`, `missing.code: \"KIND_UNOWNED\"`, message *\"loại decision chưa có chủ\"*, không lấy chủ mặc định"
     }
   ],
   "allowed_files": [
@@ -62,9 +62,9 @@
   "verify": [
     "bun test qc/acceptance/US-KNOW-01"
   ],
-  "base_commit": "c4419a9d9f82d1e65775fce59e9ada4e24f2173e",
-  "base_ref": "c4419a9",
+  "base_commit": "3d26ad2",
+  "base_ref": "3d26ad2",
   "owner": "knowledge",
   "allow_dependency": false,
-  "notes": "WP 10.1 · BIP READY. Stage 7 đã có (verifier, 4 packet 42–45); test đỏ 5/5 trước implementation (E2)."
+  "notes": "WP 10.1 · BIP READY. Stage 7 đã có (verifier, 4 packet 42–45); test đỏ 5/5 trước implementation (E2). · Stage 7 4 packet (verifier) · 4 lane / 5 AC: AC không có packet riêng được test nhưng không pin ở red_packets (gate đọc R2 đầu tiên của packet)."
 }
