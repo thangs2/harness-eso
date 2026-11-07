@@ -2,24 +2,25 @@
  * Sufficiency report for a project's knowledge base (FRD-F20 / US-KNOW-02).
  *
  * @param {Object} params
- * @param {string} params.project
+ * @param {Object} params.project
+ * @param {Record<string, string>} [params.project.kindOwners]
  * @param {Object} [params.template]
  * @param {Array<Object>} [params.declarations]
- * @param {Record<string, string>} [params.kindOwners]
  * @returns {Promise<Object>}
  */
 export async function sufficiencyReport({
   project,
   template,
   declarations = [],
-  kindOwners = {},
 } = {}) {
+  const kindOwners = project?.kindOwners || {};
+
   if (!template || !Array.isArray(template.kinds)) {
     return {
       status: 'blocked',
       code: 'NOT_MEASURED',
       findings: [],
-      message: `Dự án ${project || ''} chưa có template để đo. Không thể đánh giá độ đầy đủ.`,
+      message: `Dự án ${project?.id || project || ''} chưa có template để đo. Không thể đánh giá độ đầy đủ.`,
     };
   }
 

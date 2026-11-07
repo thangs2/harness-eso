@@ -2,12 +2,14 @@
  * Inventory knowledge sources and kinds for a project (FRD-F19 / US-KNOW-01).
  *
  * @param {Object} params
- * @param {string} params.project
+ * @param {Object} params.project
+ * @param {Record<string, string>} [params.project.kindOwners]
  * @param {Array<Object>} [params.sources]
- * @param {Record<string, string>} [params.kindOwners]
  * @returns {Promise<Object>}
  */
-export async function inventoryKnowledge({ project, sources = [], kindOwners = {} } = {}) {
+export async function inventoryKnowledge({ project, sources = [] } = {}) {
+  const kindOwners = project?.kindOwners || {};
+
   if (!sources || sources.length === 0) {
     return {
       project,
