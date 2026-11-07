@@ -12,6 +12,7 @@ import {
     parseRtm,
     extractExpectedFailure,
     hasImplementationCode,
+    redPacketFailures,
 } from '../scripts/ticket-gate.mjs';
 import { hashRedPackets, verifyRedPacketIntegrity } from '../scripts/check-test-integrity.mjs';
 
@@ -407,4 +408,31 @@ test('the RTM is the AC → SCN → test source the gate reads', () => {
 test('gate fails closed on an unknown ticket', () => {
     const result = spawnSync(process.execPath, ['scripts/ticket-gate.mjs', 'ESO-999'], { encoding: 'utf8' });
     assert.notEqual(result.status, 0);
+});
+
+test('a failure that names the pending STATE is concrete; only bare "pending" is vague', () => {
+    // `'pending'` là giá trị trạng thái của miền (chờ owner duyệt), không phải "test còn pending".
+    // Luật cũ bắt cả hai và báo sai đúng những packet cụ thể nhất — 2 packet của ESO-457 đã bị chặn.
+    const packetWith = (cell) => {
+        const lines = readFileSync(PACKET_SRC, 'utf8').split('\n');
+        const i = lines.findIndex((l) => l.startsWith('| **R2**'));
+        const cells = lines[i].split('|');
+        cells[4] = ` ${cell} `;
+        lines[i] = cells.join('|');
+        return lines.join('\n');
+    };
+
+    const literal = packetWith(
+        "`AssertionError` ở `SCN-GRAPH-05`: **actual** trả `status: 'pending'` · **expected** `status: 'pending'` cho bản ghi chờ owner duyệt, kèm `code` và lý do",
+    );
+    const rootLiteral = fixture({ packet: literal });
+    assert.deepEqual(redPacketFailures(completePack(literal), rootLiteral), []);
+
+    const vague = packetWith('`AssertionError` ở `SCN-GRAPH-05`: **actual** sẽ pending mãi thôi · **expected** viết lại sau');
+    const rootVague = fixture({ packet: vague });
+    const failures = redPacketFailures(completePack(vague), rootVague);
+    assert.ok(
+        failures.some((f) => f.startsWith('RED_PACKET_VAGUE_EXPECTED_FAILURE')),
+        `phải bắt chữ pending trơ, thấy: ${failures.join(' · ')}`,
+    );
 });

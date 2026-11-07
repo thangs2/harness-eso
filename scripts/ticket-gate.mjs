@@ -66,7 +66,9 @@ const VAGUE_FAILURE = [
     /\bsẽ fail\b/i,
     /\bfails? (somehow|later|at some point)\b/i,
     /\btodo\b/i,
-    /\bpending\b/i,
+    // `'pending'` là **giá trị trạng thái** của miền, không phải "test còn pending" — chỉ bắt khi
+    // chữ đứng một mình, không nằm trong nháy. Bắt cả hai là báo sai đúng những packet cụ thể nhất.
+    /(?<!['"\u0060])\bpending\b(?!['"\u0060])/i,
     /\bn\/a\b/i,
 ];
 
