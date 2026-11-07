@@ -52,3 +52,7 @@ export {
   upgradeProjectSdlcStandard,
   revertProjectSdlcStandard,
 } from './sdlc-config.mjs';
+
+export {
+  inventoryKnowledge,
+} from './inventory.mjs';
