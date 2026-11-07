@@ -1,0 +1,45 @@
+{
+  "ticket": "ESO-456",
+  "epic": "ESO-20",
+  "bip": {
+    "id": "BIP-10_3",
+    "file": "sdlc/09.wbs/01.packets/01.bip/57.know-guidance.md"
+  },
+  "technical": false,
+  "inv": [
+    "INV-KB-01"
+  ],
+  "ac": [
+    "AC-KNOW-03-01",
+    "AC-KNOW-03-02",
+    "AC-KNOW-03-03",
+    "AC-KNOW-03-04",
+    "AC-KNOW-03-05"
+  ],
+  "scn": [
+    "SCN-KNOW-11",
+    "SCN-KNOW-12",
+    "SCN-KNOW-13",
+    "SCN-KNOW-14",
+    "SCN-KNOW-15"
+  ],
+  "red_packets": [],
+  "allowed_files": [
+    "eso/knowledge/**",
+    "qc/acceptance/US-KNOW-03/**"
+  ],
+  "forbidden": [
+    "scripts/ticket-gate.mjs",
+    "scripts/check-test-integrity.mjs",
+    "sdlc/**",
+    "sdlc/10.test/**"
+  ],
+  "verify": [
+    "bun test qc/acceptance/US-KNOW-03"
+  ],
+  "base_commit": "c4419a9d9f82d1e65775fce59e9ada4e24f2173e",
+  "base_ref": "c4419a9",
+  "owner": "knowledge",
+  "allow_dependency": false,
+  "notes": "WP 10.3 · BIP READY. Stage 7 (RED packet) chưa có: do verifier viết (E2) — gate sẽ báo MISSING_RED_PACKETS cho tới lúc đó."
+}
