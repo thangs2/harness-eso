@@ -50,14 +50,14 @@
     }
   ],
   "allowed_files": [
-    "eso/knowledge/**",
-    "qc/acceptance/US-KNOW-01/**"
+    "eso/knowledge/**"
   ],
   "forbidden": [
     "scripts/ticket-gate.mjs",
     "scripts/check-test-integrity.mjs",
     "sdlc/**",
-    "sdlc/10.test/**"
+    "sdlc/10.test/**",
+    "qc/acceptance/**"
   ],
   "verify": [
     "bun test qc/acceptance/US-KNOW-01"

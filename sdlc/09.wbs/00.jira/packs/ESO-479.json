@@ -28,14 +28,14 @@
   ],
   "red_packets": [],
   "allowed_files": [
-    "eso/control-plane/**",
-    "qc/acceptance/US-CONSUMER-01/**"
+    "eso/control-plane/**"
   ],
   "forbidden": [
     "scripts/ticket-gate.mjs",
     "scripts/check-test-integrity.mjs",
     "sdlc/**",
-    "sdlc/10.test/**"
+    "sdlc/10.test/**",
+    "qc/acceptance/**"
   ],
   "verify": [
     "bun test qc/acceptance/US-CONSUMER-01"
