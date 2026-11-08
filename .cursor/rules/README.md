@@ -10,6 +10,7 @@
 | `core.workspace-isolation.mdc` | Always — after law loaded |
 | `core.artifacts.mdc` / `.md` | Always — `comments/` là **scratch** (gitignored, bị xoá); tài liệu bền → `docs/<NN.topic>/`, luật → `sdlc/` |
 | `core.harness-agents.mdc` | Always — pipeline after law |
+| `core.paseo-provider.mdc` / `.md` | Always — Paseo → DSH: capability là **profile-scoped**; recon bằng CLI `--path "$PWD"` |
 | `delivery.jira-agent-execution.mdc` / `.md` | Jira parent-child rollup — §6.1 · script `jira-rollup` |
 | `core.slp.mdc` | Task chạm **>1 package/tầng** — 7 worker · slice rời nhau · rubric ≥85 |
 | `core.harness-product.mdc` | Always — boundary/commands after law |

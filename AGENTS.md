@@ -29,24 +29,31 @@ Repo này **ship** sản phẩm Harness ESO (`@mu/harness-*`). Agent làm việc
 Repo này được dùng bởi **nhiều host**, và chúng **không cùng năng lực**. Bảng dưới đây là **đo thật** (2026-10-25 / 2026-11-03),
 không phải mô tả thiết kế. Chi tiết + hệ quả: `sdlc/04.landscape/03.working-environment.md`.
 
-| Năng lực | Cursor | Antigravity (AGY) | DeepSeek Harness (DSH) |
-|---|---|---|---|
-| `AGENTS.md` bơm vào context | ✅ | ✅ (user_rules) | ✅ (workspace instructions) |
-| `.cursor/rules/*.mdc` (16) tự nạp | ✅ | ⚠ nạp `.agents/rules/*.md` | ❌ **không nạp** |
-| `.cursor/agents/*-runtime.md` — 7 worker SLP | ✅ đọc + spawn | ✅ `.agents/agents/` + `invoke_subagent` | ⚠ đọc được, **không** có role registry ⇒ dùng skill `harness-engineering-team` |
-| `.agents/skills/*/SKILL.md` | ✅ | ✅ (qua skill catalog) | ✅ (qua skill catalog) |
-| MCP `codegraph` | ✅ | ✅ | ❌ **không có trong toolset** |
-| `docgraph` CLI | ✅ | ✅ | ❌ — có tệp `.docgraph/`, không có công cụ truy vấn |
-| `agentmemory-mcp` | ✅ | ✅ (`call_mcp_tool` / eager tools) | ✅ **đo lại 2026-11-07**: `memory_smart_search` · `memory_save` · `memory_diagnose` gọi được, store **966** bản ghi |
-| `deepseek-direct` | ✅ | ✅ | ❌ **không có trong toolset** |
-| `.docgraph/` · `.codegraph/` trên đĩa | ✅ truy vấn được | ✅ truy vấn được | ⚠ có tệp, **không có công cụ truy vấn** |
-| file tools · shell · `bun test` · subagent | ✅ | ✅ (`invoke_subagent`, `define_subagent`) | ✅ |
+| Năng lực | Cursor | Antigravity (AGY) | DSH `desktop` | DSH `paseo` (Paseo spawn) |
+|---|---|---|---|---|
+| `AGENTS.md` bơm vào context | ✅ | ✅ (user_rules) | ✅ (workspace instructions) | ✅ |
+| `.cursor/rules/*.mdc` (17) tự nạp | ✅ | ⚠ nạp `.agents/rules/*.md` | ❌ **không nạp** — nhận qua `AGENTS.local.md` | ❌ — như desktop |
+| `.cursor/agents/*-runtime.md` — 7 worker SLP | ✅ đọc + spawn | ✅ `.agents/agents/` + `invoke_subagent` | ⚠ đọc được, **không** có role registry ⇒ dùng skill `harness-engineering-team` | ⚠ như desktop |
+| `.agents/skills/*/SKILL.md` | ✅ | ✅ (qua skill catalog) | ✅ (qua skill catalog) | ✅ (qua skill catalog) |
+| MCP `codegraph` | ✅ | ✅ | ❌ **không có trong toolset** | ❌ |
+| `codegraph` CLI (`--path`) | ✅ | ✅ | ✅ | ✅ **đo 2026-11-08** — `status`/`explore`/`query`/`context`/`node`/`files` |
+| `docgraph` CLI | ✅ | ✅ | ✅ | ✅ **đo 2026-11-08** — `--q`, `--repo`, `--print-harness` |
+| `agentmemory-mcp` | ✅ | ✅ (`call_mcp_tool` / eager tools) | ✅ **đo lại 2026-11-07**: `memory_smart_search` · `memory_save` · `memory_diagnose`, store **966** bản ghi | ❌ **profile `paseo` không mount** — bật bằng `node scripts/setup-paseo-profile.mjs` |
+| `deepseek-direct` | ✅ | ✅ | ❌ **không có trong toolset** | ❌ |
+| `.docgraph/` · `.codegraph/` trên đĩa | ✅ truy vấn được | ✅ truy vấn được | ✅ (qua CLI) | ✅ (qua CLI) |
+| file tools · shell · `bun test` · subagent | ✅ | ✅ (`invoke_subagent`, `define_subagent`) | ✅ | ✅ |
 
 **Luật suy ra:** quy trình recon dưới đây là **quy trình của Cursor**. Trên host không có MCP, bước recon **thay bằng**
-`grep`/`glob` + `read` có kiểm soát, và phải **nói rõ** khi một kết luận dựa trên suy đoán thay vì tra cứu — vì thiếu tra
-cứu làm tăng khẳng định sai (đã xảy ra 3 lần trong một phiên).
+`codegraph`/`docgraph` CLI (nếu có binary) rồi mới tới `grep`/`glob` + `read` có kiểm soát, và phải **nói rõ** khi một
+kết luận dựa trên suy đoán thay vì tra cứu — vì thiếu tra cứu làm tăng khẳng định sai (đã xảy ra 3 lần trong một phiên).
 
 **Đo lại 2026-11-07 (DSH):** dòng cũ gộp bốn MCP vào một ô và ghi ❌ cho **cả bốn** — sai với `agentmemory-mcp`. Host DSH có memory tools (đã gọi thật, store 966 bản ghi) nhưng **không** có codegraph/docgraph CLI. Tách dòng vì một ô gộp làm cả hai chiều cùng sai: agent bỏ qua memory (đúng ra phải dùng), và tưởng có codegraph (đúng ra không).
+
+**Đo lại 2026-11-08 (DSH có nhiều profile — Paseo):** phép đo 2026-11-07 chạy trong profile **`desktop`**, nhưng được ghi
+thành "DSH ✅" **không kèm tên profile**. Paseo spawn `dsh --profile paseo`, profile đó chỉ có `dsh-base` + `dsh-paseo-bridge`
+⇒ **không một tool `memory_*` nào**. Cùng lúc, `codegraph`/`docgraph` **CLI chạy được** trong session Paseo (đã gọi thật) nên
+ô "không có công cụ truy vấn" cũng sai. Luật: **mọi ô năng lực của DSH phải nêu profile**, và recon trong session Paseo dùng
+CLI `--path "$PWD"` — xem `core.paseo-provider.mdc` + skill `paseo-recon`.
 
 **Luật này áp cho mọi agent, không chỉ người viết nó:** gặp host chưa có trong bảng ⇒ **đo rồi bổ sung bảng**, không giả
 định năng lực.

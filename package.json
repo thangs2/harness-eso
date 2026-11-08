@@ -19,6 +19,7 @@
     "sync:diagrams": "node scripts/sync-diagrams.mjs",
     "jira:sync": "node scripts/jira-sync.mjs",
     "docgraph:check": "node scripts/check-docgraph.mjs",
+    "setup:paseo": "node scripts/setup-paseo-profile.mjs",
     "build:console": "bun run --filter @mu/harness-console build",
     "build:observatory": "bun run --filter @mu/harness-observatory build",
     "console": "node packages/harness-console-server/src/server.mjs",
