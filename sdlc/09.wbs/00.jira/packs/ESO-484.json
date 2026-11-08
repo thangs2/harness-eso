@@ -63,6 +63,6 @@
   "verify": [
     "bun test qc/provision-storage.test.mjs"
   ],
-  "base_commit": "f16b98efe03a6e8fcf4c7c8bd53364e0ca8075cc",
-  "notes": "Task kỹ thuật (technical: true, không AC/SCN) theo D-105. 4 packet/5 test: T3 nằm §3.1 packet 66 nên KHÔNG có entry riêng (gate đọc R2 đầu). base=27a5e9d. · LEAD-FIX 2026-11-08: pack do builder tự sửa trong 2fd9276 (vi phạm E1/E7) — Lead khôi phục và scope lại: `sdlc/11.delivery/be-demo.sh` được phép, các nhánh sdlc khác vẫn cấm. · base=f16b98e (sau T6/T8/T9)"
+  "base_commit": "128e3f0251d95c94f470efa05f3dfd08e52f4d0c",
+  "notes": "Task kỹ thuật (technical: true, không AC/SCN) theo D-105. 4 packet/5 test: T3 nằm §3.1 packet 66 nên KHÔNG có entry riêng (gate đọc R2 đầu). base=27a5e9d. · LEAD-FIX 2026-11-08: pack do builder tự sửa trong 2fd9276 (vi phạm E1/E7) — Lead khôi phục và scope lại: `sdlc/11.delivery/be-demo.sh` được phép, các nhánh sdlc khác vẫn cấm. · base=128e3f0"
 }
