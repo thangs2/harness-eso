@@ -2,8 +2,11 @@
 /**
  * ESO v2 demo — control plane end-to-end.
  *
- *   bun scripts/demo-eso-v2.mjs --check     # run assertions, exit 0/1
- *   bun scripts/demo-eso-v2.mjs --serve     # seed and keep the server on :8787
+ *   bun scripts/demo-eso-v2.mjs --check --db-url=<dsn>   # run assertions, exit 0/1
+ *   bun scripts/demo-eso-v2.mjs --serve --db-url=<dsn>   # seed and keep the server on :8787
+ *
+ * `--db-url` is built by `sdlc/11.delivery/be-demo.sh` from the provisioned consumer; the runner
+ * reads no database URL from the environment.
  *
  * Everything is written under /tmp. It never touches a real consumer, x79 or
  * comments/artifacts. The only repo write is `npm run build` in
@@ -30,12 +33,14 @@ const NEW_CONFIG = {
 };
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`Usage: bun scripts/demo-eso-v2.mjs [--check|--serve] [--no-build] [--port=8787]
+  console.log(`Usage: bun scripts/demo-eso-v2.mjs [--check|--serve] [--no-build] [--port=8787] --db-url=<dsn> [--consumer=<id>]
 
-  --check      run the 11 demo assertions (default), exit 0/1
-  --serve      seed a file DB and keep the control plane running on 127.0.0.1:8787
-  --no-build   reuse the current eso/control-plane/dist
-  --port=N     port for --serve (default 8787)`);
+  --db-url=<dsn>  PostgreSQL DSN of the provisioned consumer (required; no environment fallback)
+  --consumer=<id> consumer the DSN belongs to (passed by be-demo.sh)
+  --check         run the 11 demo assertions (default), exit 0/1
+  --serve         seed a file DB and keep the control plane running on 127.0.0.1:8787
+  --no-build      reuse the current eso/control-plane/dist
+  --port=N        port for --serve (default 8787)`);
   process.exit(0);
 }
 
@@ -82,8 +87,12 @@ const { querySliceTenantBoundary } = await import(
   pathToFileURL(join(REPO, 'eso/graph/src/q5-tenant.mjs')).href
 );
 
-const dbUrl = process.env.ESO_DEMO_DB_URL || process.env.ESO_GRAPH_DB_URL || process.env.GRAPH_DATABASE_URL;
-if (!dbUrl) fail('PostgreSQL URL required: set ESO_DEMO_DB_URL (D-93: no SQLite)');
+// The DSN is handed over on argv by `be-demo.sh`, built from the provisioned consumer's
+// `harness.config.json` + `.harness/graph.connection` (BIP 61 §4). No environment fallback: a URL in
+// the operator's shell must not be able to point the demo at a database no consumer owns.
+const dbUrlArg = args.find((a) => a.startsWith('--db-url='));
+const dbUrl = dbUrlArg ? dbUrlArg.slice('--db-url='.length) : '';
+if (!dbUrl) fail('PostgreSQL URL required: pass --db-url=<dsn> (D-93: no SQLite; no environment fallback)');
 const demoSchema = `eso_demo_${process.pid}_${Date.now()}`;
 const schemaAdmin = new Bun.SQL(dbUrl);
 await schemaAdmin.unsafe(`CREATE SCHEMA ${demoSchema}`);
