@@ -1,21 +1,25 @@
 // RED — ESO-484 / BIP-1_8 (slice 1.8): provision graph storage at `init profile`.
 //
-// These seven tests are the Stage 7 negative control for `sdlc/10.test/66..69` (T1–T5) and for the
-// ESO-484 rework that sent the slice back to `In Progress` (T6, T7). They are written BEFORE the
-// behaviour exists, so every one of them must fail on an assertion — never on a missing import, a
-// syntax error or a fixture problem. The contract they pin (and the builder must satisfy) lives in
-// the packets, §6:
+// These nine tests are the Stage 7 negative control for `sdlc/10.test/66..69` (T1–T5), for the
+// ESO-484 rework that sent the slice back to `In Progress` (T6, T7) and for the D-106 rework that
+// sent it back a second time (T2's new contract, T8, T9). They are written BEFORE the behaviour
+// exists, so every one of them must fail on an assertion — never on a missing import, a syntax error
+// or a fixture problem. The contract they pin (and the builder must satisfy) lives in the packets, §6:
 //
 //   packages/harness-foundation/src/graph-storage.mjs
 //     planGraphStorage({ consumerId, config, adminUrl }) -> { storage: { graph }, config }
-//     applyGraphStorage({ consumerId, connect })         -> { schemaVersion, project, applied }
+//     applyGraphStorage({ consumerId, connect, cpConnect })
+//       -> { schemaVersion, project, projectRegistration, reason, applied }
 //
 //   provision.sh <consumer> --plan   prints the `storage.graph` block, opens no DB connection
 //   be-demo.sh --consumer=<id>       refuses an unprovisioned consumer, before running the demo
 //   verify-consumer.sh <consumer>    fails with a reason when `storage.graph` points nowhere
 //
-// D-105: one database + `project` column + RLS FORCE; the config carries `storage.graph` and never a
+// D-105: RLS FORCE + a project-scoped policy; the config carries `storage.graph` and never a
 // password; the admin URL is provision-time only. D-47: a second run creates nothing new.
+// D-106: one deployment = three databases `cp` / `ctx` / `graph`; `project` (identity) lives in `cp`
+// only, so `graph` holds exactly its six topology tables. With no `cp` connection the registration is
+// reported as `deferred` with a reason — never faked with an identity table inside `graph`.
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -33,6 +37,23 @@ const GRAPH_STORAGE = path.join(ESO_ROOT, 'packages/harness-foundation/src/graph
 // `assert.doesNotMatch` cannot pass by accident.
 const ADMIN_PASSWORD = 'SUPERSECRET-admin-password';
 const CORE_TABLES = ['graph_node', 'graph_edge', 'source_claim', 'completeness'];
+
+// D-106 #2: the `graph` database is exactly the six topology tables of `02.schema` §3 — sorted.
+const GRAPH_TABLES = [
+    'completeness',
+    'graph_edge',
+    'graph_index_run',
+    'graph_node',
+    'manifest_entry',
+    'source_claim',
+];
+
+/** `CREATE TABLE [IF NOT EXISTS] [schema.]name` — the captured group is the table name. */
+const CREATE_TABLE = /^CREATE TABLE (?:IF NOT EXISTS )?(?:"?[A-Za-z_]\w*"?\.)?"?([A-Za-z_]\w*)"?(?=[\s(])/i;
+/** D-106 #2: no DDL may create the identity table inside `graph`. */
+const CREATE_PROJECT = /^CREATE TABLE (?:IF NOT EXISTS )?(?:"?[A-Za-z_]\w*"?\.)?"?project"?(?=[\s(])/i;
+/** D-106 #2/#3: no write may target `project` on the graph connection. */
+const INSERT_PROJECT = /^INSERT INTO\s+(?:"?[A-Za-z_]\w*"?\.)?"?project"?(?=[\s(])/i;
 
 function tempDir(t, prefix) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -322,14 +343,19 @@ test('provision --plan is read-only and prints storage.graph', async (t) => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// T2 (BIP §7) — apply twice: one schema/version, one `project` row, one connection per run.
+// T2 (BIP §7) — apply twice on the same database: the same outcome, and no identity table in `graph`.
+//
+// D-106 changed this contract. The old T2 demanded "one `project` row" from the *graph* connection —
+// and that assertion is what let a seventh table into the six-table graph schema. Identity belongs to
+// `cp` (D-106 #2), so the graph run must neither create nor write `project`; the second run must
+// still add nothing (D-47), and both runs must report the same thing.
 // ---------------------------------------------------------------------------------------------
-test('apply is idempotent — two runs, one schema, one project row', async (t) => {
+test('apply is idempotent — two runs, one schema, no project table in graph', async (t) => {
     const mod = await graphStorageModule();
     assert.equal(
         typeof mod.applyGraphStorage,
         'function',
-        `packages/harness-foundation/src/graph-storage.mjs must export applyGraphStorage({ consumerId, connect }) — ${
+        `packages/harness-foundation/src/graph-storage.mjs must export applyGraphStorage({ consumerId, connect, cpConnect }) — ${
             mod.__importError ? mod.__importError.message : 'export missing'
         }`,
     );
@@ -346,6 +372,24 @@ test('apply is idempotent — two runs, one schema, one project row', async (t) 
     assert.equal(db.state.maxActive, 1, 'apply must not hold two connections open at once');
     assert.deepEqual(db.state.duplicateDdl, [], 'a second apply re-created an object without IF NOT EXISTS (D-47)');
     assert.deepEqual(db.state.insertIntoMissingTable, [], 'apply inserted into a table no DDL created');
+    assert.deepEqual(second, first, 'two applies on the same database must report the same result (D-47)');
+
+    // D-106 #2 — the graph database holds topology, never identity. The statements are the evidence,
+    // not `state.tables`: a table is "created" by the SQL the fake connection recorded.
+    const createdTables = db.state.statements.filter((sql) => CREATE_PROJECT.test(sql));
+    const projectWrites = db.state.statements.filter((sql) => INSERT_PROJECT.test(sql));
+    assert.deepEqual(
+        createdTables,
+        [],
+        `graph must not CREATE TABLE project — identity lives in cp (D-106 #2); got: ${createdTables[0]?.slice(0, 120)}`,
+    );
+    assert.deepEqual(
+        projectWrites,
+        [],
+        `graph must not INSERT INTO project — identity lives in cp (D-106 #2); got: ${projectWrites[0]?.slice(0, 120)}`,
+    );
+    assert.equal(db.state.tables.has('project'), false, 'the graph schema gained a `project` table (D-106 #2)');
+    assert.deepEqual(db.state.projectRows, [], `the graph connection registered ${JSON.stringify(db.state.projectRows)} project row(s); must be none (D-106 #2)`);
 
     for (const table of CORE_TABLES) {
         assert.ok(db.state.tables.has(table), `apply must create ${table} (BIP §5)`);
@@ -361,8 +405,6 @@ test('apply is idempotent — two runs, one schema, one project row', async (t) 
         'source_claim must carry the append-only trigger (BR-06)',
     );
 
-    assert.equal(db.state.projectRows.length, 1, `two applies made ${db.state.projectRows.length} project rows (must be 1)`);
-    assert.deepEqual(db.state.projectRows, ['alpha']);
     assert.ok(first.schemaVersion, 'apply must report the schema version it ensured');
     assert.equal(second.schemaVersion, first.schemaVersion, 'a second apply changed the schema version');
 });
@@ -524,7 +566,6 @@ test('apply creates the configured schema before any table, and sets search_path
     const setSearchPath = statements.findIndex(
         (sql) => /^SET\s+(?:LOCAL\s+)?search_path\b/i.test(sql) && /\beso\b/i.test(sql),
     );
-    const insertProject = statements.findIndex((sql) => /^INSERT INTO\s+(?:"?eso"?\.)?"?project"?/i.test(sql));
 
     assert.ok(firstTable >= 0, `apply ran no CREATE TABLE at all; got: ${preview}`);
     assert.ok(
@@ -543,12 +584,6 @@ test('apply creates the configured schema before any table, and sets search_path
     assert.ok(
         setSearchPath < firstTable,
         `SET search_path must run before the first CREATE TABLE (search_path at #${setSearchPath}, table at #${firstTable}); got: ${preview}`,
-    );
-    assert.ok(insertProject >= 0, `apply must register the project with INSERT INTO project; got: ${preview}`);
-    assert.ok(
-        insertProject > setSearchPath,
-        `INSERT INTO project must run after SET search_path so the row is written into eso ` +
-            `(insert at #${insertProject}, search_path at #${setSearchPath}); got: ${preview}`,
     );
 });
 
@@ -632,6 +667,136 @@ test('verify-consumer.sh fails when the graph schema is missing or stale', async
         /could not reach database/i,
         `the database is reachable: reporting only "could not reach database" cannot see a missing ` +
             `schema (the Stage 8 defect); got:\n${r.out.slice(0, 800)}`,
+    );
+});
+
+// ---------------------------------------------------------------------------------------------
+// T8 (D-106, BIP §7) — the `graph` database holds exactly the six topology tables of `02.schema` §3.
+//
+// `X24` only counted `CREATE TABLE` inside `sdlc/`, so product code could add a seventh table and
+// every check stayed green. The provisioner did exactly that: it created `project` inside `graph` to
+// register identity on the one connection it had. `qc/data-model-coverage.test.mjs` catches it after
+// the fact; this test catches it at the provisioner's own contract, from the SQL it emits.
+// ---------------------------------------------------------------------------------------------
+test('graph schema holds exactly the six topology tables', async () => {
+    const mod = await graphStorageModule();
+    assert.equal(
+        typeof mod.applyGraphStorage,
+        'function',
+        `packages/harness-foundation/src/graph-storage.mjs must export applyGraphStorage({ consumerId, connect, cpConnect }) — ${
+            mod.__importError ? mod.__importError.message : 'export missing'
+        }`,
+    );
+
+    const db = createFakeGraphDb();
+    await mod.applyGraphStorage({ consumerId: 'alpha', connect: db.connect });
+
+    const created = db.state.statements
+        .map((sql) => CREATE_TABLE.exec(sql))
+        .filter(Boolean)
+        .map((match) => match[1].toLowerCase());
+
+    assert.ok(created.length > 0, 'apply ran no CREATE TABLE at all — nothing was provisioned');
+
+    assert.deepEqual(
+        [...new Set(created)].sort(),
+        GRAPH_TABLES,
+        `the graph database must hold exactly its six topology tables (D-106 #2; 02.schema §3); ` +
+            `apply created: ${[...new Set(created)].sort().join(', ') || '(none)'}`,
+    );
+    assert.equal(
+        created.length,
+        GRAPH_TABLES.length,
+        `apply emitted ${created.length} CREATE TABLE statements for ${GRAPH_TABLES.length} tables — ` +
+            `the DDL must not re-create a table without IF NOT EXISTS (D-47); saw: ${created.join(', ')}`,
+    );
+});
+
+// ---------------------------------------------------------------------------------------------
+// T9 (D-106, BIP §7) — no `cp` connection means the registration is *deferred* and said out loud;
+// an identity table inside `graph` is not an acceptable substitute. When a second adapter (`cpConnect`)
+// is handed over, the `project` row is written there — on `cp`, never on `graph`.
+// ---------------------------------------------------------------------------------------------
+test('project registration is deferred when no cp connection exists, never faked in graph', async () => {
+    const mod = await graphStorageModule();
+    assert.equal(
+        typeof mod.applyGraphStorage,
+        'function',
+        `packages/harness-foundation/src/graph-storage.mjs must export applyGraphStorage({ consumerId, connect, cpConnect }) — ${
+            mod.__importError ? mod.__importError.message : 'export missing'
+        }`,
+    );
+
+    // --- 1. No `cpConnect`: report the gap instead of inventing a home for identity -------------
+    const graph = createFakeGraphDb();
+    const deferred = await mod.applyGraphStorage({ consumerId: 'alpha', connect: graph.connect });
+
+    assert.equal(
+        deferred.projectRegistration,
+        'deferred',
+        `with no cp connection the project cannot be registered: apply must say "deferred" (D-106 #3), ` +
+            `got ${JSON.stringify(deferred.projectRegistration)}`,
+    );
+    assert.equal(
+        typeof deferred.reason,
+        'string',
+        'a deferred registration must carry the reason it was deferred (D-106 #3: "nói ra, không đoán")',
+    );
+    assert.ok(
+        (deferred.reason || '').trim().length > 0,
+        'the deferred registration carries an empty reason — a silent deferral is the defect D-106 #3 names',
+    );
+
+    const fakedInGraph = graph.state.statements.filter(
+        (sql) => CREATE_PROJECT.test(sql) || INSERT_PROJECT.test(sql),
+    );
+    assert.deepEqual(
+        fakedInGraph,
+        [],
+        `the missing cp connection was papered over inside graph (D-106 #3): ${fakedInGraph[0]?.slice(0, 120)}`,
+    );
+    assert.equal(graph.state.tables.has('project'), false, 'graph grew a `project` table when cp was absent (D-106 #2)');
+    assert.deepEqual(graph.state.projectRows, [], 'graph registered a project row when cp was absent (D-106 #3)');
+
+    // --- 2. With `cpConnect`: the row lands on the cp adapter, not on the graph adapter ---------
+    const graphWithCp = createFakeGraphDb();
+    const cp = createFakeGraphDb();
+    const done = await mod.applyGraphStorage({
+        consumerId: 'alpha',
+        connect: graphWithCp.connect,
+        cpConnect: cp.connect,
+    });
+
+    assert.equal(
+        done.projectRegistration,
+        'done',
+        `with a cp connection the registration must be "done" (BIP §3), got ${JSON.stringify(done.projectRegistration)}`,
+    );
+
+    const cpInserts = cp.state.statements.filter((sql) => INSERT_PROJECT.test(sql));
+    assert.equal(
+        cpInserts.length,
+        1,
+        `the cp adapter must receive exactly one INSERT INTO project, saw ${cpInserts.length} on cp ` +
+            `(statements: ${cp.state.statements.length})`,
+    );
+    assert.deepEqual(cp.state.projectRows, ['alpha'], `the cp adapter must hold the project row, saw ${JSON.stringify(cp.state.projectRows)}`);
+
+    const graphInserts = graphWithCp.state.statements.filter((sql) => INSERT_PROJECT.test(sql));
+    assert.deepEqual(
+        graphInserts,
+        [],
+        `identity was written on the graph adapter even though cp was provided (D-106 #2): ${graphInserts[0]?.slice(0, 120)}`,
+    );
+    assert.equal(
+        graphWithCp.state.tables.has('project'),
+        false,
+        'graph grew a `project` table when cp was provided (D-106 #2: identity lives in cp only)',
+    );
+    assert.deepEqual(
+        graphWithCp.state.projectRows,
+        [],
+        'the graph adapter registered a project row; identity must be written on cp only (D-106 #2)',
     );
 });
 
