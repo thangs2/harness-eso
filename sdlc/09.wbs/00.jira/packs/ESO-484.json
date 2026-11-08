@@ -19,8 +19,8 @@
     {
       "packet": "sdlc/10.test/67.provision-storage.tdd-impl.md",
       "test_file": "qc/provision-storage.test.mjs",
-      "test_name": "apply is idempotent — two runs, one schema, one project row",
-      "expected_failure": "`AssertionError` ở `apply is idempotent — two runs, one schema, one project row`: **actual** `typeof applyGraphStorage === \"undefined\"` — `packages/harness-foundation/src/graph-storage.mjs` chưa có (`Cannot find module`) · **expected** `function` chạy 2 lần: `connections = 2` (mỗi lần 1), `maxActive = 1`, `0` duplicate DDL, `0` insert vào bảng chưa tạo, đủ 4 bảng lõi với `ENABLE`/`FORCE` RLS + policy theo `project`, trigger trên `source_claim`, đúng **1** dòng `project` = `alpha`, `schemaVersion` hai lần bằng nhau"
+      "test_name": "apply is idempotent — two runs, one schema, no project table in graph",
+      "expected_failure": "`AssertionError` ở `apply is idempotent — two runs, one schema, no project table in graph`: **actual** hai lần apply trả cùng kết quả nhưng adapter graph nhận **7** `CREATE TABLE` (6 topology + `CREATE TABLE IF NOT EXISTS project`), **1** `INSERT INTO project` (`projectRows = [\"alpha\"]`), và kết quả **không** có `projectRegistration` · **expected** hai lần apply cùng `schemaVersion`, `projectRegistration: \"deferred\"` (không có `cpConnect`), **0** duplicate DDL, **0** insert vào bảng chưa tạo, đủ 4 bảng lõi với `ENABLE`/`FORCE` RLS + policy theo `project`, trigger trên `source_claim`; danh sách câu SQL **không** có `CREATE TABLE … project`, **không** có `INSERT INTO project`, `projectRows` rỗng — `graph` **không** có bảng `project`"
     },
     {
       "packet": "sdlc/10.test/68.provision-storage.tdd-coverage.md",
