@@ -44,6 +44,10 @@ export function planGraphStorage({ consumerId, config, adminUrl }) {
     };
 }
 
+function quoteIdent(name) {
+    return `"${String(name).replace(/"/g, '""')}"`;
+}
+
 /**
  * Applies graph storage schema and registers the consumer project.
  * Uses exactly one connection for the entire operation.
@@ -51,15 +55,19 @@ export function planGraphStorage({ consumerId, config, adminUrl }) {
  * @param {object} params
  * @param {string} params.consumerId
  * @param {() => Promise<object>} params.connect
+ * @param {string} [params.schema='eso']
  * @returns {Promise<{ schemaVersion: string, project: string, applied: boolean }>}
  */
-export async function applyGraphStorage({ consumerId, connect }) {
+export async function applyGraphStorage({ consumerId, connect, schema = 'eso' }) {
     if (typeof connect !== 'function') {
         throw new Error('connect function is required');
     }
     const client = await connect();
     try {
+        const quotedSchema = quoteIdent(schema || 'eso');
         const ddl = `
+CREATE SCHEMA IF NOT EXISTS ${quotedSchema};
+SET search_path TO ${quotedSchema}, public;
 CREATE TABLE IF NOT EXISTS project (
   project text PRIMARY KEY,
   created_at timestamptz DEFAULT now()

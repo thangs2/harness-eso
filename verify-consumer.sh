@@ -140,7 +140,7 @@ verify_one() {
         echo "=================================================="
     fi
 
-    # Verify graph storage reachability when configured
+    # Verify graph storage reachability and schema when configured
     local graph_check
     if ! graph_check=$(node --input-type=module -e '
         import fs from "node:fs";
@@ -166,24 +166,91 @@ verify_one() {
         const host = graph.host || "127.0.0.1";
         const port = Number(graph.port) || 5432;
         const dbName = graph.database || "unknown";
+        const schema = graph.schema || "eso";
         const timeoutMs = Number(process.env.PGCONNECT_TIMEOUT || 2) * 1000;
 
         const socket = new net.Socket();
         socket.setTimeout(timeoutMs);
+
+        let connected = false;
+        let buffered = Buffer.alloc(0);
+        let ready = false;
+
+        const params = Buffer.concat([
+            Buffer.from(`user\0eso\0database\0${dbName}\0\0`, "utf8")
+        ]);
+        const startup = Buffer.alloc(8 + params.length);
+        startup.writeInt32BE(8 + params.length, 0);
+        startup.writeInt32BE(196608, 4);
+        params.copy(startup, 8);
+
         socket.on("connect", () => {
-            socket.destroy();
-            process.exit(0);
+            connected = true;
+            socket.write(startup);
         });
+
+        socket.on("data", (chunk) => {
+            buffered = Buffer.concat([buffered, chunk]);
+            while (buffered.length >= 5) {
+                const type = String.fromCharCode(buffered[0]);
+                const length = buffered.readInt32BE(1);
+                if (buffered.length < length + 1) break;
+                const payload = buffered.subarray(5, length + 1);
+                buffered = buffered.subarray(length + 1);
+
+                if (type === "Z") {
+                    if (!ready) {
+                        ready = true;
+                        const sql = `SELECT 1 FROM "${schema}".project LIMIT 1;\0`;
+                        const qPayload = Buffer.from(sql, "utf8");
+                        const queryPacket = Buffer.alloc(5 + qPayload.length);
+                        queryPacket.writeUInt8("Q".charCodeAt(0), 0);
+                        queryPacket.writeInt32BE(4 + qPayload.length, 1);
+                        qPayload.copy(queryPacket, 5);
+                        socket.write(queryPacket);
+                    } else {
+                        socket.destroy();
+                        process.exit(0);
+                    }
+                } else if (type === "E") {
+                    let msg = "";
+                    let offset = 0;
+                    while (offset < payload.length) {
+                        const fieldType = String.fromCharCode(payload[offset++]);
+                        if (fieldType === "\0" || offset >= payload.length) break;
+                        const nullIdx = payload.indexOf(0, offset);
+                        if (nullIdx < 0) break;
+                        const fieldVal = payload.subarray(offset, nullIdx).toString("utf8");
+                        if (fieldType === "M") msg = fieldVal;
+                        offset = nullIdx + 1;
+                    }
+                    socket.destroy();
+                    console.error(`❌ storage.graph: graph schema "${schema}" (or schema version) in database \x27${dbName}\x27 is missing or stale.\n   Server reported: ${msg || "schema not found"}\n   → [provision] ./provision.sh ${id}`);
+                    process.exit(1);
+                }
+            }
+        });
+
         socket.on("timeout", () => {
             socket.destroy();
-            console.error(`❌ storage.graph: could not reach database \x27${dbName}\x27 at ${host}:${port} (timeout)\n   → [provision] ./provision.sh ${id}`);
+            if (!connected) {
+                console.error(`❌ storage.graph: could not reach database \x27${dbName}\x27 at ${host}:${port} (timeout)\n   → [provision] ./provision.sh ${id}`);
+            } else {
+                console.error(`❌ storage.graph: graph schema "${schema}" (or schema version) in database \x27${dbName}\x27 probe timed out.\n   → [provision] ./provision.sh ${id}`);
+            }
             process.exit(1);
         });
+
         socket.on("error", (err) => {
             socket.destroy();
-            console.error(`❌ storage.graph: could not reach database \x27${dbName}\x27 at ${host}:${port} (${err.message})\n   → [provision] ./provision.sh ${id}`);
+            if (!connected) {
+                console.error(`❌ storage.graph: could not reach database \x27${dbName}\x27 at ${host}:${port} (${err.message})\n   → [provision] ./provision.sh ${id}`);
+            } else {
+                console.error(`❌ storage.graph: graph schema "${schema}" (or schema version) in database \x27${dbName}\x27 probe error: ${err.message}\n   → [provision] ./provision.sh ${id}`);
+            }
             process.exit(1);
         });
+
         socket.connect(port, host);
     ' "$root" "$id" 2>&1); then
         echo "$graph_check" >&2
