@@ -1,8 +1,9 @@
 // RED — ESO-484 / BIP-1_8 (slice 1.8): provision graph storage at `init profile`.
 //
-// These nine tests are the Stage 7 negative control for `sdlc/10.test/66..69` (T1–T5), for the
-// ESO-484 rework that sent the slice back to `In Progress` (T6, T7) and for the D-106 rework that
-// sent it back a second time (T2's new contract, T8, T9). They are written BEFORE the behaviour
+// These twelve tests are the Stage 7 negative control for `sdlc/10.test/66..69` (T1–T5), for the
+// ESO-484 rework that sent the slice back to `In Progress` (T6, T7), for the D-106 rework that
+// sent it back a second time (T2's new contract, T8, T9), and for the three gaps a direct demo run
+// exposed (T10–T12). They are written BEFORE the behaviour
 // exists, so every one of them must fail on an assertion — never on a missing import, a syntax error
 // or a fixture problem. The contract they pin (and the builder must satisfy) lives in the packets, §6:
 //
@@ -297,6 +298,48 @@ function fakeBun(t, dir) {
         invoked: () => fs.existsSync(probe),
         args: () => (fs.existsSync(probe) ? fs.readFileSync(probe, 'utf8').trim() : ''),
     };
+}
+
+/**
+ * A `bun` stand-in that records the argv and every DB-URL-ish environment variable it is handed.
+ * T12 uses it as the process boundary: what lands here is what the demo runner would receive, so a
+ * DSN inherited from the operator's environment is distinguishable from the consumer's own one.
+ */
+function recordingBun(t, dir) {
+    const record = path.join(dir, 'bun-record.txt');
+    fs.writeFileSync(
+        path.join(dir, 'bun'),
+        `#!/bin/sh
+{
+  printf 'ARGV %s\\n' "$*"
+  env | grep -E '(_URL|_DSN)=' || true
+} >> "${record}"
+exit 0
+`,
+    );
+    fs.chmodSync(path.join(dir, 'bun'), 0o755);
+    t.after(() => fs.rmSync(record, { force: true }));
+    return {
+        dir,
+        invoked: () => fs.existsSync(record),
+        read: () => (fs.existsSync(record) ? fs.readFileSync(record, 'utf8') : ''),
+    };
+}
+
+/** One invocation per file: the first line is `ARGV …`, the rest are `NAME=value` env entries. */
+function parseBunRecord(text) {
+    const argv = [];
+    const env = new Map();
+    for (const line of String(text || '').split('\n')) {
+        if (!line) continue;
+        if (line.startsWith('ARGV ')) {
+            argv.push(line.slice('ARGV '.length));
+            continue;
+        }
+        const eq = line.indexOf('=');
+        if (eq > 0) env.set(line.slice(0, eq), line.slice(eq + 1));
+    }
+    return { argv, env };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -797,6 +840,222 @@ test('project registration is deferred when no cp connection exists, never faked
         graphWithCp.state.projectRows,
         [],
         'the graph adapter registered a project row; identity must be written on cp only (D-106 #2)',
+    );
+});
+
+// ---------------------------------------------------------------------------------------------
+// T10 (BIP §7, ESO-484) — `be-demo.sh` must demand `--consumer`; the env-only path is the defect.
+//
+// Before this contract the wrapper accepted no consumer at all and fell straight through to the
+// runner, which then discovered the missing database by asking for `ESO_DEMO_DB_URL`. That made
+// "demo" a second way to reach a database no consumer owned: unset env was the only thing between
+// the operator and a demo that ran against whatever URL happened to be exported.
+// ---------------------------------------------------------------------------------------------
+test('be-demo requires --consumer and refuses the env-only path', (t) => {
+    const bun = fakeBun(t, tempDir(t, 'harness-graph-demo-nocon-'));
+    const r = runScript('sdlc/11.delivery/be-demo.sh', ['--check', '--no-build'], {
+        // The three fallbacks the runner understands; none may be enough to start the demo.
+        ESO_DEMO_DB_URL: '',
+        ESO_GRAPH_DB_URL: '',
+        GRAPH_DATABASE_URL: '',
+        PATH: `${bun.dir}:${process.env.PATH}`,
+    });
+
+    assert.notEqual(
+        r.status,
+        0,
+        `be-demo.sh ran with no --consumer (exit ${r.status}); runner args: ${bun.args() || '(none)'}\n${r.out.slice(0, 800)}`,
+    );
+    assert.equal(bun.invoked(), false, `be-demo.sh invoked the demo runner without a consumer: ${bun.args()}`);
+    assert.match(
+        r.out,
+        /--consumer/,
+        `the refusal must name the flag the operator forgot (--consumer=<id>); got:\n${r.out.slice(0, 800)}`,
+    );
+    assert.match(
+        r.out,
+        /provision\.sh/,
+        `the refusal must name provision.sh as the way to get a consumer; got:\n${r.out.slice(0, 800)}`,
+    );
+    assert.doesNotMatch(
+        r.out,
+        /PostgreSQL URL required/,
+        `be-demo.sh still took the env-only path (it asked for ESO_DEMO_DB_URL instead of a consumer); got:\n${r.out.slice(0, 800)}`,
+    );
+});
+
+// ---------------------------------------------------------------------------------------------
+// T11 (BIP §7, ESO-484) — a plan without `HARNESS_GRAPH_ADMIN_URL` must say `storage.graph` was
+// skipped, not print a file list that quietly omits it. Silence is the defect D-106 #3 names: the
+// operator reads "DRY RUN" and assumes the database is part of the plan.
+// ---------------------------------------------------------------------------------------------
+test('provision --plan says graph storage is skipped when no admin url is given', (t) => {
+    const state = tempDir(t, 'harness-graph-noadmin-state-');
+    const consumer = tempDir(t, 'harness-graph-noadmin-consumer-');
+    writeWorkspace(state, { id: 'alpha', root: consumer, port: 9426 });
+    fs.writeFileSync(
+        path.join(consumer, 'harness.config.json'),
+        JSON.stringify({
+            version: 1,
+            project: { id: 'alpha', displayName: 'alpha' },
+            storage: { driver: 'sqlite', sqlite: { path: '.harness/harness.db' } },
+            server: { host: '127.0.0.1', port: 9426 },
+        }),
+    );
+
+    const withoutAdmin = runScript('provision.sh', ['alpha', '--plan'], {
+        HARNESS_PRODUCT_STATE_DIR: state,
+        HARNESS_GRAPH_ADMIN_URL: '',
+    });
+
+    assert.ok(
+        withoutAdmin.status === 0 || withoutAdmin.status === 1,
+        `--plan without an admin URL must exit 0 or 1, got ${withoutAdmin.status}:\n${withoutAdmin.out.slice(0, 800)}`,
+    );
+    assert.match(
+        withoutAdmin.out,
+        /storage\.graph/,
+        `--plan without HARNESS_GRAPH_ADMIN_URL silently omitted storage.graph (D-106 #3); got:\n${withoutAdmin.out.slice(0, 1200)}`,
+    );
+    assert.match(
+        withoutAdmin.out,
+        /HARNESS_GRAPH_ADMIN_URL/,
+        `the skip must name the variable that would enable graph storage; got:\n${withoutAdmin.out.slice(0, 1200)}`,
+    );
+    assert.match(
+        withoutAdmin.out,
+        /storage\.graph[\s\S]{0,300}?(skip|skipped|bỏ|omitted)|(skip|skipped|bỏ|omitted)[\s\S]{0,300}?storage\.graph/i,
+        `the plan must say storage.graph is skipped, not merely mention it; got:\n${withoutAdmin.out.slice(0, 1200)}`,
+    );
+
+    // Positive control: with the admin URL present the block is printed in full. `--plan` opens no
+    // connection, so a fake DSN is enough and no database is required.
+    const withAdmin = runScript('provision.sh', ['alpha', '--plan'], {
+        HARNESS_PRODUCT_STATE_DIR: state,
+        HARNESS_GRAPH_ADMIN_URL: `postgres://eso:${ADMIN_PASSWORD}@127.0.0.1:54329/eso_alpha?sslmode=disable`,
+    });
+    assert.equal(
+        withAdmin.status,
+        0,
+        `--plan with an admin URL must succeed (it opens no connection); exited ${withAdmin.status}:\n${withAdmin.out.slice(0, 800)}`,
+    );
+    assert.match(
+        withAdmin.out,
+        /storage\.graph/,
+        `the positive control must print the storage.graph block; got:\n${withAdmin.out.slice(0, 1200)}`,
+    );
+    for (const [key, value] of [
+        ['host', '127.0.0.1'],
+        ['port', '54329'],
+        ['database', 'eso_alpha'],
+        ['schema', 'eso'],
+        ['ssl', 'false'],
+        ['isolation', 'shared'],
+    ]) {
+        assert.match(
+            withAdmin.out,
+            new RegExp(`["']?${key}["']?\\s*[:=]\\s*["']?${value}`, 'i'),
+            `storage.graph.${key} must be ${value} in the positive control; got:\n${withAdmin.out.slice(0, 1200)}`,
+        );
+    }
+    assert.doesNotMatch(withAdmin.out, new RegExp(ADMIN_PASSWORD), 'the plan echoed the admin password');
+});
+
+// ---------------------------------------------------------------------------------------------
+// T12 (BIP §7, ESO-484) — the wrapper hands the runner the DSN that belongs to the consumer,
+// resolved from `harness.config.json` (+ its local secret), never the operator's environment.
+//
+// The shim is the process boundary. It records argv and every `*_URL`/`*_DSN` env var the wrapper
+// passes, so the test can tell "runner got the consumer's database" from "runner inherited a URL".
+// The secret path is the one BIP §3 / OPEN-PROV-02 names: `<consumer>/.harness/graph.connection`.
+// ---------------------------------------------------------------------------------------------
+test('be-demo passes the provisioned consumer DSN to the runner, not the environment', (t) => {
+    const state = tempDir(t, 'harness-graph-dsn-state-');
+    const consumer = tempDir(t, 'harness-graph-dsn-consumer-');
+    writeWorkspace(state, { id: 'alpha', root: consumer, port: 9427 });
+    const graph = {
+        host: '127.0.0.1',
+        port: 55432,
+        database: 'eso_alpha',
+        schema: 'eso',
+        ssl: false,
+        isolation: 'shared',
+    };
+    fs.writeFileSync(
+        path.join(consumer, 'harness.config.json'),
+        JSON.stringify({
+            version: 1,
+            project: { id: 'alpha', displayName: 'alpha' },
+            storage: { driver: 'sqlite', sqlite: { path: '.harness/harness.db' }, graph },
+            server: { host: '127.0.0.1', port: 9427 },
+        }),
+    );
+    fs.mkdirSync(path.join(consumer, '.harness'), { recursive: true });
+    fs.writeFileSync(
+        path.join(consumer, '.harness', 'graph.connection'),
+        `postgres://eso:${ADMIN_PASSWORD}@${graph.host}:${graph.port}/${graph.database}?sslmode=disable\n`,
+    );
+
+    const bun = recordingBun(t, tempDir(t, 'harness-graph-dsn-bin-'));
+    const decoy = {
+        ESO_DEMO_DB_URL: 'postgres://decoy:decoy@10.99.99.99:6543/decoy_env?sslmode=disable',
+        ESO_GRAPH_DB_URL: 'postgres://decoy:decoy@10.99.99.98:6543/decoy_graph?sslmode=disable',
+        GRAPH_DATABASE_URL: 'postgres://decoy:decoy@10.99.99.97:6543/decoy_raw?sslmode=disable',
+    };
+    const r = runScript('sdlc/11.delivery/be-demo.sh', ['--check', '--no-build', '--consumer=alpha'], {
+        HARNESS_PRODUCT_STATE_DIR: state,
+        PATH: `${bun.dir}:${process.env.PATH}`,
+        ...decoy,
+    });
+
+    assert.equal(
+        r.status,
+        0,
+        `a provisioned consumer must reach the demo runner; exited ${r.status}:\n${r.out.slice(0, 800)}`,
+    );
+    assert.equal(bun.invoked(), true, `be-demo.sh never reached the demo runner for a provisioned consumer:\n${r.out.slice(0, 800)}`);
+
+    const record = bun.read();
+    const { argv, env } = parseBunRecord(record);
+    const argvText = argv.join(' ');
+    assert.match(
+        argvText,
+        /--consumer=alpha/,
+        `the runner must still be told which consumer it serves; argv: ${argvText || '(none)'}`,
+    );
+
+    // The runner's own precedence, in order (scripts/demo-eso-v2.mjs): argv DSN, then these env
+    // names. Whatever wins here is the database the runner would actually open.
+    const configured = `${graph.host}:${graph.port}/${graph.database}`;
+    const argvUrls = argvText.match(/postgres(?:ql)?:\/\/[^\s"']+/g) || [];
+    const envUrl = ['ESO_DEMO_DB_URL', 'ESO_GRAPH_DB_URL', 'GRAPH_DATABASE_URL']
+        .map((name) => env.get(name))
+        .find((value) => value && value.trim());
+    const received = argvUrls[0] || envUrl || '';
+
+    assert.ok(
+        received,
+        `the runner received no DSN at all; the wrapper must hand over ${configured} from storage.graph, ` +
+            `not rely on the operator's env. record:\n${record}`,
+    );
+    for (const [label, value] of [
+        ['host', graph.host],
+        ['port', String(graph.port)],
+        ['database', graph.database],
+    ]) {
+        assert.ok(
+            received.includes(value),
+            `the runner's DSN does not carry storage.graph.${label} (${value}); got: ${received}`,
+        );
+    }
+    assert.ok(
+        !/10\.99\.99\.(?:99|98|97)|6543|decoy_env|decoy_graph|decoy_raw/.test(received),
+        `the runner was handed the operator's env DSN instead of the consumer's: ${received}`,
+    );
+    assert.notEqual(
+        received.trim(),
+        decoy.ESO_DEMO_DB_URL,
+        'the runner received ESO_DEMO_DB_URL verbatim from the environment',
     );
 });
 
