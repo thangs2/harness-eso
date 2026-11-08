@@ -53,7 +53,7 @@ JSON có kiểu là mấu chốt: bạn **ghép** được mà không đọc vă
    **trước**; chưa có pack thì **không** spawn `build`.
 3. **Session** — `AGENTS.md` đã Read; MCP/brain theo `core.harness-tooling.mdc`. Thiếu công cụ ⇒ ghi rõ, không giả định.
 4. **Plan** — spawn `plan`. **S-GATE 1** khi >1 tầng hoặc scope mơ hồ: đưa bảng slice cho S duyệt.
-5. **Build × N** — spawn một `build` mỗi slice; song song khi `depends_on` rỗng.
+5. **Build × N** — spawn một `build` mỗi slice (trên DSH Lead: gọi CLI `agy -p "..." --agent build-runtime`); song song khi `depends_on` rỗng.
 6. **Verify** — spawn `verify` với **đúng** lệnh của Task (`bun test` trong package · `bun run test` · UI: `build:observatory` +
    `test:observatory`). FAIL ⇒ sang 7.
 7. **Audit** — spawn `audit` trên diff. `AUDIT_FAIL` ⇒ `fixbug` ↺ về 6. **3** vòng ⇒ **S-GATE 2**.

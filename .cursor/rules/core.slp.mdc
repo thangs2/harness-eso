@@ -135,3 +135,22 @@ BA AC → QC soạn SCN (sdlc/06.analysis/04.quality-control, trạng thái `pla
 Packet `READY` mà §9 đòi *"`SCN` đã chạy"* là **đảo thứ tự** và tự khoá: `bun test` đỏ trước khi có code. Plane `E` chỉ ghi
 `OK` / `OK — một phần` / `OPEN` / `OUT` — **không** ghi tiến độ chạy. Máy kiểm: `qc/sdlc-wbs.test.mjs`. Quyết định:
 `sdlc/03.inception/02-decision-log/06.architecture-va-data.md` `D-81`.
+
+## 11. Multi-Provider Binding (DSH Lead & Gate, AGY Peer)
+
+Khi chạy phân vai giữa **DeepSeek Harness (DSH)** và **Antigravity (AGY)**:
+1. **DSH đảm nhiệm Lead & Gate**:
+   - **Lead (L)**: Phân tích bài toán, chạy `plan-runtime` chia Slices độc lập, kiểm soát S-GATE 1 (Operator duyệt plan).
+   - **Gate & QC (A)**: Chạy lệnh verify bằng máy (`bun test`), thực thi `audit-runtime` chấm rubric độc lập (≥85 điểm, 0 CRITICAL), và chạy kịch bản `qc-runtime` khi được yêu cầu.
+2. **AGY đảm nhiệm Peer (P)**:
+   - DSH **không trực tiếp sửa code sản phẩm** khi được giao vai trò Lead.
+   - Với mỗi slice sau khi được duyệt, DSH dùng tool bash gọi AGY CLI (`agy`) để build:
+     ```bash
+     agy -p "<prompt 4 phần: INV, AC, allowed_files, verify command>" \
+       --agent build-runtime \
+       --dangerously-skip-permissions \
+       --output-format json
+     ```
+   - AGY nhận prompt hợp đồng 4 phần và chỉ sửa trong `allowed_files` của slice đó.
+3. **Thỏa mãn bất biến SLP**: Builder (AGY) và Gate (DSH) là hai thực thể độc lập — builder không bao giờ tự chấm điểm code của mình.
+
