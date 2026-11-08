@@ -1,9 +1,10 @@
 // RED — ESO-484 / BIP-1_8 (slice 1.8): provision graph storage at `init profile`.
 //
-// These five tests are the Stage 7 negative control for `sdlc/10.test/66..69`. They are written
-// BEFORE the behaviour exists, so every one of them must fail on an assertion — never on a missing
-// import, a syntax error or a fixture problem. The contract they pin (and the builder must satisfy)
-// lives in the packets, §6:
+// These seven tests are the Stage 7 negative control for `sdlc/10.test/66..69` (T1–T5) and for the
+// ESO-484 rework that sent the slice back to `In Progress` (T6, T7). They are written BEFORE the
+// behaviour exists, so every one of them must fail on an assertion — never on a missing import, a
+// syntax error or a fixture problem. The contract they pin (and the builder must satisfy) lives in
+// the packets, §6:
 //
 //   packages/harness-foundation/src/graph-storage.mjs
 //     planGraphStorage({ consumerId, config, adminUrl }) -> { storage: { graph }, config }
@@ -126,6 +127,9 @@ function createFakeGraphDb() {
         projectRows: [],
         duplicateDdl: [],
         insertIntoMissingTable: [],
+        // Every statement in arrival order — T6 needs the *order* (schema, then search_path, then
+        // tables/rows), which a set of created objects cannot express.
+        statements: [],
         connections: 0,
         active: 0,
         maxActive: 0,
@@ -160,6 +164,7 @@ function createFakeGraphDb() {
     function statement(raw, params = []) {
         const sql = String(raw).replace(/\s+/g, ' ').trim();
         if (!sql) return;
+        state.statements.push(sql);
         let m;
 
         if ((m = /^DROP TRIGGER IF EXISTS ([A-Za-z_]\w*) ON ([A-Za-z_]\w*)/i.exec(sql))) {
@@ -491,3 +496,306 @@ test('verify-consumer.sh fails when the graph database is missing', (t) => {
         `the failure must name the command that fixes it (./provision.sh alpha); got:\n${r.out.slice(0, 800)}`,
     );
 });
+
+// ---------------------------------------------------------------------------------------------
+// T6 (ESO-484 rework) — `applyGraphStorage` must create the configured schema and move the session
+// onto it before its first `CREATE TABLE`. The Stage 8 apply did neither: PostgreSQL accepted the
+// DDL in `public`, the config said `schema: "eso"`, and the app's `search_path=eso` then failed with
+// `relation "graph_node" does not exist`. A fake connection records every statement in order, which
+// is the only way to pin "before any table" rather than "somewhere in the run".
+// ---------------------------------------------------------------------------------------------
+test('apply creates the configured schema before any table, and sets search_path', async () => {
+    const mod = await graphStorageModule();
+    assert.equal(
+        typeof mod.applyGraphStorage,
+        'function',
+        `packages/harness-foundation/src/graph-storage.mjs must export applyGraphStorage({ consumerId, connect }) — ${
+            mod.__importError ? mod.__importError.message : 'export missing'
+        }`,
+    );
+
+    const db = createFakeGraphDb();
+    await mod.applyGraphStorage({ consumerId: 'alpha', connect: db.connect });
+
+    const statements = db.state.statements;
+    const preview = statements.slice(0, 6).map((sql) => sql.slice(0, 90)).join(' | ') || '(no SQL ran)';
+    const firstTable = statements.findIndex((sql) => /^CREATE TABLE\b/i.test(sql));
+    const createSchema = statements.findIndex((sql) => /^CREATE SCHEMA IF NOT EXISTS\s+"?eso"?(?:\s|$)/i.test(sql));
+    const setSearchPath = statements.findIndex(
+        (sql) => /^SET\s+(?:LOCAL\s+)?search_path\b/i.test(sql) && /\beso\b/i.test(sql),
+    );
+    const insertProject = statements.findIndex((sql) => /^INSERT INTO\s+(?:"?eso"?\.)?"?project"?/i.test(sql));
+
+    assert.ok(firstTable >= 0, `apply ran no CREATE TABLE at all; got: ${preview}`);
+    assert.ok(
+        createSchema >= 0,
+        `apply must create the configured schema (CREATE SCHEMA IF NOT EXISTS "eso") before any table; ` +
+            `without it the DDL lands in public while storage.graph.schema says eso (D-105 #4). got: ${preview}`,
+    );
+    assert.ok(
+        createSchema < firstTable,
+        `CREATE SCHEMA must run before the first CREATE TABLE (schema at #${createSchema}, table at #${firstTable}); got: ${preview}`,
+    );
+    assert.ok(
+        setSearchPath >= 0,
+        `apply must SET [LOCAL] search_path TO eso before creating tables (D-105 #4); got: ${preview}`,
+    );
+    assert.ok(
+        setSearchPath < firstTable,
+        `SET search_path must run before the first CREATE TABLE (search_path at #${setSearchPath}, table at #${firstTable}); got: ${preview}`,
+    );
+    assert.ok(insertProject >= 0, `apply must register the project with INSERT INTO project; got: ${preview}`);
+    assert.ok(
+        insertProject > setSearchPath,
+        `INSERT INTO project must run after SET search_path so the row is written into eso ` +
+            `(insert at #${insertProject}, search_path at #${setSearchPath}); got: ${preview}`,
+    );
+});
+
+// ---------------------------------------------------------------------------------------------
+// T7 (ESO-484 rework) — `verify-consumer.sh` must prove the graph *schema* exists, not merely that a
+// socket accepts. T5 only proves the "nothing is listening" case; a database that is up but has no
+// `eso` schema (the Stage 8 state) passed T5 and shipped green.
+//
+// The fixture is a PostgreSQL wire-protocol stand-in, not a real server: it completes the handshake,
+// answers a plain `SELECT 1` health probe, and rejects every statement that touches a table with the
+// error a real PostgreSQL returns for a missing schema. So the failure cannot be blamed on an
+// unreachable socket — the only honest verdict left is "schema missing/stale", named with the fix.
+// ---------------------------------------------------------------------------------------------
+test('verify-consumer.sh fails when the graph schema is missing or stale', async (t) => {
+    const state = tempDir(t, 'harness-graph-schema-state-');
+    const consumer = tempDir(t, 'harness-graph-schema-consumer-');
+    writeWorkspace(state, { id: 'alpha', root: consumer, port: 9425 });
+    const pg = await schemaMissingPostgres(t);
+
+    fs.writeFileSync(
+        path.join(consumer, 'harness.config.json'),
+        JSON.stringify({
+            version: 1,
+            project: { id: 'alpha', displayName: 'alpha' },
+            storage: {
+                driver: 'sqlite',
+                sqlite: { path: '.harness/harness.db' },
+                graph: {
+                    host: '127.0.0.1',
+                    port: pg.port,
+                    database: 'eso_alpha_unprovisioned',
+                    schema: 'eso',
+                    ssl: false,
+                    isolation: 'shared',
+                },
+            },
+            server: { host: '127.0.0.1', port: 9425 },
+        }),
+    );
+
+    const r = runScript('verify-consumer.sh', ['alpha'], {
+        HARNESS_PRODUCT_STATE_DIR: state,
+        PGCONNECT_TIMEOUT: '2',
+    });
+
+    assert.equal(
+        r.status,
+        1,
+        `a reachable database without the configured graph schema is an unprovisioned consumer ` +
+            `(exit ${r.status}):\n${r.out.slice(0, 800)}`,
+    );
+    // The schema verdict has to be about `storage.graph`, not a maturity check that happens to use
+    // the words "schema" or "eso": a reachable-but-empty database already reports both somewhere in
+    // the 27-line maturity report, and matching that would be the same "green because not looking"
+    // this test exists to stop.
+    assert.match(
+        r.out,
+        /(?:storage\.graph[\s\S]{0,160}?schema|schema[\s\S]{0,160}?storage\.graph)/i,
+        `the failure must tie the missing schema to storage.graph — the database answered, so ` +
+            `"could not reach database" is not the finding; got:\n${r.out.slice(0, 800)}`,
+    );
+    assert.match(
+        r.out,
+        /schema(?:\s+version)?/i,
+        `the failure must name the graph schema (or schema version) it could not find; ` +
+            `got:\n${r.out.slice(0, 800)}`,
+    );
+    assert.match(
+        r.out,
+        /schema[^\n]{0,40}\beso\b|"eso"[^\n]{0,40}schema/i,
+        `the failure must name the configured schema "eso" next to the missing-schema verdict; ` +
+            `got:\n${r.out.slice(0, 800)}`,
+    );
+    assert.match(
+        r.out,
+        /\.\/provision\.sh\s+alpha/,
+        `the failure must name the command that fixes it (./provision.sh alpha); got:\n${r.out.slice(0, 800)}`,
+    );
+    assert.doesNotMatch(
+        r.out,
+        /could not reach database/i,
+        `the database is reachable: reporting only "could not reach database" cannot see a missing ` +
+            `schema (the Stage 8 defect); got:\n${r.out.slice(0, 800)}`,
+    );
+});
+
+/**
+ * A PostgreSQL v3 wire-protocol stand-in for "server up, schema `eso` not created yet".
+ *
+ * It is deliberately small: startup handshake (incl. SSLRequest refusal), AuthenticationOk, a
+ * readable `server_version`, a successful `SELECT 1` health probe, and SQLSTATE `3F000`
+ * `schema "eso" does not exist` for every other statement. It models no rows and no tables, so it
+ * can prove verify *asks* about the schema; it cannot prove what a real PostgreSQL would answer.
+ */
+function schemaMissingPostgres(t) {
+    const message = 'schema "eso" does not exist';
+    const sockets = new Set();
+    const cstring = (value) => Buffer.concat([Buffer.from(String(value), 'utf8'), Buffer.from([0])]);
+
+    const server = net.createServer((socket) => {
+        sockets.add(socket);
+        socket.on('close', () => sockets.delete(socket));
+        socket.on('error', () => {});
+
+        let buffered = Buffer.alloc(0);
+        let started = false;
+        let failed = false;
+        let lastQuery = '';
+
+        const send = (type, payload = Buffer.alloc(0)) => {
+            const header = Buffer.alloc(5);
+            header.writeUInt8(type.charCodeAt(0), 0);
+            header.writeInt32BE(payload.length + 4, 1);
+            socket.write(Buffer.concat([header, payload]));
+        };
+        const readCString = (body, offset) => {
+            const end = body.indexOf(0, offset);
+            return { text: body.subarray(offset, end).toString('utf8'), next: end + 1 };
+        };
+        const errorResponse = () =>
+            send(
+                'E',
+                Buffer.concat([
+                    Buffer.from('S'),
+                    cstring('ERROR'),
+                    Buffer.from('V'),
+                    cstring('ERROR'),
+                    Buffer.from('C'),
+                    cstring('3F000'),
+                    Buffer.from('M'),
+                    cstring(message),
+                    Buffer.from([0]),
+                ]),
+            );
+        const readyForQuery = () => send('Z', Buffer.from([0x49]));
+        const isHealthProbe = () => /^\s*SELECT\s+1\s*;?\s*$/i.test(lastQuery);
+        const rowDescription = () =>
+            send(
+                'T',
+                Buffer.concat([
+                    Buffer.from([0, 1]),
+                    cstring('?column?'),
+                    // table oid, attnum, type oid (int4), size, modifier, format
+                    Buffer.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 0, 4, 255, 255, 255, 255, 0, 0]),
+                ]),
+            );
+        const healthRow = () => {
+            rowDescription();
+            send('D', Buffer.from([0, 1, 0, 0, 0, 1, 0x31]));
+            send('C', cstring('SELECT 1'));
+        };
+
+        const onData = (chunk) => {
+            buffered = Buffer.concat([buffered, chunk]);
+            for (;;) {
+                if (!started) {
+                    if (buffered.length < 8) return;
+                    const length = buffered.readInt32BE(0);
+                    if (length < 8 || buffered.length < length) return;
+                    const code = buffered.readInt32BE(4);
+                    buffered = buffered.subarray(length);
+                    if (code === 80877103) {
+                        socket.write('N'); // SSLRequest: no TLS, continue in the clear
+                        continue;
+                    }
+                    if (code === 80877102) {
+                        socket.destroy(); // CancelRequest
+                        return;
+                    }
+                    started = true;
+                    send('R', Buffer.alloc(4)); // AuthenticationOk
+                    send('S', Buffer.concat([cstring('server_version'), cstring('17.0')]));
+                    send('S', Buffer.concat([cstring('client_encoding'), cstring('UTF8')]));
+                    send('K', Buffer.alloc(8)); // BackendKeyData
+                    readyForQuery();
+                    continue;
+                }
+                if (buffered.length < 5) return;
+                const type = String.fromCharCode(buffered[0]);
+                const length = buffered.readInt32BE(1);
+                if (length < 4 || buffered.length < length + 1) return;
+                const body = buffered.subarray(5, length + 1);
+                buffered = buffered.subarray(length + 1);
+
+                if (type === 'X') {
+                    socket.destroy();
+                    return;
+                }
+                if (failed) {
+                    // PostgreSQL swallows everything until Sync after an error; mirror that so a
+                    // driver that pipelines Parse/Bind/Execute is not left waiting.
+                    if (type === 'S') {
+                        failed = false;
+                        readyForQuery();
+                    }
+                    continue;
+                }
+                if (type === 'Q') {
+                    lastQuery = readCString(body, 0).text;
+                    if (isHealthProbe()) healthRow();
+                    else errorResponse();
+                    readyForQuery();
+                    continue;
+                }
+                if (type === 'P') {
+                    const named = readCString(body, 0);
+                    lastQuery = readCString(body, named.next).text;
+                    if (isHealthProbe()) send('1'); // ParseComplete
+                    else {
+                        errorResponse();
+                        failed = true;
+                    }
+                    continue;
+                }
+                if (type === 'D') {
+                    if (String.fromCharCode(body[0]) === 'S') send('t', Buffer.from([0, 0]));
+                    rowDescription();
+                    continue;
+                }
+                if (type === 'B') {
+                    send('2'); // BindComplete
+                    continue;
+                }
+                if (type === 'E') {
+                    if (isHealthProbe()) {
+                        send('D', Buffer.from([0, 1, 0, 0, 0, 1, 0x31]));
+                        send('C', cstring('SELECT 1'));
+                    } else {
+                        errorResponse();
+                        failed = true;
+                    }
+                    continue;
+                }
+                if (type === 'S') readyForQuery(); // Sync
+            }
+        };
+
+        socket.on('data', onData);
+    });
+
+    return new Promise((resolve) => {
+        server.listen(0, '127.0.0.1', () => {
+            t.after(() => {
+                for (const socket of sockets) socket.destroy();
+                server.close();
+            });
+            resolve({ port: server.address().port });
+        });
+    });
+}
